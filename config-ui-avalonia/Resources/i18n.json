@@ -863,10 +863,6 @@
     "zh": "没有匹配到任何规则",
     "en": "No rule matched"
   },
-  "994": {
-    "zh": "命中的规则",
-    "en": "Matched rule"
-  },
   "996": {
     "zh": "执行预览",
     "en": "Execution preview"
@@ -891,21 +887,9 @@
     "zh": "常用分组快捷填入",
     "en": "File-group Quick Fill"
   },
-  "1007": {
-    "zh": "选择分组自动填入后缀列表,可直接修改;保存时修改将更新到该分组;选「无」清空条件值。",
-    "en": "Pick a group to fill suffixes; edits are saved back to the group on save; pick None to clear."
-  },
   "1008": {
     "zh": "无",
     "en": "None"
-  },
-  "1009": {
-    "zh": "文本特征",
-    "en": "Text Feature"
-  },
-  "1010": {
-    "zh": "行为将随特征联动: ",
-    "en": "Actions follow the feature: "
   },
   "1011": {
     "zh": "行为类型",
@@ -1015,10 +999,6 @@
     "zh": "管理行为…",
     "en": "Manage behaviors…"
   },
-  "1084": {
-    "zh": "行为库",
-    "en": "Behavior Library"
-  },
   "1085": {
     "zh": "新建行为",
     "en": "New Behavior"
@@ -1078,10 +1058,6 @@
   "1099": {
     "zh": "添加前提",
     "en": "Add Precondition"
-  },
-  "1100": {
-    "zh": "移除",
-    "en": "Remove"
   },
   "1101_applied": {
     "zh": "重启指令已发送; 若引擎未恢复, 请从托盘「重载」MyKeymap",
