@@ -15,6 +15,23 @@
   -->
 
   <UserControl.Styles>
+    <!-- 分段胶囊样式: 选中蓝底白字 / 未选白底灰字 (文本特征四选一) -->
+    <Style Selector="ToggleButton.type-toggle">
+      <Setter Property="Padding" Value="14,5"/>
+      <Setter Property="CornerRadius" Value="999"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="BorderBrush" Value="#DADCE0"/>
+      <Setter Property="Background" Value="White"/>
+      <Setter Property="Foreground" Value="#5F6368"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="MinHeight" Value="30"/>
+    </Style>
+    <Style Selector="ToggleButton.type-toggle:checked">
+      <Setter Property="Background" Value="#4169E1"/>
+      <Setter Property="BorderBrush" Value="#4169E1"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
     <!-- 映射行卡: 悬停提亮边框 / 测试命中高亮 (蓝底) -->
     <Style Selector="Border.row-card:pointerover">
       <Setter Property="BorderBrush" Value="#9DB8EC" />
@@ -68,6 +85,12 @@
         <Border Background="#E8F0FE" CornerRadius="8" Padding="12,9">
           <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#37474F"
                      Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=960}" />
+        </Border>
+
+        <!-- 页内提示条 (重复映射等非阻断反馈) -->
+        <Border IsVisible="{Binding StatusText, Converter={StaticResource NotEmpty}}"
+                Background="#FFF8E1" CornerRadius="8" Padding="12,8">
+          <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#B26A00" TextWrapping="Wrap" />
         </Border>
 
         <!-- 主快捷键 + 启用开关 -->
@@ -130,19 +153,19 @@
                       <StackPanel Grid.Column="1" Margin="10,0" Spacing="6" VerticalAlignment="Center">
                         <!-- textType: 文本特征四选一 Toggle (所见即所选, 替代 ComboBox) -->
                         <StackPanel IsVisible="{Binding IsTextType}" Orientation="Horizontal" Spacing="6">
-                          <ToggleButton MinWidth="72" Padding="10,4" CornerRadius="6"
+                          <ToggleButton Classes="type-toggle"
                                         IsChecked="{Binding IsUrl, Mode=TwoWay}"
                                         Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                                         Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1059}" />
-                          <ToggleButton MinWidth="72" Padding="10,4" CornerRadius="6"
+                          <ToggleButton Classes="type-toggle"
                                         IsChecked="{Binding IsPath, Mode=TwoWay}"
                                         Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                                         Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1060}" />
-                          <ToggleButton MinWidth="72" Padding="10,4" CornerRadius="6"
+                          <ToggleButton Classes="type-toggle"
                                         IsChecked="{Binding IsMagnet, Mode=TwoWay}"
                                         Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                                         Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1061}" />
-                          <ToggleButton MinWidth="72" Padding="10,4" CornerRadius="6"
+                          <ToggleButton Classes="type-toggle"
                                         IsChecked="{Binding IsPlain, Mode=TwoWay}"
                                         Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                                         Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1062}" />
@@ -162,6 +185,11 @@
                                   <TextBlock Text="{Binding Label}" />
                                 </DataTemplate>
                               </ComboBox.ItemTemplate>
+                              <ComboBox.SelectionBoxItemTemplate>
+                                <DataTemplate x:DataType="services:ComboOption">
+                                  <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                              </ComboBox.SelectionBoxItemTemplate>
                             </ComboBox>
                           </StackPanel>
                         </StackPanel>
@@ -220,6 +248,11 @@
                                           <TextBlock Text="{Binding Label}" />
                                         </DataTemplate>
                                       </ComboBox.ItemTemplate>
+                                      <ComboBox.SelectionBoxItemTemplate>
+                                        <DataTemplate x:DataType="services:ComboOption">
+                                          <TextBlock Text="{Binding Label}" />
+                                        </DataTemplate>
+                                      </ComboBox.SelectionBoxItemTemplate>
                                     </ComboBox>
                                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
                                     <Button Classes="icon-btn" Command="{Binding MoveUpCommand}"
@@ -303,6 +336,11 @@
                                   <TextBlock Text="{Binding Label}" />
                                 </DataTemplate>
                               </ComboBox.ItemTemplate>
+                              <ComboBox.SelectionBoxItemTemplate>
+                                <DataTemplate x:DataType="services:ComboOption">
+                                  <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                              </ComboBox.SelectionBoxItemTemplate>
                             </ComboBox>
                           </StackPanel>
                         </StackPanel>
@@ -359,6 +397,11 @@
                                           <TextBlock Text="{Binding Label}" />
                                         </DataTemplate>
                                       </ComboBox.ItemTemplate>
+                                      <ComboBox.SelectionBoxItemTemplate>
+                                        <DataTemplate x:DataType="services:ComboOption">
+                                          <TextBlock Text="{Binding Label}" />
+                                        </DataTemplate>
+                                      </ComboBox.SelectionBoxItemTemplate>
                                     </ComboBox>
                                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
                                     <Button Classes="icon-btn" Command="{Binding MoveUpCommand}"
@@ -497,6 +540,11 @@
                         <TextBlock Text="{Binding Label}" />
                       </DataTemplate>
                     </ComboBox.ItemTemplate>
+                    <ComboBox.SelectionBoxItemTemplate>
+                      <DataTemplate x:DataType="services:ComboOption">
+                        <TextBlock Text="{Binding Label}" />
+                      </DataTemplate>
+                    </ComboBox.SelectionBoxItemTemplate>
                   </ComboBox>
                 </StackPanel>
 
@@ -504,23 +552,8 @@
                 <StackPanel Spacing="4" IsVisible="{Binding IsFileExt}">
                   <TextBlock FontSize="12" Foreground="#8A8F98"
                              Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1005}" />
-                  <TextBox Text="{Binding MatchValue}"
-                           Watermark="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1034}" />
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <TextBlock FontSize="12" Foreground="#8A8F98" VerticalAlignment="Center"
-                               Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1006}" />
-                    <ComboBox MinWidth="160" ItemsSource="{Binding FileGroupOptions}"
-                              SelectedItem="{Binding FileGroupSelected}">
-                      <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="services:ComboOption">
-                          <TextBlock Text="{Binding Label}" />
-                        </DataTemplate>
-                      </ComboBox.ItemTemplate>
-                    </ComboBox>
-                    <Button Background="Transparent" BorderThickness="0" Padding="4" FontSize="12"
-                            Foreground="#4169E1" Content="?"
-                            ToolTip.Tip="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1007}" />
-                  </StackPanel>
+                  <TextBox Text="{Binding MatchValue}" IsReadOnly="True" Focusable="False"
+                           Background="#F8F9FA" />
                   <TextBlock FontSize="11" Foreground="#8A8F98" TextWrapping="Wrap" Text="{Binding MatchHint}" />
                 </StackPanel>
 

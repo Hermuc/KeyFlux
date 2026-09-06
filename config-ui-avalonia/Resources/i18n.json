@@ -1146,5 +1146,9 @@
   "1114": {
     "zh": "添加",
     "en": "Add"
+  },
+  "1115": {
+    "zh": "该匹配条件已存在, 无需重复添加",
+    "en": "This match condition already exists"
   }
 }

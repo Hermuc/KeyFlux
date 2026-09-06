@@ -198,15 +198,21 @@ public sealed class SelectedActionPageViewModelTests
         page.OpenAddPanelCommand.Execute(null);
         var panel = page.AddPanel!;
 
-        Assert.Equal(6, panel.BehaviorPicks.Count); // 默认 fileExt: 通配覆盖集
+        // 默认选中第一项 = 第一个文件后缀分组 (image): 通配覆盖集
+        Assert.Equal("group:image", panel.TypeOptions[0].Value);
+        Assert.Equal(6, panel.BehaviorPicks.Count);
+        Assert.True(panel.IsFileExt);
 
         panel.TypeSelected = panel.TypeOptions.First(o => o.Value == "url");
         Assert.Equal(["open_url", "search"], panel.BehaviorPicks.Select(p => p.Pack.Id));
         Assert.False(panel.IsFileExt);
 
-        panel.TypeSelected = panel.TypeOptions.First(o => o.Value == "fileExt");
-        Assert.Equal(6, panel.BehaviorPicks.Count);
+        // 切回分组项: IsFileExt 语义 = 分组项; 分组在前文本特征在后 (用户要求排序)
+        panel.TypeSelected = panel.TypeOptions[0];
         Assert.True(panel.IsFileExt);
+        Assert.Equal(6, panel.BehaviorPicks.Count);
+        Assert.Equal("group:image", panel.TypeOptions[0].Value);
+        Assert.Equal("url", panel.TypeOptions[1].Value);
     }
 
     /// <summary>键位序号 = 勾选列表位置序 (1 起; 与勾选先后无关), 取消勾选后后续顺延。</summary>
@@ -240,16 +246,12 @@ public sealed class SelectedActionPageViewModelTests
         page.OpenAddPanelCommand.Execute(null);
         var panel = page.AddPanel!;
 
-        Assert.False(panel.CanConfirm); // fileExt + 空值 + 无勾选
+        // 新语义: 默认选中第一个分组 (图片), 条件值已自动填充 = 该组后缀集; 只需勾行为
+        Assert.False(string.IsNullOrEmpty(panel.MatchValue)); // 分组项自带后缀集
+        Assert.False(panel.CanConfirm); // 有值但未勾行为
 
         panel.BehaviorPicks[0].IsChecked = true;
-        Assert.False(panel.CanConfirm); // 仍缺条件值
-
-        panel.MatchValue = "jpg";
         Assert.True(panel.CanConfirm);
-
-        panel.MatchValue = "   ";
-        Assert.False(panel.CanConfirm); // 仅空白同样拒绝
     }
 
     /// <summary>分组快捷填入: 选分组填后缀串 (值变化驱动 CanConfirm 刷新)。</summary>

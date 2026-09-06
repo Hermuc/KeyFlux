@@ -654,15 +654,22 @@ public sealed partial class AddMappingVm : ObservableObject
     public AddMappingVm(SelectedActionPageViewModel page)
     {
         _page = page;
-        _typeOptions =
-        [
-            new("fileExt", I18n.T("1031")),
-            new("url", I18n.T("1059")),
-            new("path", I18n.T("1060")),
-            new("magnet", I18n.T("1061")),
-            new("plain", I18n.T("1062")),
-        ];
-        _typeSelected = _typeOptions[0];
+        // 匹配类型下拉: 具体文件后缀分组在前 (每个分组 = 一级类型), 文本特征四项在后;
+        // 分组项 value 编码为 "group:<name>", 选中即定 MatchValue = 该组后缀集 (无需再填条件值)
+        _typeOptions = [];
+        foreach (var g in page.FileGroups)
+        {
+            _typeOptions.Add(new("group:" + g.Name, g.Label));
+        }
+        _typeOptions.Add(new("url", I18n.T("1059")));
+        _typeOptions.Add(new("path", I18n.T("1060")));
+        _typeOptions.Add(new("magnet", I18n.T("1061")));
+        _typeOptions.Add(new("plain", I18n.T("1062")));
+        _typeSelected = _typeOptions.FirstOrDefault();
+        if (_typeSelected is not null && IsFileExt)
+        {
+            MatchValue = GroupMatchValue ?? ""; // 初始即分组项: 同步后缀集到条件值 (构造期回调不触发)
+        }
         RebuildPicks();
     }
 
@@ -681,13 +688,26 @@ public sealed partial class AddMappingVm : ObservableObject
     partial void OnTypeSelectedChanged(ComboOption? value)
     {
         if (value is null) return;
+        if (IsFileExt)
+        {
+            MatchValue = GroupMatchValue ?? ""; // 分组项: 条件值 = 该组后缀集
+        }
         OnPropertyChanged(nameof(IsFileExt));
         OnPropertyChanged(nameof(MatchHint));
         RebuildPicks(); // 无条件重建: 各类型覆盖集不同 (fileExt 按条件值 / 文本特征按特征词)
     }
 
-    /// <summary>当前类型是否文件后缀 (决定条件值输入框可见性)。</summary>
-    public bool IsFileExt => TypeSelected?.Value == "fileExt";
+    /// <summary>当前类型是否文件后缀分组项 (分组自带后缀集, 条件值输入框不出现)。</summary>
+    public bool IsFileExt => TypeSelected?.Value?.StartsWith("group:") == true;
+
+    /// <summary>分组项对应的后缀集 (matchValue), 非分组项为 null。</summary>
+    public string? GroupMatchValue
+        => IsFileExt
+            ? _page.FileGroups.FirstOrDefault(g => "group:" + g.Name == TypeSelected?.Value)?.Exts
+                is { Count: > 0 } exts
+                ? string.Join(",", exts)
+                : null
+            : null;
 
     /// <summary>匹配提示 (fileExt=1034 / textType=1035)。</summary>
     public string MatchHint => ActionSchemeCatalog.MatchTypeHint(IsFileExt ? "fileExt" : "textType");
@@ -733,7 +753,7 @@ public sealed partial class AddMappingVm : ObservableObject
     private void RebuildPicks()
     {
         var matchType = IsFileExt ? "fileExt" : "textType";
-        var matchValue = IsFileExt ? MatchValue : TypeSelected?.Value ?? "";
+        var matchValue = IsFileExt ? (GroupMatchValue ?? MatchValue) : TypeSelected?.Value ?? "";
         var covering = BehaviorCatalog.Covering(matchType, matchValue);
         var checkedIds = BehaviorPicks.Where(p => p.IsChecked).Select(p => p.Pack.Id).ToHashSet();
         BehaviorPicks.Clear();
@@ -815,6 +835,10 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
 
     public MainViewModel Main => _main;
     public Config Config => _main.Config ?? throw new InvalidOperationException("Config 未加载");
+
+    /// <summary>页内提示条 (重复映射等非阻断反馈; 空串隐藏)。</summary>
+    [ObservableProperty]
+    private string _statusText = "";
     private ISettingsApi? Api => _main.Session.Api;
 
     /// <summary>语言切换递增, 驱动页内 ConverterParameter 文案重算。</summary>
@@ -1004,8 +1028,9 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     /// <summary>弹窗确认: 构造 SelectedMapping 插入对应分区尾部 (组内行序 = 优先级, 新行排最后)。</summary>
     public void AddMapping(AddMappingVm panel)
     {
-        var typeValue = panel.TypeSelected?.Value ?? "fileExt";
-        var isFileExt = typeValue == "fileExt";
+        var typeValue = panel.TypeSelected?.Value ?? "";
+        var isGroup = typeValue.StartsWith("group:");
+        var isFileExt = isGroup; // 分组项即 fileExt 类 mapping (matchValue = 组后缀集)
         var mapping = new SelectedMapping
         {
             MatchType = isFileExt ? "fileExt" : "textType",
@@ -1024,6 +1049,15 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
                 .ToList(),
         };
         if (mapping.Entries.Count == 0) return;
+
+        // 同 (matchType, matchValue) 分组去重: 该分组已配置时不重复添加 (后端校验同款规则)
+        if ((isGroup ? FileMappings : TextMappings).Any(r =>
+                r.Mapping.MatchType == mapping.MatchType && r.Mapping.MatchValue == mapping.MatchValue))
+        {
+            AddPanel = null;
+            StatusText = I18n.T("1115"); // 该匹配条件已存在
+            return;
+        }
 
         AddPanel = null;
         var row = new MappingRowVm(this, mapping);

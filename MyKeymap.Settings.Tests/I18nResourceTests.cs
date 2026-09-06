@@ -25,7 +25,7 @@ public sealed class I18nResourceTests
     /// 2026-09 方案 D 重构: 删 52 键 (多方案列表/方案名/导入导出/两级导航 959-1028 段 +
     /// 旧静态行为词表 1037-1058), 增 10 键 (1105-1114 选中动作单屏页) -> 286;
     /// 2026-09 复核恢复 1025 (热键冲突提示, 保留控件 HotkeyCapture 仍引用, 重构误删) -> 287。</summary>
-    private const int ExpectedKeyCount = 287;
+    private const int ExpectedKeyCount = 288;
 
     private const string LabelPrefix = "label:";
 
