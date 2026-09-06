@@ -244,7 +244,7 @@ public static class HotkeyLogic
 public sealed class HotkeyCaptureCore
 {
     private readonly List<string> _pendingPrefixes = []; // 暂存的修饰键侧别前缀 (按下顺序)
-    private readonly List<string> _stagedKeys = [];      // 暂存的非修饰键 (0-2)
+    private readonly List<string> _stagedKeys = [];      // 暂存的非修饰键 (无上限; N≥2 提交为链式组合)
     private int _caret;                                  // 插入光标 (stagedKeys 下标, 0..Count)
 
     /// <summary>是否处于捕获态。</summary>
@@ -359,8 +359,8 @@ public sealed class HotkeyCaptureCore
     private void CommitStaged()
     {
         string ahk;
-        if (_stagedKeys.Count == 2)
-            ahk = string.Join(" & ", _stagedKeys); // k1 & k2 (自定义组合不混修饰键)
+        if (_stagedKeys.Count >= 2)
+            ahk = string.Join(" & ", _stagedKeys); // k1 & k2 & ... & kN (N 键链; 链式组合不混修饰键)
         else if (_stagedKeys.Count == 1)
             ahk = HotkeyLogic.BuildAhk(_pendingPrefixes, _stagedKeys[0]); // 保留侧别前缀 (区分左右)
         else if (_pendingPrefixes.Count == 1)

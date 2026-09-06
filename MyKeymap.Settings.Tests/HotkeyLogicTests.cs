@@ -236,6 +236,56 @@ public sealed class HotkeyLogicTests
         Assert.Equal("j & k", committed);
     }
 
+    [Fact]
+    public void Capture_NKeyChain_Via_Enter_CommitsFullSequence()
+    {
+        // b11aef6 回归: 暂存无上限, ≥3 键 Enter 须提交完整链 (此前落 else 分支被 Cancel 吞掉,
+        // 表现为「编辑时能一直按、Enter 后回显旧热键、保存无效」)
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.J, anyModifierHeld: false);
+        core.HandleKeyDown(Key.K, anyModifierHeld: false);
+        core.HandleKeyDown(Key.L, anyModifierHeld: false);
+        Assert.Equal(3, core.StagedKeys.Count);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("j & k & l", committed);
+        Assert.False(core.Capturing);
+        Assert.Empty(core.StagedKeys); // 提交后暂存清空
+    }
+
+    [Fact]
+    public void Capture_FourKeyChain_Via_Enter_CommitsFullSequence()
+    {
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.S, anyModifierHeld: false);
+        core.HandleKeyDown(Key.D, anyModifierHeld: false);
+        core.HandleKeyDown(Key.J, anyModifierHeld: false);
+        core.HandleKeyDown(Key.K, anyModifierHeld: false);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("s & d & j & k", committed);
+    }
+
+    [Fact]
+    public void Capture_ChainWithStagedModifier_DropsPrefixes_KeepsChain()
+    {
+        // 链式组合不混修饰键: ≥2 非修饰键时, 误按的修饰前缀被丢弃 (与 2 键组合行为一致)
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.LeftCtrl, anyModifierHeld: true);
+        core.HandleKeyDown(Key.J, anyModifierHeld: true);
+        core.HandleKeyDown(Key.K, anyModifierHeld: true);
+        core.HandleKeyDown(Key.L, anyModifierHeld: true);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("j & k & l", committed);
+    }
+
 
     [Fact]
     public void Capture_SingleKey_Via_Enter()
