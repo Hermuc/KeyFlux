@@ -14,12 +14,24 @@
     兼容存量数据往返, 前向兼容恢复。
   -->
 
+
   <UserControl.Resources>
     <services:BoolToSeparatorHeightConverter x:Key="BoolToSeparatorHeight" />
-    <services:SeparatorItemBackgroundConverter x:Key="SeparatorItemBackground" />
+    <services:PopupBackgroundConverter x:Key="PopupBg" />
   </UserControl.Resources>
 
   <UserControl.Styles>
+    <!-- 分隔项容器压制: 无 hover/选中高亮、透明背景 (与弹层一致)、不可点击、紧凑 -->
+    <Style Selector="ComboBoxItem.sep-item">
+      <Setter Property="IsHitTestVisible" Value="False" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ComboBoxItem.sep-item:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
     <!-- 分段胶囊样式: 选中蓝底白字 / 未选白底灰字 (文本特征四选一) -->
     <Style Selector="ToggleButton.type-toggle">
       <Setter Property="Padding" Value="14,5"/>
@@ -539,15 +551,16 @@
                   <TextBlock FontSize="12" Foreground="#8A8F98"
                              Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1004}" />
                   <ComboBox MinWidth="220" ItemsSource="{Binding TypeOptions}"
-                            SelectedItem="{Binding TypeSelected}">
+                            SelectedItem="{Binding TypeSelected}"
+                            DropDownOpened="OnTypeDropdownOpened">
                     <ComboBox.ItemTemplate>
                       <DataTemplate x:DataType="services:ComboOption">
-                        <Grid Height="{Binding IsSeparator, Converter={StaticResource BoolToSeparatorHeight}}"
-                              IsHitTestVisible="{Binding !IsSeparator}"
-                              Background="{Binding IsSeparator, Converter={StaticResource SeparatorItemBackground}}">
-                          <TextBlock Text="{Binding Label}" IsVisible="{Binding !IsSeparator}" Margin="2,0" />
+                        <Grid MinHeight="{Binding IsSeparator, Converter={StaticResource BoolToSeparatorHeight}}"
+                              Background="{Binding IsSeparator, Converter={StaticResource PopupBg}}">
+                          <TextBlock Text="{Binding Label}" IsVisible="{Binding !IsSeparator}"
+                                     Margin="10,0" VerticalAlignment="Center" />
                           <Rectangle IsVisible="{Binding IsSeparator}" Height="1" Fill="#1F000000"
-                                     Margin="10,0" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                                     Margin="10,0" VerticalAlignment="Center" />
                         </Grid>
                       </DataTemplate>
                     </ComboBox.ItemTemplate>

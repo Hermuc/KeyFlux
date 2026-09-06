@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MyKeymap.Settings.ViewModels;
 
@@ -70,6 +71,25 @@ public partial class SelectedActionPageView : UserControl
         {
             row.ToggleExpandCommand.Execute(null);
         }
+    }
+
+    /// <summary>
+    /// 类型下拉打开后, 给分隔项的 ComboBoxItem 容器打 sep-item 类:
+    /// 样式表据此压制 hover/选中高亮、内边距并禁用命中 —— 分隔线视觉上只是一条线。
+    /// (容器在弹层打开时才生成, 故必须在 DropDownOpened 后经 Dispatcher 处理。)
+    /// </summary>
+    private void OnTypeDropdownOpened(object? sender, EventArgs e)
+    {
+        if (sender is not ComboBox box) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            foreach (var item in box.GetVisualDescendants().OfType<ComboBoxItem>())
+            {
+                var isSep = item.DataContext is Services.ComboOption { IsSeparator: true };
+                if (isSep && !item.Classes.Contains("sep-item")) item.Classes.Add("sep-item");
+                if (!isSep) item.Classes.Remove("sep-item");
+            }
+        }, DispatcherPriority.Loaded);
     }
 
     /// <summary>

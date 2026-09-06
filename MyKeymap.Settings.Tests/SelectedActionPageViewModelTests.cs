@@ -199,21 +199,21 @@ public sealed class SelectedActionPageViewModelTests
         var panel = page.AddPanel!;
 
         // 默认选中第一项 = 第一个文件后缀分组 (image): 通配覆盖集
-        Assert.Equal("group:image", panel.TypeOptions[0].Value);
+        Assert.Equal("group:image", Assert.IsType<ComboOption>(panel.TypeOptions[0]).Value);
         Assert.Equal(6, panel.BehaviorPicks.Count);
         Assert.True(panel.IsFileExt);
 
-        panel.TypeSelected = panel.TypeOptions.First(o => o.Value == "url");
+        panel.TypeSelected = panel.TypeOptions.OfType<ComboOption>().First(o => o.Value == "url");
         Assert.Equal(["open_url", "search"], panel.BehaviorPicks.Select(p => p.Pack.Id));
         Assert.False(panel.IsFileExt);
 
-        // 切回分组项: IsFileExt 语义 = 分组项; 分组在前、分隔线、文本特征在后 (用户要求排序)
+        // 切回分组项: 分组在前、真 Separator 控件、文本特征在后 (用户要求排序)
         panel.TypeSelected = panel.TypeOptions[0];
         Assert.True(panel.IsFileExt);
         Assert.Equal(6, panel.BehaviorPicks.Count);
         Assert.Equal("group:image", panel.TypeOptions[0].Value);
-        Assert.True(panel.TypeOptions[1].IsSeparator); // 分组分隔线 (动态跟随分组数量)
-        Assert.Equal("url", panel.TypeOptions[2].Value); // 分隔线后第一个文本特征
+        Assert.True(panel.TypeOptions[1].IsSeparator); // 动态分隔项 (跟随分组数量)
+        Assert.Equal("url", panel.TypeOptions[2].Value);
     }
 
     /// <summary>键位序号 = 勾选列表位置序 (1 起; 与勾选先后无关), 取消勾选后后续顺延。</summary>
@@ -301,7 +301,7 @@ public sealed class SelectedActionPageViewModelTests
         var (page, _) = CreatePage();
         page.OpenAddPanelCommand.Execute(null);
         var panel = page.AddPanel!;
-        panel.TypeSelected = panel.TypeOptions.First(o => o.Value == "magnet");
+        panel.TypeSelected = panel.TypeOptions.OfType<ComboOption>().First(o => o.Value == "magnet");
         panel.BehaviorPicks.First(p => p.Pack.Id == "magnet_download").IsChecked = true;
 
         page.AddMapping(panel);

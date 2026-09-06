@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
+using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MyKeymap.Settings.Models;
@@ -659,9 +660,10 @@ public sealed partial class AddMappingVm : ObservableObject
         _typeOptions = [];
         foreach (var g in page.FileGroups)
         {
-            _typeOptions.Add(new("group:" + g.Name, g.Label));
+            _typeOptions.Add(new ComboOption("group:" + g.Name, g.Label));
         }
-        // 分组与文本特征之间的动态分隔线: 分组增删后线始终跟随最后一组 (用户要求)
+        // 分组与文本特征之间的动态分隔项: 分组增删后线始终跟随最后一组 (用户要求);
+        // 容器压制 (无 hover/不可点/透明背景) 在 View 层 DropDownOpened 后处理
         _typeOptions.Add(new("", "", IsSeparator: true));
         _typeOptions.Add(new("url", I18n.T("1059")));
         _typeOptions.Add(new("path", I18n.T("1060")));
@@ -682,6 +684,7 @@ public sealed partial class AddMappingVm : ObservableObject
 
     private readonly List<ComboOption> _typeOptions;
 
+    /// <summary>类型下拉项: 分组在前、IsSeparator 分隔项居中、文本特征在后 (分隔线随分组增删动态移动)。</summary>
     public List<ComboOption> TypeOptions => _typeOptions;
 
     [ObservableProperty]
@@ -692,10 +695,14 @@ public sealed partial class AddMappingVm : ObservableObject
         if (value is null) return;
         if (value.IsSeparator)
         {
-            // 键盘导航落在分隔行: 自动跳过分隔项到下一个真实类型 (下拉视觉不可选)
-            var skip = value;
-            var next = _typeOptions.SkipWhile(o => o != skip).Skip(1).FirstOrDefault(o => !o.IsSeparator)
-                       ?? _typeOptions.LastOrDefault(o => !o.IsSeparator);
+            // 键盘导航落在分隔行: 自动跳到下一个真实类型 (循环回绕); 点击由容器 IsHitTestVisible=false 拦截
+            var idx = _typeOptions.IndexOf(value);
+            ComboOption? next = null;
+            for (var k = idx + 1; k < _typeOptions.Count; k++)
+                if (!_typeOptions[k].IsSeparator) { next = _typeOptions[k]; break; }
+            if (next is null)
+                for (var k = idx - 1; k >= 0; k--)
+                    if (!_typeOptions[k].IsSeparator) { next = _typeOptions[k]; break; }
             TypeSelected = next;
             return;
         }
