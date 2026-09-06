@@ -41,18 +41,18 @@ public sealed class HotkeyLogicTests
         Assert.Null(HotkeyLogic.ModifierFor(Key.Space));
     }
 
-    /// <summary>8 个左右修饰前缀 × 主键抽样 (字母/功能键): 捕获提交统一侧别归一化,
-    /// 左右修饰键通配两侧 (复刻诉求: 录制 "RCtrl+P" 后左 Ctrl+P 也能触发)。</summary>
+    /// <summary>8 个左右修饰前缀 × 主键抽样: 2026-09 起捕获区分左右 ——
+    /// 提交保留侧别前缀 (&lt;^a 只响应左 Ctrl+A), 显示 LCtrl/RCtrl。</summary>
     [Theory]
-    [InlineData(Key.LeftCtrl, Key.A, "^a")]
-    [InlineData(Key.RightCtrl, Key.A, "^a")]
-    [InlineData(Key.LeftAlt, Key.F5, "!F5")]
-    [InlineData(Key.RightAlt, Key.F5, "!F5")]
-    [InlineData(Key.LeftShift, Key.D7, "+7")]
-    [InlineData(Key.RightShift, Key.D7, "+7")]
-    [InlineData(Key.LWin, Key.Q, "#q")]
-    [InlineData(Key.RWin, Key.Q, "#q")]
-    public void Capture_LeftRightModifiers_AreNormalizedToSideAgnosticHotkeys(Key modifier, Key main, string expected)
+    [InlineData(Key.LeftCtrl, Key.A, "<^a")]
+    [InlineData(Key.RightCtrl, Key.A, ">^a")]
+    [InlineData(Key.LeftAlt, Key.F5, "<!F5")]
+    [InlineData(Key.RightAlt, Key.F5, ">!F5")]
+    [InlineData(Key.LeftShift, Key.D7, "<+7")]
+    [InlineData(Key.RightShift, Key.D7, ">+7")]
+    [InlineData(Key.LWin, Key.Q, "<#q")]
+    [InlineData(Key.RWin, Key.Q, ">#q")]
+    public void Capture_LeftRightModifiers_ArePreservedAsSideSpecific(Key modifier, Key main, string expected)
     {
         var core = new HotkeyCaptureCore();
         string? committed = null;
@@ -60,6 +60,9 @@ public sealed class HotkeyLogicTests
         core.StartCapture();
         core.HandleKeyDown(modifier, anyModifierHeld: true);
         core.HandleKeyDown(main, anyModifierHeld: true);
+        Assert.Null(committed);      // 只暂存, 不自动提交 (硬性要求 Enter/Esc 退出)
+        Assert.True(core.Capturing);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
         Assert.Equal(expected, committed);
         Assert.False(core.Capturing);
     }
@@ -90,7 +93,9 @@ public sealed class HotkeyLogicTests
         core.HandleKeyDown(Key.RightShift, anyModifierHeld: true); // 先按右 Shift
         core.HandleKeyDown(Key.LeftCtrl, anyModifierHeld: true);  // 后按左 Ctrl
         core.HandleKeyDown(Key.K, anyModifierHeld: true);
-        Assert.Equal("^+k", committed); // 输出通配两侧 (^+k), 归一化保留 MOD_ORDER 归并后的顺序
+        Assert.Null(committed); // 只暂存
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("<^>+k", committed); // 区分左右: 保留侧别前缀, MOD_ORDER 归并顺序 (<^ 在 >+ 前)
     }
 
     // ------------------------------------------------------------- 侧别归一化 (NormalizeSidePrefixes)
@@ -150,17 +155,19 @@ public sealed class HotkeyLogicTests
     }
 
     [Fact]
-    public void Capture_EscWithModifierHeld_DoesNotCancel_CommitsInstead()
+    public void Capture_EscWithModifierHeld_Stages_Then_Enter_Commits()
     {
-        // 复刻: Esc 仅在无任何修饰键时取消; Ctrl+Esc 是合法热键 ^esc
         var core = new HotkeyCaptureCore();
         string? committed = null;
         core.HotkeyCommitted += ahk => committed = ahk;
         core.StartCapture();
         core.HandleKeyDown(Key.LeftCtrl, anyModifierHeld: true);
-        core.HandleKeyDown(Key.Escape, anyModifierHeld: true);
-        Assert.Equal("^esc", committed);
+        core.HandleKeyDown(Key.Escape, anyModifierHeld: true); // 修饰键按住: Esc 是普通键
+        Assert.True(core.Capturing);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("<^esc", committed);
     }
+
 
     [Fact]
     public void Cancel_OnFocusLoss_ClearsPending()
@@ -180,58 +187,58 @@ public sealed class HotkeyLogicTests
     }
 
     [Fact]
-    public void Capture_SingleModifier_Committed_On_Release()
+    public void Capture_SingleModifier_Committed_Via_Enter()
     {
-        // 2026-09: 单按 Ctrl (捕获期间唯一按键) 松开即提交中性键名
+        // 2026-09: 单按 Ctrl 只暂存; Enter 确认提交物理侧键名 (区分左右)
         var core = new HotkeyCaptureCore();
         string? committed = null;
         core.HotkeyCommitted += ahk => committed = ahk;
         core.StartCapture();
         core.HandleKeyDown(Key.LeftCtrl, anyModifierHeld: true);
-        core.HandleKeyUp(Key.LeftCtrl);
-        Assert.Equal("Ctrl", committed);
+        Assert.True(core.Capturing);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("LCtrl", committed);
         Assert.False(core.Capturing);
     }
 
+
     [Fact]
-    public void Capture_TwoModifiers_Released_Does_Not_Commit_Single()
+    public void Capture_TwoModifiers_NoMain_Enter_Exits_Without_Commit()
     {
-        // Ctrl+Shift+X 意图保护: 按过两个修饰键再全部松开, 不误提交单修饰键
+        // 多修饰键无主键不可表示: Enter 退出且不提交
         var core = new HotkeyCaptureCore();
         string? committed = null;
         core.HotkeyCommitted += ahk => committed = ahk;
         core.StartCapture();
         core.HandleKeyDown(Key.LeftCtrl, anyModifierHeld: true);
         core.HandleKeyDown(Key.LeftShift, anyModifierHeld: true);
-        core.HandleKeyUp(Key.LeftCtrl);
-        Assert.Null(committed);
-        core.HandleKeyUp(Key.LeftShift);
-        Assert.Null(committed);
-        Assert.True(core.Capturing); // 仍在捕获, 可继续按 X
-        core.HandleKeyDown(Key.X, anyModifierHeld: false);
         core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
-        Assert.Equal("x", committed); // Enter 确认单键
+        Assert.Null(committed);
+        Assert.False(core.Capturing);
     }
 
+
     [Fact]
-    public void Capture_Staged_SecondKey_Commits_CustomCombo()
+    public void Capture_TwoKeys_Combo_Via_Enter()
     {
-        // J+K: 首键暂存, 第二键提交 AHK 自定义组合
+        // J+K: 首键暂存, 第二键集齐 (不自动提交), Enter 确认 AHK 自定义组合
         var core = new HotkeyCaptureCore();
         string? committed = null;
         core.HotkeyCommitted += ahk => committed = ahk;
         core.StartCapture();
         core.HandleKeyDown(Key.J, anyModifierHeld: false);
-        Assert.Null(committed); // 首键等待
-        Assert.Single(core.StagedKeys);
-        core.HandleKeyUp(Key.J); // 松开不丢暂存
+        Assert.Null(committed);
         Assert.Single(core.StagedKeys);
         core.HandleKeyDown(Key.K, anyModifierHeld: false);
+        Assert.Null(committed);            // 集齐也不自动提交
+        Assert.Equal(2, core.StagedKeys.Count);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
         Assert.Equal("j & k", committed);
     }
 
+
     [Fact]
-    public void Capture_Staged_Enter_Commits_Single_Key()
+    public void Capture_SingleKey_Via_Enter()
     {
         var core = new HotkeyCaptureCore();
         string? committed = null;
@@ -240,6 +247,72 @@ public sealed class HotkeyLogicTests
         core.HandleKeyDown(Key.J, anyModifierHeld: false);
         core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
         Assert.Equal("j", committed);
+    }
+
+
+    [Fact]
+    public void Capture_Backspace_Deletes_Last_Staged_Key()
+    {
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.J, anyModifierHeld: false);
+        core.HandleKeyDown(Key.K, anyModifierHeld: false);
+        Assert.Equal(2, core.StagedKeys.Count);
+        core.HandleKeyDown(Key.Back, anyModifierHeld: false); // 删除刚输入的 K
+        Assert.Single(core.StagedKeys);
+        Assert.Equal("j", core.StagedKeys[0]);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("j", committed);
+    }
+
+    [Fact]
+    public void Capture_Backspace_With_Caret_Moved_Deletes_Before_Caret()
+    {
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.J, anyModifierHeld: false);
+        core.HandleKeyDown(Key.K, anyModifierHeld: false); // staged [j,k], caret=2
+        core.HandleKeyDown(Key.Left, anyModifierHeld: false);  // caret=1
+        core.HandleKeyDown(Key.Back, anyModifierHeld: false);  // 删除光标前的 j
+        Assert.Equal(["k"], core.StagedKeys);
+        Assert.Equal(0, core.Caret);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("k", committed);
+    }
+
+    [Fact]
+    public void Capture_Arrows_Move_Caret_And_Never_Staged()
+    {
+        var core = new HotkeyCaptureCore();
+        core.StartCapture();
+        core.HandleKeyDown(Key.J, anyModifierHeld: false);
+        core.HandleKeyDown(Key.K, anyModifierHeld: false);
+        Assert.Equal(2, core.Caret);
+        core.HandleKeyDown(Key.Left, anyModifierHeld: false);
+        Assert.Equal(1, core.Caret);
+        core.HandleKeyDown(Key.Right, anyModifierHeld: false);
+        Assert.Equal(2, core.Caret);
+        core.HandleKeyDown(Key.Up, anyModifierHeld: false);
+        core.HandleKeyDown(Key.Down, anyModifierHeld: false);
+        Assert.Equal(2, core.Caret);
+        // 方向键/Backspace 永不出现在暂存键里
+        Assert.Equal(["j", "k"], core.StagedKeys);
+    }
+
+    [Fact]
+    public void Capture_SidePrefix_SingleModifier_Commits_Physical_Side()
+    {
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.RightCtrl, anyModifierHeld: true);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("RCtrl", committed); // 区分左右: 右 Ctrl 提交 RCtrl
     }
 
     [Fact]
@@ -260,19 +333,23 @@ public sealed class HotkeyLogicTests
         Assert.Null(committed);
     }
 
+
     [Fact]
-    public void Capture_FastPath_ModifierPlusKey_Unchanged()
+    public void Capture_ModifierPlusKey_No_Auto_Commit()
     {
+        // 2026-09 定稿: 无快路径 —— 修饰键+主键同样只暂存, Enter 才提交
         var core = new HotkeyCaptureCore();
         string? committed = null;
         core.HotkeyCommitted += ahk => committed = ahk;
         core.StartCapture();
         core.HandleKeyDown(Key.LeftCtrl, anyModifierHeld: true);
         core.HandleKeyDown(Key.P, anyModifierHeld: true);
-        Assert.Equal("^p", committed); // 快路径不变
-        core.HandleKeyUp(Key.LeftCtrl); // 提交后松开修饰键无副作用
-        Assert.Equal("^p", committed);
+        Assert.Null(committed);
+        Assert.True(core.Capturing);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("<^p", committed);
     }
+
 
     [Fact]
     public void Capture_UnsupportedKey_KeepsWaiting()

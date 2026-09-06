@@ -122,13 +122,13 @@ public partial class HotkeyCapture : UserControl
         _core.HandleKeyDown(e.Key, e.KeyModifiers != KeyModifiers.None);
     }
 
-    /// <summary>修饰键松开撤销暂存 (复刻 onKeyup)。</summary>
+    /// <summary>捕获态吞掉 KeyUp (暂存只在 Enter/Esc 变化, 松开不改变状态)。</summary>
     protected override void OnKeyUp(KeyEventArgs e)
     {
         if (_core.Capturing)
         {
             e.Handled = true;
-            _core.HandleKeyUp(e.Key);
+            return;
         }
         base.OnKeyUp(e);
     }
