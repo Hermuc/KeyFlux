@@ -16,6 +16,7 @@
 
   <UserControl.Resources>
     <services:BoolToSeparatorHeightConverter x:Key="BoolToSeparatorHeight" />
+    <services:SeparatorItemBackgroundConverter x:Key="SeparatorItemBackground" />
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -541,10 +542,12 @@
                             SelectedItem="{Binding TypeSelected}">
                     <ComboBox.ItemTemplate>
                       <DataTemplate x:DataType="services:ComboOption">
-                        <Grid MinHeight="{Binding IsSeparator, Converter={StaticResource BoolToSeparatorHeight}}">
+                        <Grid Height="{Binding IsSeparator, Converter={StaticResource BoolToSeparatorHeight}}"
+                              IsHitTestVisible="{Binding !IsSeparator}"
+                              Background="{Binding IsSeparator, Converter={StaticResource SeparatorItemBackground}}">
                           <TextBlock Text="{Binding Label}" IsVisible="{Binding !IsSeparator}" Margin="2,0" />
-                          <Rectangle IsVisible="{Binding IsSeparator}" Height="1" Fill="#12000000"
-                                     Margin="4,7" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                          <Rectangle IsVisible="{Binding IsSeparator}" Height="1" Fill="#1F000000"
+                                     Margin="10,0" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
                         </Grid>
                       </DataTemplate>
                     </ComboBox.ItemTemplate>
