@@ -33,6 +33,22 @@ public sealed class SelectedActionPageViewModelTests
         return (new SelectedActionPageViewModel(main), main.Config!);
     }
 
+    /// <summary>bug2 回归: 迁移来的 >^p 应在 VM.Hotkey 中, 且 AhkToDisplay 能渲染 (RCtrl+P)。</summary>
+    [Fact]
+    public void Hotkey_FromMigratedConfig_IsExposedAndDisplayable()
+    {
+        var config = BuildConfig();
+        config.SelectedAction = new SelectedAction
+        {
+            Hotkey = ">^p",
+            Enable = false,
+            Mappings = [],
+        };
+        var (page, _) = CreatePage(config);
+        Assert.Equal(">^p", page.Hotkey);
+        Assert.Equal("RCtrl+P", HotkeyLogic.AhkToDisplay(page.Hotkey));
+    }
+
     /// <summary>构造 fileExt 行 (entries 逐个给 behavior) 并展开。</summary>
     private static MappingRowVm NewFileRow(SelectedActionPageViewModel page, params string[] behaviors)
     {

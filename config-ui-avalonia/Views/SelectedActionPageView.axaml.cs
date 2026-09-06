@@ -62,13 +62,25 @@ public partial class SelectedActionPageView : UserControl
     private void OnRowHeaderTapped(object? sender, TappedEventArgs e)
     {
         if (e.Source is Visual source
-            && source.GetSelfAndVisualAncestors().Any(a => a is Button or ToggleSwitch or ComboBox or TextBox or CheckBox))
+            && source.GetSelfAndVisualAncestors().Any(a => a is Button or ToggleSwitch or ComboBox or TextBox or CheckBox or ToggleButton))
         {
             return;
         }
         if (sender is Border { DataContext: MappingRowVm row })
         {
             row.ToggleExpandCommand.Execute(null);
+        }
+    }
+
+    /// <summary>
+    /// 文本特征四选一 Toggle 联动: 数据写入已由 VM 的 IsXxx setter 完成
+    /// (勾选新项 = MatchValue 变更), 此处仅刷新同组其余三项的视觉态。
+    /// </summary>
+    private void OnTextTypeToggleChanged(object? sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleButton { DataContext: MappingRowVm row })
+        {
+            row.NotifyTogglesChanged();
         }
     }
 

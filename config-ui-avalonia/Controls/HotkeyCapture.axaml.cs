@@ -56,6 +56,9 @@ public partial class HotkeyCapture : UserControl
 
         I18n.Changed += OnLanguageChanged;
         DetachedFromVisualTree += (_, _) => I18n.Changed -= OnLanguageChanged;
+        // 初值兜底: 宿主绑定可能在构造期(此 handler 注册前)已写入 Hotkey —— 那次变更
+        // 不会触发类处理器, 首帧 DisplayText 停留在空串 (bug2: 迁移来的 >^p 显示为空)。
+        AttachedToVisualTree += (_, _) => RefreshPresentation();
     }
 
     private void OnLanguageChanged()

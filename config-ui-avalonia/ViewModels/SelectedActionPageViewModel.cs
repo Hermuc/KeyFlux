@@ -289,7 +289,50 @@ public sealed partial class MappingRowVm : ObservableObject
     /// <summary>匹配提示 (1034/1035)。</summary>
     public string MatchHint => ActionSchemeCatalog.MatchTypeHint(MatchType);
 
-    // ---- textType 行: 特征下拉 ----
+    // ---- textType 行: 特征四选一 (Toggle 直选, 替代 ComboBox——所见即所选, 无 ComboOption 概念) ----
+
+    /// <summary>四个互斥开关的公共读写: 直接落 Mapping.MatchValue (含 UI 联动)。</summary>
+    public bool IsUrl
+    {
+        get => Mapping.MatchValue == "url";
+        set { if (value) SetTextType("url"); }
+    }
+    public bool IsPath
+    {
+        get => Mapping.MatchValue == "path";
+        set { if (value) SetTextType("path"); }
+    }
+    public bool IsMagnet
+    {
+        get => Mapping.MatchValue == "magnet";
+        set { if (value) SetTextType("magnet"); }
+    }
+    public bool IsPlain
+    {
+        get => Mapping.MatchValue == "plain";
+        set { if (value) SetTextType("plain"); }
+    }
+
+    private void SetTextType(string value)
+    {
+        if (Mapping.MatchValue == value) return;
+        Mapping.MatchValue = value;
+        OnPropertyChanged(nameof(MatchValueDisplay));
+        OnPropertyChanged(nameof(MatchValueBadge));
+        OnPropertyChanged(nameof(MatchSummary));
+        RefreshEditorOptions();
+    }
+
+    /// <summary>切换任一 Toggle 时同步其余三个的视觉态。</summary>
+    public void NotifyTogglesChanged()
+    {
+        OnPropertyChanged(nameof(IsUrl));
+        OnPropertyChanged(nameof(IsPath));
+        OnPropertyChanged(nameof(IsMagnet));
+        OnPropertyChanged(nameof(IsPlain));
+    }
+
+    // ---- textType 行: 特征下拉 (保留: 旧序列化/兼容路径) ----
 
     /// <summary>文本特征下拉 (url/path/magnet/plain, 预翻译副本)。</summary>
     public List<ComboOption> TextTypeOptions
