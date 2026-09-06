@@ -236,8 +236,8 @@ public static class HotkeyLogic
 ///   - <b>全量暂存、显式确认</b>: 任何按键只暂存不自动提交, 硬性要求 Enter (确认) 或 Esc (取消) 退出;
 ///   - <b>区分左右</b>: 提交保留侧别前缀 (&lt;^p 只响应左 Ctrl+P), 显示 LCtrl/RCtrl;
 ///   - <b>编辑能力</b>: Backspace 删除光标前的暂存键, 方向键移动光标 —— 两者仅用于编辑, 不能成为热键组成部分;
-///   - 暂存模型: 修饰键前缀 (区分左右) + 至多两个非修饰键 (AHK 自定义组合 "k1 &amp; k2" 上限两键);
-///   - Enter 提交规则: 两键 -> "k1 &amp; k2"; 单键 -> 侧别前缀+键 ("&lt;^p") 或单键 ("j");
+///   - 暂存模型: 修饰键前缀 (区分左右) + 任意数量非修饰键 (无长度上限; N≥3 键由引擎链式组合处理);
+///   - Enter 提交规则: 单键 -> 侧别前缀+键 ("&lt;^p") 或单键 ("j"); 多键 -> "k1 &amp; k2 &amp; ..." (链式组合不混修饰键);
 ///     无键而恰一个修饰键 -> 单修饰键热键 (保留物理侧: LCtrl/RWin...); 多修饰键无主键不可表示 -> 退出不提交;
 ///   - 焦点丢失由外部调用 <see cref="Cancel"/> (中止, 不提交)。
 /// </summary>
@@ -349,7 +349,6 @@ public sealed class HotkeyCaptureCore
         var name = HotkeyLogic.KeyToAhkName(key);
         if (name is null) return;
         if (_caret > 0 && _stagedKeys[_caret - 1] == name) return; // 自动重复去重
-        if (_stagedKeys.Count >= 2) return;                        // AHK 自定义组合上限两键
         _stagedKeys.Insert(Math.Min(_caret, _stagedKeys.Count), name);
         _caret++;
         StateChanged?.Invoke();

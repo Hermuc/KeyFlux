@@ -43,6 +43,25 @@ SelectedActionInit(hotkeyName, entries) {
   if (hotkeyName == "" || !IsObject(entries) || entries.Length == 0) {
     return
   }
+  ; N 键链式组合 (≥3 键): AHK 原生自定义组合只支持两键, 故注册前两键组合,
+  ; 触发后经 _ChainWait 等待剩余键序列 (用户要求: 不限制快捷键长度上限)
+  parts := StrSplit(hotkeyName, "&", " ")
+  if (parts.Length >= 3) {
+    combo := Trim(parts[1]) " & " Trim(parts[2])
+    remaining := []
+    Loop parts.Length - 2 {
+      remaining.Push(Trim(parts[A_Index + 2]))
+    }
+    chain(thisHotkey) {
+      SelectedAction._ChainWait(combo, remaining, hotkeyName, entries)
+    }
+    try {
+      KeymapManager.GlobalKeymap.Map(combo, chain, , , , "S")
+    } catch {
+      return
+    }
+    return
+  }
   trigger(thisHotkey) {
     SelectedAction.Trigger(hotkeyName, entries)
   }
@@ -57,6 +76,7 @@ SelectedActionInit(hotkeyName, entries) {
 class SelectedAction {
   ; 菜单运行状态 (当前为单主热键设计, 重入即视为取消)
   static MenuActive := false
+  static ChainCompleted := false  ; N 键链式等待的完成标记
   static MenuIH := ""       ; 菜单 InputHook (打开期间非空, 供取消方跨线程 Stop)
   static MenuWindow := ""   ; InputTipWindow 实例 (淡出结束前持引用防 GC 拆窗)
   static MenuSeq := 0       ; 菜单代际号: 每次开/关菜单自增, 让过期的淡入淡出定时器自杀
@@ -212,6 +232,79 @@ class SelectedAction {
     this._CloseMenu()
     if (chosen != "") {
       this._Execute(chosen, selected)
+    }
+  }
+
+  /**
+   * N 键链式等待 (≥3 键热键): 前两键自定义组合触发后, 经 InputHook 等待剩余键序列。
+   *   - 有序匹配: 按下正确键推进序列, 全部命中后触发; 按错任何键 / Esc / 5s 超时 → 取消;
+   *   - 组合前缀键 (k1) 按住期间的自动重复 keydown 忽略, 防误取消;
+   *   - 剩余键以 S (Suppress) 抑制, 不泄漏到前台应用;
+   *   - 状态管理 (Suspend/热键停用/还原) 与 _RunMenu 同款。
+   */
+  static _ChainWait(combo, remaining, hotkeyName, entries) {
+    waitKey := ExtractWaitKey(combo)
+    KeymapManager.GlobalKeymap.DisableHotkey(waitKey)
+
+    wasSuspended := A_IsSuspended
+    if not (wasSuspended) {
+      Suspend(true)
+    }
+
+    this.MenuSeq++
+    seq := this.MenuSeq
+    this.ChainCompleted := false
+    ih := ""
+    try {
+      ih := InputHook("T5", "{Esc}")
+      this.MenuIH := ih
+      this.MenuActive := true
+      for _, keyName in remaining {
+        try ih.KeyOpt("{" keyName "}", "S")  ; 抑制剩余键, 不泄漏到前台
+      }
+      prefixKey := StrLower(Trim(StrSplit(combo, "&")[1]))
+      ih.OnKeyDown := (i, vk, sc) => SelectedAction._ChainOnKey(i, vk, seq, prefixKey, remaining, hotkeyName, entries)
+
+      ih.Start()
+      ih.Wait()
+      ih.Stop()
+    } finally {
+      this.MenuActive := false
+      this.MenuIH := ""
+      if not (wasSuspended) {
+        Suspend(false)
+      }
+      if (waitKey != "") {
+        KeymapManager.GlobalKeymap.EnableHotkey(waitKey)
+      }
+    }
+
+    ; 剩余序列全部命中 (InputHook 被 _ChainOnKey Stop) → 触发; Esc/超时/按错 → 取消
+    if (this.ChainCompleted) {
+      this.Trigger(hotkeyName, entries)
+    }
+  }
+
+  /**
+   * 链式等待的单键回调: 匹配 remaining 首元素推进序列;
+   * 全部命中 → 标记 completed 并 Stop InputHook; 按错 → 取消本次链。
+   */
+  static _ChainOnKey(ih, vk, seq, prefixKey, remaining, hotkeyName, entries) {
+    if (this.MenuSeq != seq) {
+      return
+    }
+    keyName := StrLower(GetKeyName(Format("vk{:X}", vk)))
+    if (keyName == prefixKey) {
+      return  ; 组合首键按住期间的自动重复, 忽略
+    }
+    if (keyName != StrLower(remaining[1])) {
+      this._CancelMenu()  ; 按错: 取消本次链
+      return
+    }
+    remaining.RemoveAt(1)
+    if (remaining.Length == 0) {
+      this.ChainCompleted := true  ; 完成标记 (实例属性, 供 _ChainWait 读取)
+      this._CancelMenu()
     }
   }
 
