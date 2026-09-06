@@ -180,17 +180,98 @@ public sealed class HotkeyLogicTests
     }
 
     [Fact]
-    public void Capture_ModifierReleased_RemovesPending()
+    public void Capture_SingleModifier_Committed_On_Release()
+    {
+        // 2026-09: 单按 Ctrl (捕获期间唯一按键) 松开即提交中性键名
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.LeftCtrl, anyModifierHeld: true);
+        core.HandleKeyUp(Key.LeftCtrl);
+        Assert.Equal("Ctrl", committed);
+        Assert.False(core.Capturing);
+    }
+
+    [Fact]
+    public void Capture_TwoModifiers_Released_Does_Not_Commit_Single()
+    {
+        // Ctrl+Shift+X 意图保护: 按过两个修饰键再全部松开, 不误提交单修饰键
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.LeftCtrl, anyModifierHeld: true);
+        core.HandleKeyDown(Key.LeftShift, anyModifierHeld: true);
+        core.HandleKeyUp(Key.LeftCtrl);
+        Assert.Null(committed);
+        core.HandleKeyUp(Key.LeftShift);
+        Assert.Null(committed);
+        Assert.True(core.Capturing); // 仍在捕获, 可继续按 X
+        core.HandleKeyDown(Key.X, anyModifierHeld: false);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("x", committed); // Enter 确认单键
+    }
+
+    [Fact]
+    public void Capture_Staged_SecondKey_Commits_CustomCombo()
+    {
+        // J+K: 首键暂存, 第二键提交 AHK 自定义组合
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.J, anyModifierHeld: false);
+        Assert.Null(committed); // 首键等待
+        Assert.Single(core.StagedKeys);
+        core.HandleKeyUp(Key.J); // 松开不丢暂存
+        Assert.Single(core.StagedKeys);
+        core.HandleKeyDown(Key.K, anyModifierHeld: false);
+        Assert.Equal("j & k", committed);
+    }
+
+    [Fact]
+    public void Capture_Staged_Enter_Commits_Single_Key()
+    {
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.J, anyModifierHeld: false);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("j", committed);
+    }
+
+    [Fact]
+    public void Capture_Staged_Esc_Cancels_And_Empty_Enter_Exits()
+    {
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.J, anyModifierHeld: false);
+        core.HandleKeyDown(Key.Escape, anyModifierHeld: false); // Esc 取消
+        Assert.False(core.Capturing);
+        Assert.Null(committed);
+
+        core.StartCapture();
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false); // 空暂存 Enter = 退出
+        Assert.False(core.Capturing);
+        Assert.Null(committed);
+    }
+
+    [Fact]
+    public void Capture_FastPath_ModifierPlusKey_Unchanged()
     {
         var core = new HotkeyCaptureCore();
         string? committed = null;
         core.HotkeyCommitted += ahk => committed = ahk;
         core.StartCapture();
         core.HandleKeyDown(Key.LeftCtrl, anyModifierHeld: true);
-        core.HandleKeyUp(Key.LeftCtrl); // 松开: 撤暂存
-        Assert.Empty(core.PendingPrefixes);
-        core.HandleKeyDown(Key.B, anyModifierHeld: false);
-        Assert.Equal("b", committed); // 无修饰主键
+        core.HandleKeyDown(Key.P, anyModifierHeld: true);
+        Assert.Equal("^p", committed); // 快路径不变
+        core.HandleKeyUp(Key.LeftCtrl); // 提交后松开修饰键无副作用
+        Assert.Equal("^p", committed);
     }
 
     [Fact]

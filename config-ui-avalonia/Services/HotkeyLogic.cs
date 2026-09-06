@@ -49,6 +49,9 @@ public static class HotkeyLogic
             ["pgup"] = "PageUp", ["pgdn"] = "PageDown",
             ["home"] = "Home", ["end"] = "End", ["ins"] = "Insert", ["del"] = "Delete",
             ["backspace"] = "Backspace", ["apps"] = "Menu",
+            // 单修饰键热键 (2026-09: 捕获支持单按 Ctrl/Alt 等) 的键名显示
+            ["ctrl"] = "Ctrl", ["alt"] = "Alt", ["shift"] = "Shift",
+            ["lwin"] = "LWin", ["rwin"] = "RWin",
         };
 
     /// <summary>
@@ -160,6 +163,9 @@ public static class HotkeyLogic
     public static string AhkToDisplay(string? ahk)
     {
         if (string.IsNullOrEmpty(ahk)) return "";
+        // 自定义组合 (j & k): 各段独立转可读名后以 " + " 连接
+        if (ahk.Contains(" & "))
+            return string.Join(" + ", ahk.Split(" & ").Select(p => AhkToDisplay(p)));
         var parts = new List<string>();
         var rest = ahk;
         // 依次提取修饰键前缀 (先两字符左右前缀, 再单字符前缀)
@@ -183,6 +189,19 @@ public static class HotkeyLogic
         => KeyDisplayMap.TryGetValue(key, out var mapped)
             ? mapped
             : string.Concat(char.ToUpperInvariant(key[0]).ToString(), key.AsSpan(1));
+
+    /// <summary>
+    /// 单修饰键热键的 AHK 键名: Ctrl/Alt/Shift 提交中性名 (两侧均可触发, 与侧别归一化语义一致);
+    /// Win 无中性键名, 保留捕获到的物理侧 (LWin/RWin)。
+    /// </summary>
+    public static string SingleModifierAhk((string Prefix, string Label) mod)
+        => mod.Label switch
+        {
+            "LCtrl" or "RCtrl" => "Ctrl",
+            "LAlt" or "RAlt" => "Alt",
+            "LShift" or "RShift" => "Shift",
+            _ => mod.Label, // LWin / RWin
+        };
 
     /// <summary>
     /// 归一化热键用于冲突比较 (复刻 normalizeHotkey): 去掉开头的 * ~ $ 以及左右修饰前缀 &lt; &gt;, 忽略大小写。
@@ -219,21 +238,28 @@ public static class HotkeyLogic
 }
 
 /// <summary>
-/// 热键捕获状态机 (复刻 HotkeyCapture.vue 的捕获交互, 与 UI 解耦便于单测):
-///   - StartCapture 进入捕获态;
-///   - 修饰键按下暂存 (按下顺序), 松开撤销暂存;
-///   - 主键按下 -> 组合生成 AHK 热键并经 <see cref="HotkeyCommitted"/> 提交, 退出捕获态;
-///   - Esc 单独按下 (无任何修饰) 取消; 焦点丢失由外部调用 <see cref="Cancel"/>。
+/// 热键捕获状态机 (与 UI 解耦便于单测)。2026-09 扩展三种形态:
+///   - 修饰键+主键 (Ctrl+P): 按住修饰键再按主键, 立即提交 (原语义不变);
+///   - 单修饰键 (Ctrl): 捕获期间只按过一个修饰键且无任何主键, 松开即提交中性键名 (Ctrl/Alt/Shift; Win 保留物理侧);
+///   - 非修饰键组合 (J+K): 第一键暂存等待, 第二键提交 "j & k" (AHK 自定义组合);
+///   - 单主键 (J): 暂存后按 Enter 确认提交 "j";
+///   - Esc 单独按取消; Enter 在无暂存时退出; 焦点丢失由外部调用 <see cref="Cancel"/>。
+/// 键位即所见: 暂存期间 DisplayText 实时回显已按部分。
 /// </summary>
 public sealed class HotkeyCaptureCore
 {
-    private readonly List<string> _pendingPrefixes = [];
+    private readonly List<string> _pendingPrefixes = []; // 按住未松的修饰键前缀
+    private readonly List<string> _stagedKeys = [];      // 已暂存的非修饰键 (0-2; AHK 自定义组合为两键)
+    private readonly HashSet<string> _modsSeen = [];     // 本次捕获按过的全部修饰键 (单修饰键提交判定用)
 
     /// <summary>是否处于捕获态。</summary>
     public bool Capturing { get; private set; }
 
-    /// <summary>当前暂存的修饰键前缀 (按下顺序), 等待主键组成完整热键。</summary>
+    /// <summary>当前按住未松的修饰键前缀 (按下顺序)。</summary>
     public IReadOnlyList<string> PendingPrefixes => _pendingPrefixes;
+
+    /// <summary>当前暂存的非修饰键 (等待 Enter 确认单键或第二键组成组合)。</summary>
+    public IReadOnlyList<string> StagedKeys => _stagedKeys;
 
     /// <summary>捕获态/暂存变化 (UI 据此刷新提示文本)。</summary>
     public event Action? StateChanged;
@@ -241,43 +267,52 @@ public sealed class HotkeyCaptureCore
     /// <summary>成功组合出热键 (AHK 格式) 时提交。</summary>
     public event Action<string>? HotkeyCommitted;
 
-    /// <summary>进入捕获态 (复刻 startCapture)。</summary>
+    /// <summary>进入捕获态。</summary>
     public void StartCapture()
     {
         Capturing = true;
         _pendingPrefixes.Clear();
+        _stagedKeys.Clear();
+        _modsSeen.Clear();
         StateChanged?.Invoke();
     }
 
-    /// <summary>取消捕获 (复刻 Esc 取消与 onFocusOut), 未捕获时无操作。</summary>
+    /// <summary>取消捕获 (Esc 取消与 onFocusOut), 未捕获时无操作。</summary>
     public void Cancel()
     {
         if (!Capturing) return;
         Capturing = false;
         _pendingPrefixes.Clear();
+        _stagedKeys.Clear();
         StateChanged?.Invoke();
     }
 
     /// <summary>
-    /// 处理按键按下 (复刻 onKeydown)。
+    /// 处理按键按下。<param name="anyModifierHeld">系统层面是否有修饰键处于按住状态 (Esc/Enter 单独按下才生效)。</param>
     /// </summary>
-    /// <param name="key">物理键。</param>
-    /// <param name="anyModifierHeld">系统层面是否有修饰键处于按住状态 (Esc 单独按下才取消)。</param>
     public void HandleKeyDown(Key key, bool anyModifierHeld)
     {
         if (!Capturing) return;
 
-        // Esc 单独按下时取消捕获 (复刻: e.key==="Escape" && 无任何修饰)
+        // Esc 单独按下: 取消捕获 (不变)
         if (key == Key.Escape && !anyModifierHeld)
         {
             Cancel();
             return;
         }
 
-        // 修饰键: 暂存等待主键 (按住不放的重复事件靠 Contains 去重, 复刻 !e.repeat + includes)
+        // Enter 单独按下: 有暂存则确认提交 (单键/组合), 无暂存直接退出
+        if (key == Key.Enter && !anyModifierHeld)
+        {
+            if (_stagedKeys.Count > 0) CommitStaged();
+            else Cancel();
+            return;
+        }
+
         var mod = HotkeyLogic.ModifierFor(key);
         if (mod is not null)
         {
+            _modsSeen.Add(mod.Value.Prefix);
             if (!_pendingPrefixes.Contains(mod.Value.Prefix))
             {
                 _pendingPrefixes.Add(mod.Value.Prefix);
@@ -286,41 +321,74 @@ public sealed class HotkeyCaptureCore
             return;
         }
 
-        // 主键: 组合修饰键生成 AHK 格式热键; 不支持的键保持等待 (复刻 key==null 时忽略)
         var name = HotkeyLogic.KeyToAhkName(key);
         if (name is null) return;
 
-        // 提交前侧别归一化: 左右修饰键统一为通配两侧的 ^/!/+/# (见 NormalizeSidePrefixes)
-        var ahk = HotkeyLogic.NormalizeSidePrefixes(HotkeyLogic.BuildAhk(_pendingPrefixes, name));
-        Capturing = false;
-        _pendingPrefixes.Clear();
-        HotkeyCommitted?.Invoke(ahk);
-        StateChanged?.Invoke();
+        // 快路径: 修饰键按住 + 主键 -> 立即提交 (Ctrl+P, 原语义)
+        if (_pendingPrefixes.Count > 0)
+        {
+            Commit(HotkeyLogic.NormalizeSidePrefixes(HotkeyLogic.BuildAhk(_pendingPrefixes, name)));
+            return;
+        }
+
+        // 非修饰键暂存 (J+K 支持): 首键等待, 异键提交组合, 同键去重
+        if (_stagedKeys.Count == 0)
+        {
+            _stagedKeys.Add(name);
+            StateChanged?.Invoke();
+            return;
+        }
+        if (_stagedKeys[^1] == name) return;  // 自动重复不重复暂存
+        if (_stagedKeys.Count >= 2) return;   // AHK 自定义组合为两键
+        _stagedKeys.Add(name);
+        CommitStaged();
     }
 
-    /// <summary>修饰键松开且未按主键时撤销暂存, 继续等待 (复刻 onKeyup)。</summary>
+    /// <summary>修饰键松开: 若它是本次捕获唯一的键且无任何暂存 -> 提交单修饰键热键; 否则撤销暂存继续等待。</summary>
     public void HandleKeyUp(Key key)
     {
         if (!Capturing) return;
         var mod = HotkeyLogic.ModifierFor(key);
         if (mod is null) return;
-        if (_pendingPrefixes.Remove(mod.Value.Prefix))
+        if (!_pendingPrefixes.Remove(mod.Value.Prefix)) return;
+
+        // 单修饰键提交仅当: 该修饰键是本次捕获唯一按过的键 (按过 Ctrl 再按 Shift 再松开
+        // 不会把 Shift 误提交为单键热键 —— Ctrl+Shift+X 意图可存活)
+        if (_pendingPrefixes.Count == 0 && _stagedKeys.Count == 0 && _modsSeen.Count == 1)
         {
-            StateChanged?.Invoke();
+            Commit(HotkeyLogic.SingleModifierAhk(mod.Value));
+            return;
         }
+        StateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// 捕获态提示文本 (复刻 display 计算): 非捕获态显示当前热键可读形式;
-    /// 捕获态显示已按修饰键 "LCtrl + ..." 或等待提示。
-    /// </summary>
+    /// <summary>捕获态提示文本: 非捕获态显示当前热键可读形式; 捕获态实时回显已按部分。</summary>
     public string DisplayText(string currentAhk, string waitingHint)
     {
         if (!Capturing) return HotkeyLogic.AhkToDisplay(currentAhk);
-        if (_pendingPrefixes.Count > 0)
-        {
-            return string.Join(" + ", _pendingPrefixes.Select(p => HotkeyLogic.ModPrefixLabels[p])) + " + ...";
-        }
-        return waitingHint;
+        var parts = new List<string>();
+        parts.AddRange(_pendingPrefixes.Select(p => HotkeyLogic.ModPrefixLabels[p]));
+        parts.AddRange(_stagedKeys.Select(k => HotkeyLogic.AhkToDisplay(k)));
+        if (parts.Count == 0) return waitingHint;
+        return string.Join(" + ", parts) + " + ...";
+    }
+
+    private void CommitStaged()
+    {
+        var ahk = string.Join(" & ", _stagedKeys);
+        Capturing = false;
+        _pendingPrefixes.Clear();
+        _stagedKeys.Clear();
+        HotkeyCommitted?.Invoke(ahk);
+        StateChanged?.Invoke();
+    }
+
+    private void Commit(string ahk)
+    {
+        Capturing = false;
+        _pendingPrefixes.Clear();
+        _stagedKeys.Clear();
+        HotkeyCommitted?.Invoke(ahk);
+        StateChanged?.Invoke();
     }
 }
