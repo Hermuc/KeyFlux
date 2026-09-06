@@ -43,20 +43,33 @@ SelectedActionInit(hotkeyName, entries) {
   if (hotkeyName == "" || !IsObject(entries) || entries.Length == 0) {
     return
   }
-  ; N 键链式组合 (≥3 键): AHK 原生自定义组合只支持两键, 故注册前两键组合,
-  ; 触发后经 _ChainWait 等待剩余键序列 (用户要求: 不限制快捷键长度上限)
+  ; N 键链式热键 (物理键数 ≥3): AHK 原生自定义组合只支持两键, 拆为「头部热键 + 尾部 InputHook 顺序匹配」。
+  ; 头部两种形态 (UI 生成端 HotkeyCaptureCore.CommitStaged 对应):
+  ;   纯键链   "j & k & l"   -> 头部注册自定义组合 "j & k", 尾部 ["l"]
+  ;   修饰链   "<^j & k & l" -> 头部注册普通修饰热键 "<^j", 尾部 ["k","l"]
+  ; 修饰链不能用 "LCtrl & j" 自定义组合形式: 组合不能混修饰键, 且那样会把 LCtrl
+  ; 全局注册为前缀键, 改变系统里单独按 LCtrl 的行为 (副作用), 故头段走普通热键。
   parts := StrSplit(hotkeyName, "&", " ")
-  if (parts.Length >= 3) {
-    combo := Trim(parts[1]) " & " Trim(parts[2])
-    remaining := []
-    Loop parts.Length - 2 {
-      remaining.Push(Trim(parts[A_Index + 2]))
+  head := Trim(parts[1])
+  headIsMod := parts.Length >= 2 && HotkeyHeadHasModifier(head)
+  if (parts.Length >= 3 || headIsMod) {
+    if (headIsMod) {
+      remaining := []
+      Loop parts.Length - 1 {
+        remaining.Push(Trim(parts[A_Index + 1]))
+      }
+    } else {
+      head := head " & " Trim(parts[2])
+      remaining := []
+      Loop parts.Length - 2 {
+        remaining.Push(Trim(parts[A_Index + 2]))
+      }
     }
     chain(thisHotkey) {
-      SelectedAction._ChainWait(combo, remaining, hotkeyName, entries)
+      SelectedAction._ChainWait(head, remaining, hotkeyName, entries)
     }
     try {
-      KeymapManager.GlobalKeymap.Map(combo, chain, , , , "S")
+      KeymapManager.GlobalKeymap.Map(head, chain, , , , "S")
     } catch {
       return
     }
@@ -71,6 +84,14 @@ SelectedActionInit(hotkeyName, entries) {
   } catch {
     return
   }
+}
+
+/**
+ * 头段是否为「带修饰键的普通热键」(如 "<^j"): 含 AHK 修饰符字符即视为是。
+ * 链式 UI 生成端只产生侧别前缀 (<^ >^ <! >! <+ >+ <# >#) 形式, 纯键名不含这些字符。
+ */
+HotkeyHeadHasModifier(part) {
+  return InStr(part, "^") || InStr(part, "!") || InStr(part, "+") || InStr(part, "#")
 }
 
 class SelectedAction {
@@ -236,7 +257,8 @@ class SelectedAction {
   }
 
   /**
-   * N 键链式等待 (≥3 键热键): 前两键自定义组合触发后, 经 InputHook 等待剩余键序列。
+   * N 键链式等待 (物理键数 ≥3): 头部热键 (自定义组合 "j & k" 或修饰热键 "<^j") 触发后,
+   * 经 InputHook 等待剩余键序列。
    *   - 有序匹配: 按下正确键推进序列, 全部命中后触发; 按错任何键 / Esc / 5s 超时 → 取消;
    *   - 组合前缀键 (k1) 按住期间的自动重复 keydown 忽略, 防误取消;
    *   - 剩余键以 S (Suppress) 抑制, 不泄漏到前台应用;
@@ -263,6 +285,9 @@ class SelectedAction {
         try ih.KeyOpt("{" keyName "}", "S")  ; 抑制剩余键, 不泄漏到前台
       }
       prefixKey := StrLower(Trim(StrSplit(combo, "&")[1]))
+      if HotkeyHeadHasModifier(prefixKey) {
+        prefixKey := StrLower(ExtractWaitKey(prefixKey))  ; 修饰链头段 "<^j" -> 主键 "j"
+      }
       ih.OnKeyDown := (i, vk, sc) => SelectedAction._ChainOnKey(i, vk, seq, prefixKey, remaining, hotkeyName, entries)
 
       ih.Start()

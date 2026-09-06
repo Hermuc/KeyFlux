@@ -271,9 +271,10 @@ public sealed class HotkeyLogicTests
     }
 
     [Fact]
-    public void Capture_ChainWithStagedModifier_DropsPrefixes_KeepsChain()
+    public void Capture_ChainWithModifiers_PreservedAsHeadPrefix()
     {
-        // 链式组合不混修饰键: ≥2 非修饰键时, 误按的修饰前缀被丢弃 (与 2 键组合行为一致)
+        // Ctrl + J,K,L: 修饰键进链首头段 (<^j & k & l), 不再丢弃 ——
+        // 引擎把头段注册为普通修饰热键, 尾部经 InputHook 顺序匹配
         var core = new HotkeyCaptureCore();
         string? committed = null;
         core.HotkeyCommitted += ahk => committed = ahk;
@@ -283,7 +284,22 @@ public sealed class HotkeyLogicTests
         core.HandleKeyDown(Key.K, anyModifierHeld: true);
         core.HandleKeyDown(Key.L, anyModifierHeld: true);
         core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
-        Assert.Equal("j & k & l", committed);
+        Assert.Equal("<^j & k & l", committed);
+    }
+
+    [Fact]
+    public void Capture_ModifierPlusTwoKeys_ChainHeadForm()
+    {
+        // Ctrl + J,K (物理 3 键, 字符串 2 段): 头段 <^j + 尾部 k —— 引擎按「头段含修饰键」判定链模式
+        var core = new HotkeyCaptureCore();
+        string? committed = null;
+        core.HotkeyCommitted += ahk => committed = ahk;
+        core.StartCapture();
+        core.HandleKeyDown(Key.LeftAlt, anyModifierHeld: true);
+        core.HandleKeyDown(Key.J, anyModifierHeld: true);
+        core.HandleKeyDown(Key.K, anyModifierHeld: true);
+        core.HandleKeyDown(Key.Enter, anyModifierHeld: false);
+        Assert.Equal("<!j & k", committed);
     }
 
 

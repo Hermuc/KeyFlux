@@ -237,7 +237,8 @@ public static class HotkeyLogic
 ///   - <b>区分左右</b>: 提交保留侧别前缀 (&lt;^p 只响应左 Ctrl+P), 显示 LCtrl/RCtrl;
 ///   - <b>编辑能力</b>: Backspace 删除光标前的暂存键, 方向键移动光标 —— 两者仅用于编辑, 不能成为热键组成部分;
 ///   - 暂存模型: 修饰键前缀 (区分左右) + 任意数量非修饰键 (无长度上限; N≥3 键由引擎链式组合处理);
-///   - Enter 提交规则: 单键 -> 侧别前缀+键 ("&lt;^p") 或单键 ("j"); 多键 -> "k1 &amp; k2 &amp; ..." (链式组合不混修饰键);
+///   - Enter 提交规则: 单键 -> 侧别前缀+键 ("&lt;^p") 或单键 ("j"); 多键 -> 链 "k1 &amp; k2 &amp; ...";
+///     链首含暂存的修饰前缀时头段为普通修饰热键 ("&lt;^j &amp; k &amp; l", 修饰键进头段不丢弃);
 ///     无键而恰一个修饰键 -> 单修饰键热键 (保留物理侧: LCtrl/RWin...); 多修饰键无主键不可表示 -> 退出不提交;
 ///   - 焦点丢失由外部调用 <see cref="Cancel"/> (中止, 不提交)。
 /// </summary>
@@ -360,7 +361,16 @@ public sealed class HotkeyCaptureCore
     {
         string ahk;
         if (_stagedKeys.Count >= 2)
-            ahk = string.Join(" & ", _stagedKeys); // k1 & k2 & ... & kN (N 键链; 链式组合不混修饰键)
+        {
+            // N 键链: 无修饰前缀 -> 纯键链 (j & k & l); 带修饰前缀 -> 头段为普通修饰热键
+            // (<^j & k & l), 引擎注册头段热键后经 InputHook 顺序匹配尾部。不能用
+            // "LCtrl & j" 自定义组合形式: AHK 自定义组合不能混修饰键, 且把 LCtrl 注册为
+            // 组合前缀键会全局改变 LCtrl 的按下行为 (系统级副作用)。
+            var head = HotkeyLogic.BuildAhk(_pendingPrefixes, _stagedKeys[0]);
+            var parts = new List<string>(_stagedKeys);
+            parts[0] = head;
+            ahk = string.Join(" & ", parts);
+        }
         else if (_stagedKeys.Count == 1)
             ahk = HotkeyLogic.BuildAhk(_pendingPrefixes, _stagedKeys[0]); // 保留侧别前缀 (区分左右)
         else if (_pendingPrefixes.Count == 1)
