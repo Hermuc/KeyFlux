@@ -4,22 +4,6 @@
  */
 
 /**
- * 模拟 Alt+Tab 热键
- */
-SystemAltTab() {
-  global altTabIsOpen := true
-  send("^!{Tab}")
-}
-
-/**
- * 模拟 Shift+Alt+Tab 热键
- */
-SystemShiftAltTab() {
-  global altTabIsOpen := true
-  send("^+!{Tab}")
-}
-
-/**
  * 锁屏
  */
 SystemLockScreen() {
