@@ -14,7 +14,8 @@ namespace MyKeymap.Settings.Services;
 // ============================================================================
 
 /// <summary>下拉选项条目 (Value 为配置值, Label 为显示文案; record 值相等便于 ComboBox 选中匹配)。</summary>
-public sealed record ComboOption(string Value, string Label);
+/// <param name="IsSeparator">分隔行标记: true 时该项在下拉中渲染为分隔线且不可选 (类型分组与文本特征之间)。</param>
+public sealed record ComboOption(string Value, string Label, bool IsSeparator = false);
 
 /// <summary>选中动作常量与共享工具方法 (2026-09 方案 D: 多方案 CRUD 工厂已随 ActionScheme 退役)。</summary>
 public static class ActionSchemeCatalog

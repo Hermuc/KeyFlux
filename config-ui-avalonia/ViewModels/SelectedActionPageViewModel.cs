@@ -661,11 +661,13 @@ public sealed partial class AddMappingVm : ObservableObject
         {
             _typeOptions.Add(new("group:" + g.Name, g.Label));
         }
+        // 分组与文本特征之间的动态分隔线: 分组增删后线始终跟随最后一组 (用户要求)
+        _typeOptions.Add(new("", "", IsSeparator: true));
         _typeOptions.Add(new("url", I18n.T("1059")));
         _typeOptions.Add(new("path", I18n.T("1060")));
         _typeOptions.Add(new("magnet", I18n.T("1061")));
         _typeOptions.Add(new("plain", I18n.T("1062")));
-        _typeSelected = _typeOptions.FirstOrDefault();
+        _typeSelected = _typeOptions.FirstOrDefault(o => !o.IsSeparator);
         if (_typeSelected is not null && IsFileExt)
         {
             MatchValue = GroupMatchValue ?? ""; // 初始即分组项: 同步后缀集到条件值 (构造期回调不触发)
@@ -688,6 +690,15 @@ public sealed partial class AddMappingVm : ObservableObject
     partial void OnTypeSelectedChanged(ComboOption? value)
     {
         if (value is null) return;
+        if (value.IsSeparator)
+        {
+            // 键盘导航落在分隔行: 自动跳过分隔项到下一个真实类型 (下拉视觉不可选)
+            var skip = value;
+            var next = _typeOptions.SkipWhile(o => o != skip).Skip(1).FirstOrDefault(o => !o.IsSeparator)
+                       ?? _typeOptions.LastOrDefault(o => !o.IsSeparator);
+            TypeSelected = next;
+            return;
+        }
         if (IsFileExt)
         {
             MatchValue = GroupMatchValue ?? ""; // 分组项: 条件值 = 该组后缀集
@@ -1029,6 +1040,7 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     public void AddMapping(AddMappingVm panel)
     {
         var typeValue = panel.TypeSelected?.Value ?? "";
+        if (string.IsNullOrEmpty(typeValue)) return; // 分隔项/未选中防御
         var isGroup = typeValue.StartsWith("group:");
         var isFileExt = isGroup; // 分组项即 fileExt 类 mapping (matchValue = 组后缀集)
         var mapping = new SelectedMapping

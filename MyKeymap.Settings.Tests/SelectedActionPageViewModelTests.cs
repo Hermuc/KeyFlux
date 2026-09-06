@@ -207,12 +207,13 @@ public sealed class SelectedActionPageViewModelTests
         Assert.Equal(["open_url", "search"], panel.BehaviorPicks.Select(p => p.Pack.Id));
         Assert.False(panel.IsFileExt);
 
-        // 切回分组项: IsFileExt 语义 = 分组项; 分组在前文本特征在后 (用户要求排序)
+        // 切回分组项: IsFileExt 语义 = 分组项; 分组在前、分隔线、文本特征在后 (用户要求排序)
         panel.TypeSelected = panel.TypeOptions[0];
         Assert.True(panel.IsFileExt);
         Assert.Equal(6, panel.BehaviorPicks.Count);
         Assert.Equal("group:image", panel.TypeOptions[0].Value);
-        Assert.Equal("url", panel.TypeOptions[1].Value);
+        Assert.True(panel.TypeOptions[1].IsSeparator); // 分组分隔线 (动态跟随分组数量)
+        Assert.Equal("url", panel.TypeOptions[2].Value); // 分隔线后第一个文本特征
     }
 
     /// <summary>键位序号 = 勾选列表位置序 (1 起; 与勾选先后无关), 取消勾选后后续顺延。</summary>
