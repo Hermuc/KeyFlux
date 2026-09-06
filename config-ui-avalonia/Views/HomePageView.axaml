@@ -1,8 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:MyKeymap.Settings.ViewModels"
-             xmlns:controls="using:MyKeymap.Settings.Controls"
-             x:Class="MyKeymap.Settings.Views.HomePageView"
+             xmlns:vm="using:KeyFlux.Settings.ViewModels"
+             xmlns:controls="using:KeyFlux.Settings.Controls"
+             x:Class="KeyFlux.Settings.Views.HomePageView"
              x:DataType="vm:HomePageViewModel">
 
   <!-- 总览页文字全部可选中复制: 文档块/静态文案均用 SelectableTextBlock
@@ -42,7 +42,7 @@
     <!-- 回退引导: 后端未提供 config_doc.html 时 -->
     <ScrollViewer IsVisible="{Binding !DocAvailable}">
       <StackPanel IsVisible="{Binding !IsLoading}" Margin="36,28" Spacing="14" MaxWidth="720">
-        <SelectableTextBlock Text="MyKeymap" FontSize="22" FontWeight="Bold" />
+        <SelectableTextBlock Text="KeyFlux" FontSize="22" FontWeight="Bold" />
         <SelectableTextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=932}"
                              Foreground="#C77700" FontSize="13" />
         <Border Height="1" Background="#E3E6EC" Margin="0,4" />

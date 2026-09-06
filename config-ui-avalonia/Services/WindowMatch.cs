@@ -1,6 +1,6 @@
 using Avalonia;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // 窗口匹配领域模型 (L2): 匹配类型枚举 + 窗口描述符 + 纯函数格式化器。

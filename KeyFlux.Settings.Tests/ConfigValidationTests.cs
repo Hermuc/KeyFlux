@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Tests.Infrastructure;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Tests.Infrastructure;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// PUT /config 的 400 校验契约 (对照 Go ValidateSelectedAction / ValidateFileGroups)。

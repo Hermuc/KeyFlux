@@ -5,8 +5,8 @@
  * 新增文案: 先在 DefaultTranslation 加英文, 再在 ChineseTranslation 加中文。
  */
 class DefaultTranslation {
-  mykeymap_on := "🚀  MyKeymap: On  "
-  mykeymap_off := "⏸️  MyKeymap: Off  "
+  keyflux_on := "🚀  KeyFlux: On  "
+  keyflux_off := "⏸️  KeyFlux: Off  "
   
   menu_pause := "Pause"
   menu_exit := "Exit"
@@ -29,8 +29,8 @@ class DefaultTranslation {
 }
 
 class ChineseTranslation extends DefaultTranslation {
-  mykeymap_on :=  "🚀  恢复 MyKeymap  "
-  mykeymap_off := "⏸️  暂停 MyKeymap  "
+  keyflux_on :=  "🚀  恢复 KeyFlux  "
+  keyflux_off := "⏸️  暂停 KeyFlux  "
 
   menu_pause := "暂停"
   menu_exit := "退出"

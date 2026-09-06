@@ -1,14 +1,14 @@
 ## 😀 欢迎
 
-1. [项目 GitHub](https://github.com/xianyukang/MyKeymap)
+1. [项目 GitHub](https://github.com/xianyukang/KeyFlux)
 2. [视频介绍](https://www.bilibili.com/video/BV1Sf4y1c7p8/)
-3. [快速入门](https://xianyukang.com/MyKeymap.html#mykeymap-%E7%AE%80%E4%BB%8B) ( 推荐看看，能了解 MyKeymap 的功能，和注意事项 )
+3. [快速入门](https://xianyukang.com/KeyFlux.html#keyflux-%E7%AE%80%E4%BB%8B) ( 推荐看看，能了解 KeyFlux 的功能，和注意事项 )
 
 
 
 ## ✨ 浏览器字体
 
-1. 可以美化浏览器字体，因为字体文件占几十 M 所以不打包在 MyKeymap 里面
+1. 可以美化浏览器字体，因为字体文件占几十 M 所以不打包在 KeyFlux 里面
 2. 效果对比: 「 [修改前](/font-compare/1.png) / [修改后](/font-compare/2.png) 」， 「 [修改前](/font-compare/3.png) / [修改后](/font-compare/4.png) 」， 「 [修改前](/font-compare/5.png) / [修改后](/font-compare/6.png) 」
 3. 如何修改: ①[去这下载工具](https://www.bilibili.com/video/BV1pP4y187bR/) ②把其中的常用字体全部装上 ③[从这跟着视频](https://www.bilibili.com/video/BV1pP4y187bR?t=190.0)一步一步操作
 

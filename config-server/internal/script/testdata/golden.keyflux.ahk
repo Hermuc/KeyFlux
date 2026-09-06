@@ -26,13 +26,13 @@ try DllCall("SetThreadDpiAwarenessContext", "ptr", -3, "ptr") ; 多显示器不�
 SetMouseDelay 0                                           ; SendInput 可能会降级为 SendEvent, 此时会有 10ms 的默认 delay
 SetWinDelay 0                                             ; 默认会在 activate, maximize, move 等窗口操作后睡眠 100ms
 A_MaxHotkeysPerInterval := 256                            ; 默认 70 可能有点低, 即使没有热键死循环也触发警告
-SendMode "Event"                                          ; 执行 SendInput 的期间会短暂卸载 Hook, 这时候松开引导键会丢失 up 事件, 所以 Event 模式更适合 MyKeymap
+SendMode "Event"                                          ; 执行 SendInput 的期间会短暂卸载 Hook, 这时候松开引导键会丢失 up 事件, 所以 Event 模式更适合 KeyFlux
 SetKeyDelay 0                                             ; 默认 10 太慢了, https://www.reddit.com/r/AutoHotkey/comments/gd3z4o/possible_unreliable_detection_of_the_keyup_event/
 ProcessSetPriority "High"
 SetWorkingDir("../")
 InitTrayMenu()
 InitKeymap()
-OnExit(MyKeymapExit)
+OnExit(KeyFluxExit)
 #include ../data/custom_functions.ahk
 
 InitKeymap()
@@ -48,7 +48,7 @@ InitKeymap()
   capsHook.KeyOpt("{Backspace}", "N")
   capsHook.OnChar := (ih, char) => (PostCharToCaspAbbr(ih, char), FuzzySuffixFire(ih, char, "capslock"))
   capsHook.OnKeyDown := PostBackspaceToCaspAbbr
-  Run("bin\MyKeymap-CommandInput.exe")
+  Run("bin\KeyFlux-CommandInput.exe")
 
   semiHook := InputHook("", "{CapsLock}{Esc}{;}", ",,,sys")
   semiHook.KeyOpt("{CapsLock}", "S")
@@ -87,7 +87,7 @@ InitKeymap()
   km.RemapInHotIf("g", "h", "ahk_class CabinetWClass", 3)
   km.RemapInHotIf("i", "j", "ahk_exe photoshop.exe", 4)
   km.RemapInHotIf("k", "l", 'WinActive("A") && GetKeyState("Shift")', 5)
-  km.Map("!f17", _ => MyKeymapReload(), , , , "S")
+  km.Map("!f17", _ => KeyFluxReload(), , , , "S")
 
   ; CapsLock
   km5 := KeymapManager.NewKeymap("*CapsLock", "CapsLock", "", "ahk_exe steam.exe")
@@ -103,7 +103,7 @@ InitKeymap()
   km.RemapKey("8", "up")
   km.Map("*9", _ => (Send("{blind}^{left}")))
   km.Map("*0", _ => MsgBox("hello"))
-  km.Map("*e", _ => MyKeymapToggleSuspend(), , , , "S")
+  km.Map("*e", _ => KeyFluxToggleSuspend(), , , , "S")
   km.Map("*q", _ => EnterCapslockAbbr(capsHook))
   km.Map("*r", km.ToggleLock)
   km.Map("*w", _ => EnterSemicolonAbbr(semiHook, semiHookAbbrWindow))
@@ -116,7 +116,7 @@ InitKeymap()
   km.Map("m5", fast.MoveMouseDown, slow, "ahk_exe code.exe", 1), slow.Map("m5", slow.MoveMouseDown, , "ahk_exe code.exe", 1)
   km.Map("m3", _ => (ToolTip("hi"), Sleep(500), Send("{enter}")))
   km.Map("m4", _ => HoldDownModifierKey("LShift"), , 'WinActive("A") && GetKeyState("Shift")', 5)
-  km.Map("m6", _ => MyKeymapOpenSettings())
+  km.Map("m6", _ => KeyFluxOpenSettings())
   km.Map("m7", _ => ToggleCapslock())
 
   ; ===== 选中动作 (单键分发) =====
@@ -151,7 +151,7 @@ InitTrayMenu() {
   A_TrayMenu.Default := Translation().menu_pause
   A_TrayMenu.ClickCount := 1
 
-  A_IconTip := "mykeymapX"
+  A_IconTip := "keyfluxX"
   TraySetIcon("./bin/icons/logo.ico", , true)
 }
 

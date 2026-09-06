@@ -1,11 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:MyKeymap.Settings.ViewModels"
-        xmlns:views="using:MyKeymap.Settings.Views"
-        x:Class="MyKeymap.Settings.Views.MainWindow"
+        xmlns:vm="using:KeyFlux.Settings.ViewModels"
+        xmlns:views="using:KeyFlux.Settings.Views"
+        x:Class="KeyFlux.Settings.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="Setting"
-        Icon="avares://MyKeymap.Settings/Assets/logo.png"
+        Icon="avares://KeyFlux.Settings/Assets/logo.png"
         Width="1200" Height="760"
         MinWidth="960" MinHeight="600"
         WindowStartupLocation="CenterScreen">
@@ -35,10 +35,10 @@
           <StackPanel Orientation="Horizontal" Spacing="10">
             <!-- 品牌 logo (tb.png 裁剪透明边距后降采样 256x256, 内容占画布 ~93%):
                  尺寸取 52: 52*0.93≈48px 实际图形, 头部 StackPanel 高度从旧 42→52(+10px),
-                 不影响 DockPanel Top 布局; 右侧 "MyKeymap" 标题 VerticalAlignment=Center 自动居中。 -->
-            <Image Source="avares://MyKeymap.Settings/Assets/logo.png"
+                 不影响 DockPanel Top 布局; 右侧 "KeyFlux" 标题 VerticalAlignment=Center 自动居中。 -->
+            <Image Source="avares://KeyFlux.Settings/Assets/logo.png"
                    Width="52" Height="52" />
-            <TextBlock VerticalAlignment="Center" Text="MyKeymap"
+            <TextBlock VerticalAlignment="Center" Text="KeyFlux"
                        FontSize="18" FontWeight="SemiBold" />
           </StackPanel>
           <Border Height="1" Background="#E3E6EC" />

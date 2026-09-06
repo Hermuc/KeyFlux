@@ -1,9 +1,9 @@
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Services;
 using System.Collections.ObjectModel;
 
-namespace MyKeymap.Settings.ViewModels;
+namespace KeyFlux.Settings.ViewModels;
 
 /// <summary>
 /// 总览页 (复刻 Home.vue): Vue 版是 &lt;iframe src="/config_doc.html"&gt; 展示帮助文档。

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace MyKeymap.Settings.Models;
+namespace KeyFlux.Settings.Models;
 
 /// <summary>
 /// 全局共享的 System.Text.Json 序列化选项。

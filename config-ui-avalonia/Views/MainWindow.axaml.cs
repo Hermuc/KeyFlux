@@ -1,11 +1,11 @@
 using Avalonia.Controls;
-using MyKeymap.Settings.Services;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.Services;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Views;
+namespace KeyFlux.Settings.Views;
 
 /// <summary>
-/// 主窗口：标题 "Setting"（AHK 侧以 "Setting ahk_exe MyKeymap.Settings.exe" 匹配窗口）。
+/// 主窗口：标题 "Setting"（AHK 侧以 "Setting ahk_exe KeyFlux.Settings.exe" 匹配窗口）。
 /// 标题栏小图标透明化经 <see cref="TitleBarIconSuppressor"/> 统一接入 (与两个对话框窗口共用)。
 /// 生命周期: Opened -> 自激活一次 + InitializeAsync (连接后端/加载配置);
 /// Closing -> 同步关停后端会话 (整树 Kill); 另有 App.Exit 与 Program.Main finally 两层兜底。

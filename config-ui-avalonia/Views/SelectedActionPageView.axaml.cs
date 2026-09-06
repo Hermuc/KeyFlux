@@ -7,9 +7,9 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Views;
+namespace KeyFlux.Settings.Views;
 
 /// <summary>
 /// 选中动作单屏页视图 (方案 D) 的交互部分:

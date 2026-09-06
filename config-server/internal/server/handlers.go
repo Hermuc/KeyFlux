@@ -28,12 +28,12 @@ func GetConfigHandler(c *gin.Context) {
 
 // syncStartupFromRegistry 用注册表 Run 键的真实状态回填 options.startup。
 // 注册表是开机自启的真实生效态 (bin/MiscTools.ahk RunAtStartup 写/删
-// HKCU\...\CurrentVersion\Run 下的 MyKeymap 值), config.json 的 options.startup
+// HKCU\...\CurrentVersion\Run 下的 KeyFlux 值), config.json 的 options.startup
 // 仅是 UI 显示态且无同步机制, 外部删除注册表项后 UI 会显示失真, 故 GET /config
 // 时以注册表为准回填。
 // 特意不放进 ParseConfig: 它还服务于 GenerateAHK/DumpPlan 等验证路径, 需保持
 // 确定性, 回填只应作用于对外 HTTP 响应。
-// 值不存在 (Run 键或 MyKeymap 值缺失) → false; 其他读失败 (如权限) → 保持
+// 值不存在 (Run 键或 KeyFlux 值缺失) → false; 其他读失败 (如权限) → 保持
 // config 原值不动, 不报错。
 func syncStartupFromRegistry(startup *bool) {
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.QUERY_VALUE)
@@ -44,9 +44,9 @@ func syncStartupFromRegistry(startup *bool) {
 		return
 	}
 	defer key.Close()
-	if _, _, err := key.GetStringValue("MyKeymap"); err != nil {
+	if _, _, err := key.GetStringValue("KeyFlux"); err != nil {
 		if errors.Is(err, syscall.ERROR_FILE_NOT_FOUND) {
-			*startup = false // MyKeymap 值不存在视为未自启
+			*startup = false // KeyFlux 值不存在视为未自启
 		}
 		return
 	}
@@ -83,15 +83,15 @@ func ServerCommandHandler(c *gin.Context) {
 		args []string
 	}{
 		"2": {
-			exe:  "./MyKeymap.exe",
+			exe:  "./KeyFlux.exe",
 			args: []string{"/script", "bin/WindowSpy.ahk"},
 		},
 		"3": {
-			exe:  "./MyKeymap.exe",
+			exe:  "./KeyFlux.exe",
 			args: []string{"/script", "./bin/MiscTools.ahk", "RunAtStartup", "On"},
 		},
 		"4": {
-			exe:  "./MyKeymap.exe",
+			exe:  "./KeyFlux.exe",
 			args: []string{"/script", "./bin/MiscTools.ahk", "RunAtStartup", "Off"},
 		},
 	}
@@ -127,11 +127,11 @@ func SaveConfigHandler(debug bool) gin.HandlerFunc {
 
 		if debug {
 			script.GenerateScripts(config) // 生成脚本文件
-			// proc.ExecCmd("./MyKeymap.exe", "./bin/MyKeymap.ahk") // 重启程序且跳过 ahk 脚本生成
+			// proc.ExecCmd("./KeyFlux.exe", "./bin/KeyFlux.ahk") // 重启程序且跳过 ahk 脚本生成
 		}
 		// 重启程序, 此时 launcher 会重新生成脚本; 启动失败时经 restartFailed 告知前端
 		// (旧前端不读该字段, 保持向后兼容)
-		restartFailed := !proc.ExecCmd("./MyKeymap.exe")
+		restartFailed := !proc.ExecCmd("./KeyFlux.exe")
 
 		c.JSON(http.StatusOK, gin.H{"message": "ok", "restartFailed": restartFailed})
 	}

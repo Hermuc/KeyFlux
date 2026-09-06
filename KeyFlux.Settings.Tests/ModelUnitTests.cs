@@ -1,9 +1,9 @@
 using System.Text.Json;
-using MyKeymap.Settings.Models;
+using KeyFlux.Settings.Models;
 // 避免与 System.Action 歧义
-using Action = MyKeymap.Settings.Models.Action;
+using Action = KeyFlux.Settings.Models.Action;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// 纯单元层契约守护 (不需要真实服务):
@@ -91,7 +91,7 @@ public sealed class ModelSerializationTests
         Assert.Equal(
             new HashSet<string>
             {
-                "hideMatrix", "mykeymapVersion", "windowGroups", "mouse", "scroll",
+                "hideMatrix", "keyfluxVersion", "windowGroups", "mouse", "scroll",
                 "commandInputSkin", "pathVariables", "startup", "language", "keyMapping", "keyboardLayout",
             },
             keys);
@@ -190,7 +190,7 @@ public sealed class ModelSerializationTests
               "disableAt": "", "hotkeys": { "a": [ { "windowGroupID": 0, "actionTypeID": 5 } ] } }
           ],
           "options": {
-            "hideMatrix": false, "mykeymapVersion": "", "windowGroups": [],
+            "hideMatrix": false, "keyfluxVersion": "", "windowGroups": [],
             "mouse": {}, "scroll": {}, "commandInputSkin": {}, "pathVariables": [],
             "startup": false, "language": "", "keyMapping": "", "keyboardLayout": ""
           }

@@ -1818,7 +1818,7 @@
           {
             "windowGroupID": 0,
             "actionTypeID": 1,
-            "comment": "打开「 MyKeymap 」文件夹",
+            "comment": "打开「 KeyFlux 」文件夹",
             "target": "ahk-expression: A_WorkingDir"
           }
         ],
@@ -1891,10 +1891,10 @@
           {
             "windowGroupID": 0,
             "actionTypeID": 1,
-            "comment": "个人常用项目 - MyKeymap",
-            "winTitle": "MyKeymap2 - Visual Studio Code",
+            "comment": "个人常用项目 - KeyFlux",
+            "winTitle": "KeyFlux2 - Visual Studio Code",
             "target": "shortcuts\\Visual Studio Code.lnk",
-            "args": "D:\\MyFiles\\MyKeymap2"
+            "args": "D:\\MyFiles\\KeyFlux2"
           }
         ],
         "ms": [
@@ -2198,7 +2198,7 @@
   ],
   "options": {
     "hideMatrix": false,
-    "mykeymapVersion": "2.0-beta33",
+    "keyfluxVersion": "2.0-beta33",
     "windowGroups": [
       {
         "id": -1,

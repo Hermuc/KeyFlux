@@ -1,7 +1,7 @@
 using System.Text.Json;
-using MyKeymap.Settings.Models;
+using KeyFlux.Settings.Models;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // 保存链路 (复刻 config-ui/src/store/config.ts):

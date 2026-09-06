@@ -7,7 +7,7 @@
  */
 class IAction {
   ; 唯一标识。内置: "activateOrRun"/"systemActions"/"windowActions"/"mouseActions"/
-  ; "remapKey"/"sendKeys"/"textFeatures"/"builtinFunctions"/"mykeymapActions"
+  ; "remapKey"/"sendKeys"/"textFeatures"/"builtinFunctions"/"keyfluxActions"
   ; 插件: "plugin:<pluginId>:<actionName>"
   Type := ""
 

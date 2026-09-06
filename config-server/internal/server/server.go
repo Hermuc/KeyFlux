@@ -1,4 +1,4 @@
-// Package server 承载 MyKeymap 配置后端的全部 HTTP 层:
+// Package server 承载 KeyFlux 配置后端的全部 HTTP 层:
 // gin 引擎装配、路由注册、handler 实现、DTO 映射。
 // 由 cmd/settings/main.go 调用 Run() 启动。
 package server
@@ -70,8 +70,8 @@ func Run(hasError chan<- struct{}, rainDone <-chan struct{}, debug bool, headles
 	}
 
 	if headless {
-		// 端口通告行: 必须为 stdout 第一行输出, 供 Avalonia 壳逐行匹配 "MYKEYMAP_PORT=" 前缀 (不打印任何装饰文本)
-		fmt.Printf("MYKEYMAP_PORT=%d\n", ln.Addr().(*net.TCPAddr).Port)
+		// 端口通告行: 必须为 stdout 第一行输出, 供 Avalonia 壳逐行匹配 "KEYFLUX_PORT=" 前缀 (不打印任何装饰文本)
+		fmt.Printf("KEYFLUX_PORT=%d\n", ln.Addr().(*net.TCPAddr).Port)
 	}
 
 	if !debug && !headless {

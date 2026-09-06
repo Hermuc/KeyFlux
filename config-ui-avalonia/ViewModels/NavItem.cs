@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace MyKeymap.Settings.ViewModels;
+namespace KeyFlux.Settings.ViewModels;
 
 /// <summary>
 /// 导航条目 (复刻 NavigationDrawer.vue 的条目模型):

@@ -73,7 +73,7 @@ func ChangeVersion(args ...string) {
 	if err != nil {
 		panic(err)
 	}
-	config.Options.MykeymapVersion = args[0]
+	config.Options.KeyfluxVersion = args[0]
 	config.Options.Language = "" // 重置语言
 	script.SaveConfigFile(config)
 	script.GenerateScripts(config)
@@ -97,11 +97,11 @@ func UseOriginalAHK(args ...string) {
 		fmt.Println("Error: file", exe, "does not exist")
 		return
 	}
-	if err := execCmd("cmd.exe", "/c", "copy /y "+exe+" MyKeymap.exe"); err != nil {
-		fmt.Println("\nPlease close MyKeymap and retry")
+	if err := execCmd("cmd.exe", "/c", "copy /y "+exe+" KeyFlux.exe"); err != nil {
+		fmt.Println("\nPlease close KeyFlux and retry")
 		return
 	}
-	if err := execCmd("cmd.exe", "/c", "copy /y bin\\Launcher.ahk MyKeymap.ahk"); err != nil {
+	if err := execCmd("cmd.exe", "/c", "copy /y bin\\Launcher.ahk KeyFlux.ahk"); err != nil {
 		panic(err)
 	}
 	fmt.Println("\ndone!")

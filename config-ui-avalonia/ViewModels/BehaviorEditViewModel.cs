@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.ViewModels;
+namespace KeyFlux.Settings.ViewModels;
 
 /// <summary>前提编辑行: 类型 (文件后缀/文本特征) + 值 (逗号分隔后缀或特征枚举值)。</summary>
 public sealed partial class BehaviorPremiseRowVm : ObservableObject

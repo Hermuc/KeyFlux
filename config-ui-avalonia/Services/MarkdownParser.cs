@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // MarkdownParser: 总览页文档解析器 (纯逻辑, 零 UI 依赖)

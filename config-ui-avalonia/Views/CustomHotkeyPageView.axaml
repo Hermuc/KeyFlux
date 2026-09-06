@@ -1,8 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:MyKeymap.Settings.ViewModels"
-             xmlns:controls="using:MyKeymap.Settings.Views.Controls"
-             x:Class="MyKeymap.Settings.Views.CustomHotkeyPageView"
+             xmlns:vm="using:KeyFlux.Settings.ViewModels"
+             xmlns:controls="using:KeyFlux.Settings.Views.Controls"
+             x:Class="KeyFlux.Settings.Views.CustomHotkeyPageView"
              x:Name="Root"
              x:DataType="vm:CustomHotkeyPageViewModel">
 

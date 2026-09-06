@@ -1,8 +1,8 @@
-[![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/Hermuc/MyKeymap/blob/main/readme.en.md)
+[![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/Hermuc/KeyFlux/blob/main/readme.en.md)
 
-# MyKeymap
+# KeyFlux
 
-MyKeymap 是一款基于 [AutoHotkey](https://www.autohotkey.com/) 的键盘映射工具，用于增强 Windows 的键盘输入体验和窗口操作效率。
+KeyFlux 是一款基于 [AutoHotkey](https://www.autohotkey.com/) 的键盘映射工具，用于增强 Windows 的键盘输入体验和窗口操作效率。
 
 ## Features
 
@@ -65,7 +65,7 @@ MyKeymap 是一款基于 [AutoHotkey](https://www.autohotkey.com/) 的键盘映�
 
 ### 原生设置界面（Avalonia GUI）构建说明（2026-08）
 
-- **源码位置**：`config-ui-avalonia/`（GUI 壳，.NET 10 / Avalonia 11 / CommunityToolkit.Mvvm）；单元测试位于仓库根目录 `MyKeymap.Settings.Tests/`
+- **源码位置**：`config-ui-avalonia/`（GUI 壳，.NET 10 / Avalonia 11 / CommunityToolkit.Mvvm）；单元测试位于仓库根目录 `KeyFlux.Settings.Tests/`
 - **构建**：`make buildClientAvalonia`（完整构建 `make build` 已包含），`dotnet publish` 自包含 win-x64 + ReadyToRun 发布到 `bin/ui/`（不入库）；开发环境需 .NET 10 SDK
 - **运行原理**：GUI 拉起 `settings.exe --headless` 子进程（命名 Mutex 单实例、Job Object 兜底回收），经 localhost HTTP 调用既有全部 API；配置写盘仍由 Go 后端统一负责，GUI 不直接写 config.json
-- **入口**：AHK 设置入口（`bin/lib/core/Functions.ahk`）启动 `bin\ui\MyKeymap.Settings.exe`；旧浏览器版设置页已随 Vue 源码一并移除（无参运行 settings.exe 现返回 404）
+- **入口**：AHK 设置入口（`bin/lib/core/Functions.ahk`）启动 `bin\ui\KeyFlux.Settings.exe`；旧浏览器版设置页已随 Vue 源码一并移除（无参运行 settings.exe 现返回 404）

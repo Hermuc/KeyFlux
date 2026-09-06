@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.ViewModels;
+namespace KeyFlux.Settings.ViewModels;
 
 /// <summary>行为库列表行 VM。</summary>
 public sealed partial class BehaviorRowVm : ObservableObject

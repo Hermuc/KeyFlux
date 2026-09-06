@@ -1,8 +1,8 @@
 using Avalonia.Input;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// HotkeyCapture 控件纯逻辑层单测 (对照 config-ui/src/components/action/constants.ts

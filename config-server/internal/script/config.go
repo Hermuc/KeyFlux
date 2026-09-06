@@ -30,7 +30,7 @@ type (
 	CommandInputSkin = model.CommandInputSkin
 )
 
-var MykeymapVersion string
+var KeyfluxVersion string
 
 // TemplateFuncMap 模板函数表已迁移到 generators 包, 别名保持既有调用方无需改动。
 var TemplateFuncMap = generators.TemplateFuncMap
@@ -47,7 +47,7 @@ func ParseConfig(file string) (*Config, error) {
 		return nil, fmt.Errorf("cannot parse config: %v", err)
 	}
 
-	config.Options.MykeymapVersion = MykeymapVersion
+	config.Options.KeyfluxVersion = KeyfluxVersion
 	if config.Options.Mouse.TipSymbol == "" {
 		config.Options.Mouse.TipSymbol = "🐶"
 	}

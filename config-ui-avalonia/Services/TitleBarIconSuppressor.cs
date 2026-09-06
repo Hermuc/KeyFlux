@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avalonia.Controls;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 /// <summary>
 /// 标题栏小图标透明化助手 (MainWindow / WindowGroupDialogWindow / OverviewEditWindow 共用)。

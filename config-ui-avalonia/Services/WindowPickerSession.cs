@@ -1,10 +1,10 @@
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
-using MyKeymap.Settings.Services.Win32;
-using static MyKeymap.Settings.Services.Win32.NativeMethods;
+using KeyFlux.Settings.Services.Win32;
+using static KeyFlux.Settings.Services.Win32.NativeMethods;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // 拾取会话层 (L4): 「窗口拾取准星」交互机制。
@@ -152,7 +152,7 @@ public sealed class WindowPickerService : IWindowPickerService
 /// </summary>
 internal sealed class PickSession
 {
-    private const string HighlightClassName = "MyKeymap.WindowPicker.Highlight";
+    private const string HighlightClassName = "KeyFlux.WindowPicker.Highlight";
     private const int FrameThickness = 3;      // 高亮框空心边宽 (px)
     private const uint HighlightColorRef = 0x00E16941; // #4169E1 -> COLORREF 0x00BBGGRR
     private static readonly IntPtr TimerId = new(1);
@@ -258,7 +258,7 @@ internal sealed class PickSession
 
     private System.Threading.Tasks.Task<WindowPickResult> Start()
     {
-        _thread = new Thread(Run) { IsBackground = true, Name = "MyKeymap.WindowPicker" };
+        _thread = new Thread(Run) { IsBackground = true, Name = "KeyFlux.WindowPicker" };
 
         // 三重联动取消 (2/3): CancellationToken + owner.Closed -> RequestCancel 唤醒 pump。
         // 设计决策: LostFocus / Deactivated 不作取消触发 —— 全局钩子不依赖焦点, 用户拾取时

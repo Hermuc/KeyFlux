@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // 拾取器诊断日志 (M1): 「准星单击不回填」修复包的可观测性底座。

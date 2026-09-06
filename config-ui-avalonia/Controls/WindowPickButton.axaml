@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:controls="using:MyKeymap.Settings.Controls"
-             x:Class="MyKeymap.Settings.Controls.WindowPickButton"
+             xmlns:controls="using:KeyFlux.Settings.Controls"
+             x:Class="KeyFlux.Settings.Controls.WindowPickButton"
              x:DataType="controls:WindowPickButton"
              Width="30">
 

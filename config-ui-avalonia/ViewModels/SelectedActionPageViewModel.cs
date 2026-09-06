@@ -3,10 +3,10 @@ using System.Text.Json;
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.ViewModels;
+namespace KeyFlux.Settings.ViewModels;
 
 // ============================================================================
 // 选中动作单屏页 (方案 D「单键分发」, 2026-09):
@@ -22,7 +22,7 @@ namespace MyKeymap.Settings.ViewModels;
 //
 // 保存纪律: 启用开关与删除映射立即保存 (沿用旧卡片页语义); 其余修改统一经
 // MainViewModel.SaveAsync 咽喉 (Ctrl+S / 侧栏「保存配置」), 避免频繁 PUT 触发
-// MyKeymap 进程重启。分组后缀写回 (评审 F1/F2 语义) 由咽喉调用
+// KeyFlux 进程重启。分组后缀写回 (评审 F1/F2 语义) 由咽喉调用
 // ApplyFileGroupWriteBack 完成。
 // ============================================================================
 

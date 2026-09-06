@@ -1,9 +1,9 @@
 using System.Text.Json.Serialization;
 
-namespace MyKeymap.Settings.Models;
+namespace KeyFlux.Settings.Models;
 
 // ============================================================================
-// MyKeymap 配置数据模型 (C# 复刻)
+// KeyFlux 配置数据模型 (C# 复刻)
 //
 // 权威蓝本: config-server/internal/script/model/types.go
 // 约定:
@@ -257,8 +257,8 @@ public sealed class Options
     [JsonPropertyName("hideMatrix")]
     public bool HideMatrix { get; set; }
 
-    [JsonPropertyName("mykeymapVersion")]
-    public string MykeymapVersion { get; set; } = "";
+    [JsonPropertyName("keyfluxVersion")]
+    public string KeyfluxVersion { get; set; } = "";
 
     [JsonPropertyName("windowGroups")]
     public List<WindowGroup> WindowGroups { get; set; } = [];

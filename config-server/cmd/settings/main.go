@@ -29,7 +29,7 @@ func main() {
 		if headless || hideMatrix() {
 			close(rainDone)
 			if !headless {
-				fmt.Println("MyKeymap config server is running...")
+				fmt.Println("KeyFlux config server is running...")
 			}
 		} else {
 			go matrix.DigitalRain(hasError, rainDone)
@@ -39,7 +39,7 @@ func main() {
 		hasError = nil
 	}
 
-	proc.ExecCmd("./MyKeymap.exe", "/script", "./bin/MiscTools.ahk", "GenerateShortcuts")
+	proc.ExecCmd("./KeyFlux.exe", "/script", "./bin/MiscTools.ahk", "GenerateShortcuts")
 	server.Run(hasError, rainDone, debug, headless)
 }
 

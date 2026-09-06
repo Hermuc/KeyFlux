@@ -51,9 +51,9 @@ if A_Args[1] = "RunAtStartup" {
   runKey := "HKCU\Software\Microsoft\Windows\CurrentVersion\Run"
   if A_Args[2] = "On" {
     ; 值数据为带引号的完整路径, 路径含空格时也能正确启动
-    RegWrite('"' A_WorkingDir '\MyKeymap.exe"', "REG_SZ", runKey, "MyKeymap")
+    RegWrite('"' A_WorkingDir '\KeyFlux.exe"', "REG_SZ", runKey, "KeyFlux")
   } else if (A_Args[2] = "Off") {
-    try RegDelete(runKey, "MyKeymap")
+    try RegDelete(runKey, "KeyFlux")
   }
   return
 }

@@ -19,7 +19,7 @@ class ActionRegistry {
     "sendKeys",           ; TypeID 6
     "textFeatures",       ; TypeID 7
     "builtinFunctions",   ; TypeID 8
-    "mykeymapActions"     ; TypeID 9
+    "keyfluxActions"     ; TypeID 9
   ]
 
   /**

@@ -2,10 +2,10 @@ using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.ViewModels;
+namespace KeyFlux.Settings.ViewModels;
 
 // ============================================================================
 // 动作编辑面板 (复刻 components/actions/Action.vue 与各动作编辑组件)
@@ -14,7 +14,7 @@ namespace MyKeymap.Settings.ViewModels;
 //   Action.vue          -> ActionEditorViewModel (窗口分组下拉 + 动作类型下拉 + 动态编辑器)
 //   ActivateOrRun.vue   -> ActivateOrRunEditorVm   (类型 1)
 //   System/Window/Mouse/
-//   Text/MyKeymap.vue   -> RadioGroupEditorVm      (类型 2/3/4/7/9, 枚举按 RadioCatalog 对齐)
+//   Text/KeyFlux.vue   -> RadioGroupEditorVm      (类型 2/3/4/7/9, 枚举按 RadioCatalog 对齐)
 //   RemapKey.vue        -> RemapEditorVm           (类型 5)
 //   SendKey.vue         -> SendKeysEditorVm        (类型 6)
 //   BuiltinFunction.vue -> AhkCodeEditorVm         (类型 8)
@@ -300,7 +300,7 @@ public sealed partial class ActivateOrRunEditorVm : ObservableObject
 }
 
 // ============================================================================
-// 类型 2/3/4/7/9: 枚举单选 (复刻 RadioGroup.vue + System/Window/Mouse/Text/MyKeymap.vue)
+// 类型 2/3/4/7/9: 枚举单选 (复刻 RadioGroup.vue + System/Window/Mouse/Text/KeyFlux.vue)
 // ============================================================================
 
 /// <summary>单选项 (labelKey 为文案键; 点击时同时把备注写为 label:NNN, 复刻 changeActionComment)。</summary>
@@ -339,7 +339,7 @@ public sealed partial class RadioOptionVm : ObservableObject
 
 /// <summary>
 /// 枚举单选编辑器。分组与取值的权威对照: System.vue / Window.vue / Mouse.vue /
-/// Text.vue / MyKeymap.vue (含 hideInAbbr 过滤); 布局复刻 RadioGroup.vue 的
+/// Text.vue / KeyFlux.vue (含 hideInAbbr 过滤); 布局复刻 RadioGroup.vue 的
 /// groups 规则 (普通: [[g1,g2],[g3,g4]]; Text 为 horizontal 单行四列)。
 /// </summary>
 public sealed partial class RadioGroupEditorVm : ObservableObject
@@ -440,7 +440,7 @@ public static class RadioCatalog
             [I(20, "62", true), I(21, "63", true), I(22, "64", true), I(23, "65", true),
              I(24, "66", true), I(25, "67", true), I(26, "68", true), I(27, "69", true), I(28, "70", true)],
         ],
-        // MyKeymap.vue
+        // KeyFlux.vue
         9 =>
         [
             [I(1, "71", true), I(2, "72"), I(3, "73"), I(4, "74")],

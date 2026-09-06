@@ -16,7 +16,7 @@ func GenerateScripts(config *Config) {
 
 	Preprocess(config)
 
-	if err := SaveAHK(config, "./templates/MyKeymap.tmpl", "../bin/MyKeymap.ahk"); err != nil {
+	if err := SaveAHK(config, "./templates/KeyFlux.tmpl", "../bin/KeyFlux.ahk"); err != nil {
 		panic(err)
 	}
 	if err := SaveAHK(config, "./templates/CommandInputSkin.tmpl", "../bin/CommandInputSkin.txt"); err != nil {

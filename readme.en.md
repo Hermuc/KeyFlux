@@ -1,6 +1,6 @@
 [![zh](https://img.shields.io/badge/lang-zh-blue.svg)](./readme.md)
 
-# MyKeymap
+# KeyFlux
 
 A program helps you improve the efficiency of using the keyboard.
 

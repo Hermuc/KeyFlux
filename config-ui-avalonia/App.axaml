@@ -3,8 +3,8 @@
      故固定 Light 以保证文字为深色可读。 -->
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:services="using:MyKeymap.Settings.Services"
-             x:Class="MyKeymap.Settings.App"
+             xmlns:services="using:KeyFlux.Settings.Services"
+             x:Class="KeyFlux.Settings.App"
              RequestedThemeVariant="Light">
 
   <Application.Resources>
@@ -13,7 +13,7 @@
     <services:IntToStringConverter x:Key="IntStr" />
     <services:StringNotEmptyConverter x:Key="NotEmpty" />
     <!-- MDI 图标字体 (导航图标, 复刻 Vue 版 mdi 图标) -->
-    <FontFamily x:Key="MdiFont">avares://MyKeymap.Settings/Assets/Fonts/materialdesignicons.ttf#Material Design Icons</FontFamily>
+    <FontFamily x:Key="MdiFont">avares://KeyFlux.Settings/Assets/Fonts/materialdesignicons.ttf#Material Design Icons</FontFamily>
     <!-- 滚动条整体宽度: Fluent 主题模板中 ScrollBar 的 MinWidth 与 Thumb 宽度均绑定 ScrollBarSize 资源
          (默认值下实测展开约 14px, 细条约 3px; 注意窗口为 125% DPI, 物理像素 = 逻辑值 x 1.25),
          此处覆盖为 10, 展开宽度收窄至约 12-13px, 细条同步变细.
@@ -26,7 +26,7 @@
   <Application.Styles>
     <FluentTheme />
     <!-- 滚动条交互手感与外观优化 (悬停即时加粗/移开即时变细/Thumb 圆角), 详见 Styles/ScrollBarStyles.axaml -->
-    <StyleInclude Source="avares://MyKeymap.Settings/Styles/ScrollBarStyles.axaml" />
+    <StyleInclude Source="avares://KeyFlux.Settings/Styles/ScrollBarStyles.axaml" />
   </Application.Styles>
 
 </Application>

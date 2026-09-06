@@ -179,7 +179,7 @@ class SelectedAction {
    *     MaxThreadsPerHotkey=1 下重复按压不会重入热键回调, 按键只会落入 InputHook,
    *     故对主键 KeyOpt S+N (吞键+通知), OnKeyDown 里由 _IsMainKey 判定后取消;
    *   - Suspend 包裹沿用 AbbrInput.StartInputHook 模式, 但尊重进入前的挂起状态
-   *     (已挂起时不再 Suspend(true)/Suspend(false), 避免把「暂停 MyKeymap」误恢复);
+   *     (已挂起时不再 Suspend(true)/Suspend(false), 避免把「暂停 KeyFlux」误恢复);
    *   - 淡入淡出经 SetTimer 逐级透明度实现, 窗口 +Disabled + NoActivate 不抢焦点。
    */
   static _RunMenu(hotkeyName, entries, selected) {

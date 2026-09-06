@@ -1,7 +1,7 @@
 using Avalonia.Controls;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Views.Controls;
+namespace KeyFlux.Settings.Views.Controls;
 
 /// <summary>
 /// 动作编辑面板 (复刻 actions/Action.vue): 窗口分组 + 动作类型下拉 + 按类型分发编辑器。

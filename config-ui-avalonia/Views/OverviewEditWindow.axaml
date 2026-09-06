@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="MyKeymap.Settings.Views.OverviewEditWindow"
+        x:Class="KeyFlux.Settings.Views.OverviewEditWindow"
         Title="Setting"
         Width="780" Height="600"
         MinWidth="560" MinHeight="400"

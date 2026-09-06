@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace MyKeymap.Settings.Models;
+namespace KeyFlux.Settings.Models;
 
 /// <summary>
 /// 行为包 manifest DTO —— wire 格式 = 文件格式 = 后端 CONTRACTS §3.9 (specVersion 1)。

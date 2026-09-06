@@ -1,8 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:MyKeymap.Settings.ViewModels"
-             xmlns:controls="using:MyKeymap.Settings.Controls"
-             x:Class="MyKeymap.Settings.Views.Controls.ActionEditorPanel"
+             xmlns:vm="using:KeyFlux.Settings.ViewModels"
+             xmlns:controls="using:KeyFlux.Settings.Controls"
+             x:Class="KeyFlux.Settings.Views.Controls.ActionEditorPanel"
              x:Name="PanelRoot"
              x:DataType="vm:ActionEditorViewModel">
 

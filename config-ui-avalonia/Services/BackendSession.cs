@@ -2,14 +2,14 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // BackendSession: settings.exe 后端连接抽象 (任务 #9 交付, 任务 #6 完善生命周期)
 //
 // 两种连接方式:
 //   1. 子进程模式 (默认): 拉起 `settings.exe --headless`,
-//      从其 stdout 首行 "MYKEYMAP_PORT=<端口>" 读取实际监听端口
+//      从其 stdout 首行 "KEYFLUX_PORT=<端口>" 读取实际监听端口
 //      (12333 被占用时 Go 侧会退到随机端口, 故必须按通告端口连接),
 //      健康轮询 GET /config 直到真正可服务。
 //   2. 直连模式 (--port <N>): 直接连接一个已运行的后端, 便于开发调试
@@ -19,7 +19,7 @@ namespace MyKeymap.Settings.Services;
 //   - Shutdown() 终止本会话拉起的子进程 settings.exe 本体 (不整树, 超时保底, 幂等),
 //     窗口 Closing / Dispatcher 退出 / 主入口 finally 三层保底, 绝不留孤儿;
 //   - Job 额外开放 BREAKAWAY_OK: settings.exe 保存时用 CREATE_BREAKAWAY_FROM_JOB
-//     重启的 MyKeymap 脱离本 Job, 关闭设置窗口不会连带终止托盘程序;
+//     重启的 KeyFlux 脱离本 Job, 关闭设置窗口不会连带终止托盘程序;
 //   - 子进程意外退出: EnableRaisingEvents + Exited 事件 -> ChildProcessExited,
 //     上层 (MainViewModel) 切错误态并提供「重试/重启后端」按钮, 不自动重启防风暴;
 //   - 后端定位: --settings-exe/--backend-dir 优先, 缺省从 AppContext.BaseDirectory
@@ -38,7 +38,7 @@ public sealed class BackendSessionOptions
     /// <summary>settings.exe 工作目录; 缺省为 settings.exe 所在目录 (bin\, Go 依赖 ../data、./site、./templates 相对路径)。</summary>
     public string? WorkingDirectory { get; init; }
 
-    /// <summary>等待 MYKEYMAP_PORT= 通告行的超时。</summary>
+    /// <summary>等待 KEYFLUX_PORT= 通告行的超时。</summary>
     public TimeSpan PortAnnounceTimeout { get; init; } = TimeSpan.FromSeconds(20);
 
     /// <summary>健康轮询超时。</summary>
@@ -158,7 +158,7 @@ public sealed class BackendSession : IAsyncDisposable
     /// <summary>
     /// 关停会话: 终止本会话拉起的子进程 (仅 settings.exe 本体, 不整树)。幂等, 可在多层退出路径重复调用:
     /// MainWindow.Closing -> App.Exit 保底 -> Program.Main finally 保底。
-    /// 不整树原因: 保存设置时 settings.exe 会以 breakaway 方式重启 MyKeymap (常驻托盘),
+    /// 不整树原因: 保存设置时 settings.exe 会以 breakaway 方式重启 KeyFlux (常驻托盘),
     /// 其启动链仍短暂挂在 settings.exe 下, 整树 Kill 会把刚重启的托盘一并终止。
     /// </summary>
     public void Shutdown()
@@ -172,7 +172,7 @@ public sealed class BackendSession : IAsyncDisposable
             {
                 if (!_child.HasExited)
                 {
-                    // 仅终止 settings.exe 本体; MyKeymap 已通过 breakaway 脱离本进程树, 不得连带终止
+                    // 仅终止 settings.exe 本体; KeyFlux 已通过 breakaway 脱离本进程树, 不得连带终止
                     _child.Kill(entireProcessTree: false);
                                         // 超时保底: WaitForExit 限时, 绝不无限阻塞退出时序
                     _child.WaitForExit(3000);
@@ -207,7 +207,7 @@ public sealed class BackendSession : IAsyncDisposable
         // 解析 settings.exe 位置。
         // 部署形态 (与 Go 相对路径约定一致, 部署根=bin 的上级):
         //   settings.exe 位于 <部署根>\bin\, 工作目录 = bin\ (../data、./site、./templates);
-        //   MyKeymap.Settings.exe 与 settings.exe 同在 bin\ (任务 #6 定案布局),
+        //   KeyFlux.Settings.exe 与 settings.exe 同在 bin\ (任务 #6 定案布局),
         //   兼容 GUI 在 bin\ 子目录 (如 bin\ui\) 的布局 (向上级查找)。
         // 开发形态: bin\Debug\net10.0\ 下没有 settings.exe, 用 --settings-exe/--port 指定。
         var exePath = ResolveSettingsExe();
@@ -252,7 +252,7 @@ public sealed class BackendSession : IAsyncDisposable
                 // Job Object 保底: 即使 GUI 被强杀 (AHK ProcessClose/任务管理器), 来不及走 Shutdown,
         // 进程退出时句柄关闭也会触发 KILL_ON_JOB_CLOSE 终止 settings.exe, 绝不留孤儿。
         // 同时开放 BREAKAWAY_OK: 允许 settings.exe 保存时以 CREATE_BREAKAWAY_FROM_JOB
-        // 重启 MyKeymap, 使其脱离本 Job, 关闭设置窗口不会连带终止托盘程序。
+        // 重启 KeyFlux, 使其脱离本 Job, 关闭设置窗口不会连带终止托盘程序。
         AttachToJobObject(_child);
 
         // 意外退出监测: 子进程崩溃 (被任务管理器结束/自身异常) 时通知上层切错误态。
@@ -277,7 +277,7 @@ public sealed class BackendSession : IAsyncDisposable
         }
         catch (TimeoutException)
         {
-            FailureReason = "等待 settings.exe 通告端口超时 (未见 MYKEYMAP_PORT= 行)";
+            FailureReason = "等待 settings.exe 通告端口超时 (未见 KEYFLUX_PORT= 行)";
             Shutdown();
             return false;
         }
@@ -310,7 +310,7 @@ public sealed class BackendSession : IAsyncDisposable
     }
 
     /// <summary>
-    /// 候选位置: ① 与 GUI 同目录 (定案布局: MyKeymap.Settings.exe 与 settings.exe 同在 bin\);
+    /// 候选位置: ① 与 GUI 同目录 (定案布局: KeyFlux.Settings.exe 与 settings.exe 同在 bin\);
     /// ② GUI 在 bin\ 子目录 (如 bin\ui\) 时向上级目录找, 保持「部署根=bin 的上级」结构。
     /// </summary>
     private static IEnumerable<string> CandidatePaths()
@@ -419,7 +419,7 @@ public sealed class BackendSession : IAsyncDisposable
         // 诊断标记 (stdout 重定向时测试脚本可捕获; 显式刷新避免缓冲延迟)
         try
         {
-            Console.WriteLine($"MYKEYMAP_BACKEND_EXITED code={exitCode}");
+            Console.WriteLine($"KEYFLUX_BACKEND_EXITED code={exitCode}");
             Console.Out.Flush();
         }
         catch { /* 无控制台时忽略 */ }
@@ -433,13 +433,13 @@ public sealed class BackendSession : IAsyncDisposable
         while (await reader.ReadLineAsync() is { } line)
         {
             AddDiagnostic("stdout: " + line);
-            // 端口通告行: headless 模式约定为 stdout 第一行 "MYKEYMAP_PORT=<端口>"
-            if (line.StartsWith("MYKEYMAP_PORT=") && int.TryParse(line["MYKEYMAP_PORT=".Length..], out var p))
+            // 端口通告行: headless 模式约定为 stdout 第一行 "KEYFLUX_PORT=<端口>"
+            if (line.StartsWith("KEYFLUX_PORT=") && int.TryParse(line["KEYFLUX_PORT=".Length..], out var p))
             {
                 portTcs.TrySetResult(p);
             }
         }
-        portTcs.TrySetException(new InvalidOperationException("settings.exe stdout 结束仍未收到 MYKEYMAP_PORT= 通告行"));
+        portTcs.TrySetException(new InvalidOperationException("settings.exe stdout 结束仍未收到 KEYFLUX_PORT= 通告行"));
     }
 
     private static async Task<bool> WaitForReadyAsync(SettingsApiClient client, TimeSpan timeout, CancellationToken ct)

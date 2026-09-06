@@ -16,4 +16,4 @@
 #Include builtins\type6_send_keys.ahk
 #Include builtins\type7_text_features.ahk
 #Include builtins\type8_builtin.ahk
-#Include builtins\type9_mykeymap.ahk
+#Include builtins\type9_keyflux.ahk

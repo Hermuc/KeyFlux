@@ -3,7 +3,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 /// <summary>
 /// 消息提示抽象: 保存 400 时弹出后端 message 等。

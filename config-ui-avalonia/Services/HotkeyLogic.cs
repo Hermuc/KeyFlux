@@ -1,9 +1,9 @@
 using Avalonia.Input;
-using MyKeymap.Settings.Models;
+using KeyFlux.Settings.Models;
 // 避免与 Models.Action 歧义 (Keymap 模型引用需要 Models 命名空间)
 using Action = System.Action;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // 热键捕获与格式化逻辑 (复刻 config-ui/src/components/action/constants.ts

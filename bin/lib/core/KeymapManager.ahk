@@ -23,7 +23,7 @@ class KeymapManager {
     }
 
     ; 在全局 keymap 中添加一个 globalHotkey, 用来激活指定的 keymap, 例如 CapsLock 模式
-    ; 让这些 globalHotkey 在特定程序中被禁用, 也就实现了 MyKeymap 在特定程序中被禁用
+    ; 让这些 globalHotkey 在特定程序中被禁用, 也就实现了 KeyFlux 在特定程序中被禁用
     winTitle := this.GlobalKeymap.DisabledAt
     if disableAt {
       winTitle := disableAt
@@ -667,8 +667,8 @@ matchWinTitleCondition(winTitle, conditionType) {
 }
 
 SendMouseButton(btn) {
-  ; MyKeymap 输入的 RButton 被鼠标手势拦截, 鼠标手势认为用户想单击右键, 所以也发送 RButton
-  ; 然而这个 RButton 又会触发 MyKeymap 的右键功能, 造成死循环, 所以在发送 RButton 前把右键暂停一下
+  ; KeyFlux 输入的 RButton 被鼠标手势拦截, 鼠标手势认为用户想单击右键, 所以也发送 RButton
+  ; 然而这个 RButton 又会触发 KeyFlux 的右键功能, 造成死循环, 所以在发送 RButton 前把右键暂停一下
   Suspend
   Send("{blind}{" btn "}")
   Sleep 50

@@ -17,15 +17,15 @@ TrayMenuHandler(ItemName, ItemPos, MyMenu) {
   ; 注: 不用 switch 是因为 2.0.19 解释器无法编译 case 表达式含函数调用/属性访问
   t := Translation()
   if (ItemName == t.menu_exit) {
-    MyKeymapExit()
+    KeyFluxExit()
   } else if (ItemName == t.menu_pause) {
-    MyKeymapToggleSuspend()
+    KeyFluxToggleSuspend()
   } else if (ItemName == t.menu_reload) {
-    MyKeymapReload()
+    KeyFluxReload()
   } else if (ItemName == t.menu_settings) {
-    MyKeymapOpenSettings()
+    KeyFluxOpenSettings()
   } else if (ItemName == t.menu_window_spy) {
-    run("MyKeymap.exe /script bin\WindowSpy.ahk")
+    run("KeyFlux.exe /script bin\WindowSpy.ahk")
   }
 }
 
@@ -34,25 +34,25 @@ TrayMenuHandler(ItemName, ItemPos, MyMenu) {
  * @param ExitReason 退出原因
  * @param ExitCode 传递给 Exit 或 ExitApp 的退出代码.
  */
-MyKeymapExit(ExitReason?, ExitCode?) {
-  ProcessClose("MyKeymap-CommandInput.exe")
+KeyFluxExit(ExitReason?, ExitCode?) {
+  ProcessClose("KeyFlux-CommandInput.exe")
   ExitApp
 }
 
 /**
  * 暂停
  */
-MyKeymapToggleSuspend() {
+KeyFluxToggleSuspend() {
   fn() {
     Suspend(!A_IsSuspended)
     if (A_IsSuspended) {
       TraySetIcon("./bin/icons/logo2.ico")
       A_TrayMenu.Check(Translation().menu_pause)
-      Tip(Translation().mykeymap_off, -500)
+      Tip(Translation().keyflux_off, -500)
     } else {
       TraySetIcon("./bin/icons/logo.ico")
       A_TrayMenu.UnCheck(Translation().menu_pause)
-      Tip(Translation().mykeymap_on, -500)
+      Tip(Translation().keyflux_on, -500)
     }
   }
 
@@ -64,14 +64,14 @@ MyKeymapToggleSuspend() {
 }
 
 /**
- * 打开设置 (原生 Avalonia GUI: bin\ui\MyKeymap.Settings.exe, 与 settings.exe 同处 bin\ 体系,
+ * 打开设置 (原生 Avalonia GUI: bin\ui\KeyFlux.Settings.exe, 与 settings.exe 同处 bin\ 体系,
  * 窗口标题 "Setting"; 不再经 wt.exe 承载, 后端由 GUI 以子进程管理)
  * WinWait 3s 超时不静默返回: 转后台 SetTimer 轮询兜底, 窗口迟到出现时补前台激活
  */
-MyKeymapOpenSettings() {
+KeyFluxOpenSettings() {
   static fallbackTimer := ""  ; 兜底轮询闭包持有者, 供下一次唤起防重入清理
   launchSettings() {
-    Run('"' A_ScriptDir '\ui\MyKeymap.Settings.exe"', A_ScriptDir)
+    Run('"' A_ScriptDir '\ui\KeyFlux.Settings.exe"', A_ScriptDir)
   }
   ; 窗口在 WinWait 后被销毁时各 Win 调用抛 TargetError, try 静默吞掉竞态;
   ; ahk_id 锚定消除三窗口同标题 Setting 的 re-match 错绑
@@ -104,20 +104,20 @@ MyKeymapOpenSettings() {
     activateSettings(cur)
   }
   ; 标题 "Setting" 较通用 (v2 默认含匹配), 叠加 ahk_exe 约束防误中他进程同名窗口
-  winTitle := "Setting ahk_exe MyKeymap.Settings.exe"
+  winTitle := "Setting ahk_exe KeyFlux.Settings.exe"
   ; 防重入: 新一次唤起接管兜底, 先清上一轮遗留的轮询 timer (闭包实例不同, 必须显式清)
   if (fallbackTimer != "")
     SetTimer(fallbackTimer, 0)
-  if (!ProcessExist("MyKeymap.Settings.exe")) {
+  if (!ProcessExist("KeyFlux.Settings.exe")) {
     launchSettings()
   } else if (WinExist(winTitle)) {
     WinActivate(winTitle)  ; 先行激活; 前台保证由下方统一后置段校验兜底
   } else {
     ; 进程存在但设置窗口不可见, 重启设置程序 (其会一并重建后端子进程)
-    if ProcessExist("MyKeymap.Settings.exe") {
-      ProcessClose("MyKeymap.Settings.exe")
+    if ProcessExist("KeyFlux.Settings.exe") {
+      ProcessClose("KeyFlux.Settings.exe")
       ; v2.0.19 实测: 返回 0=进程已关闭, 非 0(PID)=超时进程仍在
-      if (ProcessWaitClose("MyKeymap.Settings.exe", 2) != 0)
+      if (ProcessWaitClose("KeyFlux.Settings.exe", 2) != 0)
         return  ; 旧进程未被杀干净且持单实例 Mutex, 新实例会自退, 放弃本次唤起
     }
     launchSettings()
@@ -138,9 +138,9 @@ MyKeymapOpenSettings() {
 /**
  * 重启程序
  */
-MyKeymapReload() {
+KeyFluxReload() {
   Tip("Reload")
-  Run("MyKeymap.exe")
+  Run("KeyFlux.exe")
 }
 
 /**

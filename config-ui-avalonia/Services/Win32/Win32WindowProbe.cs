@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Avalonia;
-using static MyKeymap.Settings.Services.Win32.NativeMethods;
+using static KeyFlux.Settings.Services.Win32.NativeMethods;
 
-namespace MyKeymap.Settings.Services.Win32;
+namespace KeyFlux.Settings.Services.Win32;
 
 // ============================================================================
 // 窗口探测层 (L3): 屏幕物理点 -> 顶层窗口 -> 进程映像 -> WindowDescriptor。

@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.Tests.Infrastructure;
+namespace KeyFlux.Settings.Tests.Infrastructure;
 
 /// <summary>
 /// 契约测试专用「模拟部署目录 + headless settings.exe 子进程」。
@@ -14,7 +14,7 @@ namespace MyKeymap.Settings.Tests.Infrastructure;
 ///   &lt;root&gt;\bin\site\                 最小站点目录 (仅占位)
 ///   &lt;root&gt;\data\config.json          仓库 data\config.json 的独立副本 (每个测试一份)
 ///   &lt;root&gt;\shortcuts\*.lnk           若干占位快捷方式
-///   注意: 刻意不放 MyKeymap.exe —— execCmd 会静默失败, 保证测试无副作用。
+///   注意: 刻意不放 KeyFlux.exe —— execCmd 会静默失败, 保证测试无副作用。
 ///
 /// 每个测试方法独占一个实例 (xUnit 每用例新建测试类实例), 目录相互独立,
 /// PUT 类测试对 config.json 的修改不会污染其他用例。
@@ -103,8 +103,8 @@ public sealed class SettingsTestServer : IAsyncLifetime
         File.WriteAllBytes(Path.Combine(shortcutsDir, "beta.lnk"), []);
         File.WriteAllBytes(Path.Combine(shortcutsDir, "快捷方式.lnk"), []);
 
-        // 禁令守护: 模拟目录绝不允许出现 MyKeymap.exe
-        Assert.False(File.Exists(Path.Combine(RootDir, "MyKeymap.exe")), "模拟目录不得包含 MyKeymap.exe");
+        // 禁令守护: 模拟目录绝不允许出现 KeyFlux.exe
+        Assert.False(File.Exists(Path.Combine(RootDir, "KeyFlux.exe")), "模拟目录不得包含 KeyFlux.exe");
 
         var psi = new ProcessStartInfo
         {
@@ -127,7 +127,7 @@ public sealed class SettingsTestServer : IAsyncLifetime
         {
             while (await _process.StandardError.ReadLineAsync() is { } line)
             {
-                // execCmd 找不到 MyKeymap.exe 的日志会到这里, 忽略即可
+                // execCmd 找不到 KeyFlux.exe 的日志会到这里, 忽略即可
             }
         });
 
@@ -138,7 +138,7 @@ public sealed class SettingsTestServer : IAsyncLifetime
         }
         catch (TimeoutException)
         {
-            throw new TimeoutException("等待 MYKEYMAP_PORT= 通告行超时");
+            throw new TimeoutException("等待 KEYFLUX_PORT= 通告行超时");
         }
         Port = port;
         Client = new SettingsApiClient(port);
@@ -152,14 +152,14 @@ public sealed class SettingsTestServer : IAsyncLifetime
         while (await _process!.StandardOutput.ReadLineAsync() is { } line)
         {
             lock (_stdoutLines) { _stdoutLines.Add(line); }
-            // 端口通告行: headless 模式约定为 stdout 第一行 "MYKEYMAP_PORT=<端口>"
-            if (line.StartsWith("MYKEYMAP_PORT=") && int.TryParse(line["MYKEYMAP_PORT=".Length..], out var p))
+            // 端口通告行: headless 模式约定为 stdout 第一行 "KEYFLUX_PORT=<端口>"
+            if (line.StartsWith("KEYFLUX_PORT=") && int.TryParse(line["KEYFLUX_PORT=".Length..], out var p))
             {
                 _portTcs.TrySetResult(p);
             }
         }
         _portTcs.TrySetException(new InvalidOperationException(
-            "settings.exe stdout 结束仍未收到 MYKEYMAP_PORT= 通告行"));
+            "settings.exe stdout 结束仍未收到 KEYFLUX_PORT= 通告行"));
     }
 
     private async Task WaitForReadyAsync()

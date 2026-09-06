@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <!-- 被测工程: Avalonia 设置壳 (Models + Services 契约层) -->
-    <ProjectReference Include="..\config-ui-avalonia\MyKeymap.Settings.csproj" />
+    <ProjectReference Include="..\config-ui-avalonia\KeyFlux.Settings.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,9 +1,9 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using MyKeymap.Settings.Models;
+using KeyFlux.Settings.Models;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // settings.exe (Go gin 服务) HTTP 客户端层
@@ -13,7 +13,7 @@ namespace MyKeymap.Settings.Services;
 //   PUT    /config                      完整 Config JSON -> 200 {"message":"ok"}
 //                                       校验失败 -> 400 {"message":"保存失败: ..."}
 //   GET    /shortcuts                   [{"path":"shortcuts\\xx.lnk"}] (相对部署根)
-//   POST   /server/command/:id          id=2|3|4, 恒 200 {} (会 exec MyKeymap.exe)
+//   POST   /server/command/:id          id=2|3|4, 恒 200 {} (会 exec KeyFlux.exe)
 //   POST   /api/selected-action/test    模拟测试 (含页面快照语义; 2026-09 方案 D,
 //                                       旧 /api/action-schemes 6 路由已随多方案模型退役)
 // ============================================================================
@@ -38,7 +38,7 @@ public sealed record MessageBody
     public string Message { get; set; } = "";
 
     /// <summary>
-    /// 保存后 MyKeymap 进程重启失败时为 true (保存已落盘, 需经托盘「重载」手动生效);
+    /// 保存后 KeyFlux 进程重启失败时为 true (保存已落盘, 需经托盘「重载」手动生效);
     /// 旧后端无此字段 -&gt; 反序列化为 null, 视同成功, 保持向后兼容。
     /// </summary>
     [JsonPropertyName("restartFailed")]
@@ -134,7 +134,7 @@ public interface ISettingsApi
 
 /// <summary>
 /// 基于 HttpClient 的 settings.exe API 客户端。
-/// 构造时接受端口 (headless settings.exe 通过 "MYKEYMAP_PORT=" 行通告实际端口,
+/// 构造时接受端口 (headless settings.exe 通过 "KEYFLUX_PORT=" 行通告实际端口,
 /// 12333 被占用时会退到随机端口, 故基址必须按通告端口构造)。
 /// </summary>
 public sealed class SettingsApiClient : ISettingsApi, IDisposable

@@ -1,6 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="MyKeymap.Settings.Controls.EditZoneHint">
+             x:Class="KeyFlux.Settings.Controls.EditZoneHint">
 
   <!-- 悬停反馈: 背景提亮 + 边框转主题蓝 (复刻 scheme-card:hover 风格, 提示区域可点击)
        注意: 默认背景/边框也放样式里而非控件本地值 —— 本地值优先级高于样式,

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // LinkOpener: 链接打开策略 (总览页 markdown 链接的点击行为)

@@ -4,9 +4,9 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.Controls;
+namespace KeyFlux.Settings.Controls;
 
 /// <summary>
 /// 热键捕获控件 (复刻 components/action/HotkeyCapture.vue):

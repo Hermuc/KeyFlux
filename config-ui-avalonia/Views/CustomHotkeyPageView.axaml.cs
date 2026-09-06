@@ -1,8 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Input;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Views;
+namespace KeyFlux.Settings.Views;
 
 /// <summary>
 /// 全局自定义热键页视图 (复刻 views/CustomHotkey.vue):

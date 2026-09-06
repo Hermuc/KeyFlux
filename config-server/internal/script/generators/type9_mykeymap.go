@@ -5,14 +5,14 @@ import (
 	"settings/internal/script/model"
 )
 
-// TypeID 9: MyKeymap 自身动作 (暂停/重载/退出/设置/进缩写模式/大写锁定/锁定)
-func mykeymapActions9(a model.Action, inAbbrContext bool) string {
+// TypeID 9: KeyFlux 自身动作 (暂停/重载/退出/设置/进缩写模式/大写锁定/锁定)
+func keyfluxActions9(a model.Action, inAbbrContext bool) string {
 	ctx := Cfg.GetHotkeyContext(a)
 	callMap := map[int]string{
-		1: `MyKeymapToggleSuspend()`,
-		2: `MyKeymapReload()`,
-		3: `MyKeymapExit()`,
-		4: `MyKeymapOpenSettings()`,
+		1: `KeyFluxToggleSuspend()`,
+		2: `KeyFluxReload()`,
+		3: `KeyFluxExit()`,
+		4: `KeyFluxOpenSettings()`,
 		5: `EnterSemicolonAbbr(semiHook, semiHookAbbrWindow)`,
 		6: `EnterCapslockAbbr(capsHook)`,
 		7: `ToggleCapslock()`,

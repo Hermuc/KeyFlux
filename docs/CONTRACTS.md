@@ -1,4 +1,4 @@
-# MyKeymap 架构契约文档(方案 D 定稿)
+# KeyFlux 架构契约文档(方案 D 定稿)
 
 > 本文档是模块化重构的**唯一权威契约**。所有接口先在此定义并冻结,再迁移实现。
 > 状态:**骨架版(阶段 0)** — 接口签名已定,实现细节随阶段推进补充。
@@ -210,7 +210,7 @@ Oracle 导出: 命令按字典序, 同配置多次调用结果一致);生成端 
 语义冒烟 7 项 + 整脚本 `/Validate` + **Oracle diff PASS**(capslock 命令集 35/35 与步骤数相等,
 分号段双空)。
 阶段 4 实测坑两条(影响任何独立测试脚本): ① AHK v2 的 `>` 对两个字符串按**数字**比较
-(非数字串直接报错), 字典序排序必须用 `StrCompare`; ② `type9_mykeymap.ahk` 调用仅存在于
+(非数字串直接报错), 字典序排序必须用 `StrCompare`; ② `type9_keyflux.ahk` 调用仅存在于
 生成脚本的 `ExecCapslockAbbr`, AHK v2 默认 #Warn 在**加载期**弹警告对话框阻塞进程,
 `/ErrorStdOut` 无法抑制——独立测试脚本头部须加 `#Warn All, Off`。
 
@@ -361,15 +361,15 @@ class ConfigProvider {
 供 Avalonia 原生设置壳(`config-ui-avalonia/`)以子进程方式拉起后端,与既有模式共存:
 
 - **启动方式**:`settings.exe --headless`(工作目录约定与既有启动方式一致: 部署根目录, 与无参模式相同);
-- **端口通告**:stdout **首行**输出 `MYKEYMAP_PORT=<数字>`(实际监听端口),无任何其他装饰输出;
-  GUI 壳逐行读取并匹配 `MYKEYMAP_PORT=` 前缀获取端口;
+- **端口通告**:stdout **首行**输出 `KEYFLUX_PORT=<数字>`(实际监听端口),无任何其他装饰输出;
+  GUI 壳逐行读取并匹配 `KEYFLUX_PORT=` 前缀获取端口;
 - **端口回退**:默认尝试 12333,被占用时回退随机可用端口并**如实通告**(通告行永远反映真实监听端口);
-- **行为差异(仅此三项)**:跳过代码雨动画、跳过自动打开浏览器、不打印 "MyKeymap config server is running..." 装饰行;
+- **行为差异(仅此三项)**:跳过代码雨动画、跳过自动打开浏览器、不打印 "KeyFlux config server is running..." 装饰行;
 - **不变项**:全部 HTTP 路由与响应格式、配置写盘(仍由 Go 后端唯一负责, 写盘格式不变)、
   无参 / `debug` / CLI 子命令(如 `DumpPlan`/`GenerateAHK`)行为完全不受影响。
 - **进程生命周期**:由 GUI 壳管理(命名 Mutex 单实例、Job Object 强杀兜底),后端自身无感知。
-- 实现:`config-server/cmd/settings/main.go`(模式判定/代码雨跳过) + `config-server/internal/server/server.go`(端口回退与 `MYKEYMAP_PORT=` 通告);
-  入口:`bin/lib/core/Functions.ahk` 启动 `bin\ui\MyKeymap.Settings.exe`;
+- 实现:`config-server/cmd/settings/main.go`(模式判定/代码雨跳过) + `config-server/internal/server/server.go`(端口回退与 `KEYFLUX_PORT=` 通告);
+  入口:`bin/lib/core/Functions.ahk` 启动 `bin\ui\KeyFlux.Settings.exe`;
   构建:`make buildClientAvalonia` → `bin/ui/`(`.gitignore` 忽略)。
 - 部署实测(2026-08, beta33):GUI 打开/关闭/进程回收正常, 配置哈希不变。
 
@@ -392,14 +392,14 @@ action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经
 
 ## 5.3 契约测试前置二进制契约 (2026-09-03 冻结)
 
-`MyKeymap.Settings.Tests/Infrastructure/SettingsTestServer.cs` 拉起 headless settings.exe 子进程,
+`KeyFlux.Settings.Tests/Infrastructure/SettingsTestServer.cs` 拉起 headless settings.exe 子进程,
 其前置二进制路径为:
 
 ```
 %TEMP%\mk_settings_headless\settings.exe
 ```
 
-- **产出命令**: 等价于 `make buildServer` (go build -tags=nomsgpack -ldflags "-s -w -X settings/internal/script.MykeymapVersion=$(version)" -o ../bin/settings.exe ./cmd/settings), 然后复制到上述路径;
+- **产出命令**: 等价于 `make buildServer` (go build -tags=nomsgpack -ldflags "-s -w -X settings/internal/script.KeyfluxVersion=$(version)" -o ../bin/settings.exe ./cmd/settings), 然后复制到上述路径;
 - **陈旧度要求**: 该二进制的 SHA256 必须与当前 `bin/settings.exe` 一致 (即本轮构建产物);
   若不一致, 契约测试拿旧后端跑出假绿, 等于没测;
 - **覆盖时机**: 每次 `make buildServer` 后、运行 `make check-cs` 前, 须手动或自动覆盖;
@@ -425,18 +425,18 @@ action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经
 | 2026-08-22 | §6 第 1 条落地: 命令模糊输入(逐字符后缀校验, 最长优先, CapsLock 域); `Resolve` 增 `fuzzy` 可选参数(默认不变); `config-server/templates` 副本补齐阶段 6 include |
 | 2026-08-23 | 修复存量缺陷: `ActivateWindow` 谓词排除桌面壳窗口 (Progman) —— 此前 `ahk_exe explorer.exe` 类匹配把常驻桌面窗口当成"已打开的窗口"提前返回, 导致 fe 等命令在无真实窗口时永远不启动目标程序 (冷启动失效); 实证与模糊输入功能无关 |
 | 2026-08-23 | 死代码/过时代码审计与清理 (零行为变更): ① 删 `Functions.ahk` 孤立工具 `MapFindKey`/`Join` (零调用); ② 删 Go 端 `AbbrToCode` 生成器及其 FuncMap 注册 (阶段 4 已被 `AbbrRegistryCode` 取代, 模板零引用) + `command.go` panic 后不可达 return (go vet); ③ 删 config-ui 脚手架残留 `HelloWorld.vue` (零 import); ④ 部署目录 `bin/lib/` 平铺旧库 7 文件 (重构前布局残留, 仅基线文档引用) 备份后删除, 同步 `ActionRegistry.ahk` 部署副本至 phase6 版 (留桩, 不在运行链) |
-| 2026-08-23 | 设置入口启动延迟优化 (零行为变更): ① `openBrowser` 删除端口就绪后固定 600ms 延迟 (net.Listen 成功后端口已可接受连接, 实测 Go 业务初始化仅 ~20ms); ② `MyKeymapOpenSettings.launchSettings` 改为 wt 直接运行 `settings.exe` (绝对路径) 绕过 pwsh -NoExit 层 (实测启动链热 wt 660ms→~200ms, 窗口行为不变); 实测基线: 热场景全链 ~1465ms→~405ms, 冷场景 ~2480ms→~1150ms; GenerateScripts 产物逐字节一致 |
-| 2026-08-23 | 开机自启机制迁移 (零行为变更): ① `MiscTools.ahk` `RunAtStartup` 由启动文件夹快捷方式改为 HKCU\Run 注册表键 (值 `MyKeymap` = 带引号的 exe 全路径, RegWrite/RegDelete 读写); ② 旧 Startup\MyKeymap.lnk 已删除且不再重建; ③ 新增全中文 `卸载软件.bat` (二次 Y 确认; taskkill 相关进程容错; 删注册表自启值; 删旧 lnk; 删目录前检测主程序防误删; 目录删除后由 %TEMP% tail 副本输出总结, tail 以 exit 终止避免读已删文件报错); 开关往返实测无残留; GenerateScripts 产物逐字节一致 |
+| 2026-08-23 | 设置入口启动延迟优化 (零行为变更): ① `openBrowser` 删除端口就绪后固定 600ms 延迟 (net.Listen 成功后端口已可接受连接, 实测 Go 业务初始化仅 ~20ms); ② `KeyFluxOpenSettings.launchSettings` 改为 wt 直接运行 `settings.exe` (绝对路径) 绕过 pwsh -NoExit 层 (实测启动链热 wt 660ms→~200ms, 窗口行为不变); 实测基线: 热场景全链 ~1465ms→~405ms, 冷场景 ~2480ms→~1150ms; GenerateScripts 产物逐字节一致 |
+| 2026-08-23 | 开机自启机制迁移 (零行为变更): ① `MiscTools.ahk` `RunAtStartup` 由启动文件夹快捷方式改为 HKCU\Run 注册表键 (值 `KeyFlux` = 带引号的 exe 全路径, RegWrite/RegDelete 读写); ② 旧 Startup\KeyFlux.lnk 已删除且不再重建; ③ 新增全中文 `卸载软件.bat` (二次 Y 确认; taskkill 相关进程容错; 删注册表自启值; 删旧 lnk; 删目录前检测主程序防误删; 目录删除后由 %TEMP% tail 副本输出总结, tail 以 exit 终止避免读已删文件报错); 开关往返实测无残留; GenerateScripts 产物逐字节一致 |
 | 2026-08-24 | 文件分组并入文件后缀 (fileGroups 配置化): ① 删除「文件分组」匹配类型 —— Go `matchFileGroup`/`fileGroupExts`、AHK `MatchFileGroup`/内置表、前端 MATCH_TYPES 项/RuleEditor 控件/RuleList 分支、类型注释全清, 运行时引擎只认 fileExt 后缀列表; ② 分组表收敛为配置数据 `config.json` 新增 `fileGroups` 段 (name/label/exts, 默认 6 组, 用户可自行增改), Go `Config`/`model.FileGroup`/前端 `FileGroup` 类型同步, `SaveConfigHandler` 新增 `ValidateFileGroups` 结构校验 (名称/显示名/后缀非空, 非法拒绝保存); ③ 前端「文件后缀」条件值下方新增「常用分组快捷填入」下拉 (数据源=配置 fileGroups, 选择分组展开为逗号分隔后缀列表, 可继续手改; 配置缺失时不显示, 降级为纯手输); 存量配置零 fileGroup 规则故无迁移; 生成链路 (actionSchemesCode 原样透传规则字段) 与 Oracle plan 输出不受影响 |
 | 2026-08-23 | 修复存量缺陷: 选中动作热键触发报 Too many parameters (RunActionScheme) —— 热键回调 `handler(thisHotkey)` 经 `RunActionScheme.Bind(scheme)` 调用时, BoundFunc 把绑定参数前置并追加调用参数, 实际以 2 参数调用只定义 1 参数的 `RunActionScheme(scheme)`; 修复为签名加默认参数 `RunActionScheme(scheme, trigger := "")` 吸收追加参数 (闭包捕获 for 变量有指向最后一方案陷阱, 故不用箭头函数改注册) |
 | 2026-08-23 | 选中动作功能改造: ① 移除「文本正则」匹配类型 (Go 匹配分支 / AHK case / 前端选项 / 类型注释全清); ② 「文本特征→行为类型」动态联动 (textTypeActions 单一真源: url→[open_url,search], path→[open_path,open_folder], magnet→[magnet_download], plain→[open_registry,search,run,send_keys,script,copy]; Go 端保存/建/改/测四入口校验非法组合拒绝并中文提示, 前端动态渲染+自动纠正+导入校验); ③ 新增 5 类文本特征行为 open_url/open_path/open_folder/magnet_download/open_registry (全走系统默认关联: Run() ShellExecute / magnet: 协议处理检测失败给中文提示 / regedit LastKey 定位, 零第三方依赖零提权); ④ 修复 CheckMagnetHandler try 无 catch 导致 magnet 未注册时异常弹窗; GenerateScripts 产物逐字节一致, /Validate exit=0, Oracle 35/35 PASS |
-| 2026-08 | 新增 §5.1 `settings.exe --headless` 模式契约并冻结: 供 Avalonia 原生设置壳子进程拉起, stdout 首行 `MYKEYMAP_PORT=<端口>` 通告 (12333 占用回退随机端口并如实通告), 跳过代码雨/浏览器/装饰行, 路由与配置写盘与无参模式完全一致 |
-| 2026-08 | 设置界面原生窗口化 (零行为变更, 旧浏览器版保留): ① 新增 `config-ui-avalonia/` (Avalonia 11 / .NET 10 / CommunityToolkit.Mvvm, 完整移植键位图/自定义热键/缩写/选中动作/设置/主页全部页面) 与仓库根目录 `MyKeymap.Settings.Tests/` (74 个单元测试全绿); ② Go 后端新增 `--headless` 模式 (§5.1); ③ Makefile 新增 `buildClientAvalonia` (dotnet publish 自包含 win-x64 + ReadyToRun → `bin/ui/`, 已入 `build` 依赖链), `.gitignore` 追加 `bin/ui/`; ④ AHK 设置入口 (`bin/lib/core/Functions.ahk`) 改启动 `bin\ui\MyKeymap.Settings.exe`; ⑤ 配置写盘权不变: GUI 仅经 localhost HTTP 调用, Go 后端保持 config.json 唯一写盘权; 部署实测: GUI 打开/关闭/进程回收正常, 配置哈希不变 |
+| 2026-08 | 新增 §5.1 `settings.exe --headless` 模式契约并冻结: 供 Avalonia 原生设置壳子进程拉起, stdout 首行 `KEYFLUX_PORT=<端口>` 通告 (12333 占用回退随机端口并如实通告), 跳过代码雨/浏览器/装饰行, 路由与配置写盘与无参模式完全一致 |
+| 2026-08 | 设置界面原生窗口化 (零行为变更, 旧浏览器版保留): ① 新增 `config-ui-avalonia/` (Avalonia 11 / .NET 10 / CommunityToolkit.Mvvm, 完整移植键位图/自定义热键/缩写/选中动作/设置/主页全部页面) 与仓库根目录 `KeyFlux.Settings.Tests/` (74 个单元测试全绿); ② Go 后端新增 `--headless` 模式 (§5.1); ③ Makefile 新增 `buildClientAvalonia` (dotnet publish 自包含 win-x64 + ReadyToRun → `bin/ui/`, 已入 `build` 依赖链), `.gitignore` 追加 `bin/ui/`; ④ AHK 设置入口 (`bin/lib/core/Functions.ahk`) 改启动 `bin\ui\KeyFlux.Settings.exe`; ⑤ 配置写盘权不变: GUI 仅经 localhost HTTP 调用, Go 后端保持 config.json 唯一写盘权; 部署实测: GUI 打开/关闭/进程回收正常, 配置哈希不变 |
 | 2026-09-03 | Functions.ahk 按职责拆分 (零行为变更): 35 个函数逐字节搬运至 core/{Programs,WindowUtils,AbbrInput}.ahk, Functions.ahk 仅保留托盘生命周期/选中文本/编码杂项 (671→205 行); 模板 include +3; oracle.ps1 harness 同步新 include 并自包含 settings.exe 拷贝; Makefile 新增 check/check-cs/deploy 目标 (一键回归: Go 单测+GenerateAHK+/Validate+Oracle; 一键部署: 同步部署目录并重启实例) |
-| 2026-09-03 | 仓库卫生 + Makefile 部署源修正 (零行为变更): ① 维护者发布脚本 git mv 归位 `scripts/` (build_tools.go / lanzou_client.py, 不放 tools/ 因其随发布包出货), Makefile uploadLanZou 三处引用同步并顺带修 python3→python (本机无 python3); 脚本内部路径全部 cwd 相对, 移动后 0 改动; ② 修 Makefile:103 deploy 的 UI robocopy 源 bug: `config-ui-avalonia/bin/ui` 是旧自包含发布残留, 正牌输出为 buildClientAvalonia 写入的 `bin/ui`, 原写法会把部署目录 UI 用 /MIR 降级为旧构建 → 改为 `bin/ui`; ③ `bin/lib/Monitor.ahk` 头部加 MyKeymap 侧注明块 (仅 ; 注释, 代码零改动): 唯一消费者 ChangeBrightness.ahk、跨进程拉起链 type2_system.ahk BrightnessControl→TypeID2、实际使用面 Monitor()/GetBrightness/SetBrightness 及 13 方法传递闭包、未使用面约 580 行为保持与上游 tigerlily-dev v2.4.1 可 diff 而刻意保留 |
+| 2026-09-03 | 仓库卫生 + Makefile 部署源修正 (零行为变更): ① 维护者发布脚本 git mv 归位 `scripts/` (build_tools.go / lanzou_client.py, 不放 tools/ 因其随发布包出货), Makefile uploadLanZou 三处引用同步并顺带修 python3→python (本机无 python3); 脚本内部路径全部 cwd 相对, 移动后 0 改动; ② 修 Makefile:103 deploy 的 UI robocopy 源 bug: `config-ui-avalonia/bin/ui` 是旧自包含发布残留, 正牌输出为 buildClientAvalonia 写入的 `bin/ui`, 原写法会把部署目录 UI 用 /MIR 降级为旧构建 → 改为 `bin/ui`; ③ `bin/lib/Monitor.ahk` 头部加 KeyFlux 侧注明块 (仅 ; 注释, 代码零改动): 唯一消费者 ChangeBrightness.ahk、跨进程拉起链 type2_system.ahk BrightnessControl→TypeID2、实际使用面 Monitor()/GetBrightness/SetBrightness 及 13 方法传递闭包、未使用面约 580 行为保持与上游 tigerlily-dev v2.4.1 可 diff 而刻意保留 |
 | 2026-09-03 | I18n 字典外置 (零行为变更): `config-ui-avalonia/Services/I18n.cs` 的 440 行内联字典外置为 `Resources/i18n.json` (308 键, UTF-8 无 BOM), I18n.cs 降到 184 行只留加载器与 `T()`; csproj 新增 `Content` 项 (`CopyToOutputDirectory` + `CopyToPublishDirectory` 双元数据), 这是本项目首个松散部署物 (此前 AvaloniaResource 全打进 dll), publish 后落在 `bin\ui\Resources\i18n.json`, 随 Makefile:103 的 `robocopy bin/ui … /MIR` 自动同步到部署目录; 新增 7 项守卫测试 (键数 308、axaml/cs 键覆盖对账、null 与空串语义、占位符与转义保真、双语回退、Language 归一化、无 BOM), C# 测试总数 114→121 |
 | 2026-09-03 | cmd 瘦身 + API DTO 分离 (零 wire 变更): ① 任务1——`cmd/settings/main.go` 的 HTTP 层 (server() 函数体、11 条路由、全部 handler、PanicHandler、syncStartupFromRegistry) 与 `actionscheme.go` 整体迁入新建 `internal/server/` (server.go / handlers.go / actionscheme.go), `execCmd`/`fallbackExecCmd` 下沉为独立 `internal/proc/` 包 (main 与 server 共同引用, 避免循环依赖), cmd/settings/main.go 从 355 行瘦身到 61 行只留入口与模式判断; ② 任务2——新建 `internal/server/dto.go` 定义 Config 及全部嵌套结构的 DTO + 双向映射 (model→dto 供 GET, dto→model 供 PUT), GET/PUT /config handler 改为只与 DTO 打交道, 排除 json:"-" 计算态字段 (KeyMapping / RemapInHotIf) 进入 wire; RestartFailed 保守保留在 model (action-scheme 端点仍直接序列化 model, 残留耦合登记为后续项); 验证: wire 三端点逐字节一致、GenerateAHK 产物 SHA256 不变、/Validate exit=0、Oracle PASS、C# 契约测试 121 全绿 |
-| 2026-09-03 | 生成器回归网 (golden test): 新增 `internal/script/golden_test.go` + `testdata/golden.mykeymap.ahk`; 落点选 `internal/script/` 而非 `generators/` 因 golden test 调用 `SaveAHK`/`Preprocess` (属 script 包导出), 放 generators 会产生 script↔generators 导入环; 刷新方式: `UPDATE_GOLDEN=1 go test ./internal/script/...`; 合成配置规避 map 迭代序非确定性 (约束 1: sortHotkeys 非稳定排序; 约束 2: handleKeyRemapping SliceStable 保留随机序) |
+| 2026-09-03 | 生成器回归网 (golden test): 新增 `internal/script/golden_test.go` + `testdata/golden.keyflux.ahk`; 落点选 `internal/script/` 而非 `generators/` 因 golden test 调用 `SaveAHK`/`Preprocess` (属 script 包导出), 放 generators 会产生 script↔generators 导入环; 刷新方式: `UPDATE_GOLDEN=1 go test ./internal/script/...`; 合成配置规避 map 迭代序非确定性 (约束 1: sortHotkeys 非稳定排序; 约束 2: handleKeyRemapping SliceStable 保留随机序) |
 | 2026-09-03 | 三维评审非阻断修复批次 (Go/Makefile/AHK/文档, 零行为变更): ① `bin/lib/Monitor.ahk` 注明块裸行号全部改为符号锚点描述 (对上游 diff 更 robust, 消除 +25 行偏移导致的 ~15 处行号失效); ② `internal/server/dto.go` keymapToDTO/dtoToKeymap 内层 Hotkeys value slice 补 nil 守卫 (修复 null→[] 往返非恒等), 新增 `dto_test.go` 表驱动测试; ③ `internal/script/golden_test.go` BOM 断言从 normalizeAHK 归一化中拆出为独立 bytes.HasPrefix 检查 (消除产物 BOM 丢失不可观测盲区); ④ Makefile buildClientAvalonia 后新增 i18n.json SHA256 断言 (publish 产出与源不一致即 exit 1); ⑤ CONTRACTS.md 补全: §2 目录树补 i18n.json 双路径 + 契约条目、§5.1 实现指针更新、新增 §5.2 双轨 DTO 边界 + §5.3 契约测试前置二进制契约; 并行 C# 侧修复 (归属任务 #65): I18nResourceTests 物理存在断言、SettingsTestServer 陈旧度断言、I18n.cs 头部注释补回 |
 | 2026-09-04 | 移除选中动作「默认 (兜底)」匹配类型: ① Go `matchActionRule` 删 `case "default": return true` (仅剩 fileExt/textType, 落空 return false), AHK `MatchActionRule` 同步删 case; ② 前端 MATCH_TYPES 词条、default→\* 条件值分支、RuleList default→「任意内容」展示分支、兜底规则不在末尾警示 (DefaultRuleNotLast/RefreshDefaultWarning + axaml 警示 Border) 全清; ③ i18n 删 4 键 (979/998/1033/1036) 键数守卫 309→305; ④ 存量 default 规则将不再命中 (历史规则在编辑器中回退显示为第一项, 用户重新选择即完成迁移); ⑤ golden 夹具删两条 default 规则并重刷基线 (仅 matchType: "default" 渲染行消失); readme/readme.en 匹配类型改两类表述 |
 | 2026-09-05 | 行为包体系一期落地 (§3.9 冻结): 11 个内置行为打包为只读内置包 (bin/behaviors 入库), 规则 ActionType 语义升级为行为 ID (内置 ID 直通=存量零迁移), internal/behaviors 包 (加载/覆盖/删除约束), 保存校验统一为覆盖检查 (取代 textTypeActions 静态表+修复首条短路缺陷), API 5 端点 (GET/POST/PUT/DELETE /api/behaviors + apply 显式重启), 生成期展开 (渲染+plan 镜像); 行为库前端窗口与 C# 目录服务为二期提交 |

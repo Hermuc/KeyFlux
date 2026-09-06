@@ -1,9 +1,9 @@
 #Requires AutoHotkey v2.0
-; 该脚本只能编译成Exe使用，只用做启动MyKeymap.ahk和AHk v2使用
+; 该脚本只能编译成Exe使用，只用做启动KeyFlux.ahk和AHk v2使用
 #SingleInstance Force
 #NoTrayIcon
 ;@Ahk2Exe-SetMainIcon ./bin/icons/logo3.ico
-;@Ahk2Exe-ExeName MyKeymap
+;@Ahk2Exe-ExeName KeyFlux
 SetWorkingDir(A_ScriptDir)
 
 ; 以管理员权限运行
@@ -22,23 +22,23 @@ if not (A_IsAdmin or RegExMatch(full_command_line, " /restart(?!\S)")) {
     ExitApp
   } catch Error as e {
     hasTip := true
-    ToolTip("`n    MyKeymap is running with normal privileges.`n    MyKeymap will not work in a window with admin rights  ( e.g., Taskmgr.exe )    `n ")
+    ToolTip("`n    KeyFlux is running with normal privileges.`n    KeyFlux will not work in a window with admin rights  ( e.g., Taskmgr.exe )    `n ")
   }
 }
 
-mainAhkFilePath := "./bin/MyKeymap.ahk"
+mainAhkFilePath := "./bin/KeyFlux.ahk"
 
 if (A_Args.Length) {
-  Run("MyKeymap.exe /script " A_Args.Get(1))
+  Run("KeyFlux.exe /script " A_Args.Get(1))
 } else {
   ; 通过配置文件生成脚本
   RunWait("./bin/settings.exe GenerateScripts", "./bin", "Hide")
   ; 首次运行则生成快捷方式
   if !FileExist(A_WorkingDir "\shortcuts\*.*") {
-    Run("MyKeymap.exe /script ./bin/MiscTools.ahk GenerateShortcuts")
+    Run("KeyFlux.exe /script ./bin/MiscTools.ahk GenerateShortcuts")
   }
   ; 启动脚本
-  Run("MyKeymap.exe /script " mainAhkFilePath)
+  Run("KeyFlux.exe /script " mainAhkFilePath)
 }
 
 if IsSet(hasTip) {

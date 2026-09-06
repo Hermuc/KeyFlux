@@ -1,7 +1,7 @@
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// 内置行为包测试夹具: 与 bin/behaviors/ 11 个 manifest 的 appliesTo/entry 语义一致

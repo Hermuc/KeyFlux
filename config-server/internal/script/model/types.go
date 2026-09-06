@@ -1,4 +1,4 @@
-// Package model 承载 MyKeymap 配置的数据模型与纯配置方法。
+// Package model 承载 KeyFlux 配置的数据模型与纯配置方法。
 // 依赖方向: generators -> model <- script, 避免生成逻辑与数据模型循环依赖。
 package model
 
@@ -63,7 +63,7 @@ type ActionScheme struct {
 	Enable bool         `json:"enable"`
 	Rules  []ActionRule `json:"rules"`
 
-	// 传输层字段 (不落盘): 保存/新建方案后重启 MyKeymap 失败时由 handler 置 true 随响应返回;
+	// 传输层字段 (不落盘): 保存/新建方案后重启 KeyFlux 失败时由 handler 置 true 随响应返回;
 	// omitempty 保证 false 时不序列化, config.json 落盘与导入导出均不受影响
 	RestartFailed bool `json:"restartFailed,omitempty"`
 }
@@ -123,7 +123,7 @@ type Action struct {
 
 type Options struct {
 	HideMatrix       bool             `json:"hideMatrix"`
-	MykeymapVersion  string           `json:"mykeymapVersion"`
+	KeyfluxVersion  string           `json:"keyfluxVersion"`
 	WindowGroups     []WindowGroup    `json:"windowGroups"`
 	Mouse            Mouse            `json:"mouse"`
 	Scroll           Scroll           `json:"scroll"`

@@ -81,7 +81,7 @@ type ActionDTO struct {
 
 type OptionsDTO struct {
 	HideMatrix       bool                 `json:"hideMatrix"`
-	MykeymapVersion  string               `json:"mykeymapVersion"`
+	KeyfluxVersion  string               `json:"keyfluxVersion"`
 	WindowGroups     []WindowGroupDTO     `json:"windowGroups"`
 	Mouse            MouseDTO             `json:"mouse"`
 	Scroll           ScrollDTO            `json:"scroll"`
@@ -266,7 +266,7 @@ func selectedEntryToDTO(e *model.SelectedEntry) SelectedEntryDTO {
 func optionsToDTO(o model.Options) OptionsDTO {
 	dto := OptionsDTO{
 		HideMatrix:      o.HideMatrix,
-		MykeymapVersion: o.MykeymapVersion,
+		KeyfluxVersion: o.KeyfluxVersion,
 		Mouse: MouseDTO{
 			KeepMouseMode: o.Mouse.KeepMouseMode,
 			ShowTip:       o.Mouse.ShowTip,
@@ -440,7 +440,7 @@ func dtoToSelectedEntry(e *SelectedEntryDTO) model.SelectedEntry {
 func dtoToOptions(o OptionsDTO) model.Options {
 	m := model.Options{
 		HideMatrix:      o.HideMatrix,
-		MykeymapVersion: o.MykeymapVersion,
+		KeyfluxVersion: o.KeyfluxVersion,
 		Mouse: model.Mouse{
 			KeepMouseMode: o.Mouse.KeepMouseMode,
 			ShowTip:       o.Mouse.ShowTip,

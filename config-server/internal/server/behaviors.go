@@ -118,7 +118,7 @@ func DeleteBehaviorHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
 
-// ApplyBehaviorsHandler 重启 MyKeymap 使行为变更生效 (launcher 重新生成脚本并注册)。
+// ApplyBehaviorsHandler 重启 KeyFlux 使行为变更生效 (launcher 重新生成脚本并注册)。
 func ApplyBehaviorsHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"restartFailed": !proc.ExecCmd("./MyKeymap.exe")})
+	c.JSON(http.StatusOK, gin.H{"restartFailed": !proc.ExecCmd("./KeyFlux.exe")})
 }

@@ -17,7 +17,7 @@ var BehaviorCatalog *behaviors.Catalog
 // generators 不 import script 避免依赖环, 修改时两处同步; plan.go 投影同口径引用)。
 const selectedActionKeyCap = 9
 
-// selectedActionCode 把 selectedAction (单键分发) 渲染为 AHK 代码 (用于 mykeymap.tmpl 模板)。
+// selectedActionCode 把 selectedAction (单键分发) 渲染为 AHK 代码 (用于 keyflux.tmpl 模板)。
 // 产物由 bin/lib/rules/SelectedAction.ahk 的 SelectedActionInit 消费 (任务 #30 按此实现):
 // 单热键注册 + 数据数组; 数组顺序 = mappings 配置顺序 (即匹配优先级), 同一 mapping 内
 // entries 顺序 = 菜单序号 1..n。

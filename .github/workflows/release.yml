@@ -1,7 +1,7 @@
 name: release
 
 # 打 tag (v*) 才构建并发布正式 Release; workflow_dispatch 用于手动验证构建 (可跳过发布)。
-# 产物: MyKeymap-<version>.7z (自包含, 解压即用)。
+# 产物: KeyFlux-<version>.7z (自包含, 解压即用)。
 # 注意: Oracle 对账脚本 (tools/oracle.ps1) 内含本机硬编码路径, 不在 CI 运行;
 #       生成契约由 golden 快照测试 + /Validate 覆盖。
 
@@ -61,7 +61,7 @@ jobs:
       - name: Build settings.exe (version injected via ldflags)
         run: |
           go build -C ./config-server -tags=nomsgpack \
-            -ldflags "-s -w -X settings/internal/script.MykeymapVersion=${{ steps.ver.outputs.version }}" \
+            -ldflags "-s -w -X settings/internal/script.KeyfluxVersion=${{ steps.ver.outputs.version }}" \
             -o ../bin/settings.exe ./cmd/settings
 
       - name: Stage headless backend for C# endpoint tests
@@ -74,7 +74,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          dotnet test MyKeymap.Settings.Tests/MyKeymap.Settings.Tests.csproj --nologo --logger trx 2>&1 | tee "$TEMP/citest.log"
+          dotnet test KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --nologo --logger trx 2>&1 | tee "$TEMP/citest.log"
 
       - name: Dump test failures as annotations
         if: failure()
@@ -95,8 +95,8 @@ jobs:
 
       - name: Generate + validate AHK script (/Validate)
         run: |
-          bin/settings.exe GenerateAHK ./data/config.json ./config-server/templates/mykeymap.tmpl ./bin/MyKeymap.ahk
-          MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate ./bin/MyKeymap.ahk
+          bin/settings.exe GenerateAHK ./data/config.json ./config-server/templates/keyflux.tmpl ./bin/KeyFlux.ahk
+          MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate ./bin/KeyFlux.ahk
 
       - name: Sync templates (buildServer 后半段)
         run: |
@@ -106,7 +106,7 @@ jobs:
       - name: Publish Avalonia UI (self-contained win-x64 + ReadyToRun)
         shell: pwsh
         run: |
-          $out = dotnet publish config-ui-avalonia/MyKeymap.Settings.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true -o bin/ui --nologo -v q 2>&1 | Out-String
+          $out = dotnet publish config-ui-avalonia/KeyFlux.Settings.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true -o bin/ui --nologo -v q 2>&1 | Out-String
           if ($LASTEXITCODE -ne 0) {
             $tail = ($out -split "`r?`n" | Where-Object { $_ -ne '' } | Select-Object -Last 20) -join "`n"
             Write-Output ("::error::publish failed%0A" + ($tail -replace "%", "%25" -replace "`n", "%0A"))
@@ -125,7 +125,7 @@ jobs:
       - name: Assemble release folder
         shell: bash
         run: |
-          FOLDER="MyKeymap-${{ steps.ver.outputs.version }}"
+          FOLDER="KeyFlux-${{ steps.ver.outputs.version }}"
           rm -rf "$FOLDER"
           mkdir -p "$FOLDER/shortcuts"
           rm -rf bin/site && cp -r site-assets bin/site
@@ -133,7 +133,7 @@ jobs:
           cp -r bin "$FOLDER/"
           cp -r tools "$FOLDER/"
           rm -f "$FOLDER/tools/oracle.ps1"
-          cp MyKeymap.exe "$FOLDER/"
+          cp KeyFlux.exe "$FOLDER/"
           cp -- *.bat "$FOLDER/"
 
       - name: Install 7-Zip
@@ -143,18 +143,18 @@ jobs:
         shell: bash
         run: |
           SEVENZIP="$(command -v 7z.exe || echo '/c/Program Files/7-Zip/7z.exe')"
-          "$SEVENZIP" a "MyKeymap-${{ steps.ver.outputs.version }}.7z" "MyKeymap-${{ steps.ver.outputs.version }}"
+          "$SEVENZIP" a "KeyFlux-${{ steps.ver.outputs.version }}.7z" "KeyFlux-${{ steps.ver.outputs.version }}"
 
       - name: Upload build artifact (workflow_dispatch 验证用)
         if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
-          name: MyKeymap-${{ steps.ver.outputs.version }}
-          path: MyKeymap-*.7z
+          name: KeyFlux-${{ steps.ver.outputs.version }}
+          path: KeyFlux-*.7z
 
       - name: Publish release
         if: ${{ github.event_name == 'push' || inputs.skip_release == false }}
         uses: softprops/action-gh-release@v2
         with:
-          files: MyKeymap-*.7z
+          files: KeyFlux-*.7z
           generate_release_notes: true

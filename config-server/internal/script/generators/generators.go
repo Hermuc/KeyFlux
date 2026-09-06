@@ -25,7 +25,7 @@ var ActionMap = map[int]func(model.Action, bool) string{
 	6:              sendKeys6,
 	7:              textFeatures7,
 	8:              builtinFunctions8,
-	9:              mykeymapActions9,
+	9:              keyfluxActions9,
 }
 
 func ActionToHotkey(action model.Action) string {
@@ -46,7 +46,7 @@ var TemplateFuncMap = template.FuncMap{
 	"sortHotkeys":          sortHotkeys,
 	"divide":               divide,
 	"renderKeymap":         renderKeymap,
-	"GroupDisableMyKeymap": GroupDisableMyKeymap,
+	"GroupDisableKeyFlux": GroupDisableKeyFlux,
 	"selectedActionCode":   selectedActionCode,
 }
 
@@ -170,7 +170,7 @@ func containsOnlyModifier(hotkey string) bool {
 	return hotkey != "" && strings.Trim(hotkey, "#!^+<>*~$") == ""
 }
 
-func GroupDisableMyKeymap(groups []model.WindowGroup) string {
+func GroupDisableKeyFlux(groups []model.WindowGroup) string {
 	for _, g := range groups {
 		if g.ID == -1 {
 			return model.GroupToWinTile(g)

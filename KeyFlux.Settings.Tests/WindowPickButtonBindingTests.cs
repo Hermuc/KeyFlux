@@ -6,12 +6,12 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
-using MyKeymap.Settings.Controls;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Controls;
+using KeyFlux.Settings.Services;
 
-[assembly: AvaloniaTestApplication(typeof(MyKeymap.Settings.Tests.WindowPickBindingBootstrapper))]
+[assembly: AvaloniaTestApplication(typeof(KeyFlux.Settings.Tests.WindowPickBindingBootstrapper))]
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// Headless 测试宿主 Application。刻意不走被测 <c>App</c> —— 其

@@ -1,8 +1,8 @@
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// 「文件后缀 (fileExt)」语境行为下拉按前提过滤 + 分组关联生命周期 + 后缀修改保存写回 的单元测试。
@@ -20,10 +20,10 @@ public sealed class FileGroupActionFilterTests
     private static readonly string[] ImageExts = ["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico"];
     private static readonly string[] CodeExts = ["c", "cpp", "h", "py", "go", "rs", "json"];
 
-    /// <summary>行为目录种子 (CONTRACTS §3.9): 内置 11 包由共享夹具构造, 一次性注入。</summary>
+    /// <summary>行为目录种子 (CONTRACTS §3.9): 内置 11 包 + 空用户包, 无条件重播种保证测试顺序无关
+    /// (SeedForTests 为整表替换; 若守卫跳过, BehaviorCatalogTests 先跑时其用户包夹具会泄漏进本类断言)。</summary>
     private static void EnsureBehaviorCatalog()
     {
-        if (BehaviorCatalog.Loaded) return;
         BehaviorCatalog.SeedForTests(BehaviorFixtures.Builtin(), []);
     }
 

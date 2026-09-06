@@ -1,8 +1,8 @@
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
-using MyKeymap.Settings.Tests.Infrastructure;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
+using KeyFlux.Settings.Tests.Infrastructure;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// POST /api/selected-action/test 契约 (方案 D 单键分发, 对照 Go selectedaction_test.go):

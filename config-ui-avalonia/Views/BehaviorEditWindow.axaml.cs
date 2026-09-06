@@ -1,9 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Views;
+namespace KeyFlux.Settings.Views;
 
 /// <summary>
 /// 行为新建/编辑表单窗口 (模态): 保存经后端校验, 成功后置 <see cref="Saved"/> 由

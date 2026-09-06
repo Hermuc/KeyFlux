@@ -1,4 +1,4 @@
-# MyKeymap 热键行为核对清单(基线 v2:部署真源)
+# KeyFlux 热键行为核对清单(基线 v2:部署真源)
 
 > 本清单是重构期间"零行为变更"约束的验收依据。
 > 每完成一个重构阶段,须逐项核对后方可进入下一阶段。
@@ -7,7 +7,7 @@
 
 | 项 | 值 |
 |---|---|
-| 基线脚本 | `docs/baseline/MyKeymap.ahk.snapshot`(= 重构前部署目录 `MyKeymap-2.0-beta33\bin\MyKeymap.ahk`,**255 行**,备份自 `MyKeymap-deploy-backup-before-phase1`) |
+| 基线脚本 | `docs/baseline/MyKeymap.ahk.snapshot`(= 重构前部署目录 `MyKeymap-2.0-beta33\bin\KeyFlux.ahk`,**255 行**,备份自 `MyKeymap-deploy-backup-before-phase1`) |
 | 配置真源 | **部署目录 `MyKeymap-2.0-beta33\data\config.json`**(用户日常使用与保存配置的版本,16 keymaps,启用 4 模式);仓库 `data/config.json` 已同步为部署配置 |
 | 生成分支 | `dev`(原 refactor/modularize) |
 | 模式过滤规则 | `EnabledKeymaps`:仅 `id=1` 与 `id>=5` 且 `enable=true` 的 keymap 进入生成(id=2/3/4 由 CommandInput/静态 switch 处理)。部署配置启用:id=5 CapsLock / id=8 J 模式 / id=9 F 模式 / id=1 Custom Hotkeys;其余(id=6,7,10,11,12,13,14,16,17)均为 `enable=false`,不生成 |
@@ -20,9 +20,9 @@
 - [ ] `SendMode "Event"`、`SetKeyDelay 0`、`SetMouseDelay 0`、`SetWinDelay 0`
 - [ ] `A_MaxHotkeysPerInterval := 256`、`ProcessSetPriority "High"`、`#UseHook true`
 - [ ] DPI 感知 DllCall、`SetWorkingDir("../")`
-- [ ] 启动即运行 `bin\MyKeymap-CommandInput.exe`
+- [ ] 启动即运行 `bin\KeyFlux-CommandInput.exe`
 - [ ] 托盘菜单 5 项:暂停/退出/重载/设置/WindowSpy,单击=暂停,图标 `bin/icons/logo.ico`
-- [ ] 退出时 `MyKeymapExit` 关闭 CommandInput 进程
+- [ ] 退出时 `KeyFluxExit` 关闭 CommandInput 进程
 - [ ] `InitKeymap` 结尾 `KeymapManager.GlobalKeymap.Enable()`;脚本末尾空 `#HotIf`
 
 ## 模式 1 — CapsLock(`*CapsLock`,id=5)
@@ -72,10 +72,10 @@
   ob Obsidian / pp PiliPlus / qq QQ / steam Steam / tg AyuGram / wx 微信 / hm HypoMux
 - [ ] 路径类:dl 下载目录 / dm 工作目录 / rb 回收站 / jy 剪映专业版(绝对路径)
   ls Lossless Scaling(绝对路径)/ tb 图吧工具箱(绝对路径)/ tu Total Uninstall(绝对路径)
-  et Everything(绝对路径)/ mm VSCode 打开 `D:\MyFiles\MyKeymap2`
+  et Everything(绝对路径)/ mm VSCode 打开 `D:\MyFiles\KeyFlux2`
 - [ ] 系统类:sd 关机 / sl 睡眠 / re / tm 任务管理器(`^+{esc}`)/ rd 显示桌面(`#d`)
   kp 关进程 / pd 进程所在目录 / ly 蓝牙设置 / cw 智能关窗 / gd Ghost Downloader
-- [ ] MyKeymap 类:se 打开设置 / ex 退出 / wt 终端打开选中路径(`-d "{selected}"`,唯一 {selected} 占位)
+- [ ] KeyFlux 类:se 打开设置 / ex 退出 / wt 终端打开选中路径(`-d "{selected}"`,唯一 {selected} 占位)
 - [ ] 窗口激活类:zg Zed
 
 ## 分号缩写(0 条)

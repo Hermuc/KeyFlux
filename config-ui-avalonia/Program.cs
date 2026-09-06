@@ -3,14 +3,14 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Avalonia;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings;
+namespace KeyFlux.Settings;
 
 /// <summary>
 /// 程序入口：单实例守卫 + 初始化并启动 Avalonia 桌面应用。
-/// 单实例约定 (与 AHK 侧 MyKeymapOpenSettings 三分支语义配合):
-///   命名 Mutex "MyKeymap.Settings.SingleInstance"; 第二实例不重复开窗口,
+/// 单实例约定 (与 AHK 侧 KeyFluxOpenSettings 三分支语义配合):
+///   命名 Mutex "KeyFlux.Settings.SingleInstance"; 第二实例不重复开窗口,
 ///   激活已有窗口 (标题 "Setting", 限本进程) 后立即退出。
 /// </summary>
 internal static class Program
@@ -18,7 +18,7 @@ internal static class Program
     /// <summary>进程创建时间 (Win32 GetProcessTimes; 托管 Stopwatch 在 Main 入口才初始化, 会漏掉运行时启动耗时)。</summary>
     public static readonly DateTime ProcessStartTimeUtc = GetProcessCreationTimeUtc();
 
-    private const string SingleInstanceMutexName = "MyKeymap.Settings.SingleInstance";
+    private const string SingleInstanceMutexName = "KeyFlux.Settings.SingleInstance";
     private const string MainWindowTitle = "Setting";
 
     /// <summary>

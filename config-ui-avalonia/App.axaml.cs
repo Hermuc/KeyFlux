@@ -1,11 +1,11 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using MyKeymap.Settings.Services;
-using MyKeymap.Settings.ViewModels;
-using MyKeymap.Settings.Views;
+using KeyFlux.Settings.Services;
+using KeyFlux.Settings.ViewModels;
+using KeyFlux.Settings.Views;
 
-namespace MyKeymap.Settings;
+namespace KeyFlux.Settings;
 
 /// <summary>
 /// 应用程序类：加载 App.axaml 并在框架初始化完成后创建主窗口。

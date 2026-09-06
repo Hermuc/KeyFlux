@@ -1,6 +1,6 @@
-using MyKeymap.Settings.Models;
+using KeyFlux.Settings.Models;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // 选中动作系统常量 (匹配类型/文本特征词表 + 共享工具; 复刻 config-ui constants.ts)。

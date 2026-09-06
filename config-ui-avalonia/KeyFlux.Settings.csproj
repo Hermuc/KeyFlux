@@ -3,14 +3,14 @@
   <PropertyGroup>
     <!-- 精简框架本地化附属资源 (原 Makefile -p: 开关; pwsh 下引号包裹的 zh-Hans;en 会拆坏命令行, 故移入工程文件) -->
     <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
-    <!-- 输出为 Windows 可执行程序，最终产物为 MyKeymap.Settings.exe -->
+    <!-- 输出为 Windows 可执行程序，最终产物为 KeyFlux.Settings.exe -->
     <OutputType>WinExe</OutputType>
     <!-- 目标框架：.NET 10 -->
     <TargetFramework>net10.0</TargetFramework>
-    <!-- 程序集 / 产品名：主 exe 最终命名 MyKeymap.Settings.exe -->
-    <AssemblyName>MyKeymap.Settings</AssemblyName>
-    <RootNamespace>MyKeymap.Settings</RootNamespace>
-    <Product>MyKeymap.Settings</Product>
+    <!-- 程序集 / 产品名：主 exe 最终命名 KeyFlux.Settings.exe -->
+    <AssemblyName>KeyFlux.Settings</AssemblyName>
+    <RootNamespace>KeyFlux.Settings</RootNamespace>
+    <Product>KeyFlux.Settings</Product>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- 启用编译绑定（x:CompileBindings），提升绑定性能与编译期检查 -->
@@ -18,7 +18,7 @@
     <!-- 保留全球化（界面含中文，不能启用 InvariantGlobalization） -->
     <InvariantGlobalization>false</InvariantGlobalization>
     <!-- exe 文件图标（多尺寸 16/32/48/256 的 ICO，由 tb.png 生成）。
-         它只作用于 apphost(MyKeymap.Settings.exe) 的 Win32 图标资源，与窗体/标题栏用的
+         它只作用于 apphost(KeyFlux.Settings.exe) 的 Win32 图标资源，与窗体/标题栏用的
          avares 资源是两条路径；下方 <AvaloniaResource Include="Assets\**" /> 会顺带把它也
          打进资源包(+44KB)，不影响运行。 -->
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
@@ -46,7 +46,7 @@
 
   <ItemGroup>
     <!-- 守卫测试需读取 I18n 的内部成员 (KeyCount), 用于文案表键数与键覆盖对账 -->
-    <InternalsVisibleTo Include="MyKeymap.Settings.Tests" />
+    <InternalsVisibleTo Include="KeyFlux.Settings.Tests" />
   </ItemGroup>
 
 </Project>

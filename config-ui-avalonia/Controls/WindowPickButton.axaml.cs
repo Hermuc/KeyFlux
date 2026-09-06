@@ -4,9 +4,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.Controls;
+namespace KeyFlux.Settings.Controls;
 
 /// <summary>
 /// 窗口拾取准星按钮 (方案 L5 控件层, 照 <see cref="HotkeyCapture"/> 范式):
@@ -192,7 +192,7 @@ public partial class WindowPickButton : UserControl
 
     /// <summary>
     /// 写回 Text: AppendMode 追加为新行 ("\n" 分隔, 对齐 WindowGroupRowVm.Value), 否则整值替换。
-    /// internal 供 MyKeymap.Settings.Tests 的绑定链路裁决/回归测试直接调用
+    /// internal 供 KeyFlux.Settings.Tests 的绑定链路裁决/回归测试直接调用
     /// (csproj 已有 InternalsVisibleTo; 借此锁定 "Success 写回 -> 宿主绑定源更新" 的行为)。
     /// </summary>
     internal void WriteBack(string text)

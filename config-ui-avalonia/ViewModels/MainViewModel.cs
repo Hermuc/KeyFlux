@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.ViewModels;
+namespace KeyFlux.Settings.ViewModels;
 
 /// <summary>
 /// 主窗口 (应用骨架) 视图模型, 对应 Vue 的 App.vue + NavigationDrawer + router:
@@ -120,7 +120,7 @@ public sealed partial class MainViewModel : ObservableObject
         try
         {
             Console.WriteLine(
-                $"MYKEYMAP_GUI_READY port={Session.Port} elapsed_ms={(long)(DateTime.UtcNow - Program.ProcessStartTimeUtc).TotalMilliseconds}");
+                $"KEYFLUX_GUI_READY port={Session.Port} elapsed_ms={(long)(DateTime.UtcNow - Program.ProcessStartTimeUtc).TotalMilliseconds}");
             Console.Out.Flush(); // 重定向到文件时有缓冲, 必须显式刷新才能被外部及时读到
         }
         catch { /* 忽略 */ }
@@ -267,7 +267,7 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 if (resp.Value?.RestartFailed == true)
                 {
-                    // 保存已落盘但 MyKeymap 重启失败: 明确提示手动重载,
+                    // 保存已落盘但 KeyFlux 重启失败: 明确提示手动重载,
                     // 避免「UI 显示保存成功但新热键/配置不生效」的困惑
                     _messages.Show(I18n.T("1078"), I18n.T("1079"));
                 }

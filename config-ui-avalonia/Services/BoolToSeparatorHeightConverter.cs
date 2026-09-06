@@ -2,7 +2,7 @@ using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 /// <summary>
 /// 分隔行高度转换: IsSeparator=true → 7 (紧凑分隔行, 视觉上只是一条线的占位), false → NaN (自适应内容)。

@@ -1,8 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:MyKeymap.Settings.ViewModels"
-             xmlns:local="using:MyKeymap.Settings.Views.Controls"
-             x:Class="MyKeymap.Settings.Views.Controls.CommentSummaryPanel">
+             xmlns:vm="using:KeyFlux.Settings.ViewModels"
+             xmlns:local="using:KeyFlux.Settings.Views.Controls"
+             x:Class="KeyFlux.Settings.Views.Controls.CommentSummaryPanel">
 
   <!-- 备注汇总控件 (复刻 ActionCommentTable, KeymapPage/AbbrPage 共用):
        标题 + 独立滚动的条目列表; 使用方设置 ItemsSource / LanguageTick 两个属性。

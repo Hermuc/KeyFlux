@@ -1,10 +1,10 @@
-using MyKeymap.Settings.Tests.Infrastructure;
+using KeyFlux.Settings.Tests.Infrastructure;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// GET /shortcuts 与 POST /server/command/:id 契约。
-/// 注意: 模拟目录不含 MyKeymap.exe, execCmd 静默失败 —— 命令端点恒 200 且无副作用。
+/// 注意: 模拟目录不含 KeyFlux.exe, execCmd 静默失败 —— 命令端点恒 200 且无副作用。
 /// </summary>
 public sealed class MiscEndpointTests : ServerTestBase
 {
@@ -34,10 +34,10 @@ public sealed class MiscEndpointTests : ServerTestBase
         Assert.Equal(200, resp.StatusCode);
         Assert.Equal("{}", resp.RawBody.Trim());
 
-        // 给子进程启动留一点时间, 然后确认模拟目录内没有凭空多出 MyKeymap.exe
+        // 给子进程启动留一点时间, 然后确认模拟目录内没有凭空多出 KeyFlux.exe
         await Task.Delay(300);
-        Assert.False(File.Exists(Path.Combine(Server.RootDir, "MyKeymap.exe")),
-            "模拟目录不应出现 MyKeymap.exe (execCmd 找不到目标应静默失败)");
-        Assert.Empty(Directory.GetFiles(Server.RootDir, "MyKeymap.exe", SearchOption.AllDirectories));
+        Assert.False(File.Exists(Path.Combine(Server.RootDir, "KeyFlux.exe")),
+            "模拟目录不应出现 KeyFlux.exe (execCmd 找不到目标应静默失败)");
+        Assert.Empty(Directory.GetFiles(Server.RootDir, "KeyFlux.exe", SearchOption.AllDirectories));
     }
 }

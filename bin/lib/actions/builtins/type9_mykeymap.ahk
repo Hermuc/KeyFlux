@@ -1,5 +1,5 @@
 ﻿/**
- * TypeID 9: MyKeymap 自身动作
+ * TypeID 9: KeyFlux 自身动作
  * 拆自 Actions.ahk (模块化重构阶段 3), 函数体逐行搬运未做任何修改。
  */
 

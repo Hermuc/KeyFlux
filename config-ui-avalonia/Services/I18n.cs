@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 // ============================================================================
 // 双语资源方案 (复刻 config-ui/src/store/language-map.ts 的 label:NNN 机制)
@@ -19,7 +19,7 @@ namespace MyKeymap.Settings.Services;
 // 文案数据源: Resources/i18n.json (松散文件, 由 csproj 的 Content 项复制到
 //   build 输出与 publish 输出的 Resources/ 子目录)。刻意不用 avares:// ——
 //   Avalonia 的 AssetLoader 每次调用都现取 AvaloniaLocator 服务, 只有已 Build
-//   的 Avalonia 应用里才可用; 而 MyKeymap.Settings.Tests 是纯 xunit 宿主,
+//   的 Avalonia 应用里才可用; 而 KeyFlux.Settings.Tests 是纯 xunit 宿主,
 //   守卫测试 I18nResourceTests 必须能在无 Avalonia 应用的前提下读到文案表。
 //   JSON 形状: { "<key>": { "zh": <string|null>, "en": <string|null> }, ... }
 //   zh=null 表示该键无中文 (T() 回退英文); en="" 与 en=null 在 T() 里同样触发
@@ -27,7 +27,7 @@ namespace MyKeymap.Settings.Services;
 //
 // 键段索引 (原字典的分节注释; JSON 承载不了注释, 迁移到此):
 //   1-16 window | 17-24,2401-2402 system | 2404-2407 总览页 (Home) 编辑
-//   25-37 mouse | 38-70 text (62-70 为英文专属键名, zh=null) | 71-78 MyKeymap
+//   25-37 mouse | 38-70 text (62-70 为英文专属键名, zh=null) | 71-78 KeyFlux
 //   200-209 Action types | 301-309 App Launcher (含 301err/301hint 两个非数字键)
 //   401-406 Other | 501-507 Settings | 601-612 Window Groups
 //   701-715 Mouse Options | 721-726 Keyboard Layout | 741-755 Command Window

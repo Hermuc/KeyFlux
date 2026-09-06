@@ -1,5 +1,5 @@
 /**
- * AbbrInput.ahk —— 缩写命令输入框 (MyKeymap-CommandInput) 的 InputHook 启动与消息通道
+ * AbbrInput.ahk —— 缩写命令输入框 (KeyFlux-CommandInput) 的 InputHook 启动与消息通道
  * (从 Functions.ahk 拆分, 2026-09-03, 函数体逐行搬运未修改)。
  * 分组: InputHook 启动 (StartInputHook) | 命令框窗口消息 (PostMessageToCpasAbbr/Hide/Char/Backspace)。
  */
@@ -37,10 +37,10 @@ PostMessageToCpasAbbr(msg, wParam := 0) {
   temp := A_DetectHiddenWindows
   DetectHiddenWindows(1)
   ; 调用 WinExist 的耗时都不超过 2ms, 没必要做缓存了
-  if WinExist("ahk_class MyKeymap_Command_Input ahk_exe MyKeymap-CommandInput.exe") {
+  if WinExist("ahk_class KeyFlux_Command_Input ahk_exe KeyFlux-CommandInput.exe") {
     PostMessage(msg, wParam, 0)
   } else {
-    Tip("无法找到命令框, 可能需要重启 MyKeymap", -3000)
+    Tip("无法找到命令框, 可能需要重启 KeyFlux", -3000)
   }
   DetectHiddenWindows(temp)
 }

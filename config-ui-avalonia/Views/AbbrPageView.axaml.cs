@@ -1,9 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Views;
+namespace KeyFlux.Settings.Views;
 
 /// <summary>缩写命令页视图 (复刻 views/Abbr.vue): 命令框回车执行指令。</summary>
 public partial class AbbrPageView : UserControl

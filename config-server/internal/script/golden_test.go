@@ -10,15 +10,15 @@ import (
 )
 
 // 黄金文件测试: 用 Go 字面量合成的最小配置走完整渲染管线 (Preprocess -> SaveAHK),
-// 把产物与 testdata/golden.mykeymap.ahk 逐行比对, 守护"配置 -> AHK 脚本"的生成契约。
+// 把产物与 testdata/golden.keyflux.ahk 逐行比对, 守护"配置 -> AHK 脚本"的生成契约。
 //
 // 严禁读取 data/config.json (含个人数据, 且样例变动会反复打破快照); 合成配置见 syntheticConfig()。
 //
 // 相对路径口径与既有 skin_defaults_test.go 一致: go test 的工作目录是本包目录
-// (config-server/internal/script), 故模板为 ../../templates/mykeymap.tmpl。
+// (config-server/internal/script), 故模板为 ../../templates/keyflux.tmpl。
 const (
-	goldenTemplate  = "../../templates/mykeymap.tmpl"
-	goldenFile      = "testdata/golden.mykeymap.ahk"
+	goldenTemplate  = "../../templates/keyflux.tmpl"
+	goldenFile      = "testdata/golden.keyflux.ahk"
 	updateGoldenEnv = "UPDATE_GOLDEN"
 )
 
@@ -42,9 +42,9 @@ const (
 //   本配置的做法: 六个重映射分别用 WindowGroupID 0..5, 全互异, 排序后顺序完全确定。
 // ============================================================================
 
-// TestGoldenMyKeymapAHK 是快照断言主体。
+// TestGoldenKeyFluxAHK 是快照断言主体。
 // UPDATE_GOLDEN=1 时改写黄金文件而非断言 (用于渲染规则有意变更后刷新基线)。
-func TestGoldenMyKeymapAHK(t *testing.T) {
+func TestGoldenKeyFluxAHK(t *testing.T) {
 	gotRaw := generateAHK(t)
 
 	if os.Getenv(updateGoldenEnv) == "1" {
@@ -87,7 +87,7 @@ func TestSyntheticConfigCoversMatrix(t *testing.T) {
 	// desc 说明覆盖点, needle 是产物里必须出现的确定性子串。
 	matrix := []struct{ desc, needle string }{
 		// Preprocess 注入 + 全部 9 个 TypeID
-		{`Preprocess 注入 !f17 (TypeID9/ValueID2, 免疫 suspend)`, `km.Map("!f17", _ => MyKeymapReload()`},
+		{`Preprocess 注入 !f17 (TypeID9/ValueID2, 免疫 suspend)`, `km.Map("!f17", _ => KeyFluxReload()`},
 		{`TypeID1 activateOrRun1`, `ActivateOrRun(`},
 		{`TypeID2 systemActions2 (SystemLockScreen)`, `SystemLockScreen()`},
 		{`TypeID3 windowActions3 (SmartCloseWindow)`, `SmartCloseWindow()`},
@@ -147,7 +147,7 @@ func generateAHK(t *testing.T) string {
 	cfg := syntheticConfig()
 	Preprocess(cfg) // 必须与 SaveAHK 保持同序, 否则 !f17 不会出现在快照里
 
-	outPath := filepath.Join(t.TempDir(), "MyKeymap.ahk")
+	outPath := filepath.Join(t.TempDir(), "KeyFlux.ahk")
 	if err := SaveAHK(cfg, goldenTemplate, outPath); err != nil {
 		t.Fatalf("SaveAHK 失败: %v", err)
 	}
@@ -309,8 +309,8 @@ func syntheticConfig() *Config {
 			},
 		},
 		Options: Options{
-			// MykeymapVersion 由 ldflags 注入, 测试环境为空; 实测 mykeymap.tmpl 不渲染版本号, 保持默认空。
-			MykeymapVersion: "",
+			// KeyfluxVersion 由 ldflags 注入, 测试环境为空; 实测 keyflux.tmpl 不渲染版本号, 保持默认空。
+			KeyfluxVersion: "",
 			// conditionType 1..5 各一; 含单行 value (直出) 与多行 value (ahk_group)。
 			WindowGroups: []WindowGroup{
 				{ID: 1, Name: "Editor", Value: "ahk_exe code.exe", ConditionType: 1},

@@ -1,8 +1,8 @@
 using System.Text.Json;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Tests.Infrastructure;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Tests.Infrastructure;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>共享测试数据构造器 (合法/非法 selectedAction 快照; 行为 ID 与 bin/behaviors 内置包一致)。</summary>
 internal static class TestData
@@ -162,15 +162,15 @@ public sealed class ConfigContractTests : ServerTestBase
         var options = root.GetProperty("options");
         foreach (var prop in new[]
         {
-            "hideMatrix", "mykeymapVersion", "windowGroups", "mouse", "scroll",
+            "hideMatrix", "keyfluxVersion", "windowGroups", "mouse", "scroll",
             "commandInputSkin", "pathVariables", "startup", "language", "keyMapping", "keyboardLayout",
         })
         {
             Assert.True(options.TryGetProperty(prop, out _), $"options 缺少字段 {prop}");
         }
         // Go ParseConfig 读路径注入: 版本号来自构建期 ldflags, 非空
-        Assert.False(string.IsNullOrEmpty(options.GetProperty("mykeymapVersion").GetString()),
-            "options.mykeymapVersion 应由 Go 侧注入构建版本号");
+        Assert.False(string.IsNullOrEmpty(options.GetProperty("keyfluxVersion").GetString()),
+            "options.keyfluxVersion 应由 Go 侧注入构建版本号");
         // tipSymbol 缺省注入 🐶 (种子配置若已带值则仅断言非空)
         Assert.False(string.IsNullOrEmpty(options.GetProperty("mouse").GetProperty("tipSymbol").GetString()));
         // commandInputSkin 全零时 Go 注入默认皮肤

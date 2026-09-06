@@ -1,6 +1,6 @@
-using MyKeymap.Settings.Services;
+using KeyFlux.Settings.Services;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// MarkdownParser 契约守护: 总览页文档 (config_doc.md 子集) 的解析结果。
@@ -81,7 +81,7 @@ public sealed class MarkdownParserTests
         var md = """
             ## 😀 欢迎
 
-            1. [项目 GitHub](https://github.com/xianyukang/MyKeymap)
+            1. [项目 GitHub](https://github.com/xianyukang/KeyFlux)
             2. [视频介绍](https://www.bilibili.com/video/BV1Sf4y1c7p8/)
 
             ## 🚀 启动程序或激活窗口 

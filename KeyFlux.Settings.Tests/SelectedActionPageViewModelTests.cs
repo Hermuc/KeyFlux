@@ -1,8 +1,8 @@
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.Services;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Services;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// 选中动作单屏页 (方案 D) 纯 ViewModel 单测:
@@ -16,7 +16,7 @@ public sealed class SelectedActionPageViewModelTests
 {
     private static void EnsureBehaviorCatalog()
     {
-        if (BehaviorCatalog.Loaded) return;
+        // 无条件重播种 (整表替换): 消除跨测试类的全局单例顺序依赖
         BehaviorCatalog.SeedForTests(BehaviorFixtures.Builtin(), []);
     }
 

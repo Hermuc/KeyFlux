@@ -1,9 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using MyKeymap.Settings.Services;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.Services;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Views;
+namespace KeyFlux.Settings.Views;
 
 /// <summary>
 /// 总览页编辑窗口: 编辑 markdown 原文, 保存到 config.overviewDocMd (data/config.json 真源,

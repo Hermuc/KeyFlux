@@ -1,9 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using MyKeymap.Settings.Services;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.Services;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Views;
+namespace KeyFlux.Settings.Views;
 
 /// <summary>
 /// 窗口条件组对话框 (复刻 WindowGroupDialog.vue): 模态打开, 保存才整体替换

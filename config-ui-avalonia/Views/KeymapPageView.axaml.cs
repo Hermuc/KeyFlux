@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.VisualTree;
 
-namespace MyKeymap.Settings.Views;
+namespace KeyFlux.Settings.Views;
 
 /// <summary>键位图页视图 (复刻 views/Keymap.vue)。</summary>
 public partial class KeymapPageView : UserControl

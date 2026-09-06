@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace MyKeymap.Settings.Services.Win32;
+namespace KeyFlux.Settings.Services.Win32;
 
 // ============================================================================
 // Win32 P/Invoke 基础设施层 (L1): 集中「窗口拾取准星」功能所需的全部原生 API。

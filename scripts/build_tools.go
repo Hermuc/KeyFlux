@@ -58,23 +58,23 @@ func updateShareLink(args []string) {
 		return line
 	}
 
-	format = "- [MyKeymap %s](%s) ( 提取码 %s )"
+	format = "- [KeyFlux %s](%s) ( 提取码 %s )"
 	if err = ReplaceInFile("./readme.md", replacer); err != nil {
 		panic(err)
 	}
 
-	format = "- 下载地址: [MyKeymap %s](%s) ( 提取码 %s )"
-	// 站点文档路径参数化: 第 2 个命令行参数或 MYKEYMAP_SITE_DOC 环境变量,
+	format = "- 下载地址: [KeyFlux %s](%s) ( 提取码 %s )"
+	// 站点文档路径参数化: 第 2 个命令行参数或 KEYFLUX_SITE_DOC 环境变量,
 	// 缺省时跳过该步骤 (原为硬编码 WSL 路径, 仅原作者环境可用)
 	siteDoc := ""
 	if len(args) > 1 {
 		siteDoc = args[1]
 	}
 	if siteDoc == "" {
-		siteDoc = os.Getenv("MYKEYMAP_SITE_DOC")
+		siteDoc = os.Getenv("KEYFLUX_SITE_DOC")
 	}
 	if siteDoc == "" {
-		log.Println("skip site doc update: pass the doc path as 2nd arg or set MYKEYMAP_SITE_DOC")
+		log.Println("skip site doc update: pass the doc path as 2nd arg or set KEYFLUX_SITE_DOC")
 	} else if err = ReplaceInFile(siteDoc, replacer); err != nil {
 		log.Println("update site doc failed:", err)
 	}

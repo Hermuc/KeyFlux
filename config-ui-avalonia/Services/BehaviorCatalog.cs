@@ -1,6 +1,6 @@
-using MyKeymap.Settings.Models;
+using KeyFlux.Settings.Models;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 /// <summary>
 /// 行为目录 (CONTRACTS §3.9): 后端 GET /api/behaviors 快照 + 覆盖/默认/显示名推导。

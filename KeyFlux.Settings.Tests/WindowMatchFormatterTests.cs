@@ -1,8 +1,8 @@
 using Avalonia;
-using MyKeymap.Settings.Services;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.Services;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Tests;
+namespace KeyFlux.Settings.Tests;
 
 /// <summary>
 /// WindowMatchFormatter 纯函数格式化 + EvaluateWinTitleError 校验放宽 单测。

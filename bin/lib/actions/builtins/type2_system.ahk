@@ -43,7 +43,7 @@ SoundControl() {
 }
 
 BrightnessControl() {
-  Run("MyKeymap.exe /script bin\ChangeBrightness.ahk")
+  Run("KeyFlux.exe /script bin\ChangeBrightness.ahk")
 }
 
 CopySelectedAsPlainText() {

@@ -1,9 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using MyKeymap.Settings.Models;
-using MyKeymap.Settings.ViewModels;
+using KeyFlux.Settings.Models;
+using KeyFlux.Settings.ViewModels;
 
-namespace MyKeymap.Settings.Views;
+namespace KeyFlux.Settings.Views;
 
 /// <summary>
 /// 行为库窗口 (CONTRACTS §3.9): 浏览/新建/编辑/删除行为包; 新建与编辑打开

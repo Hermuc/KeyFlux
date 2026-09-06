@@ -304,19 +304,19 @@
     "en": "Ctrl+Shift+Tab"
   },
   "71": {
-    "zh": "暂停 MyKeymap",
+    "zh": "暂停 KeyFlux",
     "en": "Pause"
   },
   "72": {
-    "zh": "重启 MyKeymap",
+    "zh": "重启 KeyFlux",
     "en": "Reload"
   },
   "73": {
-    "zh": "退出 MyKeymap",
+    "zh": "退出 KeyFlux",
     "en": "Exit"
   },
   "74": {
-    "zh": "打开 MyKeymap 设置",
+    "zh": "打开 KeyFlux 设置",
     "en": "Settings"
   },
   "75": {
@@ -372,8 +372,8 @@
     "en": "⚛️ Custom Functions"
   },
   "209": {
-    "zh": "⚙️ MyKeymap 相关",
-    "en": "⚙️ MyKeymap"
+    "zh": "⚙️ KeyFlux 相关",
+    "en": "⚙️ KeyFlux"
   },
   "301": {
     "zh": "要激活的窗口 (进程匹配用 ahk_exe 程序名.exe)",
@@ -517,7 +517,7 @@
   },
   "612": {
     "zh": "注意: MyKeyamp 的所有热键在 Exclude 组中会被禁用",
-    "en": "Note: MyKeymap will be disabled in the \"Exclude\" group."
+    "en": "Note: KeyFlux will be disabled in the \"Exclude\" group."
   },
   "701": {
     "zh": "🖱️ 修改鼠标参数",
@@ -724,8 +724,8 @@
     "en": "Loading config…"
   },
   "919": {
-    "zh": "无法连接到 MyKeymap 设置后端",
-    "en": "Cannot reach the MyKeymap settings backend"
+    "zh": "无法连接到 KeyFlux 设置后端",
+    "en": "Cannot reach the KeyFlux settings backend"
   },
   "920": {
     "zh": "重试",
@@ -756,8 +756,8 @@
     "en": "Add"
   },
   "934": {
-    "zh": "MyKeymap 是一个按键层工具: 按住触发键进入某个模式, 该模式下普通按键被映射为自定义动作。",
-    "en": "MyKeymap is a key-layer tool: hold a modifier key to enter a layer where plain keys are remapped to custom actions."
+    "zh": "KeyFlux 是一个按键层工具: 按住触发键进入某个模式, 该模式下普通按键被映射为自定义动作。",
+    "en": "KeyFlux is a key-layer tool: hold a modifier key to enter a layer where plain keys are remapped to custom actions."
   },
   "935": {
     "zh": "快速上手",
@@ -796,8 +796,8 @@
     "en": "(1) Put custom functions in data\\custom_functions.ahk, then call them here."
   },
   "956": {
-    "zh": "(2) 复杂的脚本推荐做成独立的 ahk 文件，然后用 MyKeymap 启动那个 ahk 文件",
-    "en": "(2) For complex scripts, make a standalone .ahk file and let MyKeymap launch it."
+    "zh": "(2) 复杂的脚本推荐做成独立的 ahk 文件，然后用 KeyFlux 启动那个 ahk 文件",
+    "en": "(2) For complex scripts, make a standalone .ahk file and let KeyFlux launch it."
   },
   "957": {
     "zh": "此处修改",
@@ -976,12 +976,12 @@
     "en": "Hotkey changed; click \"Save\" to apply"
   },
   "1078": {
-    "zh": "已保存, 但 MyKeymap 重启失败",
-    "en": "Saved, but MyKeymap failed to restart"
+    "zh": "已保存, 但 KeyFlux 重启失败",
+    "en": "Saved, but KeyFlux failed to restart"
   },
   "1079": {
-    "zh": "改动已写入配置, 但 MyKeymap 进程重启失败, 新热键暂不生效。请通过托盘菜单「重载」手动生效。",
-    "en": "Changes were written to config, but MyKeymap failed to restart, so the new hotkey is not active yet. Use the tray menu \"Reload\" to apply it."
+    "zh": "改动已写入配置, 但 KeyFlux 进程重启失败, 新热键暂不生效。请通过托盘菜单「重载」手动生效。",
+    "en": "Changes were written to config, but KeyFlux failed to restart, so the new hotkey is not active yet. Use the tray menu \"Reload\" to apply it."
   },
   "1080": {
     "zh": "拾取窗口：点击后移动准星到目标窗口并单击填入；Esc 或右键取消",
@@ -1036,12 +1036,12 @@
     "en": "Custom"
   },
   "1094": {
-    "zh": "立即生效 (重启 MyKeymap)",
-    "en": "Apply Now (restarts MyKeymap)"
+    "zh": "立即生效 (重启 KeyFlux)",
+    "en": "Apply Now (restarts KeyFlux)"
   },
   "1095": {
-    "zh": "行为的增删改在此管理; 变更需重启 MyKeymap 后生效 (点「立即生效」或保存设置)",
-    "en": "Manage behaviors here; changes take effect after MyKeymap restarts (click Apply Now or save settings)"
+    "zh": "行为的增删改在此管理; 变更需重启 KeyFlux 后生效 (点「立即生效」或保存设置)",
+    "en": "Manage behaviors here; changes take effect after KeyFlux restarts (click Apply Now or save settings)"
   },
   "1096": {
     "zh": "删除",
@@ -1060,8 +1060,8 @@
     "en": "Add Precondition"
   },
   "1101_applied": {
-    "zh": "重启指令已发送; 若引擎未恢复, 请从托盘「重载」MyKeymap",
-    "en": "Restart requested; if the engine does not recover, reload MyKeymap from the tray"
+    "zh": "重启指令已发送; 若引擎未恢复, 请从托盘「重载」KeyFlux",
+    "en": "Restart requested; if the engine does not recover, reload KeyFlux from the tray"
   },
   "1102_deleted": {
     "zh": "已删除: {0}",

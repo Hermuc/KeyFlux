@@ -2,7 +2,7 @@ using System.Collections;
 using Avalonia;
 using Avalonia.Controls;
 
-namespace MyKeymap.Settings.Views.Controls;
+namespace KeyFlux.Settings.Views.Controls;
 
 /// <summary>
 /// 备注汇总控件 (复刻 ActionCommentTable): 标题 + 可独立滚动的条目列表。

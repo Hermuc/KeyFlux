@@ -2,7 +2,7 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Data.Converters;
 
-namespace MyKeymap.Settings.Services;
+namespace KeyFlux.Settings.Services;
 
 /// <summary>int <-> 字符串 (触发延时等数值输入框; 解析失败时拒绝写回)。</summary>
 public sealed class IntToStringConverter : IValueConverter

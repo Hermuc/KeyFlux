@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 
-namespace MyKeymap.Settings.Controls;
+namespace KeyFlux.Settings.Controls;
 
 /// <summary>
 /// 可复用「编辑区提示」控件: 虚线分割线 + 可点击说明区域。
