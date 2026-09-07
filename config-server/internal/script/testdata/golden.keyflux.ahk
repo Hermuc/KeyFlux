@@ -151,7 +151,7 @@ InitTrayMenu() {
   A_TrayMenu.Default := Translation().menu_pause
   A_TrayMenu.ClickCount := 1
 
-  A_IconTip := "keyfluxX"
+  A_IconTip := "KeyFlux"
   TraySetIcon("./bin/icons/logo.ico", , true)
 }
 
