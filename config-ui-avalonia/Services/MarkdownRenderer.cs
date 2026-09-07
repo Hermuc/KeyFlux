@@ -23,14 +23,21 @@ public static class MarkdownRenderer
     private const string CodeFont = "Consolas";
 
     /// <summary>
-    /// 文档字体链: 内嵌 Twemoji 彩色字体置顶 —— emoji 逐字符直接命中应用自带 COLR 字形,
-    /// 完全不依赖系统字体栈 (实测本机 DirectWrite/系统字体解析跨重启不稳定, 引擎提权拉起时
-    /// 系统回退会把 emoji 落到单色字形, FontManagerOptions 与组合字体族均无法可靠修复);
-    /// 非 emoji 字符 Twemoji 无字形, 依序落回 YaHei UI / Segoe UI, CJK 与排版度量不变。
+    /// 文档字体链: 保持 YaHei UI 首位 (行高/基线度量与历史渲染一致)。
+    /// 注意不能把内嵌 Twemoji 放在组合字体链首位 —— 那会让 Twemoji 成为段落主字体,
+    /// 行基线按其超大垂直度量计算, 而 TextBlock 默认 ClipToBounds + 段落固定 LineHeight
+    /// 会把超出行框的 emoji 字形整个裁掉 (表现为 emoji 消失)。
+    /// emoji 由 AppendInline 拆成独立 Run 直接指定 EmojiFontFamily (见下)。
     /// </summary>
-    private static readonly FontFamily DocFontFamily = new FontFamily(
-        "avares://KeyFlux.Settings/Assets/Fonts/Twemoji.Mozilla.ttf#Twemoji Mozilla, " +
-        "Microsoft YaHei UI, Segoe UI, Segoe UI Emoji");
+    private static readonly FontFamily DocFontFamily =
+        new FontFamily("Microsoft YaHei UI, Segoe UI, Segoe UI Emoji");
+
+    /// <summary>
+    /// emoji 专用字体: 内嵌 Twemoji (COLR 彩色), 单一家族直接命中, 不依赖系统字体栈
+    /// (本机系统字体解析在屏幕渲染路径上跨重启不稳定)。字形贴 YaHei 基线绘制, 落在行框内。
+    /// </summary>
+    private static readonly FontFamily EmojiFontFamily =
+        new FontFamily("avares://KeyFlux.Settings/Assets/Fonts/Twemoji.Mozilla.ttf#Twemoji Mozilla");
 
     /// <summary>链接文字基线补偿 (14px 字号实测校准): 段落行高 24 用 15.4, 列表行高 23 用 15.2。</summary>
     private const double ParagraphLinkOffset = 15.4;
@@ -177,10 +184,63 @@ public static class MarkdownRenderer
                     });
                     break;
                 default:
-                    tb.Inlines.Add(new Run(inline.Text) { FontSize = fontSize });
+                    AppendTextRuns(tb, inline.Text, fontSize);
                     break;
             }
         }
+    }
+
+    /// <summary>emoji 基字符 (按码点判断; 覆盖 astral 区、杂项符号、丁贝符、专用变体)。</summary>
+    private static bool IsEmojiBase(int cp) =>
+        (cp >= 0x1F000 && cp <= 0x1FBFF) ||          // astral emoji (含区域指示符/补充符号)
+        (cp >= 0x2600 && cp <= 0x27BF) ||            // 杂项符号 ☀⚡✅ + 丁贝符 ✂
+        (cp >= 0x2B00 && cp <= 0x2BFF) ||            // ⭐⬛ 等
+        cp is 0x203C or 0x2049 or 0x2139 or          // ‼ ⁉ ℹ
+              0x231A or 0x231B or                    // ⌚ ⌛
+              0x3030 or 0x303D or 0x3297 or 0x3299;  // 〰 〽 ㊗ ㊙
+
+    /// <summary>emoji 连接/呈现修饰符 (VS16 / ZWJ / keycap), 仅在紧邻 emoji 时归属 emoji 段。</summary>
+    private static bool IsEmojiExtend(int cp) => cp is 0xFE0F or 0x200D or 0x20E3;
+
+    /// <summary>
+    /// 普通文本按码点拆段: emoji 序列用内嵌 Twemoji 渲染 (彩色且不依赖系统字体栈),
+    /// 其余文字保持 DocFontFamily (度量与历史渲染一致)。
+    /// ZWJ 系列与 VS16 修饰符跟随相邻 emoji 合并为同一段。
+    /// </summary>
+    private static void AppendTextRuns(TextBlock tb, string text, int fontSize)
+    {
+        int i = 0, segStart = 0;
+        bool inEmoji = false, prevEmoji = false;
+
+        void Flush(int end, bool emoji)
+        {
+            if (end <= segStart) return;
+            var seg = text[segStart..end];
+            tb.Inlines.Add(emoji
+                ? new Run(seg) { FontSize = fontSize, FontFamily = EmojiFontFamily }
+                : new Run(seg) { FontSize = fontSize });
+        }
+
+        while (i < text.Length)
+        {
+            int cp = char.IsSurrogatePair(text, i)
+                ? char.ConvertToUtf32(text, i) : text[i];
+            int len = char.IsSurrogatePair(text, i) ? 2 : 1;
+
+            bool isBase = IsEmojiBase(cp);
+            bool isExt = IsEmojiExtend(cp);
+            bool emojiChar = isBase || (isExt && prevEmoji);
+
+            if (emojiChar != inEmoji)
+            {
+                Flush(i, inEmoji);
+                segStart = i;
+                inEmoji = emojiChar;
+            }
+            prevEmoji = emojiChar;
+            i += len;
+        }
+        Flush(text.Length, inEmoji);
     }
 
     /// <summary>

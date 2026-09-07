@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         CanResize="True"
         ShowInTaskbar="False"
-        FontFamily="avares://KeyFlux.Settings/Assets/Fonts/Twemoji.Mozilla.ttf#Twemoji Mozilla, Microsoft YaHei UI, Segoe UI, Segoe UI Emoji">
+        FontFamily="Microsoft YaHei UI, Segoe UI, Segoe UI Emoji">
 
   <!-- 总览页编辑窗口: 编辑 markdown 原文 (纯文本, 支持 # 标题 / 列表 / [链接] / ![图片] / `代码`) -->
   <DockPanel Margin="20">
@@ -24,11 +24,11 @@
               Background="#4169E1" Foreground="White" CornerRadius="8" Padding="18,7" />
     </StackPanel>
 
-    <!-- 编辑态 emoji 彩色: 内嵌 Twemoji COLR 字体直接命中 emoji (不依赖系统字体栈);
-         正文仍由 Consolas 渲染, 字体度量不变 -->
+    <!-- 编辑态 emoji 彩色: Consolas 首位保持原字体度量, emoji 逐字符回退命中内嵌
+         Twemoji COLR 彩色字形 (不依赖系统字体栈) -->
     <TextBox x:Name="Editor"
              AcceptsReturn="True" TextWrapping="NoWrap"
-             FontFamily="avares://KeyFlux.Settings/Assets/Fonts/Twemoji.Mozilla.ttf#Twemoji Mozilla, Consolas, Segoe UI Emoji" FontSize="13"
+             FontFamily="Consolas, avares://KeyFlux.Settings/Assets/Fonts/Twemoji.Mozilla.ttf#Twemoji Mozilla, Segoe UI Emoji" FontSize="13"
              Background="White" BorderBrush="#D5D9E0" BorderThickness="1"
              CornerRadius="6" Padding="10" />
   </DockPanel>
