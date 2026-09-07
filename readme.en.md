@@ -1,30 +1,39 @@
 [![zh](https://img.shields.io/badge/lang-zh-blue.svg)](./readme.md)
+[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows)](https://github.com/Hermuc/KeyFlux)
+[![License](https://img.shields.io/badge/License-GPL--3.0-blue)](./LICENSE)
 
-# KeyFlux
+# ⌨️ KeyFlux
 
-A program helps you improve the efficiency of using the keyboard.
+> A keyboard tool for Windows that helps you get more done without leaving the home row.
 
-## Features
+## ✨ Features
 
-- Quickly start and switch any application
-- Control the mouse with the keyboard
-- Remap keys: cursor control, digit input and symbol input on the home row
+- 🚀 **Quick app switching** — launch and switch any application with a hotkey
+- 🖱️ **Mouse control** — drive the mouse from the keyboard, no more hand traveling
+- ⌨️ **Key remapping** — cursor control, digit input and symbol input on the home row
 
-## Usage
+## 📦 Quick start
 
-- Enter `CapsLock`, `S`, `E` to open the settings window.
+1. Download and unzip from [Releases](https://github.com/Hermuc/KeyFlux/releases/latest) 📥
+2. Run `KeyFlux.exe` ▶️
+3. Press <kbd>CapsLock</kbd> + <kbd>S</kbd> + <kbd>E</kbd> to open the settings window ⚙️
 
-## Screenshots
+## 🖼️ Screenshots
 
 ![settings](./doc/settings.en.png)
 
-## Differences from upstream
+## 🔀 Differences from upstream
 
 This fork is based on [xianyukang/MyKeymap](https://github.com/xianyukang/MyKeymap). Main differences:
 
-- **Native settings window (Avalonia GUI)**: the old browser-based (Vue) settings page has been fully replaced by a native Avalonia desktop app (`config-ui-avalonia/`); the GUI launches `settings.exe --headless` as a child process and talks to the Go backend over localhost HTTP, config writing stays in the Go backend
-- **Selected action system**: select text or files, then press a hotkey to trigger a preset action; rules are editable visually in the settings UI. Two match types — file extensions (with file-group quick fill, groups customizable via `fileGroups` in config.json), text features (URL / path / magnet link / plain text auto-detection); text features are strictly paired with dedicated actions (open URL, open path, open folder, magnet download, registry jump)
-- **CommandInput skin**: the look of the command input box (background, border, gridlines, key colors, window position/width, shadow, hide animation, etc.) is configurable in the settings UI via the `commandInputSkin` field in config.json
-- **"Matrix" digital rain**: running `bin\settings.exe` directly still shows the "Matrix" style digital rain in the console (disable via `options.hideMatrix`)
-- **Tray recall**: bring back apps (e.g. WeChat/QQ) minimized to the tray instantly with a hotkey, without re-launching a new instance
-- **Registry-based autostart + one-click uninstall script**; invalid hotkey configs are skipped with a tip instead of crashing the whole program
+- 🖥️ **Native settings window (Avalonia GUI)** — the old browser-based (Vue) settings page has been fully replaced by a native desktop app (`config-ui-avalonia/`); the GUI launches `settings.exe --headless` as a child process and talks to the Go backend over localhost HTTP, config writing stays in the backend
+- ⚡ **Selected action system** — select text or files, then press a hotkey to trigger a preset action; rules are editable visually. Two match types: file extensions (with customizable group quick-fill) and text features (URL / path / magnet link / plain text), strictly paired with dedicated actions
+- 🎨 **CommandInput skin** — background, border, gridlines, key colors, window position/width, shadow, hide animation and more, configurable via the `commandInputSkin` field in config.json
+- 💊 **"Matrix" digital rain** — running `bin\settings.exe` directly still shows the digital rain in the console (disable via `options.hideMatrix`)
+- 🚪 **Tray recall** — bring back apps (e.g. WeChat/QQ) minimized to the tray instantly, without re-launching a new instance
+- 🛡️ **More robust** — invalid hotkey configs are skipped with a tip instead of crashing the whole program
+- 🧰 **Registry-based autostart + one-click uninstall script**
+
+---
+
+🙌 Upstream: [xianyukang/MyKeymap](https://github.com/xianyukang/MyKeymap) · 📄 License: [GPL-3.0](./LICENSE)
