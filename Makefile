@@ -80,9 +80,21 @@ server: buildServer
 ahk: buildServer
 	@bin/settings.exe GenerateAHK ./data/config.json ./config-server/templates/keyflux.tmpl ./bin/KeyFlux.ahk
 
+# ===== 编译输出目录 (单一真源) =====
+# 编译产物的最终落点, 固定为本机部署目录 D:\PortableApps\KeyFlux-1.0-beta1。
+# 路径用正斜杠写法 (MSYS/Git Bash 与 robocopy 均可识别); 需要临时换落点时用 make OUT_DIR=<路径> 覆盖。
+# 说明: bin/ 只是「暂存区」(check 回归、build 打 7z 包都要读它, 不能取消),
+#       真正对外生效的产物由 sync-out 从这里同步到 OUT_DIR, 不会留在项目目录里。
+OUT_DIR ?= D:/PortableApps/KeyFlux-1.0-beta1
+
+# 输出目录不存在时自动创建 (order-only 前置目标: 目录已存在则直接跳过, 不会误触发重建)
+$(OUT_DIR):
+	@mkdir -p "$(OUT_DIR)"
+	@echo "[mkdir] 编译输出目录已就绪: $(OUT_DIR)"
+
 # ===== 本机回归与部署 (2026-09-03 新增) =====
 # 部署目录 = 正在使用的软件 (行为基线配置所在, 见 docs/CONTRACTS.md 约束 1)
-DEPLOY_DIR := ../KeyFlux-1.0-beta1
+DEPLOY_DIR := $(OUT_DIR)
 CHECK_CONFIG := $(DEPLOY_DIR)/data/config.json
 
 # check: 一键回归 = Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
@@ -96,13 +108,22 @@ check: buildServer
 check-cs:
 	dotnet test KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --nologo
 
-# deploy: 回归通过后编译并同步到部署目录, 重启实例 (robocopy 退出码 0-7 均为成功)
-deploy: check buildClientAvalonia
-	MSYS_NO_PATHCONV=1 robocopy bin/lib $(DEPLOY_DIR)/bin/lib /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
-	MSYS_NO_PATHCONV=1 robocopy bin/templates $(DEPLOY_DIR)/bin/templates /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
-	MSYS_NO_PATHCONV=1 robocopy site-assets $(DEPLOY_DIR)/bin/site /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
-	MSYS_NO_PATHCONV=1 robocopy bin/ui $(DEPLOY_DIR)/bin/ui /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
-	MSYS_NO_PATHCONV=1 robocopy bin $(DEPLOY_DIR)/bin *.ahk *.exe *.ps1 *.txt *.dll /XF KeyFlux.ahk /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
-	pwsh -NoProfile -Command "$$d=(Resolve-Path '$(DEPLOY_DIR)').Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d 'KeyFlux.exe') -WorkingDirectory $$d"
+# sync-out: 把编译产物同步到 OUT_DIR (robocopy 退出码 0-7 均为成功)
+sync-out: | $(OUT_DIR)
+	MSYS_NO_PATHCONV=1 robocopy bin/lib $(OUT_DIR)/bin/lib /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
+	MSYS_NO_PATHCONV=1 robocopy bin/templates $(OUT_DIR)/bin/templates /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
+	MSYS_NO_PATHCONV=1 robocopy site-assets $(OUT_DIR)/bin/site /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
+	MSYS_NO_PATHCONV=1 robocopy bin/ui $(OUT_DIR)/bin/ui /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
+	# 文件模式必须加引号: 否则在 make 工作目录(仓库根)被 shell 展开, *.exe 会变成根目录下的 KeyFlux.exe,
+	# 导致 bin/settings.exe 等永远同步不到部署目录 (历史遗留缺陷)
+	MSYS_NO_PATHCONV=1 robocopy bin $(OUT_DIR)/bin '*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll' /XF KeyFlux.ahk /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
 
-.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-cs deploy
+# out: 只编译并把产物落到 OUT_DIR (不跑回归、不重启实例, 便于验证输出目录配置)
+out: buildServer buildClientAvalonia sync-out
+	@echo ------------------------- out ok -> $(OUT_DIR) -------------------------------
+
+# deploy: 回归通过后编译并同步到部署目录, 重启实例 (robocopy 退出码 0-7 均为成功)
+deploy: check buildClientAvalonia sync-out
+	pwsh -NoProfile -Command "$$d=(Resolve-Path '$(OUT_DIR)').Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d 'KeyFlux.exe') -WorkingDirectory $$d"
+
+.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-cs sync-out out deploy

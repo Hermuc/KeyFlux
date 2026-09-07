@@ -1087,9 +1087,9 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
 
     // ------------------------------------------------------------- 模拟测试条
 
-    /// <summary>模拟选中内容 (复刻旧默认 "https://example.com")。</summary>
+    /// <summary>模拟选中内容 (复刻旧默认 "https://github.com/Hermuc/KeyFlux")。</summary>
     [ObservableProperty]
-    private string _testContent = "https://example.com";
+    private string _testContent = "https://github.com/Hermuc/KeyFlux";
 
     [ObservableProperty]
     private bool _testIsFile;
@@ -1186,7 +1186,7 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         TestContent = row.IsTextType
             ? row.Mapping.MatchValue switch
             {
-                "url" => "https://example.com",
+                "url" => "https://github.com/Hermuc/KeyFlux",
                 "path" => "C:\\Windows\\explorer.exe",
                 "magnet" => "magnet:?xt=urn:btih:example",
                 _ => "hello world",
