@@ -4,6 +4,7 @@
         xmlns:views="using:KeyFlux.Settings.Views"
         x:Class="KeyFlux.Settings.Views.MainWindow"
         x:DataType="vm:MainViewModel"
+        FontFamily="Microsoft YaHei UI, Segoe UI, Segoe UI Emoji"
         Title="Setting"
         Icon="avares://KeyFlux.Settings/Assets/logo.png"
         Width="1200" Height="760"

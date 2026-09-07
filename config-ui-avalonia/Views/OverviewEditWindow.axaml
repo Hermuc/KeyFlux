@@ -6,7 +6,8 @@
         MinWidth="560" MinHeight="400"
         WindowStartupLocation="CenterOwner"
         CanResize="True"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        FontFamily="Microsoft YaHei UI, Segoe UI, Segoe UI Emoji">
 
   <!-- 总览页编辑窗口: 编辑 markdown 原文 (纯文本, 支持 # 标题 / 列表 / [链接] / ![图片] / `代码`) -->
   <DockPanel Margin="20">
@@ -23,9 +24,11 @@
               Background="#4169E1" Foreground="White" CornerRadius="8" Padding="18,7" />
     </StackPanel>
 
+    <!-- 编辑态 emoji 彩色: Consolas 无 emoji 字形, 逐字符回退走家族列表落至
+         Segoe UI Emoji (COLR 彩色); 正文仍由 Consolas 渲染, 字体度量不变 -->
     <TextBox x:Name="Editor"
              AcceptsReturn="True" TextWrapping="NoWrap"
-             FontFamily="Consolas" FontSize="13"
+             FontFamily="Consolas, Segoe UI Emoji" FontSize="13"
              Background="White" BorderBrush="#D5D9E0" BorderThickness="1"
              CornerRadius="6" Padding="10" />
   </DockPanel>

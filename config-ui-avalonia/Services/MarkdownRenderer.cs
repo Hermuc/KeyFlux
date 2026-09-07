@@ -22,6 +22,15 @@ public static class MarkdownRenderer
     private const string CodeColor = "#C7254E";
     private const string CodeFont = "Consolas";
 
+    /// <summary>
+    /// 文档字体链 (显式组合字体族): 逐字符回退必须走家族列表本身,
+    /// 不能依赖 FontManagerOptions.FontFallbacks —— 同一二进制下, 部分启动环境
+    /// (如引擎提权拉起) 中全局回退不生效, emoji 会落盘到单色字形 (Segoe UI Symbol)。
+    /// CJK 放首位与现渲染一致 (zh-CN 平台回退本来就是 YaHei UI), Segoe UI Emoji 收尾保证彩色 (COLR)。
+    /// </summary>
+    private static readonly FontFamily DocFontFamily =
+        new FontFamily("Microsoft YaHei UI, Segoe UI, Segoe UI Emoji");
+
     /// <summary>链接文字基线补偿 (14px 字号实测校准): 段落行高 24 用 15.4, 列表行高 23 用 15.2。</summary>
     private const double ParagraphLinkOffset = 15.4;
     private const double ListLinkOffset = 15.2;
@@ -77,6 +86,7 @@ public static class MarkdownRenderer
         {
             FontSize = 14,
             LineHeight = 24,
+            FontFamily = DocFontFamily,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 2, 0, 2),
         };
@@ -95,6 +105,7 @@ public static class MarkdownRenderer
             {
                 FontSize = 14,
                 LineHeight = 23,
+                FontFamily = DocFontFamily,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(20 * (item.Level - 1), 0, 0, 0),
             };
