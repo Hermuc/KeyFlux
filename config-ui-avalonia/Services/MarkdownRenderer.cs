@@ -23,13 +23,14 @@ public static class MarkdownRenderer
     private const string CodeFont = "Consolas";
 
     /// <summary>
-    /// 文档字体链 (显式组合字体族): 逐字符回退必须走家族列表本身,
-    /// 不能依赖 FontManagerOptions.FontFallbacks —— 同一二进制下, 部分启动环境
-    /// (如引擎提权拉起) 中全局回退不生效, emoji 会落盘到单色字形 (Segoe UI Symbol)。
-    /// CJK 放首位与现渲染一致 (zh-CN 平台回退本来就是 YaHei UI), Segoe UI Emoji 收尾保证彩色 (COLR)。
+    /// 文档字体链: 内嵌 Twemoji 彩色字体置顶 —— emoji 逐字符直接命中应用自带 COLR 字形,
+    /// 完全不依赖系统字体栈 (实测本机 DirectWrite/系统字体解析跨重启不稳定, 引擎提权拉起时
+    /// 系统回退会把 emoji 落到单色字形, FontManagerOptions 与组合字体族均无法可靠修复);
+    /// 非 emoji 字符 Twemoji 无字形, 依序落回 YaHei UI / Segoe UI, CJK 与排版度量不变。
     /// </summary>
-    private static readonly FontFamily DocFontFamily =
-        new FontFamily("Microsoft YaHei UI, Segoe UI, Segoe UI Emoji");
+    private static readonly FontFamily DocFontFamily = new FontFamily(
+        "avares://KeyFlux.Settings/Assets/Fonts/Twemoji.Mozilla.ttf#Twemoji Mozilla, " +
+        "Microsoft YaHei UI, Segoe UI, Segoe UI Emoji");
 
     /// <summary>链接文字基线补偿 (14px 字号实测校准): 段落行高 24 用 15.4, 列表行高 23 用 15.2。</summary>
     private const double ParagraphLinkOffset = 15.4;
