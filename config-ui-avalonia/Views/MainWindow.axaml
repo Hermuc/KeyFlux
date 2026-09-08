@@ -92,9 +92,6 @@
           <DataTemplate DataType="vm:KeymapPageViewModel">
             <views:KeymapPageView />
           </DataTemplate>
-          <DataTemplate DataType="vm:CustomHotkeyPageViewModel">
-            <views:CustomHotkeyPageView />
-          </DataTemplate>
           <DataTemplate DataType="vm:AbbrPageViewModel">
             <views:AbbrPageView />
           </DataTemplate>

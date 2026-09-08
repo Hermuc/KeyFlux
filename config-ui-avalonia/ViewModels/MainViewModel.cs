@@ -158,6 +158,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>
     /// 复刻 NavigationDrawer: 总览 + 选中动作 + 启用的 keymap 列表。
+    /// keymap/1 (自定义热键) 不再入导航 —— 2026-09-08 迁入设置页「其他设置」卡片。
     /// 重建时保持原选中项 (按稳定 Id)。
     /// </summary>
     private void BuildNav()
@@ -189,7 +190,7 @@ public sealed partial class MainViewModel : ObservableObject
             },
         };
 
-        foreach (var km in Config.Keymaps.Where(k => k.Enable))
+        foreach (var km in Config.Keymaps.Where(k => k.Enable && k.Id != 1))
         {
             var hotkey = NavBadge.EffectiveHotkey(km, Config.Keymaps);
             items.Add(new NavItem
@@ -207,14 +208,14 @@ public sealed partial class MainViewModel : ObservableObject
         CurrentNavItem = NavItems.FirstOrDefault(n => n.Id == selectedId) ?? NavItems.FirstOrDefault();
     }
 
-    /// <summary>keymap 条目 -> 页面 (复刻 router: id4=设置页, id1=自定义热键, id2|3=缩写, 其余=矩阵页)。</summary>
+    /// <summary>keymap 条目 -> 页面 (复刻 router: id4=设置页, id2|3=缩写, 其余=矩阵页;
+    /// id1=自定义热键已迁入设置页, 不再单独建页)。</summary>
     private object PageForKeymap(Keymap km)
     {
         if (km.Id == 4) return SettingsVm!;
         if (_keymapPages.TryGetValue(km.Id, out var page)) return page;
         page = km.Id switch
         {
-            1 => new CustomHotkeyPageViewModel(this, km),
             2 or 3 => new AbbrPageViewModel(this, km),
             _ => new KeymapPageViewModel(this, km),
         };

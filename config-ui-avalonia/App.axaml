@@ -12,6 +12,7 @@
     <services:I18nConverter x:Key="Tr" />
     <services:IntToStringConverter x:Key="IntStr" />
     <services:StringNotEmptyConverter x:Key="NotEmpty" />
+    <services:NotNullConverter x:Key="NotNull" />
     <!-- MDI 图标字体 (导航图标, 复刻 Vue 版 mdi 图标) -->
     <FontFamily x:Key="MdiFont">avares://KeyFlux.Settings/Assets/Fonts/materialdesignicons.ttf#Material Design Icons</FontFamily>
     <!-- 滚动条整体宽度: Fluent 主题模板中 ScrollBar 的 MinWidth 与 Thumb 宽度均绑定 ScrollBarSize 资源

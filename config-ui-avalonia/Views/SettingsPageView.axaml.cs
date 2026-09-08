@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using KeyFlux.Settings.ViewModels;
 
@@ -37,6 +38,44 @@ public partial class SettingsPageView : UserControl
             {
                 vm.Main.RecreateKeymapPages();
             }
+        }
+    }
+
+    // ----------------------------------------------------- 自定义热键分区 (原 Custom Hotkeys 页迁入)
+
+    /// <summary>热键编辑框聚焦即选中该行 (编辑器随选中键定位, 复刻 OnRowFocused)。</summary>
+    private void OnCustomHotkeyRowFocused(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is Control { DataContext: CustomHotkeyRowVm row }
+            && DataContext is SettingsPageViewModel { CustomHotkeys: { } ck })
+        {
+            ck.SelectRow(row);
+        }
+    }
+
+    /// <summary>热键失焦提交 (复刻 @change=changeCustomHotkey: 改名后选中新键)。</summary>
+    private void OnCustomHotkeyLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: CustomHotkeyRowVm row }
+            && DataContext is SettingsPageViewModel { CustomHotkeys: { } ck })
+        {
+            ck.CommitRow(row);
+        }
+    }
+
+    /// <summary>
+    /// 单击「功能」(原备注列): 先选中该行动作, 再弹出动作编辑面板窗口模态编辑;
+    /// 编辑字段经 Core.NotifyDataChanged 即时刷新行表备注, 无需关闭后手动刷新。
+    /// </summary>
+    private async void OnCustomHotkeyCommentClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: CustomHotkeyRowVm row }
+            && DataContext is SettingsPageViewModel { CustomHotkeys: { } ck }
+            && TopLevel.GetTopLevel(this) is Window owner)
+        {
+            ck.SelectRow(row);
+            var dialog = new ActionEditorWindow { DataContext = ck };
+            await dialog.ShowDialog(owner);
         }
     }
 }

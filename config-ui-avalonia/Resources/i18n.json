@@ -1122,5 +1122,17 @@
   "1115": {
     "zh": "该匹配条件已存在, 无需重复添加",
     "en": "This match condition already exists"
+  },
+  "1116": {
+    "zh": "自定义热键",
+    "en": "Custom Hotkeys"
+  },
+  "1117": {
+    "zh": "功能",
+    "en": "Function"
+  },
+  "1118": {
+    "zh": "新建",
+    "en": "New"
   }
 }

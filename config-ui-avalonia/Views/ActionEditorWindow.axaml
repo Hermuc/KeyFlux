@@ -1,0 +1,14 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:KeyFlux.Settings.ViewModels"
+        xmlns:controls="using:KeyFlux.Settings.Views.Controls"
+        x:Class="KeyFlux.Settings.Views.ActionEditorWindow"
+        x:DataType="vm:CustomHotkeyPageViewModel"
+        Title="Setting" Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" CanResize="False">
+
+  <!-- 动作编辑面板弹窗 (设置页自定义热键分区「功能」点击打开, 2026-09-08 自独立页迁入):
+       DataContext = CustomHotkeyPageViewModel, 面板绑定其 Editor (随 Core.SelectedHotkey 定位);
+       面板自带固定高度 430, 窗口高度随内容自适应 -->
+  <controls:ActionEditorPanel Width="512" DataContext="{Binding Editor}" />
+</Window>

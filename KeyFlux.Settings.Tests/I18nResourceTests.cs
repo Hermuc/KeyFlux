@@ -30,7 +30,8 @@ public sealed class I18nResourceTests
     /// 2026-09 二轮死代码清理: 删孤儿 1 键 (962 未设置快捷键占位, 全域零引用) -> 281;
     /// 初判死键的 301hint 经回归对账证伪 —— ActionEditorPanel.axaml 以
     /// ConverterParameter=301hint 引用, 非数字键勿用纯数字正则扫描。</summary>
-    private const int ExpectedKeyCount = 281;
+    /// 2026-09-08 自定义热键迁入设置页: 新增 1116 自定义热键 / 1117 功能 / 1118 新建 -> 284。
+    private const int ExpectedKeyCount = 284;
 
     private const string LabelPrefix = "label:";
 

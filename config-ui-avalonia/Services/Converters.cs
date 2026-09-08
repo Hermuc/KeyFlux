@@ -26,6 +26,16 @@ public sealed class StringNotEmptyConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>对象非空判定 (分区/卡片随可选子 VM 显隐, 如设置页自定义热键分区)。</summary>
+public sealed class NotNullConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is not null;
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>
 /// 双语文案转换器 (App.axaml 里的 x:Key="Tr"): ConverterParameter 为文案键,
 /// 绑定源为 ViewModel 的 LanguageTick。LanguageTick 递增 -> 绑定重新求值 ->

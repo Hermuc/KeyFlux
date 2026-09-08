@@ -118,8 +118,10 @@ public sealed partial class KeymapRowViewModel : ObservableObject
 /// <summary>
 /// Settings 选项页 (逐项复刻 Settings.vue):
 /// 左列 = 快捷键方案表 (名称/触发键/上层/开关/删除 + 新增);
-/// 右列 = 其他设置 (开机自启、隐藏矩阵、语言、鼠标/滚轮参数、键盘布局、
+/// 右列 = 其他设置 (开机自启、隐藏矩阵、语言、自定义热键、鼠标/滚轮参数、键盘布局、
 /// 命令框皮肤、触发延时、路径变量), 分区互斥展开 (复刻 resetOtherToFalse)。
+/// 自定义热键分区 (2026-09-08 自独立页迁入): 复用 CustomHotkeyPageViewModel,
+/// 编辑动作经 ActionEditorWindow 弹窗 (原页右侧内嵌面板)。
 /// </summary>
 public sealed partial class SettingsPageViewModel : ObservableObject
 {
@@ -130,6 +132,8 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     {
         _main = main;
         Config = main.Config ?? throw new InvalidOperationException("Config 未加载");
+        var customKeymap = Config.Keymaps.FirstOrDefault(k => k.Id == 1);
+        if (customKeymap is not null) CustomHotkeys = new CustomHotkeyPageViewModel(main, customKeymap);
         BuildSkinFields();
         foreach (var pv in Options.PathVariables) PathVariables.Add(pv);
         RefreshKeymapSection();
@@ -141,6 +145,11 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     public Mouse MouseOpts => Options.Mouse;
     public Scroll ScrollOpts => Options.Scroll;
     private ISettingsApi? Api => _main.Session.Api;
+
+    /// <summary>
+    /// 自定义热键分区 (keymap/1, 原 Custom Hotkeys 页迁入; keymap 缺失时为 null 整卡隐藏)。
+    /// </summary>
+    public CustomHotkeyPageViewModel? CustomHotkeys { get; }
 
     /// <summary>主 VM (视图打开窗口组对话框等场景使用)。</summary>
     public MainViewModel Main => _main;
@@ -158,6 +167,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     [ObservableProperty] private bool _showKeymapDelay = true;
     [ObservableProperty] private bool _showSkin;
     [ObservableProperty] private bool _showPathVariables;
+    [ObservableProperty] private bool _showCustomHotkeys;
 
     [RelayCommand]
     private void ToggleSection(string? which)
@@ -170,10 +180,11 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             "delay" => ShowKeymapDelay,
             "skin" => ShowSkin,
             "pathvars" => ShowPathVariables,
+            "customhotkeys" => ShowCustomHotkeys,
             _ => false,
         };
         ShowMouseOption = ShowLanguageOption = ShowKeyboardLayout = false;
-        ShowKeymapDelay = ShowSkin = ShowPathVariables = false;
+        ShowKeymapDelay = ShowSkin = ShowPathVariables = ShowCustomHotkeys = false;
         if (wasOpen) return;
         switch (which)
         {
@@ -183,6 +194,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             case "delay": ShowKeymapDelay = true; break;
             case "skin": ShowSkin = true; break;
             case "pathvars": ShowPathVariables = true; break;
+            case "customhotkeys": ShowCustomHotkeys = true; break;
         }
     }
 
@@ -422,6 +434,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     public void OnLanguageChanged()
     {
         LanguageTick++;
+        CustomHotkeys?.OnLanguageChanged();
         foreach (var f in SkinFields) f.RefreshLabel();
         foreach (var r in KeymapRows) r.RefreshComputed();
         OnPropertyChanged(nameof(SelectedLanguage));

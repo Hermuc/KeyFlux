@@ -155,6 +155,60 @@
           </Button>
         </Border>
 
+        <!-- ⌨️ 自定义热键 (label:1116, 原 Custom Hotkeys 页迁入 2026-09-08):
+             展开 = 热键/功能 两列同行列表; 热键列点击聚焦即编辑 (失焦提交复刻 @change),
+             功能列 (原「备注」) 点击弹 ActionEditorWindow 编辑动作; 底部新建 (label:1118) -->
+        <Border Background="White" CornerRadius="12" Padding="16"
+                IsVisible="{Binding CustomHotkeys, Converter={StaticResource NotNull}}">
+          <StackPanel Spacing="10">
+            <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}"
+                    CommandParameter="customhotkeys">
+              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1116}"
+                         FontWeight="SemiBold" />
+            </Button>
+            <StackPanel IsVisible="{Binding ShowCustomHotkeys}" Spacing="8">
+              <Grid ColumnDefinitions="100,*,26" Margin="0,0,0,2">
+                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=404}"
+                           Foreground="#8A8F98" FontSize="12" />
+                <TextBlock Grid.Column="1" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1117}"
+                           Foreground="#8A8F98" FontSize="12" />
+              </Grid>
+              <ItemsControl ItemsSource="{Binding CustomHotkeys.Rows}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CustomHotkeyRowVm">
+                    <Grid ColumnDefinitions="100,*,26" Margin="0,1"
+                          Background="{Binding RowBackground}">
+                      <!-- 热键: 点击聚焦即选中该行, 失焦提交 (复刻 v-text-field @change) -->
+                      <TextBox Text="{Binding Hotkey}" LostFocus="OnCustomHotkeyLostFocus"
+                               GotFocus="OnCustomHotkeyRowFocused"
+                               Watermark="{Binding #Root.((vm:SettingsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=957}"
+                               Padding="6,4" FontSize="13" />
+                      <!-- 功能 (原备注): 点击弹出动作编辑面板窗口 -->
+                      <Button Grid.Column="1" Click="OnCustomHotkeyCommentClick"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                              Background="Transparent" Padding="8,4">
+                        <TextBlock Text="{Binding Comment}" TextTrimming="CharacterEllipsis"
+                                   FontSize="13" />
+                      </Button>
+                      <!-- 删除 -->
+                      <Button Grid.Column="2" Content="✕"
+                              Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).CustomHotkeys.RemoveRowCommand}"
+                              CommandParameter="{Binding}"
+                              Background="Transparent" Foreground="#C62828" Padding="6,3" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Button Command="{Binding CustomHotkeys.AddRowCommand}"
+                      HorizontalAlignment="Left" Margin="0,4,0,0"
+                      Background="Transparent" BorderBrush="#2E7D32" BorderThickness="1"
+                      Foreground="#2E7D32" Padding="12,5" CornerRadius="8">
+                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1118}" />
+              </Button>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
         <!-- 🖱️ 修改鼠标参数 (label:701, 含滚轮参数) -->
         <Border Background="White" CornerRadius="12" Padding="16">
           <StackPanel Spacing="10">
