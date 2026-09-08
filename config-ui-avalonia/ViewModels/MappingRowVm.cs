@@ -118,6 +118,10 @@ public sealed partial class MappingRowVm : ObservableObject
         OnPropertyChanged(nameof(MatchValueDisplay));
         OnPropertyChanged(nameof(MatchValueBadge));
         OnPropertyChanged(nameof(MatchSummary));
+        // 四个 Toggle 的勾选态由 MatchValue 派生, 必须在此同步:
+        // 只靠 Checked 事件回调时机不可靠 (事件先于绑定推值触发时, 旧项残留点亮,
+        // 实测"最多同时亮两个") —— 数据变了必须自己发全通知。
+        NotifyTogglesChanged();
         RefreshEditorOptions();
     }
 
@@ -148,6 +152,7 @@ public sealed partial class MappingRowVm : ObservableObject
         OnPropertyChanged(nameof(MatchValueDisplay));
         OnPropertyChanged(nameof(MatchValueBadge));
         OnPropertyChanged(nameof(MatchSummary));
+        NotifyTogglesChanged(); // 与 SetTextType 同理: Toggle 视觉态随 MatchValue 同步
         RefreshEditorOptions();
     }
 

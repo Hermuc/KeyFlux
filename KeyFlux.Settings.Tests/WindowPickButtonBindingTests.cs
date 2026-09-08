@@ -35,7 +35,8 @@ public static class WindowPickBindingBootstrapper
 {
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<WindowPickBindingTestApp>()
-            .UseHeadless(new AvaloniaHeadlessPlatformOptions());
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
+            .UseSkia(); // Skia 渲染: 支撑 CaptureRenderedFrame 截帧诊断
 }
 
 /// <summary>测试 VM: 复刻宿主绑定源的 INPC 形态 (ActionEditorViewModel.WinTitle / WindowGroupRowVm.Value)。</summary>

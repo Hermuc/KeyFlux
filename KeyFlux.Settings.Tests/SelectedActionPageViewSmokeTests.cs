@@ -1,5 +1,7 @@
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using KeyFlux.Settings.Models;
@@ -77,6 +79,25 @@ public sealed class SelectedActionPageViewSmokeTests
             // 收起后不抛异常 (删除/收起路径依赖 ExpandedRow 仲裁)
             page.ExpandedRow = null;
             Dispatcher.UIThread.RunJobs();
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>诊断: 渲染整页并保存 PNG 到 %TEMP%, 供人工目视检查 (不参与断言)。</summary>
+    [AvaloniaFact]
+    public void Capture_Page_Screenshot()
+    {
+        var (page, view, window) = CreateHost();
+        try
+        {
+            window.Background = Brushes.White; // headless 默认透明底, 截图白底更接近真实观感
+            Dispatcher.UIThread.RunJobs();
+            var path = Path.Combine(Path.GetTempPath(), "keyflux-selected-action.png");
+            window.CaptureRenderedFrame()?.Save(path);
+            Assert.True(File.Exists(path), "截帧未产出文件");
         }
         finally
         {
