@@ -23,14 +23,15 @@
 
   <!-- 整页内容包 Viewbox Uniform 等比缩放 (背景留在 ScrollViewer 上, 左右两列均属内容区一同缩放):
        缩放由可用尺寸驱动 (默认内容区 936 / 测量宽 1024 -> 约 0.91, 窗口宽到 1288 时回到 1);
-       ScrollViewer 横向 Disabled -> Viewbox Uniform 随内容区宽动态缩放, 但 MaxWidth=1088 封顶:
-       窗口缩窄时组件等比缩小; 加宽超过内容基准 (1008 = 左列 500 + 右列 460 + 左右边距 48) 后继续放大,
-       最大约 1088/1008 ≈ 1.08 倍 (2026-09-08 应用户反馈从 1200/1.19 倍下调: 最大化后组件嫌大,
-       1.08 = 用户当前窗口 1351 宽时的实际倍率, 当前窗口观感不变、最大化不再继续放大); 要调上限改 MaxWidth;
+       ScrollViewer 横向 Disabled -> Viewbox Uniform 随内容区宽动态缩放, 但 MaxWidth=988 封顶:
+       窗口缩窄时组件等比缩小; 加宽超过内容基准 (916 = 左列 500 + 右列 368 + 左右边距 48) 后继续放大,
+       最大约 988/916 ≈ 1.08 倍 (2026-09-08 应用户反馈从 1200/1.19 倍下调: 最大化后组件嫌大,
+       1.08 = 用户当前窗口 1351 宽时的实际倍率, 当前窗口观感不变、最大化不再继续放大; 同日右列收窄 20%
+       460->368 后 MaxWidth 同步 1088->988, 否则基准变窄会推高整体倍率使左列连带变大); 要调上限改 MaxWidth;
        HorizontalAlignment=Left 使封顶后内容左对齐 (同自定义热键页), 避免居中在两侧留大白;
        纵向默认 Auto -> Viewbox 纵向不放大, 放大溢出由 ScrollViewer 滚动承接 -->
   <ScrollViewer Background="#F0F2F7">
-    <Viewbox Stretch="Uniform" MaxWidth="1088" HorizontalAlignment="Left">
+    <Viewbox Stretch="Uniform" MaxWidth="988" HorizontalAlignment="Left">
     <Grid ColumnDefinitions="500,*" Margin="24,20,24,28">
 
       <!-- ===================== 左列: 快捷键方案 (label:915, 复刻 Settings.vue 表格) ===================== -->
@@ -100,12 +101,13 @@
       </Border>
 
       <!-- ===================== 右列: 其他设置 (label:505) ===================== -->
-      <!-- Width=460 锁定测量宽 (必要): Viewbox 以 Infinity 测量子内容, * 列会塌缩为卡片自然宽
-           (路径变量行 140,240,* 与卡内 220,* 的 * 列塌缩到空 TextBox 宽), 且长文本
+      <!-- Width=368 锁定测量宽 (必要): Viewbox 以 Infinity 测量子内容, * 列会塌缩为卡片自然宽
+           (路径变量行 112,192,* 与卡内 176,* 的 * 列塌缩到空 TextBox 宽), 且长文本
            (键盘布局/帮助, 均已加 TextWrapping=Wrap 换行显示) 期望宽随内容变化导致缩放比例跳动;
-           锁宽后测量全程有界、比例稳定。460 = 逐卡盘点后的最宽卡: 路径变量行 140+240+✕按钮≈30
-           = 410 + 卡 Padding 32 = 442, 留 18px 余量; 渲染时卡片仍按 460 槽宽正常分配 * 列 -->
-      <StackPanel Grid.Column="1" Spacing="12" Width="460">
+           锁宽后测量全程有界、比例稳定。368 = 460 等比收窄 20% (2026-09-08 应用户要求),
+           卡内固定列宽同步 220->176 / 140,240->112,192, 路径行 112+192+✕按钮≈32 = 336 + 卡 Padding 32 = 368 正好;
+           渲染时卡片仍按 368 槽宽正常分配 * 列 -->
+      <StackPanel Grid.Column="1" Spacing="12" Width="368">
         <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=505}"
                    FontSize="16" FontWeight="SemiBold" />
 
@@ -163,31 +165,31 @@
             <StackPanel IsVisible="{Binding ShowMouseOption}" Spacing="8">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=702}"
                          FontWeight="SemiBold" Foreground="#4169E1" />
-              <Grid ColumnDefinitions="220,*">
+              <Grid ColumnDefinitions="176,*">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=703}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding MouseOpts.Delay1}" />
               </Grid>
-              <Grid ColumnDefinitions="220,*">
+              <Grid ColumnDefinitions="176,*">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=704}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding MouseOpts.Delay2}" />
               </Grid>
-              <Grid ColumnDefinitions="220,*">
+              <Grid ColumnDefinitions="176,*">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=705}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding MouseOpts.FastSingle}" />
               </Grid>
-              <Grid ColumnDefinitions="220,*">
+              <Grid ColumnDefinitions="176,*">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=706}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding MouseOpts.FastRepeat}" />
               </Grid>
-              <Grid ColumnDefinitions="220,*">
+              <Grid ColumnDefinitions="176,*">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=707}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding MouseOpts.SlowSingle}" />
               </Grid>
-              <Grid ColumnDefinitions="220,*">
+              <Grid ColumnDefinitions="176,*">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=708}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding MouseOpts.SlowRepeat}" />
               </Grid>
-              <Grid ColumnDefinitions="220,*">
+              <Grid ColumnDefinitions="176,*">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=709}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding MouseOpts.TipSymbol}" />
               </Grid>
@@ -198,16 +200,16 @@
 
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=712}"
                          FontWeight="SemiBold" Foreground="#4169E1" Margin="0,8,0,0" />
-              <Grid ColumnDefinitions="220,*">
+              <Grid ColumnDefinitions="176,*">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=713}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding ScrollOpts.Delay1}" />
               </Grid>
-              <Grid ColumnDefinitions="220,*">
-                <!-- 714 文案约 230px 超 220 列宽, 加 Wrap 换行显示防溢出 -->
+              <Grid ColumnDefinitions="176,*">
+                <!-- 714 文案约 230px 超 176 列宽, 加 Wrap 换行显示防溢出 -->
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=714}" VerticalAlignment="Center" TextWrapping="Wrap" />
                 <TextBox Grid.Column="1" Text="{Binding ScrollOpts.Delay2}" />
               </Grid>
-              <Grid ColumnDefinitions="220,*">
+              <Grid ColumnDefinitions="176,*">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=715}" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding ScrollOpts.OnceLineCount}" />
               </Grid>
@@ -258,7 +260,7 @@
               <ItemsControl ItemsSource="{Binding CustomKeymaps}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="models:Keymap">
-                    <Grid ColumnDefinitions="220,120" Margin="0,2">
+                    <Grid ColumnDefinitions="176,96" Margin="0,2">
                       <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBox Grid.Column="1" Text="{Binding Delay, Converter={StaticResource IntStr}}"
                                Padding="6,4" />
@@ -301,13 +303,13 @@
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=911}"
                          Foreground="#8A8F98" FontSize="12" TextWrapping="Wrap" />
               <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,4">
-                <TextBlock Width="140" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=909}" Foreground="#8A8F98" FontSize="12" />
-                <TextBlock Width="240" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=910}" Foreground="#8A8F98" FontSize="12" />
+                <TextBlock Width="112" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=909}" Foreground="#8A8F98" FontSize="12" />
+                <TextBlock Width="192" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=910}" Foreground="#8A8F98" FontSize="12" />
               </StackPanel>
               <ItemsControl ItemsSource="{Binding PathVariables}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="models:PathVariable">
-                    <Grid ColumnDefinitions="140,240,*" Margin="0,2">
+                    <Grid ColumnDefinitions="112,192,*" Margin="0,2">
                       <TextBox Text="{Binding Name}" Margin="0,0,6,0" Padding="6,4" />
                       <TextBox Grid.Column="1" Text="{Binding Value}" Padding="6,4" />
                       <Button Grid.Column="2" Content="✕"
