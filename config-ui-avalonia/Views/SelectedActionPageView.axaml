@@ -12,12 +12,160 @@
     暂缓消费, 本版 UI 不呈现 —— SelectedAction.ahk 引擎未定义其菜单语义, 生成端也不把
     options 写进数据数组。模型字段 (SelectedEntry.Options / EntryRowVm 三属性) 保留不删,
     兼容存量数据往返, 前向兼容恢复。
+
+    布局去重 (2026-09-08): 文本特征/文件后缀两分区原本各持有一份几乎相同的行卡 DataTemplate
+    (仅 textType 四选一 Toggle 块差异), 提取为页面级共享模板 MappingRowCard —— textType/
+    fileExt 两个分支以行 VM 的 IsTextType 自然开关, 分区差异由数据决定而非模板复制。
+    行内/弹窗的页面 LanguageTick 长绑定 ($parent[views:...]) 改为行 VM / EntryRowVm /
+    AddMappingVm 的 LanguageTick 中继属性 (页面 OnLanguageChanged -> RefreshLanguage 链推送)。
   -->
 
 
   <UserControl.Resources>
     <services:BoolToSeparatorHeightConverter x:Key="BoolToSeparatorHeight" />
     <services:PopupBackgroundConverter x:Key="PopupBg" />
+
+    <!-- 共享行卡模板: 文本特征/文件后缀两分区共用 (Classes 样式见 UserControl.Styles) -->
+    <DataTemplate x:Key="MappingRowCard" x:DataType="vm:MappingRowVm">
+
+      <Border Classes="row-card" Classes.matched="{Binding IsMatched}"
+              Background="White" BorderBrush="#E3E6EC" BorderThickness="1"
+              CornerRadius="10" Padding="12" Margin="0,0,0,8"
+              Tapped="OnRowHeaderTapped">
+        <StackPanel Spacing="8">
+          <!-- 行头: 类型徽章 + 条件值编辑 + 行操作 -->
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <Border Background="{Binding TypeBadgeColorHex}" CornerRadius="6"
+                    Padding="8,3" VerticalAlignment="Center">
+              <TextBlock Text="{Binding TypeBadgeText}" Foreground="White" FontSize="12" />
+            </Border>
+
+            <StackPanel Grid.Column="1" Margin="10,0" Spacing="6" VerticalAlignment="Center">
+              <!-- textType: 文本特征四选一 Toggle (所见即所选, 替代 ComboBox) -->
+              <StackPanel IsVisible="{Binding IsTextType}" Orientation="Horizontal" Spacing="6">
+                <ToggleButton Classes="type-toggle"
+                              IsChecked="{Binding IsUrl, Mode=TwoWay}"
+                              Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
+                              Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1059}" />
+                <ToggleButton Classes="type-toggle"
+                              IsChecked="{Binding IsPath, Mode=TwoWay}"
+                              Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
+                              Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1060}" />
+                <ToggleButton Classes="type-toggle"
+                              IsChecked="{Binding IsMagnet, Mode=TwoWay}"
+                              Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
+                              Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1061}" />
+                <ToggleButton Classes="type-toggle"
+                              IsChecked="{Binding IsPlain, Mode=TwoWay}"
+                              Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
+                              Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1062}" />
+              </StackPanel>
+              <!-- fileExt: 条件值 + 分组快捷填入 -->
+              <StackPanel IsVisible="{Binding !IsTextType}" Spacing="6">
+                <TextBox Text="{Binding MatchValueDisplay}"
+                         Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1034}" />
+                <StackPanel IsVisible="{Binding ShowFileGroupFill}" Orientation="Horizontal" Spacing="6">
+                  <TextBlock FontSize="12" Foreground="#8A8F98" VerticalAlignment="Center"
+                             Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1006}" />
+                  <ComboBox MinWidth="160"
+                            ItemsSource="{Binding FileGroupOptions}"
+                            SelectedItem="{Binding FileGroupSelected}" />
+                </StackPanel>
+              </StackPanel>
+              <TextBlock Text="{Binding MatchHint}" FontSize="11" Foreground="#8A8F98"
+                         TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
+              <Button Classes="icon-btn" Command="{Binding TestRowCommand}" Content="▶"
+                      ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
+              <Button Classes="icon-btn" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}" Content="↑" />
+              <Button Classes="icon-btn" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}" Content="↓" />
+              <Button Classes="icon-btn" Command="{Binding AskRemoveCommand}" Content="✕" Foreground="#D32F2F" />
+            </StackPanel>
+          </Grid>
+
+          <!-- chips 键位表 (序号即菜单数字键) -->
+          <ItemsControl ItemsSource="{Binding Chips}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:EntryChipVm">
+                <Border Classes="chip" BorderBrush="{Binding ColorHex}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="{Binding Index}" Foreground="{Binding ColorHex}"
+                               FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Label}" Foreground="{Binding ColorHex}" FontSize="12" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- 行内手风琴编辑器 (同屏只开一个, 由页面 ExpandedRow 仲裁) -->
+          <StackPanel IsVisible="{Binding IsExpanded}" Spacing="8" Margin="0,4,0,0">
+            <ItemsControl ItemsSource="{Binding Editors}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:EntryRowVm">
+                  <Border Background="#FAFBFC" BorderBrush="#ECEFF3" BorderThickness="1"
+                          CornerRadius="8" Padding="10" Margin="0,0,0,6">
+                    <StackPanel Spacing="8">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Border Background="#E8F0FE" CornerRadius="6" Padding="7,2"
+                                VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Index}" Foreground="#4169E1"
+                                     FontWeight="SemiBold" FontSize="13" />
+                        </Border>
+                        <ComboBox Grid.Column="1" Margin="10,0" HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding BehaviorOptions}"
+                                  SelectedItem="{Binding BehaviorSelected}" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                          <Button Classes="icon-btn" Command="{Binding MoveUpCommand}"
+                                  IsEnabled="{Binding CanMoveUp}" Content="↑" />
+                          <Button Classes="icon-btn" Command="{Binding MoveDownCommand}"
+                                  IsEnabled="{Binding CanMoveDown}" Content="↓" />
+                          <Button Classes="icon-btn" Command="{Binding RemoveCommand}"
+                                  IsEnabled="{Binding CanRemove}" Content="✕" Foreground="#D32F2F"
+                                  ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1108}" />
+                        </StackPanel>
+                      </Grid>
+                      <TextBlock Text="{Binding BehaviorHint}" FontSize="11" Foreground="#8A8F98"
+                                 TextWrapping="Wrap" />
+                      <!-- 命令模板 -->
+                      <StackPanel IsVisible="{Binding ShowTemplate}" Spacing="4">
+                        <TextBlock FontSize="11" Foreground="#8A8F98"
+                                   Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1012}" />
+                        <TextBox Text="{Binding ActionValue}" TextWrapping="Wrap" AcceptsReturn="False" />
+                      </StackPanel>
+                      <TextBlock IsVisible="{Binding IsNoValue}" FontSize="11" Foreground="#2E7D32"
+                                 TextWrapping="Wrap" Text="{Binding TemplateHint}" />
+                      <!-- 工作目录 -->
+                      <TextBox Text="{Binding WorkingDir}"
+                               Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1015}" />
+                      <!-- 评审 D1: Options 三开关 (1016/1017/1018) 本版不渲染, 模型字段保留前向兼容 (见文件头注记) -->
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 添加行为 (达 9 禁用 + 提示) -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Command="{Binding AddEntryCommand}" IsEnabled="{Binding CanAddEntry}"
+                      Background="Transparent" BorderThickness="1" BorderBrush="#4169E1"
+                      Foreground="#4169E1" CornerRadius="8" Padding="12,5" FontSize="12"
+                      Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1106}" />
+              <TextBlock IsVisible="{Binding !CanAddEntry}" FontSize="12" Foreground="#B26A00"
+                         VerticalAlignment="Center"
+                         Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1107}" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -73,7 +221,21 @@
       <Setter Property="MinWidth" Value="28" />
       <Setter Property="FontSize" Value="13" />
     </Style>
+    <!-- 黄色提示条 (StatusText / 热键卡提示): 统一底色与内距 -->
+    <Style Selector="Border.hint">
+      <Setter Property="Background" Value="#FFF8E1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
   </UserControl.Styles>
+
+  <!-- ComboOption 隐式模板: 行为/文件分组下拉的 Item 与 SelectionBox 共用;
+       弹窗类型下拉的分隔线样式在 ItemTemplate 上显式覆盖, 不受影响 -->
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="services:ComboOption">
+      <TextBlock Text="{Binding Label}" />
+    </DataTemplate>
+  </UserControl.DataTemplates>
 
   <Grid Margin="20" RowDefinitions="Auto,*">
 
@@ -105,8 +267,7 @@
         </Border>
 
         <!-- 页内提示条 (重复映射等非阻断反馈) -->
-        <Border IsVisible="{Binding StatusText, Converter={StaticResource NotEmpty}}"
-                Background="#FFF8E1" CornerRadius="8" Padding="12,8">
+        <Border Classes="hint" IsVisible="{Binding StatusText, Converter={StaticResource NotEmpty}}">
           <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#B26A00" TextWrapping="Wrap" />
         </Border>
 
@@ -123,13 +284,9 @@
             </Grid>
             <controls:HotkeyCapture Hotkey="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).Hotkey, Mode=TwoWay}"
                                     UsedHotkeys="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).UsedHotkeys}" />
-            <TextBlock IsVisible="{Binding NoHotkeyWarning}" FontSize="12" Foreground="#B26A00"
-                       TextWrapping="Wrap"
-                       Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=976}" />
-            <Border IsVisible="{Binding HotkeyPendingSave}" Background="#FFF8E1"
-                    CornerRadius="6" Padding="10,6">
-              <TextBlock FontSize="12" Foreground="#B26A00" TextWrapping="Wrap"
-                         Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1077}" />
+            <!-- 热键提示条 (互斥合并: 未保存 1077 优先于空热键警示 976, 文案见 VM.HotkeyHintText) -->
+            <Border Classes="hint" IsVisible="{Binding HotkeyHintText, Converter={StaticResource NotEmpty}}">
+              <TextBlock Text="{Binding HotkeyHintText}" FontSize="12" Foreground="#B26A00" TextWrapping="Wrap" />
             </Border>
           </StackPanel>
         </Border>
@@ -151,318 +308,16 @@
         <StackPanel IsVisible="{Binding TextMappings.Count}" Spacing="8">
           <TextBlock FontWeight="SemiBold" FontSize="15"
                      Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1032}" />
-          <ItemsControl ItemsSource="{Binding TextMappings}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:MappingRowVm">
-
-                <Border Classes="row-card" Classes.matched="{Binding IsMatched}"
-                        Background="White" BorderBrush="#E3E6EC" BorderThickness="1"
-                        CornerRadius="10" Padding="12" Margin="0,0,0,8"
-                        Tapped="OnRowHeaderTapped">
-                  <StackPanel Spacing="8">
-                    <!-- 行头: 类型徽章 + 条件值编辑 + 行操作 -->
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                      <Border Background="{Binding TypeBadgeColorHex}" CornerRadius="6"
-                              Padding="8,3" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding TypeBadgeText}" Foreground="White" FontSize="12" />
-                      </Border>
-
-                      <StackPanel Grid.Column="1" Margin="10,0" Spacing="6" VerticalAlignment="Center">
-                        <!-- textType: 文本特征四选一 Toggle (所见即所选, 替代 ComboBox) -->
-                        <StackPanel IsVisible="{Binding IsTextType}" Orientation="Horizontal" Spacing="6">
-                          <ToggleButton Classes="type-toggle"
-                                        IsChecked="{Binding IsUrl, Mode=TwoWay}"
-                                        Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
-                                        Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1059}" />
-                          <ToggleButton Classes="type-toggle"
-                                        IsChecked="{Binding IsPath, Mode=TwoWay}"
-                                        Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
-                                        Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1060}" />
-                          <ToggleButton Classes="type-toggle"
-                                        IsChecked="{Binding IsMagnet, Mode=TwoWay}"
-                                        Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
-                                        Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1061}" />
-                          <ToggleButton Classes="type-toggle"
-                                        IsChecked="{Binding IsPlain, Mode=TwoWay}"
-                                        Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
-                                        Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1062}" />
-                        </StackPanel>
-                        <!-- fileExt: 条件值 + 分组快捷填入 -->
-                        <StackPanel IsVisible="{Binding !IsTextType}" Spacing="6">
-                          <TextBox Text="{Binding MatchValueDisplay}"
-                                   Watermark="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1034}" />
-                          <StackPanel IsVisible="{Binding ShowFileGroupFill}" Orientation="Horizontal" Spacing="6">
-                            <TextBlock FontSize="12" Foreground="#8A8F98" VerticalAlignment="Center"
-                                       Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1006}" />
-                            <ComboBox MinWidth="160"
-                                      ItemsSource="{Binding FileGroupOptions}"
-                                      SelectedItem="{Binding FileGroupSelected}">
-                              <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="services:ComboOption">
-                                  <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                              </ComboBox.ItemTemplate>
-                              <ComboBox.SelectionBoxItemTemplate>
-                                <DataTemplate x:DataType="services:ComboOption">
-                                  <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                              </ComboBox.SelectionBoxItemTemplate>
-                            </ComboBox>
-                          </StackPanel>
-                        </StackPanel>
-                        <TextBlock Text="{Binding MatchHint}" FontSize="11" Foreground="#8A8F98"
-                                   TextWrapping="Wrap" />
-                      </StackPanel>
-
-                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
-                        <Button Classes="icon-btn" Command="{Binding TestRowCommand}" Content="▶"
-                                ToolTip.Tip="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
-                        <Button Classes="icon-btn" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}" Content="↑" />
-                        <Button Classes="icon-btn" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}" Content="↓" />
-                        <Button Classes="icon-btn" Command="{Binding AskRemoveCommand}" Content="✕" Foreground="#D32F2F" />
-                      </StackPanel>
-                    </Grid>
-
-                    <!-- chips 键位表 (序号即菜单数字键) -->
-                    <ItemsControl ItemsSource="{Binding Chips}">
-                      <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                          <WrapPanel />
-                        </ItemsPanelTemplate>
-                      </ItemsControl.ItemsPanel>
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:EntryChipVm">
-                          <Border Classes="chip" BorderBrush="{Binding ColorHex}">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                              <TextBlock Text="{Binding Index}" Foreground="{Binding ColorHex}"
-                                         FontSize="12" FontWeight="SemiBold" />
-                              <TextBlock Text="{Binding Label}" Foreground="{Binding ColorHex}" FontSize="12" />
-                            </StackPanel>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <!-- 行内手风琴编辑器 (同屏只开一个, 由页面 ExpandedRow 仲裁) -->
-                    <StackPanel IsVisible="{Binding IsExpanded}" Spacing="8" Margin="0,4,0,0">
-                      <ItemsControl ItemsSource="{Binding Editors}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:EntryRowVm">
-                            <Border Background="#FAFBFC" BorderBrush="#ECEFF3" BorderThickness="1"
-                                    CornerRadius="8" Padding="10" Margin="0,0,0,6">
-                              <StackPanel Spacing="8">
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                  <Border Background="#E8F0FE" CornerRadius="6" Padding="7,2"
-                                          VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Index}" Foreground="#4169E1"
-                                               FontWeight="SemiBold" FontSize="13" />
-                                  </Border>
-                                  <ComboBox Grid.Column="1" Margin="10,0" HorizontalAlignment="Stretch"
-                                            ItemsSource="{Binding BehaviorOptions}"
-                                            SelectedItem="{Binding BehaviorSelected}">
-                                      <ComboBox.ItemTemplate>
-                                        <DataTemplate x:DataType="services:ComboOption">
-                                          <TextBlock Text="{Binding Label}" />
-                                        </DataTemplate>
-                                      </ComboBox.ItemTemplate>
-                                      <ComboBox.SelectionBoxItemTemplate>
-                                        <DataTemplate x:DataType="services:ComboOption">
-                                          <TextBlock Text="{Binding Label}" />
-                                        </DataTemplate>
-                                      </ComboBox.SelectionBoxItemTemplate>
-                                    </ComboBox>
-                                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
-                                    <Button Classes="icon-btn" Command="{Binding MoveUpCommand}"
-                                            IsEnabled="{Binding CanMoveUp}" Content="↑" />
-                                    <Button Classes="icon-btn" Command="{Binding MoveDownCommand}"
-                                            IsEnabled="{Binding CanMoveDown}" Content="↓" />
-                                    <Button Classes="icon-btn" Command="{Binding RemoveCommand}"
-                                            IsEnabled="{Binding CanRemove}" Content="✕" Foreground="#D32F2F"
-                                            ToolTip.Tip="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1108}" />
-                                  </StackPanel>
-                                </Grid>
-                                <TextBlock Text="{Binding BehaviorHint}" FontSize="11" Foreground="#8A8F98"
-                                           TextWrapping="Wrap" />
-                                <!-- 命令模板 -->
-                                <StackPanel IsVisible="{Binding ShowTemplate}" Spacing="4">
-                                  <TextBlock FontSize="11" Foreground="#8A8F98"
-                                             Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1012}" />
-                                  <TextBox Text="{Binding ActionValue}" TextWrapping="Wrap" AcceptsReturn="False" />
-                                </StackPanel>
-                                <TextBlock IsVisible="{Binding IsNoValue}" FontSize="11" Foreground="#2E7D32"
-                                           TextWrapping="Wrap" Text="{Binding TemplateHint}" />
-                                <!-- 工作目录 -->
-                                <TextBox Text="{Binding WorkingDir}"
-                                         Watermark="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1015}" />
-                                <!-- 评审 D1: Options 三开关 (1016/1017/1018) 本版不渲染, 模型字段保留前向兼容 (见文件头注记) -->
-                              </StackPanel>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-
-                      <!-- 添加行为 (达 9 禁用 + 提示) -->
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Command="{Binding AddEntryCommand}" IsEnabled="{Binding CanAddEntry}"
-                                Background="Transparent" BorderThickness="1" BorderBrush="#4169E1"
-                                Foreground="#4169E1" CornerRadius="8" Padding="12,5" FontSize="12"
-                                Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1106}" />
-                        <TextBlock IsVisible="{Binding !CanAddEntry}" FontSize="12" Foreground="#B26A00"
-                                   VerticalAlignment="Center"
-                                   Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1107}" />
-                      </StackPanel>
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <ItemsControl ItemsSource="{Binding TextMappings}"
+                        ItemTemplate="{StaticResource MappingRowCard}" />
         </StackPanel>
 
         <!-- ===================== 分区二: 文件后缀 ===================== -->
         <StackPanel IsVisible="{Binding FileMappings.Count}" Spacing="8">
           <TextBlock FontWeight="SemiBold" FontSize="15"
                      Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1031}" />
-          <ItemsControl ItemsSource="{Binding FileMappings}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:MappingRowVm">
-
-                <Border Classes="row-card" Classes.matched="{Binding IsMatched}"
-                        Background="White" BorderBrush="#E3E6EC" BorderThickness="1"
-                        CornerRadius="10" Padding="12" Margin="0,0,0,8"
-                        Tapped="OnRowHeaderTapped">
-                  <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                      <Border Background="{Binding TypeBadgeColorHex}" CornerRadius="6"
-                              Padding="8,3" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding TypeBadgeText}" Foreground="White" FontSize="12" />
-                      </Border>
-
-                      <StackPanel Grid.Column="1" Margin="10,0" Spacing="6" VerticalAlignment="Center">
-                        <StackPanel IsVisible="{Binding !IsTextType}" Spacing="6">
-                          <TextBox Text="{Binding MatchValueDisplay}"
-                                   Watermark="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1034}" />
-                          <StackPanel IsVisible="{Binding ShowFileGroupFill}" Orientation="Horizontal" Spacing="6">
-                            <TextBlock FontSize="12" Foreground="#8A8F98" VerticalAlignment="Center"
-                                       Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1006}" />
-                            <ComboBox MinWidth="160"
-                                      ItemsSource="{Binding FileGroupOptions}"
-                                      SelectedItem="{Binding FileGroupSelected}">
-                              <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="services:ComboOption">
-                                  <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                              </ComboBox.ItemTemplate>
-                              <ComboBox.SelectionBoxItemTemplate>
-                                <DataTemplate x:DataType="services:ComboOption">
-                                  <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                              </ComboBox.SelectionBoxItemTemplate>
-                            </ComboBox>
-                          </StackPanel>
-                        </StackPanel>
-                        <TextBlock Text="{Binding MatchHint}" FontSize="11" Foreground="#8A8F98"
-                                   TextWrapping="Wrap" />
-                      </StackPanel>
-
-                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
-                        <Button Classes="icon-btn" Command="{Binding TestRowCommand}" Content="▶"
-                                ToolTip.Tip="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
-                        <Button Classes="icon-btn" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}" Content="↑" />
-                        <Button Classes="icon-btn" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}" Content="↓" />
-                        <Button Classes="icon-btn" Command="{Binding AskRemoveCommand}" Content="✕" Foreground="#D32F2F" />
-                      </StackPanel>
-                    </Grid>
-
-                    <ItemsControl ItemsSource="{Binding Chips}">
-                      <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                          <WrapPanel />
-                        </ItemsPanelTemplate>
-                      </ItemsControl.ItemsPanel>
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:EntryChipVm">
-                          <Border Classes="chip" BorderBrush="{Binding ColorHex}">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                              <TextBlock Text="{Binding Index}" Foreground="{Binding ColorHex}"
-                                         FontSize="12" FontWeight="SemiBold" />
-                              <TextBlock Text="{Binding Label}" Foreground="{Binding ColorHex}" FontSize="12" />
-                            </StackPanel>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <StackPanel IsVisible="{Binding IsExpanded}" Spacing="8" Margin="0,4,0,0">
-                      <ItemsControl ItemsSource="{Binding Editors}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:EntryRowVm">
-                            <Border Background="#FAFBFC" BorderBrush="#ECEFF3" BorderThickness="1"
-                                    CornerRadius="8" Padding="10" Margin="0,0,0,6">
-                              <StackPanel Spacing="8">
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                  <Border Background="#E8F0FE" CornerRadius="6" Padding="7,2"
-                                          VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Index}" Foreground="#4169E1"
-                                               FontWeight="SemiBold" FontSize="13" />
-                                  </Border>
-                                  <ComboBox Grid.Column="1" Margin="10,0" HorizontalAlignment="Stretch"
-                                            ItemsSource="{Binding BehaviorOptions}"
-                                            SelectedItem="{Binding BehaviorSelected}">
-                                      <ComboBox.ItemTemplate>
-                                        <DataTemplate x:DataType="services:ComboOption">
-                                          <TextBlock Text="{Binding Label}" />
-                                        </DataTemplate>
-                                      </ComboBox.ItemTemplate>
-                                      <ComboBox.SelectionBoxItemTemplate>
-                                        <DataTemplate x:DataType="services:ComboOption">
-                                          <TextBlock Text="{Binding Label}" />
-                                        </DataTemplate>
-                                      </ComboBox.SelectionBoxItemTemplate>
-                                    </ComboBox>
-                                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
-                                    <Button Classes="icon-btn" Command="{Binding MoveUpCommand}"
-                                            IsEnabled="{Binding CanMoveUp}" Content="↑" />
-                                    <Button Classes="icon-btn" Command="{Binding MoveDownCommand}"
-                                            IsEnabled="{Binding CanMoveDown}" Content="↓" />
-                                    <Button Classes="icon-btn" Command="{Binding RemoveCommand}"
-                                            IsEnabled="{Binding CanRemove}" Content="✕" Foreground="#D32F2F"
-                                            ToolTip.Tip="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1108}" />
-                                  </StackPanel>
-                                </Grid>
-                                <TextBlock Text="{Binding BehaviorHint}" FontSize="11" Foreground="#8A8F98"
-                                           TextWrapping="Wrap" />
-                                <StackPanel IsVisible="{Binding ShowTemplate}" Spacing="4">
-                                  <TextBlock FontSize="11" Foreground="#8A8F98"
-                                             Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1012}" />
-                                  <TextBox Text="{Binding ActionValue}" TextWrapping="Wrap" AcceptsReturn="False" />
-                                </StackPanel>
-                                <TextBlock IsVisible="{Binding IsNoValue}" FontSize="11" Foreground="#2E7D32"
-                                           TextWrapping="Wrap" Text="{Binding TemplateHint}" />
-                                <TextBox Text="{Binding WorkingDir}"
-                                         Watermark="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1015}" />
-                                <!-- 评审 D1: Options 三开关 (1016/1017/1018) 本版不渲染, 模型字段保留前向兼容 (见文件头注记) -->
-                              </StackPanel>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Command="{Binding AddEntryCommand}" IsEnabled="{Binding CanAddEntry}"
-                                Background="Transparent" BorderThickness="1" BorderBrush="#4169E1"
-                                Foreground="#4169E1" CornerRadius="8" Padding="12,5" FontSize="12"
-                                Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1106}" />
-                        <TextBlock IsVisible="{Binding !CanAddEntry}" FontSize="12" Foreground="#B26A00"
-                                   VerticalAlignment="Center"
-                                   Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1107}" />
-                      </StackPanel>
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <ItemsControl ItemsSource="{Binding FileMappings}"
+                        ItemTemplate="{StaticResource MappingRowCard}" />
         </StackPanel>
 
         <!-- ===================== 底部紧凑模拟测试条 ===================== -->
@@ -543,13 +398,13 @@
               <StackPanel Spacing="12">
                 <!-- 标题 + 说明 -->
                 <TextBlock FontSize="17" FontWeight="SemiBold"
-                           Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1105}" />
+                           Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1105}" />
                 <TextBlock FontSize="12" Foreground="#5F6368" TextWrapping="Wrap" Text="{Binding Hint}" />
 
                 <!-- 步骤 1: 类型 (文件后缀 + 文本特征四选一) -->
                 <StackPanel Spacing="4">
                   <TextBlock FontSize="12" Foreground="#8A8F98"
-                             Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1004}" />
+                             Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1004}" />
                   <ComboBox MinWidth="220" ItemsSource="{Binding TypeOptions}"
                             SelectedItem="{Binding TypeSelected}"
                             DropDownOpened="OnTypeDropdownOpened">
@@ -564,18 +419,13 @@
                         </Grid>
                       </DataTemplate>
                     </ComboBox.ItemTemplate>
-                    <ComboBox.SelectionBoxItemTemplate>
-                      <DataTemplate x:DataType="services:ComboOption">
-                        <TextBlock Text="{Binding Label}" />
-                      </DataTemplate>
-                    </ComboBox.SelectionBoxItemTemplate>
                   </ComboBox>
                 </StackPanel>
 
                 <!-- 步骤 2: 条件值 (仅文件后缀) -->
                 <StackPanel Spacing="4" IsVisible="{Binding IsFileExt}">
                   <TextBlock FontSize="12" Foreground="#8A8F98"
-                             Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1005}" />
+                             Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1005}" />
                   <TextBox Text="{Binding MatchValue}" IsReadOnly="True" Focusable="False"
                            Background="#F8F9FA" />
                   <TextBlock FontSize="11" Foreground="#8A8F98" TextWrapping="Wrap" Text="{Binding MatchHint}" />
@@ -584,7 +434,7 @@
                 <!-- 步骤 3: 行为勾选 (勾选顺序 = 菜单键位; 最多 9) -->
                 <StackPanel Spacing="4">
                   <TextBlock FontSize="12" Foreground="#8A8F98"
-                             Text="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1011}" />
+                             Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1011}" />
                   <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding BehaviorPicks}">
                       <ItemsControl.ItemTemplate>
@@ -609,7 +459,7 @@
                   <Button Background="Transparent" BorderThickness="0" Padding="0" Margin="0,2,0,0"
                           FontSize="12" Foreground="#4169E1" HorizontalAlignment="Left"
                           Click="OnManageBehaviors"
-                          Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1083}" />
+                          Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1083}" />
                 </StackPanel>
 
                 <!-- 底部按钮 -->
@@ -617,10 +467,10 @@
                   <Button Command="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).CloseAddPanelCommand}"
                           Background="White" BorderThickness="1" BorderBrush="#E3E6EC"
                           CornerRadius="8" Padding="18,7"
-                          Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=970}" />
+                          Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=970}" />
                   <Button Command="{Binding ConfirmCommand}" IsEnabled="{Binding CanConfirm}"
                           Background="#4169E1" Foreground="White" CornerRadius="8" Padding="18,7"
-                          Content="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1114}" />
+                          Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1114}" />
                 </StackPanel>
               </StackPanel>
             </Border>
