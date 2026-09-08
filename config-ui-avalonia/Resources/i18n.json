@@ -1080,24 +1080,24 @@
     "en": "Any file"
   },
   "1105": {
-    "zh": "添加映射",
-    "en": "Add Mapping"
+    "zh": "添加规则",
+    "en": "Add Rule"
   },
   "1106": {
     "zh": "添加行为",
     "en": "Add Action"
   },
   "1107": {
-    "zh": "每个映射最多 9 个行为",
-    "en": "Up to 9 actions per mapping"
+    "zh": "每条规则最多 9 个行为",
+    "en": "Up to 9 actions per rule"
   },
   "1108": {
     "zh": "至少保留一个行为",
     "en": "Keep at least one action"
   },
   "1109": {
-    "zh": "确定删除映射「{0}」吗? 删除后会立即保存。",
-    "en": "Delete mapping \"{0}\"? This saves immediately."
+    "zh": "确定删除规则「{0}」吗? 删除后会立即保存。",
+    "en": "Delete rule \"{0}\"? This saves immediately."
   },
   "1110": {
     "zh": "菜单键位",
@@ -1108,12 +1108,12 @@
     "en": "Pick a type, fill in the value, then check the actions for the menu (numbered by check order, up to 9)."
   },
   "1112": {
-    "zh": "还没有映射",
-    "en": "No mappings yet"
+    "zh": "还没有规则",
+    "en": "No rules yet"
   },
   "1113": {
-    "zh": "点击「添加映射」创建第一个映射",
-    "en": "Click \"Add Mapping\" to create the first one"
+    "zh": "点击「添加规则」创建第一条规则",
+    "en": "Click \"Add Rule\" to create the first one"
   },
   "1114": {
     "zh": "添加",
