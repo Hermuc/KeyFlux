@@ -40,6 +40,7 @@ public sealed class SelectedActionPageViewSmokeTests
             MatchValue = "url",
             Entries = [new SelectedEntry { Behavior = "open_url", Options = new RuleOptions() }],
         }));
+        page.NotifyMoveability(); // 同真实加载链路: 行序视觉态 (含分区首行标题标记)
         page.ExpandedRow = page.FileMappings[0];
 
         var view = new SelectedActionPageView { DataContext = page };

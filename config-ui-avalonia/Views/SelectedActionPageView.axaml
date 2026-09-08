@@ -33,9 +33,13 @@
               CornerRadius="10" Padding="12" Margin="0,0,0,8"
               Tapped="OnRowHeaderTapped">
         <StackPanel Spacing="8">
-          <!-- 行头: 条件值编辑 + 行操作 (分区标题已在卡外着色, 不再重复类型徽章) -->
-          <Grid ColumnDefinitions="*,Auto">
-            <StackPanel Spacing="6" VerticalAlignment="Center">
+          <!-- 行头: 分区标题 (仅分区首行, 沿用原徽章色) + 条件值编辑 + 行操作 -->
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <TextBlock IsVisible="{Binding IsFirstInPartition}"
+                       Text="{Binding TypeBadgeText}" Foreground="{Binding TypeBadgeColorHex}"
+                       FontWeight="SemiBold" FontSize="15" MinWidth="64"
+                       VerticalAlignment="Center" Margin="0,0,8,0" />
+            <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
               <!-- textType: 文本特征四选一 Toggle (所见即所选, 替代 ComboBox) -->
               <StackPanel IsVisible="{Binding IsTextType}" Orientation="Horizontal" Spacing="6">
                 <ToggleButton Classes="type-toggle"
@@ -55,23 +59,35 @@
                               Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                               Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1062}" />
               </StackPanel>
-              <!-- fileExt: 条件值 + 分组快捷填入 -->
+              <!-- fileExt: 条件值 + 分组快捷填入 (分组 Toggle 互斥点亮, 同 textType 所见即所选;
+                   再点已亮项 = 解除关联并清空; 后缀框始终可编辑, 手改保持关联) -->
               <StackPanel IsVisible="{Binding !IsTextType}" Spacing="6">
                 <TextBox Text="{Binding MatchValueDisplay}"
                          Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1034}" />
                 <StackPanel IsVisible="{Binding ShowFileGroupFill}" Orientation="Horizontal" Spacing="6">
                   <TextBlock FontSize="12" Foreground="#8A8F98" VerticalAlignment="Center"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1006}" />
-                  <ComboBox MinWidth="160"
-                            ItemsSource="{Binding FileGroupOptions}"
-                            SelectedItem="{Binding FileGroupSelected}" />
+                  <ItemsControl ItemsSource="{Binding GroupToggles}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:FileGroupToggleVm">
+                        <ToggleButton Classes="type-toggle"
+                                      IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                      Content="{Binding Label}" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
                 </StackPanel>
               </StackPanel>
               <TextBlock Text="{Binding MatchHint}" FontSize="11" Foreground="#8A8F98"
                          TextWrapping="Wrap" />
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
               <Button Classes="icon-btn" Command="{Binding TestRowCommand}" Content="▶"
                       ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
               <Button Classes="icon-btn" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}" Content="↑" />
@@ -300,17 +316,13 @@
         </StackPanel>
 
         <!-- ===================== 分区一: 文本特征 ===================== -->
-        <StackPanel IsVisible="{Binding TextMappings.Count}" Spacing="8">
-          <TextBlock FontWeight="SemiBold" FontSize="15" Foreground="#4169E1"
-                     Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1032}" />
+        <StackPanel IsVisible="{Binding TextMappings.Count}">
           <ItemsControl ItemsSource="{Binding TextMappings}"
                         ItemTemplate="{StaticResource MappingRowCard}" />
         </StackPanel>
 
         <!-- ===================== 分区二: 文件后缀 ===================== -->
-        <StackPanel IsVisible="{Binding FileMappings.Count}" Spacing="8">
-          <TextBlock FontWeight="SemiBold" FontSize="15" Foreground="#E65100"
-                     Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1031}" />
+        <StackPanel IsVisible="{Binding FileMappings.Count}">
           <ItemsControl ItemsSource="{Binding FileMappings}"
                         ItemTemplate="{StaticResource MappingRowCard}" />
         </StackPanel>

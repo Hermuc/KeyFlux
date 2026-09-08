@@ -472,4 +472,34 @@ public sealed class SelectedActionPageViewModelTests
         Assert.Equal("jpg", m.MatchValue);
         Assert.Equal(["open"], m.Entries.Select(e => e.Behavior));
     }
+
+    // ------------------------------------------------------------- 分区首行标记 (卡内标题展示)
+
+    /// <summary>分区标题只在首行卡内展示: 加载后标首行; 移动换位后标记跟随新序;
+    /// 删除首行后顺延到下一行 (标题不消失)。</summary>
+    [Fact]
+    public async Task PartitionTitleFlag_Follows_Row_Order_And_Shifts_On_Remove()
+    {
+        var config = BuildConfig();
+        config.SelectedAction = new SelectedAction
+        {
+            Mappings =
+            [
+                new SelectedMapping { MatchType = "textType", MatchValue = "url", Entries = [new SelectedEntry { Behavior = "open_url", Options = new RuleOptions() }] },
+                new SelectedMapping { MatchType = "textType", MatchValue = "plain", Entries = [new SelectedEntry { Behavior = "search", Options = new RuleOptions() }] },
+            ],
+        };
+        var (page, _) = CreatePage(config);
+        Assert.True(page.TextMappings[0].IsFirstInPartition);
+        Assert.False(page.TextMappings[1].IsFirstInPartition);
+
+        page.MoveMapping(page.TextMappings[1], -1); // 移动后标记随新序换位
+        Assert.False(page.TextMappings[1].IsFirstInPartition);
+        Assert.True(page.TextMappings[0].IsFirstInPartition);
+
+        page.ConfirmAsync = (_, _) => Task.FromResult(true); // 删除首行 -> 标记顺延
+        await page.AskRemoveAsync(page.TextMappings[0]);
+        Assert.True(page.TextMappings[0].IsFirstInPartition);
+        Assert.Single(page.TextMappings);
+    }
 }

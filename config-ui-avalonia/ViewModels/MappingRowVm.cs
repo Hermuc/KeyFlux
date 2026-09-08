@@ -28,6 +28,7 @@ public sealed partial class MappingRowVm : ObservableObject
             _applying = false;
         }
         ResolveInitialAssociation();
+        RefreshGroupToggles(); // 分组 Toggle 初始勾选态 (依赖 ResolveInitialAssociation 的推导结果)
         RefreshChips();
     }
 
@@ -156,7 +157,7 @@ public sealed partial class MappingRowVm : ObservableObject
         RebindEditorsToPremise();
     }
 
-    // ---- fileExt 行: 分组快捷填入 (评审 F2 语义) ----
+    // ---- fileExt 行: 分组快捷填入 (评审 F2 语义; UI 为分组 Toggle, 驱动既有 FileGroupSelected 链路) ----
 
     /// <summary>分组快捷填入可见性 (fileExt 且存在分组)。</summary>
     public bool ShowFileGroupFill => !IsTextType && FileGroups.Count > 0;
@@ -186,15 +187,38 @@ public sealed partial class MappingRowVm : ObservableObject
         if (_applying || value is null) return;
         if (value.Value.Length == 0)
         {
-            // 「无」: 解除关联并清空条件值
+            // 「无」: 解除关联并清空条件值; 前提回退通用文件集, 非覆盖行为重绑 (同 textType 语义)
             AssociatedGroupName = null;
             MatchValueDisplay = "";
+            RebindEditorsToPremise();
             return;
         }
         var group = FileGroups.FirstOrDefault(g => g.Name == value.Value);
         if (group is null) return;
         MatchValueDisplay = string.Join(", ", group.Exts); // 触发编辑器选项刷新
         AssociatedGroupName = group.Name;
+        RebindEditorsToPremise(); // 分组 Toggle = 离散前提切换 (2026-09-10 语义): 行为随新前提联动
+        NotifyGroupToggles(); // 互斥: 广播全组重估 (旧亮项熄灭, 派生态不依赖路由事件时序)
+    }
+
+    /// <summary>分组 Toggle 集 (每组一个; 勾选态由 FileGroupSelected 派生)。</summary>
+    public ObservableCollection<FileGroupToggleVm> GroupToggles { get; } = [];
+
+    /// <summary>重建分组 Toggle (构造/语言切换/分组列表可能变化时; 顺带刷新可见性)。</summary>
+    public void RefreshGroupToggles()
+    {
+        GroupToggles.Clear();
+        foreach (var g in FileGroups)
+        {
+            GroupToggles.Add(new FileGroupToggleVm(this, g.Name, g.Label));
+        }
+        OnPropertyChanged(nameof(ShowFileGroupFill));
+    }
+
+    /// <summary>FileGroupSelected 变化后广播各 Toggle 勾选态 (含「无」路径)。</summary>
+    private void NotifyGroupToggles()
+    {
+        foreach (var t in GroupToggles) t.NotifyChecked();
     }
 
     private void SyncFileGroupSelected()
@@ -204,6 +228,7 @@ public sealed partial class MappingRowVm : ObservableObject
             ? null
             : FileGroupOptions.FirstOrDefault(o => o.Value == AssociatedGroupName);
         _applying = false;
+        NotifyGroupToggles(); // 勾选态随关联/解除同步 (清空值解除关联路径由此覆盖)
     }
 
     /// <summary>初始关联推导 (按值命中分组; 手改后缀后由 AssociatedGroupName 保持, 不再重推导)。</summary>
@@ -224,6 +249,10 @@ public sealed partial class MappingRowVm : ObservableObject
     }
 
     // ---- chips 键位表 ----
+
+    /// <summary>是否为所在分区的首行 (分区标题在卡内首行展示, 多行时不重复)。</summary>
+    [ObservableProperty]
+    private bool _isFirstInPartition;
 
     public ObservableCollection<EntryChipVm> Chips { get; } = [];
 
@@ -282,11 +311,11 @@ public sealed partial class MappingRowVm : ObservableObject
     }
 
     /// <summary>
-    /// 特征切换 (textType 换 url/path/magnet/plain) 联动: 不适用新前提的 entry
+    /// 前提切换 (textType 换特征 / fileExt 换分组 Toggle 或「无」) 联动: 不适用新前提的 entry
     /// 自动换为该前提默认行为 (模板重置与手动换行为同语义; 无默认前提保留脏值),
-    /// 展开 = 所见即当前类型生效的行为。直接改底层 Entries: 收起态 Editors 为空,
-    /// 展开态重建编辑行。仅供特征切换路径调用 —— fileExt 逐字符输入与分组填入
-    /// 不走此链路 (避免打字中途破坏性重置; 分组另有"不兼容行为保持不动"约定)。
+    /// 展开 = 所见即当前前提生效的行为。直接改底层 Entries: 收起态 Editors 为空,
+    /// 展开态重建编辑行。仅供离散切换路径调用 —— fileExt 逐字符输入不走此链路
+    /// (打字中途重置是破坏性的; 手改后缀保持既有行为与关联语义)。
     /// </summary>
     private void RebindEditorsToPremise()
     {
@@ -391,6 +420,7 @@ public sealed partial class MappingRowVm : ObservableObject
         OnPropertyChanged(nameof(TextTypeOptions));
         OnPropertyChanged(nameof(FileGroupOptions));
         OnPropertyChanged(nameof(ShowFileGroupFill));
+        RefreshGroupToggles(); // 分组列表可能已变 (他页增删), 重建 Toggle 集与标签
         RefreshChips();
         foreach (var editor in Editors) editor.RefreshLanguage();
     }

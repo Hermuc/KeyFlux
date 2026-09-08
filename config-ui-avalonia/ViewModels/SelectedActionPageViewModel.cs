@@ -206,9 +206,18 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         NotifyMoveability();
     }
 
-    private void NotifyMoveability()
+    /// <summary>行序相关视觉态刷新 (移动边界 + 分区首行标记; internal 供测试挂行后触发)。</summary>
+    internal void NotifyMoveability()
     {
         foreach (var row in TextMappings.Concat(FileMappings)) row.NotifyMoveability();
+        RefreshPartitionTitles();
+    }
+
+    /// <summary>分区首行标记 (标题在卡内首行展示; 加载/增删/移动后首行可能变化)。</summary>
+    private void RefreshPartitionTitles()
+    {
+        foreach (var row in TextMappings) row.IsFirstInPartition = ReferenceEquals(row, TextMappings[0]);
+        foreach (var row in FileMappings) row.IsFirstInPartition = ReferenceEquals(row, FileMappings[0]);
     }
 
     /// <summary>删除映射 (确认后立即保存, 1109 文案语义)。</summary>

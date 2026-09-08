@@ -142,7 +142,7 @@ public sealed class FileGroupActionFilterTests
 
     // ------------------------------------------------------------- 分组选择联动
 
-    /// <summary>选分组: 填充分组后缀串并建立关联 (行为与模板不纠正 —— 合法性由保存校验接管)。</summary>
+    /// <summary>选分组: 填充分组后缀串并建立关联 (通配覆盖行为如 open 保留 —— 适用任意文件前提)。</summary>
     [Fact]
     public void OnFileGroupSelected_Fills_ExtList_And_Associates()
     {
@@ -151,19 +151,20 @@ public sealed class FileGroupActionFilterTests
 
         Assert.Equal(string.Join(", ", ImageExts), row.MatchValueDisplay);
         Assert.Equal("image", row.AssociatedGroupName);
-        Assert.Equal("open", editor.Entry.Behavior); // 行为不被联动纠正
+        Assert.Equal("open", editor.Entry.Behavior); // 通配覆盖行为保留
     }
 
-    /// <summary>当前行为磁力下载 (仅覆盖文本前提): 选分组不纠正行为、不清空残留载荷
-    /// (2026-09 语义: 纠正职责移交保存校验, 脏值由用户在行为下拉显式处理)。</summary>
+    /// <summary>当前行为磁力下载 (仅覆盖文本前提, 不覆盖任何文件前提): 选分组后重绑为该前提
+    /// 默认行为, 残留载荷随模板重置 (2026-09-10 语义: 分组 Toggle = 离散前提切换, 同 textType)。</summary>
     [Fact]
-    public void OnFileGroupSelected_Keeps_Incompatible_Behavior_And_Payload_Untouched()
+    public void OnFileGroupSelected_Rebinds_NonCovering_Entry_To_Premise_Default()
     {
         var (_, row, editor, _) = CreateHost("", "magnet_download", "magnet:?xt=1");
         row.FileGroupSelected = row.FileGroupOptions.First(o => o.Value == "image");
 
-        Assert.Equal("magnet_download", editor.Entry.Behavior);
-        Assert.Equal("magnet:?xt=1", editor.ActionValue);
+        var def = BehaviorCatalog.DefaultFor("fileExt", string.Join(", ", ImageExts));
+        Assert.Equal(def, editor.Entry.Behavior);
+        Assert.Equal(BehaviorCatalog.DefaultTemplateFor(def), editor.Entry.ActionValue); // 载荷随模板重置
         Assert.Equal(string.Join(", ", ImageExts), row.MatchValueDisplay);
         Assert.Equal("image", row.AssociatedGroupName);
     }
@@ -179,6 +180,101 @@ public sealed class FileGroupActionFilterTests
         Assert.Null(row.AssociatedGroupName);
         Assert.Null(row.FileGroupSelected); // 下拉回退未选态
         Assert.Equal(FileCovering, OptionValues(editor));
+    }
+
+    // ------------------------------------------------------------- 分组 Toggle (行头直选, 替代下拉)
+
+    /// <summary>
+    /// 分组 Toggle 互斥点亮: 点亮 image 填入并关联; 再点亮 code 互斥换位;
+    /// 再点已亮项熄灭 = 「无」 (清空条件值 + 解除关联)。勾选态由 FileGroupSelected 派生,
+    /// 行 VM 广播同步 (与 textType 同一派生属性教训)。
+    /// </summary>
+    [Fact]
+    public void GroupToggles_Mutually_Exclusive_And_Drive_Fill_Clear()
+    {
+        var (_, row, _, _) = CreateHost("", "open");
+        var tImage = row.GroupToggles.First(t => t.Name == "image");
+        var tCode = row.GroupToggles.First(t => t.Name == "code");
+
+        tImage.IsChecked = true;
+        Assert.True(tImage.IsChecked);
+        Assert.False(tCode.IsChecked); // 互斥
+        Assert.Equal(string.Join(", ", ImageExts), row.MatchValueDisplay);
+        Assert.Equal("image", row.AssociatedGroupName);
+
+        tCode.IsChecked = true; // 换组: 旧项熄灭, 值与关联随新组
+        Assert.True(tCode.IsChecked);
+        Assert.False(tImage.IsChecked);
+        Assert.Equal(string.Join(", ", CodeExts), row.MatchValueDisplay);
+        Assert.Equal("code", row.AssociatedGroupName);
+
+        tCode.IsChecked = false; // 熄灭已亮项 = 「无」
+        Assert.False(tCode.IsChecked);
+        Assert.False(tImage.IsChecked);
+        Assert.Equal("", row.MatchValueDisplay);
+        Assert.Null(row.AssociatedGroupName);
+    }
+
+    /// <summary>初始关联推导同步点亮对应 Toggle (构造链: ResolveInitialAssociation -> RefreshGroupToggles)。</summary>
+    [Fact]
+    public void GroupToggles_Reflect_Initial_Association()
+    {
+        var (_, row, _, _) = CreateHost(string.Join(", ", ImageExts), "open");
+        Assert.True(row.GroupToggles.First(t => t.Name == "image").IsChecked);
+        Assert.False(row.GroupToggles.First(t => t.Name == "code").IsChecked);
+    }
+
+    /// <summary>专属后缀行为包随分组 Toggle 联动: ps_edit (jpg/png 专属) 在 image 组覆盖保留,
+    /// 切到 code 组后不覆盖 -> 重绑为该前提默认行为 (展开 = 所见即当前前提生效的行为)。</summary>
+    [Fact]
+    public void GroupToggle_Switch_Rebinds_NonCovering_Specific_Pack()
+    {
+        var (_, row, _, _) = CreateHost(string.Join(", ", ImageExts), "ps_edit", "ps.exe %{selected%}");
+        // CreateHost 内部已重播种内置包; 追加用户专属包 (不影响已构造行的数据引用)
+        BehaviorCatalog.SeedForTests(BehaviorFixtures.Builtin(),
+        [
+            new BehaviorPack
+            {
+                Id = "ps_edit", Name = "PS 编辑图片", NameEn = "PS Edit", SpecVersion = 1,
+                AppliesTo = [new BehaviorAppliesTo { Type = "fileExt", Exts = ["jpg", "png"] }],
+                Entry = new BehaviorEntry { Kind = "builtin", Action = "run" },
+                Source = "user",
+            },
+        ]);
+        Assert.Equal("ps_edit", row.Mapping.Entries[0].Behavior); // image 前提下专属包覆盖保留
+
+        row.GroupToggles.First(t => t.Name == "code").IsChecked = true; // 切到 code 组
+
+        var def = BehaviorCatalog.DefaultFor("fileExt", string.Join(", ", CodeExts));
+        Assert.Equal(def, row.Mapping.Entries[0].Behavior);
+        Assert.Equal(BehaviorCatalog.DefaultTemplateFor(def), row.Mapping.Entries[0].ActionValue);
+        Assert.Equal(string.Join(", ", CodeExts), row.MatchValueDisplay);
+        Assert.Equal("code", row.AssociatedGroupName);
+    }
+
+    /// <summary>点「无」(熄灭已亮 Toggle): 前提回退通用文件集, 专属包不覆盖通配前提 -> 同样重绑。</summary>
+    [Fact]
+    public void GroupToggle_None_Rebinds_NonCovering_Specific_Pack()
+    {
+        var (_, row, _, _) = CreateHost(string.Join(", ", ImageExts), "ps_edit", "ps.exe %{selected%}");
+        BehaviorCatalog.SeedForTests(BehaviorFixtures.Builtin(),
+        [
+            new BehaviorPack
+            {
+                Id = "ps_edit", Name = "PS 编辑图片", NameEn = "PS Edit", SpecVersion = 1,
+                AppliesTo = [new BehaviorAppliesTo { Type = "fileExt", Exts = ["jpg", "png"] }],
+                Entry = new BehaviorEntry { Kind = "builtin", Action = "run" },
+                Source = "user",
+            },
+        ]);
+
+        row.FileGroupSelected = row.FileGroupOptions.First(o => o.Value == ""); // 「无」
+
+        var def = BehaviorCatalog.DefaultFor("fileExt", "");
+        Assert.Equal(def, row.Mapping.Entries[0].Behavior);
+        Assert.Equal(BehaviorCatalog.DefaultTemplateFor(def), row.Mapping.Entries[0].ActionValue);
+        Assert.Equal("", row.MatchValueDisplay);
+        Assert.Null(row.AssociatedGroupName);
     }
 
     // ------------------------------------------------------------- 初始关联推导
