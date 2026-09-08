@@ -17,6 +17,7 @@ namespace KeyFlux.Settings.Tests;
 /// DataTemplate 内的事件绑定 / $parent 绑定错误, 只能靠实例化整页 + 布局运行兜底。
 /// 覆盖: 空态渲染 / fileExt+textType 两分区行卡渲染 / 展开手风琴再收起。
 /// </summary>
+[Collection("BehaviorCatalogSerial")]
 public sealed class SelectedActionPageViewSmokeTests
 {
     private static (SelectedActionPageViewModel Page, SelectedActionPageView View, Window Window) CreateHost()

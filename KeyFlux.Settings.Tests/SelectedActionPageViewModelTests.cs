@@ -12,6 +12,7 @@ namespace KeyFlux.Settings.Tests;
 ///   - 弹窗落位: fileExt -> FileMappings / textType -> TextMappings, 列表顺序 = 菜单键位顺序;
 ///   - 热键与手风琴仲裁: Hotkey 写模型+未保存标记 / UsedHotkeys 收集 / 同屏只开一个。
 /// </summary>
+[Collection("BehaviorCatalogSerial")]
 public sealed class SelectedActionPageViewModelTests
 {
     private static void EnsureBehaviorCatalog()

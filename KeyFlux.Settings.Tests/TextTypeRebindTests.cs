@@ -10,6 +10,7 @@ namespace KeyFlux.Settings.Tests;
 /// 适用者保留。重绑直接作用于底层 Entries —— 收起态 Editors 为空也生效, 展开态重建编辑行。
 /// fileExt 逐字符输入/分组填入不走重绑 (打字中途破坏性 + 分组"不兼容行为保持不动"既有约定)。
 /// </summary>
+[Collection("BehaviorCatalogSerial")]
 public sealed class TextTypeRebindTests
 {
     private static SelectedActionPageViewModel CreatePage()

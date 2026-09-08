@@ -4,6 +4,13 @@ using KeyFlux.Settings.Services;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
+/// 行为目录串行集合: BehaviorCatalog 为静态单例, 6 个测试类各自 SeedForTests 播种,
+/// 并行运行时会互踩 (含 PsEdit 的播种泄漏进通配断言 -> Count 6 变 7)。禁并行修复。
+/// </summary>
+[CollectionDefinition("BehaviorCatalogSerial", DisableParallelization = true)]
+public sealed class BehaviorCatalogSerialCollection;
+
+/// <summary>
 /// 内置行为包测试夹具: 与 bin/behaviors/ 11 个 manifest 的 appliesTo/entry 语义一致
 /// (行为库/覆盖过滤测试共用; 若内置包前提调整, 此处与 golden 守卫需同步)。
 /// 条目顺序 = 目录序 (ID 字典序), 决定 BehaviorCatalog 默认推导的稳定序。
@@ -55,6 +62,7 @@ public static class BehaviorFixtures
         };
 }
 
+[Collection("BehaviorCatalogSerial")]
 public sealed class BehaviorCatalogTests
 {
     /// <summary>文件语境覆盖集: 通配行为 6 项, 按目录序; 文本专用行为不覆盖文件前提。</summary>

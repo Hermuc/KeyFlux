@@ -14,6 +14,7 @@ namespace KeyFlux.Settings.Tests;
 /// 文本特征四选一 Toggle 的互斥性验证: 依次点击各 Toggle, 同一时刻必须只有一个点亮,
 /// 且 MatchValue 与点亮项一致 (用户反馈"最多能点亮两个"的排查)。
 /// </summary>
+[Collection("BehaviorCatalogSerial")]
 public sealed class TextTypeToggleExclusiveTests
 {
     private static (SelectedActionPageViewModel Page, MappingRowVm Row, SelectedActionPageView View, Window Window) CreateHost()
