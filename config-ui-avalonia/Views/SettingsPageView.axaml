@@ -23,13 +23,14 @@
 
   <!-- 整页内容包 Viewbox Uniform 等比缩放 (背景留在 ScrollViewer 上, 左右两列均属内容区一同缩放):
        缩放由可用尺寸驱动 (默认内容区 936 / 测量宽 1024 -> 约 0.91, 窗口宽到 1288 时回到 1);
-       ScrollViewer 横向 Disabled -> Viewbox Uniform 随内容区宽动态缩放, 但 MaxWidth=1200 封顶:
+       ScrollViewer 横向 Disabled -> Viewbox Uniform 随内容区宽动态缩放, 但 MaxWidth=1088 封顶:
        窗口缩窄时组件等比缩小; 加宽超过内容基准 (1008 = 左列 500 + 右列 460 + 左右边距 48) 后继续放大,
-       最大约 1200/1008 ≈ 1.19 倍 (与自定义热键页 ~1.2 倍风格一致); 要调最大上限改 MaxWidth;
+       最大约 1088/1008 ≈ 1.08 倍 (2026-09-08 应用户反馈从 1200/1.19 倍下调: 最大化后组件嫌大,
+       1.08 = 用户当前窗口 1351 宽时的实际倍率, 当前窗口观感不变、最大化不再继续放大); 要调上限改 MaxWidth;
        HorizontalAlignment=Left 使封顶后内容左对齐 (同自定义热键页), 避免居中在两侧留大白;
        纵向默认 Auto -> Viewbox 纵向不放大, 放大溢出由 ScrollViewer 滚动承接 -->
   <ScrollViewer Background="#F0F2F7">
-    <Viewbox Stretch="Uniform" MaxWidth="1200" HorizontalAlignment="Left">
+    <Viewbox Stretch="Uniform" MaxWidth="1088" HorizontalAlignment="Left">
     <Grid ColumnDefinitions="500,*" Margin="24,20,24,28">
 
       <!-- ===================== 左列: 快捷键方案 (label:915, 复刻 Settings.vue 表格) ===================== -->
