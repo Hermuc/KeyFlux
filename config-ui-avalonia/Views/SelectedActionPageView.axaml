@@ -169,7 +169,7 @@
                       Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1106}" />
               <TextBlock IsVisible="{Binding !CanAddEntry}" FontSize="12" Foreground="#B26A00"
                          VerticalAlignment="Center"
-                         Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1107}" />
+                         Text="{Binding AddEntryHint}" />
             </StackPanel>
           </StackPanel>
         </StackPanel>

@@ -156,6 +156,48 @@ public sealed class SelectedActionPageViewModelTests
         Assert.Equal(9, row.Mapping.Entries.Count); // 守卫生效不追加
     }
 
+    /// <summary>
+    /// 重复行为禁止 (2026-09-08): 单行为匹配类型 (magnet 仅磁力链接下载) 已有 1 条时
+    /// 「添加行为」禁用 (提示 1119 而非 1107); 多行为类型 (url 双行为) 未占满可加,
+    /// 占满后同样禁用 —— 判定按覆盖集剩余未占用项, 不限于单行为特例; 空行仍允许加第一个。
+    /// </summary>
+    [Fact]
+    public void AddEntry_Blocked_When_MatchType_Has_Single_Behavior()
+    {
+        var (page, _) = CreatePage();
+        MappingRowVm NewRow(string matchValue, params string[] behaviors) =>
+            new(page, new SelectedMapping
+            {
+                MatchType = "textType",
+                MatchValue = matchValue,
+                Entries = [.. behaviors.Select(b => new SelectedEntry
+                {
+                    Behavior = b,
+                    Options = new RuleOptions(),
+                })],
+            });
+
+        var magnetRow = NewRow("magnet", "magnet_download");
+        page.TextMappings.Add(magnetRow);
+        Assert.False(magnetRow.CanAddEntry);
+        Assert.Equal(I18n.T("1119"), magnetRow.AddEntryHint); // 单行为提示, 非 9 上限文案
+        magnetRow.AddEntryCommand.Execute(null);
+        Assert.Single(magnetRow.Mapping.Entries); // 守卫生效不追加
+
+        var magnetEmpty = NewRow("magnet");
+        page.TextMappings.Add(magnetEmpty);
+        Assert.True(magnetEmpty.CanAddEntry); // 空行仍允许加第一个
+
+        var urlRow = NewRow("url", "open_url");
+        page.TextMappings.Add(urlRow);
+        Assert.True(urlRow.CanAddEntry); // url 双行为类型未占满仍可加
+
+        urlRow.Mapping.Entries.Add(new SelectedEntry { Behavior = "search", Options = new RuleOptions() });
+        urlRow.RefreshChips();
+        Assert.False(urlRow.CanAddEntry); // 覆盖集全部占用后同样禁止 (防重复泛化)
+        Assert.Equal(I18n.T("1119"), urlRow.AddEntryHint);
+    }
+
     /// <summary>添加行为默认取覆盖集中第一个未占用行为 (url: open_url 已占 -> search)。</summary>
     [Fact]
     public void AddEntry_Picks_First_Unused_Covering_Behavior()
@@ -166,10 +208,9 @@ public sealed class SelectedActionPageViewModelTests
         row.AddEntryCommand.Execute(null);
         Assert.Equal(["open_url", "search"], row.Mapping.Entries.Select(e => e.Behavior));
 
-        // 占满覆盖集后再加: 回退第一条 (open_url)
+        // 占满覆盖集后再加: 守卫拦截不追加 (2026-09-08 防重复, 旧回退第一条已废)
         row.AddEntryCommand.Execute(null);
-        Assert.Equal(3, row.Mapping.Entries.Count);
-        Assert.Equal("open_url", row.Mapping.Entries[2].Behavior);
+        Assert.Equal(2, row.Mapping.Entries.Count);
     }
 
     // ------------------------------------------------------------- 类型过滤

@@ -1134,5 +1134,9 @@
   "1118": {
     "zh": "新建",
     "en": "New"
+  },
+  "1119": {
+    "zh": "该匹配类型的可用行为都已添加，无法重复添加",
+    "en": "All available behaviors for this match type have been added"
   }
 }

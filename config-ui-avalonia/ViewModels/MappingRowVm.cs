@@ -262,6 +262,7 @@ public sealed partial class MappingRowVm : ObservableObject
             Chips.Add(new EntryChipVm(i + 1, BehaviorCatalog.LabelFor(e.Behavior), BehaviorBadgeColors.ForBehavior(e.Behavior)));
         }
         OnPropertyChanged(nameof(CanAddEntry));
+        OnPropertyChanged(nameof(AddEntryHint));
     }
 
     // ---- 手风琴编辑器 ----
@@ -304,6 +305,9 @@ public sealed partial class MappingRowVm : ObservableObject
             editor.RefreshOptions();
             // 现选行为不在新覆盖集时由 BuildBehaviorOptions 脏值插首位, 无需改动选中项
         }
+        // 覆盖集随前提变化, 单行为判定随之刷新 (如 url 双行为 <-> magnet 单行为)
+        OnPropertyChanged(nameof(CanAddEntry));
+        OnPropertyChanged(nameof(AddEntryHint));
     }
 
     // ---- 前提切换的行为快照 (UI 会话级记忆) ----
@@ -376,14 +380,31 @@ public sealed partial class MappingRowVm : ObservableObject
 
     // ---- 行为增删 / 排序 (手风琴内) ----
 
-    /// <summary>约束: 行为数达 9 时「添加行为」禁用。</summary>
-    public bool CanAddEntry => Mapping.Entries.Count < 9;
+    /// <summary>
+    /// 约束: 行为数达 9 时禁用; 覆盖集中的可用行为已全部占用时禁用 —— 再加必为重复行为
+    /// (2026-09-08 应用户要求, 首版只挡单行为类型存在漏洞: 覆盖集多项时仍可手选已占用
+    /// 行为重复添加, 泛化为查覆盖集剩余未占用项); 空行仍允许加第一个。
+    /// </summary>
+    public bool CanAddEntry
+    {
+        get
+        {
+            if (Mapping.Entries.Count >= 9) return false;
+            if (Mapping.Entries.Count == 0) return true;
+            var used = Mapping.Entries.Select(e => e.Behavior).ToHashSet();
+            return BehaviorCatalog.Covering(MatchType, Mapping.MatchValue).Any(p => !used.Contains(p.Id));
+        }
+    }
+
+    /// <summary>「添加行为」禁用原因提示 (1107 达 9 上限 / 1119 可用行为已全部添加)。</summary>
+    public string AddEntryHint => Mapping.Entries.Count >= 9 ? I18n.T("1107") : I18n.T("1119");
 
     [RelayCommand]
     private void AddEntry()
     {
         if (!CanAddEntry) return;
-        // 默认取覆盖集中第一个未占用的行为; 全占用回退第一条
+        // 默认取覆盖集中第一个未占用行为 (全占用已被 CanAddEntry 拦截;
+        // 覆盖集为空的脏值行回退 open, 保证空行可加第一个)
         var covering = BehaviorCatalog.Covering(MatchType, Mapping.MatchValue);
         var used = Mapping.Entries.Select(e => e.Behavior).ToHashSet();
         var id = covering.FirstOrDefault(p => !used.Contains(p.Id))?.Id
