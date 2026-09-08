@@ -277,6 +277,36 @@ public sealed class FileGroupActionFilterTests
         Assert.Null(row.AssociatedGroupName);
     }
 
+    /// <summary>
+    /// 前提快照记忆 (2026-09-10 bug 修复): 图片组配专属行为 -> 切文档组重绑为通配默认
+    /// -> 切回图片组应还原之前配的行为, 而非被通配默认 (open_path) 永久吞掉。
+    /// </summary>
+    [Fact]
+    public void GroupToggle_SwitchBack_Restores_Previous_Premise_Snapshot()
+    {
+        var (_, row, _, _) = CreateHost(string.Join(", ", ImageExts), "ps_edit", "ps.exe %{selected%}");
+        BehaviorCatalog.SeedForTests(BehaviorFixtures.Builtin(),
+        [
+            new BehaviorPack
+            {
+                Id = "ps_edit", Name = "PS 编辑图片", NameEn = "PS Edit", SpecVersion = 1,
+                AppliesTo = [new BehaviorAppliesTo { Type = "fileExt", Exts = ["jpg", "png"] }],
+                Entry = new BehaviorEntry { Kind = "builtin", Action = "run" },
+                Source = "user",
+            },
+        ]);
+
+        row.GroupToggles.First(t => t.Name == "code").IsChecked = true; // 切走: 重绑为通配默认
+        var def = BehaviorCatalog.DefaultFor("fileExt", string.Join(", ", CodeExts));
+        Assert.Equal(def, row.Mapping.Entries[0].Behavior);
+
+        row.GroupToggles.First(t => t.Name == "image").IsChecked = true; // 切回: 快照还原
+        Assert.Equal("ps_edit", row.Mapping.Entries[0].Behavior);
+        Assert.Equal("ps.exe %{selected%}", row.Mapping.Entries[0].ActionValue); // 模板一并还原
+        Assert.Equal(string.Join(", ", ImageExts), row.MatchValueDisplay);
+        Assert.Equal("image", row.AssociatedGroupName);
+    }
+
     // ------------------------------------------------------------- 初始关联推导
 
     /// <summary>条件值 = 分组后缀全集的乱序/大小写变体: 构造时重建关联 (SameExts 归一化比较)。</summary>

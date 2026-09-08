@@ -115,6 +115,7 @@ public sealed partial class MappingRowVm : ObservableObject
     private void SetTextType(string value)
     {
         if (Mapping.MatchValue == value) return;
+        SnapshotCurrentPremise();
         Mapping.MatchValue = value;
         OnPropertyChanged(nameof(MatchValueDisplay));
         OnPropertyChanged(nameof(MatchValueBadge));
@@ -123,7 +124,7 @@ public sealed partial class MappingRowVm : ObservableObject
         // 只靠 Checked 事件回调时机不可靠 (事件先于绑定推值触发时, 旧项残留点亮,
         // 实测"最多同时亮两个") —— 数据变了必须自己发全通知。
         NotifyTogglesChanged();
-        RebindEditorsToPremise();
+        RestoreOrRebindForCurrentPremise();
     }
 
     /// <summary>切换任一 Toggle 时同步其余三个的视觉态。</summary>
@@ -149,12 +150,13 @@ public sealed partial class MappingRowVm : ObservableObject
     partial void OnTextTypeSelectedChanged(ComboOption? value)
     {
         if (_applying || value is null || value.Value == Mapping.MatchValue) return;
+        SnapshotCurrentPremise();
         Mapping.MatchValue = value.Value;
         OnPropertyChanged(nameof(MatchValueDisplay));
         OnPropertyChanged(nameof(MatchValueBadge));
         OnPropertyChanged(nameof(MatchSummary));
         NotifyTogglesChanged(); // 与 SetTextType 同理: Toggle 视觉态随 MatchValue 同步
-        RebindEditorsToPremise();
+        RestoreOrRebindForCurrentPremise();
     }
 
     // ---- fileExt 行: 分组快捷填入 (评审 F2 语义; UI 为分组 Toggle, 驱动既有 FileGroupSelected 链路) ----
@@ -185,19 +187,20 @@ public sealed partial class MappingRowVm : ObservableObject
     partial void OnFileGroupSelectedChanged(ComboOption? value)
     {
         if (_applying || value is null) return;
+        SnapshotCurrentPremise(); // 切换前暂存当前前提的行为配置
         if (value.Value.Length == 0)
         {
-            // 「无」: 解除关联并清空条件值; 前提回退通用文件集, 非覆盖行为重绑 (同 textType 语义)
+            // 「无」: 解除关联并清空条件值; 前提回退通用文件集
             AssociatedGroupName = null;
             MatchValueDisplay = "";
-            RebindEditorsToPremise();
+            RestoreOrRebindForCurrentPremise();
             return;
         }
         var group = FileGroups.FirstOrDefault(g => g.Name == value.Value);
         if (group is null) return;
         MatchValueDisplay = string.Join(", ", group.Exts); // 触发编辑器选项刷新
         AssociatedGroupName = group.Name;
-        RebindEditorsToPremise(); // 分组 Toggle = 离散前提切换 (2026-09-10 语义): 行为随新前提联动
+        RestoreOrRebindForCurrentPremise(); // 分组 Toggle = 离散前提切换 (2026-09-10 语义)
         NotifyGroupToggles(); // 互斥: 广播全组重估 (旧亮项熄灭, 派生态不依赖路由事件时序)
     }
 
@@ -307,6 +310,51 @@ public sealed partial class MappingRowVm : ObservableObject
         {
             editor.RefreshOptions();
             // 现选行为不在新覆盖集时由 BuildBehaviorOptions 脏值插首位, 无需改动选中项
+        }
+    }
+
+    // ---- 前提切换的行为快照 (UI 会话级记忆) ----
+
+    // 痛点: 行为配置单值存储在 Entries 上, 切走前提时不适用的行为被重绑为通配默认
+    // (如 open_path), 切回后通配行为仍覆盖原前提 -> 用户为原前提配的行为丢失
+    // (实测: 图片组配专属行为 -> 文档组变 open_path -> 切回图片仍是 open_path)。
+    // 方案: 离散切换前把当前 Entries 深拷贝暂存 (键 = 切换前 MatchValue), 切到新
+    // 前提时有快照则整体还原, 无则走重绑规则。快照仅会话内存态: 持久化始终为
+    // 当前前提的 Entries, 保存后重启其他前提的记忆不保留, 由重绑规则兜底。
+    private readonly Dictionary<string, List<SelectedEntry>> _premiseSnapshots = new();
+
+    private static List<SelectedEntry> CloneEntries(IEnumerable<SelectedEntry> source)
+        => source.Select(e => new SelectedEntry
+        {
+            Behavior = e.Behavior,
+            ActionValue = e.ActionValue,
+            WorkingDir = e.WorkingDir,
+            Options = new RuleOptions
+            {
+                CopyToClipboard = e.Options.CopyToClipboard,
+                ClearSelection = e.Options.ClearSelection,
+                Confirm = e.Options.Confirm,
+            },
+        }).ToList();
+
+    /// <summary>切换前提前暂存当前行为配置 (键 = 当前 MatchValue; 每次覆盖, 保留最新配置)。</summary>
+    private void SnapshotCurrentPremise()
+        => _premiseSnapshots[Mapping.MatchValue] = CloneEntries(Mapping.Entries);
+
+    /// <summary>前提已切到 Mapping.MatchValue 后: 有快照则整体还原, 否则按重绑规则落到该前提默认。</summary>
+    private void RestoreOrRebindForCurrentPremise()
+    {
+        if (_premiseSnapshots.TryGetValue(Mapping.MatchValue, out var snapshot))
+        {
+            Mapping.Entries.Clear();
+            foreach (var e in CloneEntries(snapshot)) Mapping.Entries.Add(e);
+            if (IsExpanded) OpenEditor(); // 展开态重建编辑行 (绑新 entry 对象)
+            RefreshChips();
+            RefreshEditorOptions();
+        }
+        else
+        {
+            RebindEditorsToPremise();
         }
     }
 

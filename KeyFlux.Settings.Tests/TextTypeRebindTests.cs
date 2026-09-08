@@ -92,4 +92,25 @@ public sealed class TextTypeRebindTests
         Assert.Equal(2, row.Mapping.Entries.Count);
         Assert.Equal(2, row.Chips.Count); // 只换值不增删, 序号顺延
     }
+
+    /// <summary>
+    /// 前提快照记忆 (2026-09-10): 切走再切回, 之前配置 (含自改模板) 被还原, 而非重绑
+    /// 默认模板 —— url(open_url) -> plain(重绑 search, 自改模板) -> url -> plain 还原自改模板。
+    /// </summary>
+    [Fact]
+    public void Switch_Back_Restores_Previous_Premise_Snapshot()
+    {
+        var page = CreatePage();
+        var row = NewRow(page, "url", "open_url");
+        row.IsPlain = true; // 重绑 search + 包默认模板
+        row.Mapping.Entries[0].ActionValue = "https://custom/?q=%selected%"; // 用户自改模板
+
+        row.IsUrl = true; // 切回 url: 快照还原 (open_url, 无参)
+        Assert.Equal("open_url", row.Mapping.Entries[0].Behavior);
+        Assert.Equal("", row.Mapping.Entries[0].ActionValue);
+
+        row.IsPlain = true; // 再切回 plain: 还原快照 (search, 自改模板), 非重绑默认模板
+        Assert.Equal("search", row.Mapping.Entries[0].Behavior);
+        Assert.Equal("https://custom/?q=%selected%", row.Mapping.Entries[0].ActionValue);
+    }
 }
