@@ -8,8 +8,7 @@ using KeyFlux.Settings.Services;
 
 namespace KeyFlux.Settings.ViewModels;
 /// <summary>
-/// 一行映射 (一个 <see cref="SelectedMapping"/> 的 UI 投影, 直接持有底层对象引用):
-/// 类型徽章 + 条件值编辑 + chips 键位表 + 行内手风琴 (同屏只开一个, 由页面 ExpandedRow 统一仲裁)。
+/// 一行映射: <see cref="SelectedMapping"/> 的 UI 投影, 直接持有底层对象引用。
 /// </summary>
 public sealed partial class MappingRowVm : ObservableObject
 {
@@ -54,14 +53,10 @@ public sealed partial class MappingRowVm : ObservableObject
     public string MatchSummary
         => $"{TypeBadgeText}: {(Mapping.MatchValue.Trim().Length == 0 ? I18n.T("999") : Mapping.MatchValue)}";
 
-    /// <summary>语言切换刻度中继 (行内 XAML 的 Tr 绑定直接读此属性重译;
-    /// 数值同步页面, 通知由页面 OnLanguageChanged -> RefreshLanguage 推送, 免事件订阅)。</summary>
+    /// <summary>语言切换刻度, 行内绑定读此重译。</summary>
     public int LanguageTick => _page.LanguageTick;
 
-    /// <summary>
-    /// 条件值 (fileExt 行可编辑; textType 行经下拉改)。
-    /// 手改保持分组关联 (写回语义: 关联分组的后缀修改保存时写回); 清空值解除关联。
-    /// </summary>
+    /// <summary>条件值 (fileExt 可编辑; textType 经下拉改)。手改后缀保持分组关联并写回。</summary>
     public string MatchValueDisplay
     {
         get => Mapping.MatchValue;
@@ -114,9 +109,8 @@ public sealed partial class MappingRowVm : ObservableObject
         Mapping.MatchValue = value;
         OnPropertyChanged(nameof(MatchValueDisplay));
         OnPropertyChanged(nameof(MatchSummary));
-        // 四个 Toggle 的勾选态由 MatchValue 派生, 必须在此同步:
-        // 只靠 Checked 事件回调时机不可靠 (事件先于绑定推值触发时, 旧项残留点亮,
-        // 实测"最多同时亮两个") —— 数据变了必须自己发全通知。
+        // Toggle 勾选态由 MatchValue 派生, 数据变了必须自己发全通知
+        // (只靠事件回调时旧项可能残留点亮)
         NotifyTogglesChanged();
         RestoreOrRebindForCurrentPremise();
     }
@@ -168,10 +162,7 @@ public sealed partial class MappingRowVm : ObservableObject
         }
     }
 
-    /// <summary>
-    /// 显式关联的分组名 (null=无): 分组填入建立 / 清空值解除 / 初始按值推导;
-    /// 手改后缀保持关联, 保存时把修改写回该分组。
-    /// </summary>
+    /// <summary>关联分组名 (null=无)。保存时后缀修改写回该分组。</summary>
     public string? AssociatedGroupName { get; internal set; }
 
     [ObservableProperty]
@@ -310,14 +301,10 @@ public sealed partial class MappingRowVm : ObservableObject
         OnPropertyChanged(nameof(AddEntryHint));
     }
 
-    // ---- 前提切换的行为快照 (UI 会话级记忆) ----
+    // ---- 前提切换的行为快照 (仅会话内存) ----
 
-    // 痛点: 行为配置单值存储在 Entries 上, 切走前提时不适用的行为被重绑为通配默认
-    // (如 open_path), 切回后通配行为仍覆盖原前提 -> 用户为原前提配的行为丢失
-    // (实测: 图片组配专属行为 -> 文档组变 open_path -> 切回图片仍是 open_path)。
-    // 方案: 离散切换前把当前 Entries 深拷贝暂存 (键 = 切换前 MatchValue), 切到新
-    // 前提时有快照则整体还原, 无则走重绑规则。快照仅会话内存态: 持久化始终为
-    // 当前前提的 Entries, 保存后重启其他前提的记忆不保留, 由重绑规则兜底。
+    // 切走前提前深拷贝暂存 Entries, 切回时还原; 无快照则走重绑规则。
+    // 不持久化: 保存后重启即丢, 由重绑规则兜底。
     private readonly Dictionary<string, List<SelectedEntry>> _premiseSnapshots = new();
 
     private static List<SelectedEntry> CloneEntries(IEnumerable<SelectedEntry> source)
@@ -356,11 +343,8 @@ public sealed partial class MappingRowVm : ObservableObject
     }
 
     /// <summary>
-    /// 前提切换 (textType 换特征 / fileExt 换分组 Toggle 或「无」) 联动: 不适用新前提的 entry
-    /// 自动换为该前提默认行为 (模板重置与手动换行为同语义; 无默认前提保留脏值),
-    /// 展开 = 所见即当前前提生效的行为。直接改底层 Entries: 收起态 Editors 为空,
-    /// 展开态重建编辑行。仅供离散切换路径调用 —— fileExt 逐字符输入不走此链路
-    /// (打字中途重置是破坏性的; 手改后缀保持既有行为与关联语义)。
+    /// 前提切换联动: 不适用新前提的 entry 换为该前提默认行为。
+    /// 直接改底层 Entries。仅供离散切换调用, 逐字符输入不走此链路 (避免打字中途重置)。
     /// </summary>
     private void RebindEditorsToPremise()
     {
@@ -381,9 +365,7 @@ public sealed partial class MappingRowVm : ObservableObject
     // ---- 行为增删 / 排序 (手风琴内) ----
 
     /// <summary>
-    /// 约束: 行为数达 9 时禁用; 覆盖集中的可用行为已全部占用时禁用 —— 再加必为重复行为
-    /// (2026-09-08 应用户要求, 首版只挡单行为类型存在漏洞: 覆盖集多项时仍可手选已占用
-    /// 行为重复添加, 泛化为查覆盖集剩余未占用项); 空行仍允许加第一个。
+    /// 约束: 行为数达 9, 或覆盖集可用行为已全部占用时禁用 (再加必重复); 空行可加第一个。
     /// </summary>
     public bool CanAddEntry
     {
@@ -403,8 +385,7 @@ public sealed partial class MappingRowVm : ObservableObject
     private void AddEntry()
     {
         if (!CanAddEntry) return;
-        // 默认取覆盖集中第一个未占用行为 (全占用已被 CanAddEntry 拦截;
-        // 覆盖集为空的脏值行回退 open, 保证空行可加第一个)
+        // 取覆盖集中第一个未占用行为; 覆盖集为空的脏值行回退 open
         var covering = BehaviorCatalog.Covering(MatchType, Mapping.MatchValue);
         var used = Mapping.Entries.Select(e => e.Behavior).ToHashSet();
         var id = covering.FirstOrDefault(p => !used.Contains(p.Id))?.Id

@@ -2,11 +2,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace KeyFlux.Settings.ViewModels;
 /// <summary>
-/// 文件后缀行的分组 Toggle (与 textType 特征 Toggle 同款交互: 所见即所选)。
-/// 点亮 = 选中该分组 (复用 FileGroupSelected 填入链路, 保留写回关联语义);
-/// 再点已亮项 = 解除关联并清空条件值 (等价旧下拉的「无」)。
-/// 勾选态由行 VM 的 FileGroupSelected 派生, 行 VM 变更后经 NotifyChecked 广播,
-/// 与 textType 教训一致: 派生视觉态必须由数据变更方主动通知, 不依赖路由事件时序。
+/// 文件后缀行的分组 Toggle: 点亮 = 选中该分组, 再点 = 解除关联并清空条件值。
+/// 勾选态由行 VM 广播, 不依赖路由事件时序。
 /// </summary>
 public sealed class FileGroupToggleVm : ObservableObject
 {

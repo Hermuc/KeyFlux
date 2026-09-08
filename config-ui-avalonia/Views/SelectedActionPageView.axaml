@@ -8,16 +8,8 @@
              x:DataType="vm:SelectedActionPageViewModel">
 
   <!--
-    评审 D1 定案 (2026-09-06): 方案 D 下 entry.options 三开关 (复制到剪贴板/清空选区/执行前确认)
-    暂缓消费, 本版 UI 不呈现 —— SelectedAction.ahk 引擎未定义其菜单语义, 生成端也不把
-    options 写进数据数组。模型字段 (SelectedEntry.Options / EntryRowVm 三属性) 保留不删,
-    兼容存量数据往返, 前向兼容恢复。
-
-    布局去重 (2026-09-08): 文本特征/文件后缀两分区原本各持有一份几乎相同的行卡 DataTemplate
-    (仅 textType 四选一 Toggle 块差异), 提取为页面级共享模板 MappingRowCard —— textType/
-    fileExt 两个分支以行 VM 的 IsTextType 自然开关, 分区差异由数据决定而非模板复制。
-    行内/弹窗的页面 LanguageTick 长绑定 ($parent[views:...]) 改为行 VM / EntryRowVm /
-    AddMappingVm 的 LanguageTick 中继属性 (页面 OnLanguageChanged -> RefreshLanguage 链推送)。
+    entry.options 三开关本版 UI 不呈现 (引擎未消费), 模型字段保留兼容存量数据。
+    两分区共用共享行卡模板 MappingRowCard, 分区差异由行 VM 的 IsTextType 决定。
   -->
 
 
@@ -59,8 +51,7 @@
                               Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                               Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1062}" />
               </StackPanel>
-              <!-- fileExt: 条件值 + 分组快捷填入 (分组 Toggle 互斥点亮, 同 textType 所见即所选;
-                   再点已亮项 = 解除关联并清空; 后缀框始终可编辑, 手改保持关联) -->
+              <!-- fileExt: 条件值 + 分组快捷填入 (再点已亮项 = 解除关联并清空) -->
               <StackPanel IsVisible="{Binding !IsTextType}" Spacing="6">
                 <TextBox Text="{Binding MatchValueDisplay}"
                          Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1034}" />
@@ -200,9 +191,7 @@
       <Setter Property="FontSize" Value="13"/>
       <Setter Property="MinHeight" Value="30"/>
     </Style>
-    <!-- 点亮态与分区标题同色 (文本蓝 #4169E1 / 后缀橙 #E65100), 实底白字。
-         点亮态必须打在模板的 PART_ContentPresenter 上: Fluent 的 :checked 主题样式
-         直接给该部件设 Background/Foreground, 只改控件属性会被模板覆盖 (实测仍显主题蓝)。 -->
+    <!-- 点亮态必须打在模板 PART_ContentPresenter 上, 只改控件属性会被 Fluent 主题覆盖 -->
     <Style Selector="ToggleButton.tone-blue:checked /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#4169E1"/>
       <Setter Property="Foreground" Value="White"/>

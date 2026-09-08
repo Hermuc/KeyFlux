@@ -8,9 +8,7 @@ using KeyFlux.Settings.Services;
 
 namespace KeyFlux.Settings.ViewModels;
 /// <summary>
-/// 手风琴内单个行为的编辑行 (直接持有底层 <see cref="SelectedEntry"/> 引用):
-/// 行为下拉 (按 BehaviorCatalog.Covering 过滤, 脏值恒可见)、命令模板、工作目录、
-/// Options 三开关与排序/删除。
+/// 手风琴内单个行为的编辑行: 行为下拉、命令模板、工作目录、排序/删除。
 /// </summary>
 public sealed partial class EntryRowVm : ObservableObject
 {
@@ -92,8 +90,7 @@ public sealed partial class EntryRowVm : ObservableObject
     /// <summary>行为提示 (包 description)。</summary>
     public string BehaviorHint => BehaviorCatalog.HintFor(Entry.Behavior);
 
-    /// <summary>语言切换刻度中继 (行内 XAML 的 Tr 绑定直接读此属性重译;
-    /// 数值同步所属行 VM, 通知随行 RefreshLanguage 链推送)。</summary>
+    /// <summary>语言切换刻度, 行内绑定读此重译。</summary>
     public int LanguageTick => _row.LanguageTick;
 
     // ---- 无参语义与模板 ----
@@ -126,8 +123,7 @@ public sealed partial class EntryRowVm : ObservableObject
         }
     }
 
-    // ---- Options 三开关 (RuleOptions; 评审 D1 定案: 方案 D 下 options 三开关暂缓消费,
-    // UI 本版不呈现, 属性保留以兼容存量数据往返, 前向兼容恢复) ----
+    // ---- Options 三开关 (UI 本版不呈现, 属性保留兼容存量数据) ----
 
     public bool CopyToClipboard
     {

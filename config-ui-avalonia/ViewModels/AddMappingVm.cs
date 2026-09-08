@@ -8,9 +8,7 @@ using KeyFlux.Settings.Services;
 
 namespace KeyFlux.Settings.ViewModels;
 /// <summary>
-/// 添加映射弹窗 (页内 overlay 面板, 非独立窗口; VM 可单测):
-/// 类型四选一 (文件后缀 + 文本特征 url/path/magnet/plain) -> 条件值 (fileExt 支持分组快捷填入)
-/// -> 行为库勾选过滤 (BehaviorCatalog.Covering, 列表顺序即菜单顺序, 与勾选先后无关)。
+/// 添加规则弹窗 (页内 overlay 面板): 选类型 -> 填条件值 -> 勾选行为 (顺序即菜单顺序)。
 /// </summary>
 public sealed partial class AddMappingVm : ObservableObject
 {
@@ -19,15 +17,13 @@ public sealed partial class AddMappingVm : ObservableObject
     public AddMappingVm(SelectedActionPageViewModel page)
     {
         _page = page;
-        // 匹配类型下拉: 具体文件后缀分组在前 (每个分组 = 一级类型), 文本特征四项在后;
-        // 分组项 value 编码为 "group:<name>", 选中即定 MatchValue = 该组后缀集 (无需再填条件值)
+        // 类型下拉: 分组在前, 分隔项居中, 文本特征在后; 分组项即定条件值
         _typeOptions = [];
         foreach (var g in page.FileGroups)
         {
             _typeOptions.Add(new ComboOption("group:" + g.Name, g.Label));
         }
-        // 分组与文本特征之间的动态分隔项: 分组增删后线始终跟随最后一组 (用户要求);
-        // 容器压制 (无 hover/不可点/透明背景) 在 View 层 DropDownOpened 后处理
+        // 分隔线始终跟随最后一组 (用户要求); 容器压制在 View 层 DropDownOpened 后处理
         _typeOptions.Add(new("", "", IsSeparator: true));
         _typeOptions.Add(new("url", I18n.T("1059")));
         _typeOptions.Add(new("path", I18n.T("1060")));
@@ -44,7 +40,7 @@ public sealed partial class AddMappingVm : ObservableObject
     /// <summary>弹窗说明 (1111)。</summary>
     public string Hint => I18n.T("1111");
 
-    /// <summary>语言切换刻度中继 (弹窗内 Tr 绑定重译触发源; 数值同步页面, 通知随 RefreshLanguage 推送)。</summary>
+    /// <summary>语言切换刻度, 弹窗内绑定读此重译。</summary>
     public int LanguageTick => _page.LanguageTick;
 
     // ---- 步骤 1: 类型 ----

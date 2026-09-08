@@ -9,21 +9,9 @@ using KeyFlux.Settings.Services;
 namespace KeyFlux.Settings.ViewModels;
 
 // ============================================================================
-// 选中动作单屏页 (方案 D「单键分发」, 2026-09):
-//   单一热键 + mappings 匹配前提桶 + entries 行为菜单 (1..9 数字键选择)。
-//   旧多方案 ActionScheme 与两级导航 (列表页 -> 编辑页) 已整体退役。
-//
-// 结构:
-//   EntryChipVm                  行为胶囊 ([1 浏览器打开] 式序号, 只读投影)
-//   EntryRowVm                   手风琴内行为编辑行 (行为下拉/模板/工作目录/Options)
-//   MappingRowVm                 一行映射 (textType/fileExt), chips + 行内手风琴
-//   AddMappingVm / BehaviorPickVm 添加映射弹窗 (类型 -> 值 -> 行为勾选)
-//   SelectedActionPageViewModel  页面宿主 (热键捕获/开关/两分区/模拟条/保存)
-//
-// 保存纪律: 启用开关与删除映射立即保存 (沿用旧卡片页语义); 其余修改统一经
-// MainViewModel.SaveAsync 咽喉 (Ctrl+S / 侧栏「保存配置」), 避免频繁 PUT 触发
-// KeyFlux 进程重启。分组后缀写回 (评审 F1/F2 语义) 由咽喉调用
-// ApplyFileGroupWriteBack 完成。
+// 选中动作单屏页: 单一热键 + 匹配规则 + 行为菜单 (1..9 数字键选择)。
+// 保存纪律: 启用/删除立即保存; 其余修改经 MainViewModel.SaveAsync 咽喉。
+// 分组后缀写回由咽喉调用 ApplyFileGroupWriteBack 完成。
 // ============================================================================
 
 /// <summary>行为胶囊 (只读投影; 序号 = entries 下标 + 1, 即菜单数字键位)。</summary>
@@ -51,9 +39,8 @@ public static class BehaviorBadgeColors
 }
 
 /// <summary>
-/// 选中动作单屏页 (方案 D, 复刻重构文档 §三): 主快捷键捕获 + 启用开关 +
-/// 两分区映射列表 (文本特征/文件后缀, 组内行序 = 匹配优先级) + 添加映射弹窗 +
-/// 底部紧凑模拟测试条。数据真源 = Config.SelectedAction (恒对象, GET/PUT /config 全链路携带)。
+/// 选中动作单屏页: 主快捷键捕获 + 启用开关 + 两分区规则列表 + 添加弹窗 + 模拟测试条。
+/// 数据真源 = Config.SelectedAction。
 /// </summary>
 public sealed partial class SelectedActionPageViewModel : ObservableObject, ILanguageRefresh
 {
@@ -106,18 +93,16 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     /// <summary>空热键警示 (976)。</summary>
     public bool NoHotkeyWarning => string.IsNullOrEmpty(Sa.Hotkey);
 
-    /// <summary>热键卡内提示条文案 (互斥合并): 未保存 (1077) 优先于空热键警示 (976);
-    /// 空串隐藏。NoHotkeyWarning/HotkeyPendingSave 保留原属性供测试断言。</summary>
+    /// <summary>热键卡提示条文案: 未保存 (1077) 优先于空热键警示 (976); 空串隐藏。</summary>
     public string HotkeyHintText
         => HotkeyPendingSave ? I18n.T("1077") : NoHotkeyWarning ? I18n.T("976") : "";
 
-    /// <summary>热键已修改未保存提示条 (1077; 保存成功后由 MainViewModel.SaveAsync 成功分支经 OnConfigSaved 复位)。</summary>
+    /// <summary>热键已改未保存提示 (1077; 保存成功后复位)。</summary>
     [ObservableProperty]
     private bool _hotkeyPendingSave;
     partial void OnHotkeyPendingSaveChanged(bool value) => OnPropertyChanged(nameof(HotkeyHintText));
 
-    /// <summary>主配置保存成功后回调 (评审 L4: MainViewModel.SaveAsync 成功分支调用)。
-    /// 此前 HotkeyPendingSave 永不复位, 热键改过一次后提示条一直悬挂到关窗。</summary>
+    /// <summary>主配置保存成功后复位热键未保存提示。</summary>
     public void OnConfigSaved() => HotkeyPendingSave = false;
 
     /// <summary>已占用热键 (启用的 keymaps 全部热键; 单方案模型无其他方案冲突源)。</summary>
@@ -126,8 +111,7 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
 
     private HashSet<string> BuildUsedHotkeys() => HotkeyLogic.CollectUsedHotkeys(Config.Keymaps);
 
-    /// <summary>启用开关: 写入内存并立即保存 (沿用旧卡片页语义);
-    /// 失败 (400 / 传输层异常) 回滚到原值, 避免开关显示与真实配置不一致 (评审 L3)。</summary>
+    /// <summary>启用开关: 立即保存, 失败回滚 (避免显示与配置不一致)。</summary>
     public bool Enable
     {
         get => Sa.Enable;
@@ -142,9 +126,7 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         }
     }
 
-    /// <summary>启用开关的立即保存 (fire-and-forget 包裹 try/catch, 评审 L3):
-    /// 保存失败或抛异常时还原 Sa.Enable 并刷新 UI 态; 若期间用户再次拨动
-    /// (内存值已不是本次尝试写入的值), 尊重最新意图不回滚。</summary>
+    /// <summary>启用开关的立即保存: 失败则回滚 (用户已再次拨动则尊重最新意图)。</summary>
     private async Task SaveEnableAsync(bool original, bool attempted)
     {
         try
@@ -450,9 +432,7 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
 
     // ------------------------------------------------------------- 保存 / 写回
 
-    /// <summary>两分区投影回模型 (textType 在前; 行 VM 直接持有底层对象, 属性修改天然同步)。
-    /// internal: 页面自身 SaveConfigAsync 调用之外, MainViewModel.SaveAsync 咽喉 (评审 C1)
-    /// 也要在节流判断前调用, 保证 Ctrl+S / 侧栏「保存」等外部入口把新加映射写进载荷。</summary>
+    /// <summary>两分区投影回模型 (行 VM 直接持有底层对象, 属性修改天然同步)。</summary>
     internal void SyncToModel()
     {
         Sa.Mappings.Clear();
@@ -468,10 +448,8 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     }
 
     /// <summary>
-    /// 保存前把关联分组的条件值修改写回 Config.FileGroups 对应条目
-    /// (评审 F1: 调用点在 MainViewModel.SaveAsync 统一咽喉; F2: 关联意图存于行 VM 的
-    /// AssociatedGroupName —— 选分组建立 / 清空值解除 / 初始按值推导 / 手改后缀保持)。
-    /// 多行关联同一分组时后写者胜, 无需加锁。
+    /// 保存前把关联分组的前件值修改写回 Config.FileGroups。
+    /// 多行关联同一分组时后写者胜。
     /// </summary>
     internal void ApplyFileGroupWriteBack()
     {

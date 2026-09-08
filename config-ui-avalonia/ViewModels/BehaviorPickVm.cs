@@ -7,7 +7,7 @@ using KeyFlux.Settings.Models;
 using KeyFlux.Settings.Services;
 
 namespace KeyFlux.Settings.ViewModels;
-/// <summary>添加映射弹窗内的行为勾选项 (勾选顺序 = 菜单键位顺序)。</summary>
+/// <summary>添加规则弹窗内的行为勾选项 (勾选顺序 = 菜单键位顺序)。</summary>
 public sealed partial class BehaviorPickVm : ObservableObject
 {
     private readonly AddMappingVm _panel;

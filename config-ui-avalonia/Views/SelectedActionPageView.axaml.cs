@@ -12,11 +12,7 @@ using KeyFlux.Settings.ViewModels;
 namespace KeyFlux.Settings.Views;
 
 /// <summary>
-/// 选中动作单屏页视图 (方案 D) 的交互部分:
-///   - 向页面 VM 注入真实确认对话框 (删除映射确认);
-///   - 视图挂载后拉取行为目录 (下拉/勾选列表数据源);
-///   - 「管理行为…」打开 BehaviorLibraryWindow, 关闭后重拉目录;
-///   - 行头点击展开手风琴 (点在输入控件/按钮上时交给控件自身)。
+/// 选中动作单屏页视图交互: 确认框注入、行为目录拉取、行头点击展开手风琴等。
 /// </summary>
 public partial class SelectedActionPageView : UserControl
 {
@@ -24,9 +20,7 @@ public partial class SelectedActionPageView : UserControl
     {
         InitializeComponent();
         DataContextChanged += (_, _) => InjectConfirmDialog();
-        // 视图随导航每次重建 (MainWindow 的 DataTemplate), 而页面 VM 是启动期单例:
-        // ConfirmAsync 必须始终指向"当前挂在可视树上"的视图实例, 否则旧视图的
-        // TopLevel.GetTopLevel 返回 null, 确认框静默失败 → 删除无反应。
+        // 视图随导航重建而 VM 是单例, 确认框必须始终指向挂在树上的当前视图
         AttachedToVisualTree += (_, _) =>
         {
             InjectConfirmDialog();
@@ -74,9 +68,7 @@ public partial class SelectedActionPageView : UserControl
     }
 
     /// <summary>
-    /// 类型下拉打开后, 给分隔项的 ComboBoxItem 容器打 sep-item 类:
-    /// 样式表据此压制 hover/选中高亮、内边距并禁用命中 —— 分隔线视觉上只是一条线。
-    /// (容器在弹层打开时才生成, 故必须在 DropDownOpened 后经 Dispatcher 处理。)
+    /// 类型下拉打开后给分隔项容器打 sep-item 类 (样式表据此把分隔项压成一条线)。
     /// </summary>
     private void OnTypeDropdownOpened(object? sender, EventArgs e)
     {
@@ -92,10 +84,7 @@ public partial class SelectedActionPageView : UserControl
         }, DispatcherPriority.Loaded);
     }
 
-    /// <summary>
-    /// 文本特征四选一 Toggle 联动: 数据写入已由 VM 的 IsXxx setter 完成
-    /// (勾选新项 = MatchValue 变更), 此处仅刷新同组其余三项的视觉态。
-    /// </summary>
+    /// <summary>文本特征 Toggle 联动: 数据写入已在 VM 完成, 此处仅刷新同组其余三项视觉态。</summary>
     private void OnTextTypeToggleChanged(object? sender, RoutedEventArgs e)
     {
         if (sender is ToggleButton { DataContext: MappingRowVm row })
