@@ -122,7 +122,7 @@ public sealed partial class MappingRowVm : ObservableObject
         // 只靠 Checked 事件回调时机不可靠 (事件先于绑定推值触发时, 旧项残留点亮,
         // 实测"最多同时亮两个") —— 数据变了必须自己发全通知。
         NotifyTogglesChanged();
-        RefreshEditorOptions();
+        RebindEditorsToPremise();
     }
 
     /// <summary>切换任一 Toggle 时同步其余三个的视觉态。</summary>
@@ -153,7 +153,7 @@ public sealed partial class MappingRowVm : ObservableObject
         OnPropertyChanged(nameof(MatchValueBadge));
         OnPropertyChanged(nameof(MatchSummary));
         NotifyTogglesChanged(); // 与 SetTextType 同理: Toggle 视觉态随 MatchValue 同步
-        RefreshEditorOptions();
+        RebindEditorsToPremise();
     }
 
     // ---- fileExt 行: 分组快捷填入 (评审 F2 语义) ----
@@ -279,6 +279,29 @@ public sealed partial class MappingRowVm : ObservableObject
             editor.RefreshOptions();
             // 现选行为不在新覆盖集时由 BuildBehaviorOptions 脏值插首位, 无需改动选中项
         }
+    }
+
+    /// <summary>
+    /// 特征切换 (textType 换 url/path/magnet/plain) 联动: 不适用新前提的 entry
+    /// 自动换为该前提默认行为 (模板重置与手动换行为同语义; 无默认前提保留脏值),
+    /// 展开 = 所见即当前类型生效的行为。直接改底层 Entries: 收起态 Editors 为空,
+    /// 展开态重建编辑行。仅供特征切换路径调用 —— fileExt 逐字符输入与分组填入
+    /// 不走此链路 (避免打字中途破坏性重置; 分组另有"不兼容行为保持不动"约定)。
+    /// </summary>
+    private void RebindEditorsToPremise()
+    {
+        var covering = BehaviorCatalog.Covering(Mapping.MatchType, Mapping.MatchValue)
+            .Select(p => p.Id).ToHashSet();
+        var def = BehaviorCatalog.DefaultFor(Mapping.MatchType, Mapping.MatchValue);
+        foreach (var entry in Mapping.Entries)
+        {
+            if (covering.Contains(entry.Behavior) || def is null) continue;
+            entry.Behavior = def;
+            entry.ActionValue = BehaviorCatalog.IsNoValue(def) ? "" : BehaviorCatalog.DefaultTemplateFor(def);
+        }
+        if (IsExpanded) OpenEditor(); // 展开态重建编辑行 (下拉副本/提示随新行为)
+        RefreshChips();
+        RefreshEditorOptions();
     }
 
     // ---- 行为增删 / 排序 (手风琴内) ----
