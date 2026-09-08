@@ -8,9 +8,13 @@
 
   <!-- 动作编辑面板 (复刻 actions/Action.vue 卡片: 分组下拉 + 类型下拉 + 按类型分发编辑器);
        宽度由使用处指定 (KeymapPage/CustomHotkey 720, AbbrPage 动态同步 chips 最宽行), 控件内不设 Width;
-       Border 必须 Stretch 铺满使用处给定宽度 —— Left 会使白卡片收缩为内容最小期望宽 (动态方案下窄于 W) -->
+       Border 必须 Stretch 铺满使用处给定宽度 —— Left 会使白卡片收缩为内容最小期望宽 (动态方案下窄于 W)。
+       高度必须固定 (Height 而非 MinHeight): 本面板位于 Viewbox Uniform 缩放页内, 编辑器出现时
+       若自然高度变化 (实测类型 3/7 = 422 > 空态 380), 缩放比随之变小, 整页 (键盘网格+编辑框)
+       被等比缩小 (点选键后页面抖动 bug)。固定 430 = 最高编辑器 422 + 字体度量余量;
+       编辑器内容区包 ScrollViewer 兜底, 超出时滚动而非撑高, 保证缩放比恒定 -->
   <Border Background="White" CornerRadius="12" BorderBrush="#E3E6EC" BorderThickness="1"
-          MinHeight="380" Padding="16,12" HorizontalAlignment="Stretch">
+          Height="430" Padding="16,12" HorizontalAlignment="Stretch">
     <DockPanel>
 
       <!-- 头部: 窗口分组 (5/12) + 动作类型 (7/12) -->
@@ -25,8 +29,9 @@
                   HorizontalAlignment="Stretch" />
       </Grid>
 
-      <!-- 按编辑器 VM 类型分发 (类型 0 时 Editor 为 null) -->
-      <ContentControl Content="{Binding Editor}">
+      <!-- 按编辑器 VM 类型分发 (类型 0 时 Editor 为 null); ScrollViewer 兜底: 内容超过固定高度时滚动 -->
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ContentControl Content="{Binding Editor}">
         <ContentControl.DataTemplates>
 
           <!-- ===================== 类型 1: 启动程序或激活窗口 ===================== -->
@@ -167,7 +172,8 @@
           </DataTemplate>
 
         </ContentControl.DataTemplates>
-      </ContentControl>
+        </ContentControl>
+      </ScrollViewer>
     </DockPanel>
   </Border>
 </UserControl>
