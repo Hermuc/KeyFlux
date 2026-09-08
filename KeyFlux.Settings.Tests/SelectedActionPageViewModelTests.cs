@@ -423,26 +423,6 @@ public sealed class SelectedActionPageViewModelTests
         Assert.Empty(config.SelectedAction.Mappings);
     }
 
-    /// <summary>行排序: 分区内移动 (组内行序 = 优先级), 不跨分区; 边界禁用。</summary>
-    [Fact]
-    public void MoveMapping_Within_Partition_Only()
-    {
-        var (page, _) = CreatePage();
-        var f1 = NewFileRow(page, "open");
-        var t1 = NewUrlRow(page, "open_url");
-        var f2 = NewFileRow(page, "run");
-
-        // 边界: 首行不能上移, 尾行不能下移
-        Assert.False(f1.CanMoveUp);
-        Assert.True(f1.CanMoveDown);
-        Assert.False(f2.CanMoveDown);
-
-        page.MoveMapping(f2, -1);
-        Assert.Equal([f2, f1], page.FileMappings);
-        // textType 分区不受影响
-        Assert.Equal([t1], page.TextMappings);
-    }
-
     // ------------------------------------------------------------- 保存链路投影 (评审 C1)
 
     /// <summary>
@@ -493,7 +473,8 @@ public sealed class SelectedActionPageViewModelTests
         Assert.True(page.TextMappings[0].IsFirstInPartition);
         Assert.False(page.TextMappings[1].IsFirstInPartition);
 
-        page.MoveMapping(page.TextMappings[1], -1); // 移动后标记随新序换位
+        page.TextMappings.Move(1, 0); // 集合移动后刷新, 标记随新序换位
+        page.RefreshPartitionTitles();
         Assert.False(page.TextMappings[1].IsFirstInPartition);
         Assert.True(page.TextMappings[0].IsFirstInPartition);
 

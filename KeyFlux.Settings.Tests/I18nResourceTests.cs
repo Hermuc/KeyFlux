@@ -26,8 +26,11 @@ public sealed class I18nResourceTests
     /// 旧静态行为词表 1037-1058), 增 10 键 (1105-1114 选中动作单屏页) -> 286;
     /// 2026-09 复核恢复 1025 (热键冲突提示, 保留控件 HotkeyCapture 仍引用, 重构误删) -> 287;
     /// 2026-09 死代码清理: 删行为库迭代遗留孤儿 6 键 (994/1007/1009/1010/1084/1100,
-    /// cs/axaml/配置/Go 全域零引用, 见 89708f4) -> 282。</summary>
-    private const int ExpectedKeyCount = 282;
+    /// cs/axaml/配置/Go 全域零引用, 见 89708f4) -> 282;
+    /// 2026-09 二轮死代码清理: 删孤儿 1 键 (962 未设置快捷键占位, 全域零引用) -> 281;
+    /// 初判死键的 301hint 经回归对账证伪 —— ActionEditorPanel.axaml 以
+    /// ConverterParameter=301hint 引用, 非数字键勿用纯数字正则扫描。</summary>
+    private const int ExpectedKeyCount = 281;
 
     private const string LabelPrefix = "label:";
 

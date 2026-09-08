@@ -807,10 +807,6 @@
     "zh": "在任意窗口选中文本或文件后按下方案的快捷键, 即可触发预设行为。变量 %selected% 表示当前选中的内容。",
     "en": "Select text or files in any window, then press the scheme's hotkey to trigger its action. %selected% stands for the selection."
   },
-  "962": {
-    "zh": "(未设置快捷键)",
-    "en": "(No hotkey)"
-  },
   "964": {
     "zh": "启用",
     "en": "On"

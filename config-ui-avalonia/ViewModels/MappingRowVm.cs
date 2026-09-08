@@ -50,10 +50,6 @@ public sealed partial class MappingRowVm : ObservableObject
 
     // ---- 条件值 ----
 
-    /// <summary>条件值徽章 (空时显示「(未设置)」)。</summary>
-    public string MatchValueBadge
-        => Mapping.MatchValue.Trim().Length == 0 ? I18n.T("999") : Mapping.MatchValue;
-
     /// <summary>行摘要 (删除确认等场景)。</summary>
     public string MatchSummary
         => $"{TypeBadgeText}: {(Mapping.MatchValue.Trim().Length == 0 ? I18n.T("999") : Mapping.MatchValue)}";
@@ -74,7 +70,6 @@ public sealed partial class MappingRowVm : ObservableObject
             if (Mapping.MatchValue == value) return;
             Mapping.MatchValue = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(MatchValueBadge));
             OnPropertyChanged(nameof(MatchSummary));
             if (!IsTextType && value.Trim().Length == 0)
             {
@@ -118,7 +113,6 @@ public sealed partial class MappingRowVm : ObservableObject
         SnapshotCurrentPremise();
         Mapping.MatchValue = value;
         OnPropertyChanged(nameof(MatchValueDisplay));
-        OnPropertyChanged(nameof(MatchValueBadge));
         OnPropertyChanged(nameof(MatchSummary));
         // 四个 Toggle 的勾选态由 MatchValue 派生, 必须在此同步:
         // 只靠 Checked 事件回调时机不可靠 (事件先于绑定推值触发时, 旧项残留点亮,
@@ -153,7 +147,6 @@ public sealed partial class MappingRowVm : ObservableObject
         SnapshotCurrentPremise();
         Mapping.MatchValue = value.Value;
         OnPropertyChanged(nameof(MatchValueDisplay));
-        OnPropertyChanged(nameof(MatchValueBadge));
         OnPropertyChanged(nameof(MatchSummary));
         NotifyTogglesChanged(); // 与 SetTextType 同理: Toggle 视觉态随 MatchValue 同步
         RestoreOrRebindForCurrentPremise();
@@ -432,21 +425,6 @@ public sealed partial class MappingRowVm : ObservableObject
 
     // ---- 行级操作 ----
 
-    public bool CanMoveUp => _page.CanMove(this, -1);
-    public bool CanMoveDown => _page.CanMove(this, 1);
-
-    internal void NotifyMoveability()
-    {
-        OnPropertyChanged(nameof(CanMoveUp));
-        OnPropertyChanged(nameof(CanMoveDown));
-    }
-
-    [RelayCommand]
-    private void MoveUp() => _page.MoveMapping(this, -1);
-
-    [RelayCommand]
-    private void MoveDown() => _page.MoveMapping(this, 1);
-
     [RelayCommand]
     private void ToggleExpand() => _page.ExpandedRow = IsExpanded ? null : this;
 
@@ -457,12 +435,11 @@ public sealed partial class MappingRowVm : ObservableObject
     [RelayCommand]
     private void AskRemove() => _ = _page.AskRemoveAsync(this);
 
-    /// <summary>语言切换: 徽章/下拉副本/摘要即时拼接刷新。</summary>
+    /// <summary>语言切换: 下拉副本/摘要即时拼接刷新。</summary>
     public void RefreshLanguage()
     {
         OnPropertyChanged(nameof(LanguageTick));
         OnPropertyChanged(nameof(TypeBadgeText));
-        OnPropertyChanged(nameof(MatchValueBadge));
         OnPropertyChanged(nameof(MatchSummary));
         OnPropertyChanged(nameof(MatchHint));
         OnPropertyChanged(nameof(TextTypeOptions));
