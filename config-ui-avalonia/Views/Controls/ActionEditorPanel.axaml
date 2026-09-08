@@ -29,8 +29,9 @@
                   HorizontalAlignment="Stretch" />
       </Grid>
 
-      <!-- 按编辑器 VM 类型分发 (类型 0 时 Editor 为 null); ScrollViewer 兜底: 内容超过固定高度时滚动 -->
-      <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <!-- 按编辑器 VM 类型分发 (类型 0 时 Editor 为 null); ScrollViewer 兜底: 内容超过固定高度时滚动;
+           x:Name 供 code-behind 点选键格后把选中项滚动定位进可视区 -->
+      <ScrollViewer x:Name="EditorScroll" VerticalScrollBarVisibility="Auto">
         <ContentControl Content="{Binding Editor}">
         <ContentControl.DataTemplates>
 

@@ -363,7 +363,6 @@ public sealed partial class RadioGroupEditorVm : ObservableObject
     private List<List<List<RadioOptionVm>>> BuildRows()
     {
         var groups = RadioCatalog.GroupsFor(_a.TypeId);
-        var horizontal = RadioCatalog.IsHorizontal(_a.TypeId);
         var isAbbr = _editor.Core.IsAbbr;
 
         var built = groups
@@ -372,18 +371,13 @@ public sealed partial class RadioGroupEditorVm : ObservableObject
             .Where(c => c.Count > 0)
             .ToList();
 
-        // 复刻 groups 布局: horizontal -> 单行全部列; 否则两两一行
+        // 分行: 两两一行 (2026-09-08: 类型 7 原为单行全部 4 组, 总宽约 590 > 面板内容宽
+        // 584, 第 4 组被横向裁剪只剩选项圆圈左弧; 改两两一行后任意语言/字体下不再溢出,
+        // 高度由面板 Height=430 + 内部 ScrollViewer 兜底)
         var rows = new List<List<List<RadioOptionVm>>>();
-        if (horizontal)
+        for (var i = 0; i < built.Count; i += 2)
         {
-            rows.Add(built);
-        }
-        else
-        {
-            for (var i = 0; i < built.Count; i += 2)
-            {
-                rows.Add(built.Skip(i).Take(2).ToList());
-            }
+            rows.Add(built.Skip(i).Take(2).ToList());
         }
         return rows;
     }
@@ -452,7 +446,8 @@ public static class RadioCatalog
     private static RadioItem I(int valueId, string labelKey, bool hideInAbbr = false)
         => new(valueId, labelKey, hideInAbbr);
 
-    /// <summary>Text.vue 使用 horizontal 布局。</summary>
+    // (原 Text.vue horizontal 单行布局已废: 4 组单行宽约 590 > 面板内容宽 584 会裁剪,
+    //  2026-09-08 起统一两两一行, 本方法保留供目录语义查询)
     public static bool IsHorizontal(int typeId) => typeId == 7;
 }
 
