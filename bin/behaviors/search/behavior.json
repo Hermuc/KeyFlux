@@ -4,7 +4,7 @@
   "nameEn": "Search",
   "version": "1.0.0",
   "specVersion": 1,
-  "description": "把 %selected% 作为关键词搜索, 如 https://www.google.com/search?q=%selected%",
+  "description": "把 %selected% 作为关键词搜索, 如 https://bing.com/search?q=%selected%",
   "appliesTo": [
     {
       "type": "textType",
@@ -20,7 +20,7 @@
     "kind": "builtin",
     "action": "search",
     "params": {
-      "actionValue": "https://www.google.com/search?q=%selected%"
+      "actionValue": "https://bing.com/search?q=%selected%"
     }
   }
 }

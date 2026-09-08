@@ -22,7 +22,7 @@ public static class BehaviorFixtures
         Pack("run", [Text("plain"), File(["*"])], "run", template: "%selected%"),
         Pack("script", [Text("plain"), File(["*"])], "script"),
         Pack("search", [Text("url"), Text("plain", def: true)], "search",
-             template: "https://www.google.com/search?q=%selected%"),
+             template: "https://bing.com/search?q=%selected%"),
         Pack("send_keys", [Text("plain")], "send_keys"),
     ];
 
@@ -128,7 +128,7 @@ public sealed class BehaviorCatalogTests
         Assert.True(BehaviorCatalog.IsNoValue("copy")); // 包未声明模板
         Assert.False(BehaviorCatalog.IsNoValue("search"));
         Assert.False(BehaviorCatalog.IsNoValue("ps_edit"));
-        Assert.Equal("https://www.google.com/search?q=%selected%", BehaviorCatalog.DefaultTemplateFor("search"));
+        Assert.Equal("https://bing.com/search?q=%selected%", BehaviorCatalog.DefaultTemplateFor("search"));
         Assert.Equal("%selected%", BehaviorCatalog.DefaultTemplateFor("run"));
         Assert.Equal("", BehaviorCatalog.DefaultTemplateFor("copy"));
     }

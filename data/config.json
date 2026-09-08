@@ -1843,8 +1843,8 @@
           {
             "windowGroupID": 0,
             "actionTypeID": 1,
-            "comment": "用 Google 搜索选中的内容，或跳转到选中的 HTTP 链接",
-            "target": "https://www.google.com/search?q={selected}"
+            "comment": "用 Bing 搜索选中的内容，或跳转到选中的 HTTP 链接",
+            "target": "https://bing.com/search?q={selected}"
           }
         ],
         "gj": [

@@ -42,7 +42,7 @@ public sealed class TextTypeRebindTests
 
         row.IsPlain = true; // open_url 不适用 plain → 换 plain 默认 search (模板随包默认)
         Assert.Equal("search", row.Mapping.Entries[0].Behavior);
-        Assert.Equal("https://www.google.com/search?q=%selected%", row.Mapping.Entries[0].ActionValue);
+        Assert.Equal("https://bing.com/search?q=%selected%", row.Mapping.Entries[0].ActionValue);
 
         row.IsPath = true; // search 不覆盖 path → open_path
         Assert.Equal("open_path", row.Mapping.Entries[0].Behavior);
