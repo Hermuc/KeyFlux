@@ -3,6 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Avalonia;
+using Avalonia.Media;
+using Avalonia.Media.Fonts;
 using KeyFlux.Settings.Services;
 
 namespace KeyFlux.Settings;
@@ -55,10 +57,19 @@ internal static class Program
 
     /// <summary>
     /// 构建 Avalonia 应用：平台自动检测 + Fluent 主题（见 App.axaml）。
+    /// FontFallbacks: 让未拆段的零星 emoji 字符可回退到 Segoe UI Emoji 取到字形
+    /// (文本栈仅单色; 彩色渲染由 MarkdownRenderer 的 Skia 位图方案负责)。
     /// </summary>
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .With(new FontManagerOptions
+            {
+                FontFallbacks = new[]
+                {
+                    new FontFallback { FontFamily = new FontFamily("Segoe UI Emoji") }
+                }
+            })
             .LogToTrace();
 
     // ----------------------------------------------------------- 窗口激活 (P/Invoke)
