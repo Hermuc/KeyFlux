@@ -31,8 +31,11 @@ mainAhkFilePath := "./bin/KeyFlux.ahk"
 if (A_Args.Length) {
   Run("KeyFlux.exe /script " A_Args.Get(1))
 } else {
-  ; 通过配置文件生成脚本
-  RunWait("./bin/settings.exe GenerateScripts", "./bin", "Hide")
+  ; 通过配置文件生成脚本 (幂等跳过: 配置/模板均不比产物新时省去重生成,
+  ; 免去开机时 settings.exe 冷启动阻塞, 加快热键就绪 2026-09-10)
+  if (NeedsRegenerate("./data/config.json", "./bin/templates/keyflux.tmpl", mainAhkFilePath)) {
+    RunWait("./bin/settings.exe GenerateScripts", "./bin", "Hide")
+  }
   ; 首次运行则生成快捷方式
   if !FileExist(A_WorkingDir "\shortcuts\*.*") {
     Run("KeyFlux.exe /script ./bin/MiscTools.ahk GenerateShortcuts")
@@ -43,4 +46,21 @@ if (A_Args.Length) {
 
 if IsSet(hasTip) {
   Sleep 7000
+}
+
+/**
+ * 判断是否需要重新生成主脚本: 产物缺失, 或配置/模板任一比产物新时需重生成。
+ * FileGetTime 返回 YYYYMMDDHH24MISS 字符串, 字典序即时间序。
+ */
+NeedsRegenerate(config, template, genScript) {
+  if !FileExist(genScript) {
+    return true
+  }
+  genTime := FileGetTime(genScript)
+  for src in [config, template] {
+    if FileExist(src) && FileGetTime(src) > genTime {
+      return true
+    }
+  }
+  return false
 }
