@@ -22,7 +22,7 @@ public static class BehaviorFixtures
         Pack("copy", [Text("plain"), File(["*"])], "copy"),
         Pack("magnet_download", [Text("magnet", def: true)], "magnet_download"),
         Pack("open", [File(["*"])], "open"),
-        Pack("open_folder", [Text("path"), File(["*"])], "open_folder"),
+        Pack("open_folder", [File(["*"])], "open_folder"),
         Pack("open_path", [Text("path", def: true), File(["*"], def: true)], "open_path"),
         Pack("open_registry", [Text("plain")], "open_registry"),
         Pack("open_url", [Text("url", def: true)], "open_url"),

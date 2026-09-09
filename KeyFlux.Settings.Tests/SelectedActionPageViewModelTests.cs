@@ -188,17 +188,20 @@ public sealed class SelectedActionPageViewModelTests
         page.TextMappings.Add(magnetEmpty);
         Assert.True(magnetEmpty.CanAddEntry); // 空行仍允许加第一个
 
-        var pathRow = NewRow("path", "open_path");
-        page.TextMappings.Add(pathRow);
-        Assert.True(pathRow.CanAddEntry); // path 双行为类型未占满仍可加
+        var plainRow = NewRow("plain", "search");
+        page.TextMappings.Add(plainRow);
+        Assert.True(plainRow.CanAddEntry); // plain 覆盖集 6 项, 未占满仍可加
 
-        pathRow.Mapping.Entries.Add(new SelectedEntry { Behavior = "open_folder", Options = new RuleOptions() });
-        pathRow.RefreshChips();
-        Assert.False(pathRow.CanAddEntry); // 覆盖集全部占用后同样禁止 (防重复泛化)
-        Assert.Equal(I18n.T("1119"), pathRow.AddEntryHint);
+        foreach (var b in new[] { "copy", "open_registry", "run", "script", "send_keys" })
+        {
+            plainRow.Mapping.Entries.Add(new SelectedEntry { Behavior = b, Options = new RuleOptions() });
+        }
+        plainRow.RefreshChips();
+        Assert.False(plainRow.CanAddEntry); // 覆盖集全部占用后禁止 (防重复泛化)
+        Assert.Equal(I18n.T("1119"), plainRow.AddEntryHint);
     }
 
-    /// <summary>添加行为默认取覆盖集中第一个未占用行为 (path: open_path 已占 -> open_folder)。</summary>
+    /// <summary>添加行为默认取覆盖集中第一个未占用行为 (plain 目录序: 已有 search -> 依次补 copy/open_registry/run/script/send_keys)。</summary>
     [Fact]
     public void AddEntry_Picks_First_Unused_Covering_Behavior()
     {
@@ -206,17 +209,21 @@ public sealed class SelectedActionPageViewModelTests
         var row = new MappingRowVm(page, new SelectedMapping
         {
             MatchType = "textType",
-            MatchValue = "path",
-            Entries = [new SelectedEntry { Behavior = "open_path", Options = new RuleOptions() }],
+            MatchValue = "plain",
+            Entries = [new SelectedEntry { Behavior = "search", Options = new RuleOptions() }],
         });
         page.TextMappings.Add(row); // 行必须挂到分区: 仲裁/调序都遍历分区集合
 
-        row.AddEntryCommand.Execute(null);
-        Assert.Equal(["open_path", "open_folder"], row.Mapping.Entries.Select(e => e.Behavior));
+        for (var i = 0; i < 5; i++)
+        {
+            row.AddEntryCommand.Execute(null);
+        }
+        Assert.Equal(["search", "copy", "open_registry", "run", "script", "send_keys"],
+            row.Mapping.Entries.Select(e => e.Behavior));
 
         // 占满覆盖集后再加: 守卫拦截不追加 (2026-09-08 防重复, 旧回退第一条已废)
         row.AddEntryCommand.Execute(null);
-        Assert.Equal(2, row.Mapping.Entries.Count);
+        Assert.Equal(6, row.Mapping.Entries.Count);
     }
 
     // ------------------------------------------------------------- 类型过滤

@@ -7,10 +7,6 @@
   "description": "用系统默认文件管理器打开选中路径所在文件夹",
   "appliesTo": [
     {
-      "type": "textType",
-      "value": "path"
-    },
-    {
       "type": "fileExt",
       "exts": [
         "*"
