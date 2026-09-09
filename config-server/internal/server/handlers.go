@@ -28,12 +28,14 @@ func GetConfigHandler(c *gin.Context) {
 
 // syncStartupFromRegistry 用注册表 Run 键的真实状态回填 options.startup。
 // 注册表是开机自启的真实生效态 (bin/MiscTools.ahk RunAtStartup 写/删
-// HKCU\...\CurrentVersion\Run 下的 KeyFlux 值), config.json 的 options.startup
+// HKCU\...\CurrentVersion\Run 下的 0KeyFlux 值), config.json 的 options.startup
 // 仅是 UI 显示态且无同步机制, 外部删除注册表项后 UI 会显示失真, 故 GET /config
 // 时以注册表为准回填。
+// 键名 0KeyFlux: Run 键按值名字母序枚举启动, 0 开头抢到第一批 (KeyFlux 的 K
+// 恰排常见自启软件末位, 2026-09-10); 兼容回退旧键名 KeyFlux。
 // 特意不放进 ParseConfig: 它还服务于 GenerateAHK/DumpPlan 等验证路径, 需保持
 // 确定性, 回填只应作用于对外 HTTP 响应。
-// 值不存在 (Run 键或 KeyFlux 值缺失) → false; 其他读失败 (如权限) → 保持
+// 值不存在 (Run 键或键名缺失) → false; 其他读失败 (如权限) → 保持
 // config 原值不动, 不报错。
 func syncStartupFromRegistry(startup *bool) {
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.QUERY_VALUE)
@@ -44,13 +46,13 @@ func syncStartupFromRegistry(startup *bool) {
 		return
 	}
 	defer key.Close()
-	if _, _, err := key.GetStringValue("KeyFlux"); err != nil {
-		if errors.Is(err, syscall.ERROR_FILE_NOT_FOUND) {
-			*startup = false // KeyFlux 值不存在视为未自启
+	for _, name := range []string{"0KeyFlux", "KeyFlux"} { // KeyFlux 为 2026-09-10 前旧键名
+		if _, _, err := key.GetStringValue(name); err == nil {
+			*startup = true
+			return
 		}
-		return
 	}
-	*startup = true
+	*startup = false
 }
 
 func GetShortcutsHandler(c *gin.Context) {

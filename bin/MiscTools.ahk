@@ -1,4 +1,4 @@
-﻿#Requires AutoHotkey v2.0
+#Requires AutoHotkey v2.0
 #SingleInstance Force
 #NoTrayIcon
 
@@ -48,11 +48,14 @@ if A_Args[1] = "GenerateShortcuts" {
 
 if A_Args[1] = "RunAtStartup" {
   ; 开机自启使用 HKCU\Run 注册表键 (2026-08-23 迁移, 替代旧版启动文件夹快捷方式)
+  ; 键名 0 开头: Run 键按值名字母序枚举启动, 0KeyFlux 抢到第一批 (KeyFlux 的 K 恰排常见自启软件末位, 2026-09-10)
   runKey := "HKCU\Software\Microsoft\Windows\CurrentVersion\Run"
   if A_Args[2] = "On" {
     ; 值数据为带引号的完整路径, 路径含空格时也能正确启动
-    RegWrite('"' A_WorkingDir '\KeyFlux.exe"', "REG_SZ", runKey, "KeyFlux")
+    RegWrite('"' A_WorkingDir '\KeyFlux.exe"', "REG_SZ", runKey, "0KeyFlux")
+    try RegDelete(runKey, "KeyFlux") ; 清理旧键名 (迁移, 2026-09-10 前的键名)
   } else if (A_Args[2] = "Off") {
+    try RegDelete(runKey, "0KeyFlux")
     try RegDelete(runKey, "KeyFlux")
   }
   return
