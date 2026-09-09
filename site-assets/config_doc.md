@@ -67,10 +67,10 @@
 ### 概述
 
 - 此功能用来输入一串按键或文本，比较好用建议掌握👍，常用于:
-  1. 重映射不好按的快捷键: 比如用 Capslock+X 来触发 Alt+F4，能让快捷键变得更好按
+  1. 重映射不好按的快捷键: 比如默认配置用 Capslock+X 关闭当前窗口，比按 Alt+F4 好按
   2. 通过输入一串按键实现各种各样的目的: 
-     - 比如用 Capslock+D 来输入 Home、Shift+End、Backspace，能删除一行文本
-     - 比如用 Capslock+R 来输入 Win+X、U 、R，能重启电脑
+     - 比如用 Capslock+0 来输入 Home、Shift+End、Backspace，能删除一行文本 ( 下面会详细解释这个例子 )
+     - 比如依次输入 Win、X、U、R 这几个按键，能重启电脑
 
 ### 如何配置
 
