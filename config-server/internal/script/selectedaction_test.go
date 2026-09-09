@@ -234,7 +234,7 @@ func TestValidateDistinctMappingsPass(t *testing.T) {
 	// 合法多样: textType 两种特征 + fileExt 一组后缀
 	sa := &SelectedAction{Hotkey: ">^p", Enable: true, Mappings: []SelectedMapping{
 		{MatchType: "textType", MatchValue: "url", Entries: []SelectedEntry{{Behavior: "open_url"}}},
-		{MatchType: "textType", MatchValue: "plain", Entries: []SelectedEntry{{Behavior: "open_registry"}}},
+		{MatchType: "textType", MatchValue: "plain", Entries: []SelectedEntry{{Behavior: "run"}}},
 		{MatchType: "fileExt", MatchValue: "jpg,png", Entries: []SelectedEntry{{Behavior: "open"}}},
 	}}
 	if err := ValidateSelectedAction(sa, nil); err != nil {

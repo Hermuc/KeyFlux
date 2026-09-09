@@ -445,13 +445,17 @@ class SelectedAction {
         ; 默认浏览器打开选中网址 (AHK Run 对 http(s)/ftp URL 自动调用系统默认浏览器)
         Run(Trim(content))
       case "open_path":
-        OpenSelectedPaths(content)
+        ; 注册表路径 (HKEY_*/HKxx 开头) 自动转入注册表编辑器定位 (2026-09-10 open_registry 并入)
+        if RegExMatch(Trim(StrSplit(content, "`n")[1]),
+            "i)^(HKEY_CLASSES_ROOT|HKEY_CURRENT_USER|HKEY_LOCAL_MACHINE|HKEY_USERS|HKEY_CURRENT_CONFIG|HKCR|HKCU|HKLM|HKU|HKCC)(\\|$)") {
+          OpenRegistryKey(content)
+        } else {
+          OpenSelectedPaths(content)
+        }
       case "open_folder":
         OpenSelectedFolder(content)
       case "magnet_download":
         DownloadMagnet(content)
-      case "open_registry":
-        OpenRegistryKey(content)
       case "open":
         RunReplaced(entry.actionValue, content, entry.workingDir)
       case "run":

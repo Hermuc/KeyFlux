@@ -81,8 +81,8 @@ type FileGroup struct {
 // MatchType: fileExt(文件后缀) / textType(文本特征) (default(兜底) 已于 2026-09 移除, 存量不再命中)
 //   - fileExt 条件值为逗号分隔后缀列表, 可用配置中的 fileGroups 快捷填充
 // ActionType: open(程序打开) / search(搜索) / run(执行命令) / send_keys(发送按键) / script(AHK脚本) / copy(复制到剪贴板)
-//   + textType 专用行为: open_url(默认浏览器打开网址) / open_path(系统关联打开) / open_folder(打开文件夹)
-//     / magnet_download(磁力链接下载) / open_registry(注册表定位); 特征与行为的合法组合见 actionscheme.go 的 textTypeActions
+//   + textType 专用行为: open_url(默认浏览器打开网址) / open_path(系统关联打开, 注册表路径自动转入注册表定位)
+//     / open_folder(打开文件夹) / magnet_download(磁力链接下载); 特征与行为的合法组合见行为包 appliesTo 声明
 // 注: textType 特征的 actionValue 为「特征选择」而非条件值, 专用行为不接受命令模板 (actionValue 留空)
 type ActionRule struct {
 	Priority    int         `json:"priority"`

@@ -190,9 +190,9 @@ public sealed class SelectedActionPageViewModelTests
 
         var plainRow = NewRow("plain", "search");
         page.TextMappings.Add(plainRow);
-        Assert.True(plainRow.CanAddEntry); // plain 覆盖集 6 项, 未占满仍可加
+        Assert.True(plainRow.CanAddEntry); // plain 覆盖集 5 项, 未占满仍可加
 
-        foreach (var b in new[] { "copy", "open_registry", "run", "script", "send_keys" })
+        foreach (var b in new[] { "copy", "run", "script", "send_keys" })
         {
             plainRow.Mapping.Entries.Add(new SelectedEntry { Behavior = b, Options = new RuleOptions() });
         }
@@ -201,7 +201,7 @@ public sealed class SelectedActionPageViewModelTests
         Assert.Equal(I18n.T("1119"), plainRow.AddEntryHint);
     }
 
-    /// <summary>添加行为默认取覆盖集中第一个未占用行为 (plain 目录序: 已有 search -> 依次补 copy/open_registry/run/script/send_keys)。</summary>
+    /// <summary>添加行为默认取覆盖集中第一个未占用行为 (plain 目录序: 已有 search -> 依次补 copy/run/script/send_keys)。</summary>
     [Fact]
     public void AddEntry_Picks_First_Unused_Covering_Behavior()
     {
@@ -214,16 +214,16 @@ public sealed class SelectedActionPageViewModelTests
         });
         page.TextMappings.Add(row); // 行必须挂到分区: 仲裁/调序都遍历分区集合
 
-        for (var i = 0; i < 5; i++)
+        for (var i = 0; i < 4; i++)
         {
             row.AddEntryCommand.Execute(null);
         }
-        Assert.Equal(["search", "copy", "open_registry", "run", "script", "send_keys"],
+        Assert.Equal(["search", "copy", "run", "script", "send_keys"],
             row.Mapping.Entries.Select(e => e.Behavior));
 
         // 占满覆盖集后再加: 守卫拦截不追加 (2026-09-08 防重复, 旧回退第一条已废)
         row.AddEntryCommand.Execute(null);
-        Assert.Equal(6, row.Mapping.Entries.Count);
+        Assert.Equal(5, row.Mapping.Entries.Count);
     }
 
     // ------------------------------------------------------------- 类型过滤

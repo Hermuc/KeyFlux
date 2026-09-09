@@ -33,7 +33,7 @@ public static class BehaviorBadgeColors
     {
         "open_url" => LinkBlue,
         "open_path" or "open_folder" => PathGreen,
-        "magnet_download" or "open_registry" => MagnetPurple,
+        "magnet_download" => MagnetPurple,
         _ => PlainGray,
     };
 }

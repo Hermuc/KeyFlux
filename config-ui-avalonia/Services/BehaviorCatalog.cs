@@ -130,7 +130,7 @@ public static class BehaviorCatalog
     /// (引擎级知识, 对齐 AHK ExecuteActionRule 分支; 不随用户包增减)。
     /// </summary>
     public static readonly HashSet<string> BaseActionNoValue =
-        ["open_url", "open_path", "open_folder", "magnet_download", "open_registry"];
+        ["open_url", "open_path", "open_folder", "magnet_download"];
 
     /// <summary>是否无参行为: 内置语义集, 或包入口未声明默认命令模板。</summary>
     public static bool IsNoValue(string id)

@@ -124,8 +124,6 @@ func PreviewAction(rule *ActionRule, content string) string {
 		return "打开选中路径所在文件夹"
 	case "magnet_download":
 		return "用默认 BT 下载工具下载: " + content
-	case "open_registry":
-		return "打开注册表编辑器并定位: " + content
 	default:
 		return strings.ReplaceAll(rule.ActionValue, "%selected%", content)
 	}

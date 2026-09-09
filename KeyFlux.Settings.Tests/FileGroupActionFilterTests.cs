@@ -82,7 +82,7 @@ public sealed class FileGroupActionFilterTests
     // ------------------------------------------------------------- 行为下拉过滤
 
     /// <summary>关联 image: 文件语境覆盖集 = 通配内置行为 6 项 (专属无), 按目录序排列;
-    /// 文本专用行为 (magnet_download/open_url/open_registry/send_keys/search) 不出现。</summary>
+    /// 文本专用行为 (magnet_download/open_url/send_keys/search) 不出现。</summary>
     [Fact]
     public void BehaviorOptions_With_Image_Association_Shows_Covering_Generic_Set()
     {
@@ -111,7 +111,7 @@ public sealed class FileGroupActionFilterTests
 
     /// <summary>
     /// 存量脏值 (关联 image 但行为是 magnet_download): 脏值恒插首位保持可见可选,
-    /// 其余仍按前提过滤 (send_keys/open_registry 等文本专用行为不可见)。
+    /// 其余仍按前提过滤 (send_keys 等文本专用行为不可见; open_registry 已并入 open_path)。
     /// </summary>
     [Fact]
     public void BehaviorOptions_Keeps_Dirty_Action_Visible_In_Associated_Group()
@@ -120,7 +120,7 @@ public sealed class FileGroupActionFilterTests
         var values = editor.BehaviorOptions.Select(o => o.Value).ToList();
         Assert.Equal("magnet_download", values[0]); // 脏值插首位
         Assert.DoesNotContain("send_keys", values);
-        Assert.DoesNotContain("open_registry", values);
+        Assert.DoesNotContain("open_registry", values); // 行为包已删, 回归护栏
         Assert.DoesNotContain("search", values);
         Assert.Equal("magnet_download", editor.Entry.Behavior);
         Assert.Equal("magnet:?xt=1", editor.ActionValue); // 脏载荷不被构造期清洗

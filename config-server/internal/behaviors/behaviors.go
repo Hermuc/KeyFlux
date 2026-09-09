@@ -33,7 +33,7 @@ var idPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 // 基础动作词表)。行为包 entry.kind=builtin 的 action 必须取值于此; 用户包 ID 不得占用。
 var BuiltinActionIDs = map[string]bool{
 	"open_url": true, "open_path": true, "open_folder": true, "magnet_download": true,
-	"open_registry": true, "open": true, "search": true, "run": true,
+	"open": true, "search": true, "run": true,
 	"send_keys": true, "script": true, "copy": true,
 }
 

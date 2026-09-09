@@ -24,7 +24,6 @@ public static class BehaviorFixtures
         Pack("open", [File(["*"])], "open"),
         Pack("open_folder", [File(["*"])], "open_folder"),
         Pack("open_path", [Text("path", def: true), File(["*"], def: true)], "open_path"),
-        Pack("open_registry", [Text("plain")], "open_registry"),
         Pack("open_url", [Text("url", def: true)], "open_url"),
         Pack("run", [Text("plain"), File(["*"])], "run", template: "%selected%"),
         Pack("script", [Text("plain"), File(["*"])], "script"),
@@ -82,7 +81,7 @@ public sealed class BehaviorCatalogTests
         BehaviorCatalog.SeedForTests(BehaviorFixtures.Builtin(), []);
         Assert.Equal(new[] { "open_url" },
             BehaviorCatalog.Covering("textType", "url").Select(p => p.Id));
-        Assert.Equal(new[] { "copy", "open_registry", "run", "script", "search", "send_keys" },
+        Assert.Equal(new[] { "copy", "run", "script", "search", "send_keys" },
             BehaviorCatalog.Covering("textType", "plain").Select(p => p.Id));
     }
 
