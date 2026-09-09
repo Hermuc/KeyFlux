@@ -1,8 +1,8 @@
 ## 😀 欢迎
 
-1. [项目 GitHub](https://github.com/xianyukang/KeyFlux)
+1. [项目 GitHub](https://github.com/Hermuc/KeyFlux)
 2. [视频介绍](https://www.bilibili.com/video/BV1Sf4y1c7p8/)
-3. [快速入门](https://xianyukang.com/KeyFlux.html#keyflux-%E7%AE%80%E4%BB%8B) ( 推荐看看，能了解 KeyFlux 的功能，和注意事项 )
+3. [快速入门](https://xianyukang.com/MyKeymap.html#mykeymap-%E7%AE%80%E4%BB%8B) ( 推荐看看，能了解 KeyFlux 的功能，和注意事项 )
 
 
 
@@ -120,9 +120,9 @@
 
 ### 星号的作用
 
-点开 Settings 页会发现有的触发键以星号开头 ( 例如 3 模式的的 `*3` )，而有的没有星号 ( 例如 `Tab` )
+点开 Settings 页会发现有的触发键以星号开头 ( 例如 3 模式的 `*3` )，而有的没有星号 ( 例如 `Tab` )
 
-`*3` 中星号的作用是，在按住 Ctrl, Alt, Win, Shift 等键时，再按 3 也能触发 3 模式，所以 `Win+3+K` = `Win+2`
+`*3` 中星号的作用是，在按住 Ctrl, Alt, Win, Shift 等键时，再按 3 也能触发 3 模式，比如按住 `Win` 不放，再依次按 `3`、`K`，依然会触发 3 模式的 `K` 键映射
 
 如果不加星号，那么按下 `Win+3` 就执行它原本的功能，仿佛 3 模式不存在
 

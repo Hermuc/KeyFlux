@@ -516,7 +516,7 @@
     "en": "Cancel"
   },
   "612": {
-    "zh": "注意: MyKeyamp 的所有热键在 Exclude 组中会被禁用",
+    "zh": "注意: KeyFlux 的所有热键在 Exclude 组中会被禁用",
     "en": "Note: KeyFlux will be disabled in the \"Exclude\" group."
   },
   "701": {
@@ -764,8 +764,8 @@
     "en": "Quick start"
   },
   "936": {
-    "zh": "左侧导航列出已启用的快捷键方案, 点击进入对应方案 (页面编辑功能由后续移植任务提供)。",
-    "en": "The left navigation lists enabled keymaps. Click one to open it (editing arrives in later migration tasks)."
+    "zh": "左侧导航列出已启用的快捷键方案, 点击进入对应方案; 总览文档可在页面底部编辑区自定义。",
+    "en": "The left navigation lists enabled keymaps. Click one to open it; the document can be customized via the edit zone at the bottom of the Overview page."
   },
   "937": {
     "zh": "在「设置」页可调整鼠标参数、命令框皮肤、触发延时、键盘布局、开机自启等。",
