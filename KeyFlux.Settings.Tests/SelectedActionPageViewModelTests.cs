@@ -188,25 +188,31 @@ public sealed class SelectedActionPageViewModelTests
         page.TextMappings.Add(magnetEmpty);
         Assert.True(magnetEmpty.CanAddEntry); // 空行仍允许加第一个
 
-        var urlRow = NewRow("url", "open_url");
-        page.TextMappings.Add(urlRow);
-        Assert.True(urlRow.CanAddEntry); // url 双行为类型未占满仍可加
+        var pathRow = NewRow("path", "open_path");
+        page.TextMappings.Add(pathRow);
+        Assert.True(pathRow.CanAddEntry); // path 双行为类型未占满仍可加
 
-        urlRow.Mapping.Entries.Add(new SelectedEntry { Behavior = "search", Options = new RuleOptions() });
-        urlRow.RefreshChips();
-        Assert.False(urlRow.CanAddEntry); // 覆盖集全部占用后同样禁止 (防重复泛化)
-        Assert.Equal(I18n.T("1119"), urlRow.AddEntryHint);
+        pathRow.Mapping.Entries.Add(new SelectedEntry { Behavior = "open_folder", Options = new RuleOptions() });
+        pathRow.RefreshChips();
+        Assert.False(pathRow.CanAddEntry); // 覆盖集全部占用后同样禁止 (防重复泛化)
+        Assert.Equal(I18n.T("1119"), pathRow.AddEntryHint);
     }
 
-    /// <summary>添加行为默认取覆盖集中第一个未占用行为 (url: open_url 已占 -> search)。</summary>
+    /// <summary>添加行为默认取覆盖集中第一个未占用行为 (path: open_path 已占 -> open_folder)。</summary>
     [Fact]
     public void AddEntry_Picks_First_Unused_Covering_Behavior()
     {
         var (page, _) = CreatePage();
-        var row = NewUrlRow(page, "open_url");
+        var row = new MappingRowVm(page, new SelectedMapping
+        {
+            MatchType = "textType",
+            MatchValue = "path",
+            Entries = [new SelectedEntry { Behavior = "open_path", Options = new RuleOptions() }],
+        });
+        page.TextMappings.Add(row); // 行必须挂到分区: 仲裁/调序都遍历分区集合
 
         row.AddEntryCommand.Execute(null);
-        Assert.Equal(["open_url", "search"], row.Mapping.Entries.Select(e => e.Behavior));
+        Assert.Equal(["open_path", "open_folder"], row.Mapping.Entries.Select(e => e.Behavior));
 
         // 占满覆盖集后再加: 守卫拦截不追加 (2026-09-08 防重复, 旧回退第一条已废)
         row.AddEntryCommand.Execute(null);
@@ -215,7 +221,7 @@ public sealed class SelectedActionPageViewModelTests
 
     // ------------------------------------------------------------- 类型过滤
 
-    /// <summary>行为下拉按行前提过滤: fileExt 行 = 通配 6 项; textType(url) 行 = 文本专属 2 项。</summary>
+    /// <summary>行为下拉按行前提过滤: fileExt 行 = 通配 6 项; textType(url) 行 = 文本专属 1 项 (open_url, 2026-09-10 起 search 不适用)。</summary>
     [Fact]
     public void BehaviorOptions_Filtered_By_Mapping_Premise()
     {
@@ -226,7 +232,7 @@ public sealed class SelectedActionPageViewModelTests
 
         Assert.Equal(new HashSet<string> { "copy", "open", "open_folder", "open_path", "run", "script" },
             fileOptions);
-        Assert.Equal(new HashSet<string> { "open_url", "search" },
+        Assert.Equal(new HashSet<string> { "open_url" },
             urlRow.Editors[0].BehaviorOptions.Select(o => o.Value).ToHashSet());
     }
 
@@ -246,7 +252,7 @@ public sealed class SelectedActionPageViewModelTests
         Assert.True(panel.IsFileExt);
 
         panel.TypeSelected = panel.TypeOptions.OfType<ComboOption>().First(o => o.Value == "url");
-        Assert.Equal(["open_url", "search"], panel.BehaviorPicks.Select(p => p.Pack.Id));
+        Assert.Equal(["open_url"], panel.BehaviorPicks.Select(p => p.Pack.Id));
         Assert.False(panel.IsFileExt);
 
         // 切回分组项: 分组在前、真 Separator 控件、文本特征在后 (用户要求排序)

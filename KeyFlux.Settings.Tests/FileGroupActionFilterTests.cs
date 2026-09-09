@@ -126,7 +126,7 @@ public sealed class FileGroupActionFilterTests
         Assert.Equal("magnet:?xt=1", editor.ActionValue); // 脏载荷不被构造期清洗
     }
 
-    /// <summary>textType(url) 行: 覆盖集 = 文本专属 {open_url, search}, 文件行为不可见 (类型过滤)。</summary>
+    /// <summary>textType(url) 行: 覆盖集 = 文本专属 {open_url} (2026-09-10 起 search 不适用), 文件行为不可见 (类型过滤)。</summary>
     [Fact]
     public void BehaviorOptions_TextType_Url_Shows_TextOnly_Set()
     {
@@ -138,7 +138,7 @@ public sealed class FileGroupActionFilterTests
             Entries = [new SelectedEntry { Behavior = "open_url", Options = new RuleOptions() }],
         });
         page.ExpandedRow = row;
-        Assert.Equal(new HashSet<string> { "open_url", "search" }, OptionValues(row.Editors[0]));
+        Assert.Equal(new HashSet<string> { "open_url" }, OptionValues(row.Editors[0]));
     }
 
     // ------------------------------------------------------------- 分组选择联动

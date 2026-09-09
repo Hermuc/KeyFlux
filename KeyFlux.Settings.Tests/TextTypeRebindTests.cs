@@ -77,7 +77,7 @@ public sealed class TextTypeRebindTests
     public void Covering_Behavior_Preserved_On_Type_Switch()
     {
         var page = CreatePage();
-        var row = NewRow(page, "url", "search"); // search 覆盖 url 与 plain
+        var row = NewRow(page, "url", "search"); // 构造脏值: search 已不覆盖 url (plain 下合法, 验证跨类型保留)
         row.IsPlain = true;
         Assert.Equal("search", row.Mapping.Entries[0].Behavior);
     }

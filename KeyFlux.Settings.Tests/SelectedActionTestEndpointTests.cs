@@ -26,13 +26,11 @@ public sealed class SelectedActionTestEndpointTests : ServerTestBase
         Assert.Equal("textType", resp.Value.MatchType);
         Assert.Equal("url", resp.Value.MatchValue);
 
-        // 菜单键位 1 起, 顺序 = entries 顺序
-        Assert.Equal(2, resp.Value.Menu.Count);
+        // 菜单键位 1 起, 顺序 = entries 顺序 (url 覆盖集仅 open_url, 2026-09-10 起 search 不适用)
+        Assert.Single(resp.Value.Menu);
         Assert.Equal(1, resp.Value.Menu[0].Key);
         Assert.Equal("open_url", resp.Value.Menu[0].Behavior);
         Assert.False(string.IsNullOrEmpty(resp.Value.Menu[0].Name), "菜单项应携带显示名");
-        Assert.Equal(2, resp.Value.Menu[1].Key);
-        Assert.Equal("search", resp.Value.Menu[1].Behavior);
 
         // 预览基于选中内容生成 (open_url 语义)
         Assert.False(string.IsNullOrEmpty(resp.Value.Preview), "命中时应返回执行预览");

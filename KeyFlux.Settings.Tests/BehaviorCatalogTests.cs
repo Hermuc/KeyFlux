@@ -28,7 +28,7 @@ public static class BehaviorFixtures
         Pack("open_url", [Text("url", def: true)], "open_url"),
         Pack("run", [Text("plain"), File(["*"])], "run", template: "%selected%"),
         Pack("script", [Text("plain"), File(["*"])], "script"),
-        Pack("search", [Text("url"), Text("plain", def: true)], "search",
+        Pack("search", [Text("plain", def: true)], "search",
              template: "https://bing.com/search?q=%selected%"),
         Pack("send_keys", [Text("plain")], "send_keys"),
     ];
@@ -75,12 +75,12 @@ public sealed class BehaviorCatalogTests
             covering.Select(p => p.Id));
     }
 
-    /// <summary>文本特征覆盖: url → open_url + search; plain → 6 项 (均为无 default 标记的覆盖包)。</summary>
+    /// <summary>文本特征覆盖: url → 仅 open_url (2026-09-10 起 search 不再覆盖 url); plain → 6 项 (均为无 default 标记的覆盖包)。</summary>
     [Fact]
     public void Covering_TextType_Follows_Pack_Premises()
     {
         BehaviorCatalog.SeedForTests(BehaviorFixtures.Builtin(), []);
-        Assert.Equal(new[] { "open_url", "search" },
+        Assert.Equal(new[] { "open_url" },
             BehaviorCatalog.Covering("textType", "url").Select(p => p.Id));
         Assert.Equal(new[] { "copy", "open_registry", "run", "script", "search", "send_keys" },
             BehaviorCatalog.Covering("textType", "plain").Select(p => p.Id));

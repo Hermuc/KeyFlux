@@ -21,8 +21,6 @@ internal static class TestData
                 Entries =
                 [
                     new SelectedEntry { Behavior = "open_url" },
-                    // 带 %selected% 占位符模板, 便于在 /test 预览断言替换结果
-                    new SelectedEntry { Behavior = "search", ActionValue = "https://www.bing.com/search?q=%selected%" },
                 ],
             },
             new SelectedMapping

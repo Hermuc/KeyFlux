@@ -8,10 +8,6 @@
   "appliesTo": [
     {
       "type": "textType",
-      "value": "url"
-    },
-    {
-      "type": "textType",
       "value": "plain",
       "default": true
     }
