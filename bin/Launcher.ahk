@@ -5,6 +5,7 @@
 ;@Ahk2Exe-SetMainIcon ./bin/icons/logo3.ico
 ;@Ahk2Exe-ExeName KeyFlux
 SetWorkingDir(A_ScriptDir)
+FileAppend(A_TickCount " bootstrap-enter" (A_Args.Length ? " args:" A_Args[1] : "") "`n", A_WorkingDir "\boot-log.txt")
 
 ; 以管理员权限运行
 full_command_line := DllCall("GetCommandLine", "str")
@@ -15,8 +16,10 @@ if not (A_IsAdmin or RegExMatch(full_command_line, " /restart(?!\S)")) {
   }
 
   try {
-    if A_IsCompiled
+    if A_IsCompiled {
+      FileAppend(A_TickCount " elevate-request`n", A_WorkingDir "\boot-log.txt")
       Run '*RunAs "' A_ScriptFullPath '" ' otherArgs ' /restart'
+    }
     else
       Run '*RunAs "' A_AhkPath '" /restart "' A_ScriptFullPath '"'
     ExitApp
@@ -41,7 +44,10 @@ if (A_Args.Length) {
     Run("KeyFlux.exe /script ./bin/MiscTools.ahk GenerateShortcuts")
   }
   ; 启动脚本
+  FileAppend(A_TickCount " launch-engine`n", A_WorkingDir "\boot-log.txt")
   Run("KeyFlux.exe /script " mainAhkFilePath)
+  ; 可移植性自愈: 目录移动/换机后自动重建自启任务 (异步, 不阻塞就绪)
+  Run("KeyFlux.exe /script ./bin/MiscTools.ahk RepairStartupTask")
 }
 
 if IsSet(hasTip) {

@@ -30,8 +30,10 @@ SendMode "Event"                                          ; 执行 SendInput 的
 SetKeyDelay 0                                             ; 默认 10 太慢了, https://www.reddit.com/r/AutoHotkey/comments/gd3z4o/possible_unreliable_detection_of_the_keyup_event/
 ProcessSetPriority "High"
 SetWorkingDir("../")
+FileAppend(A_TickCount " engine-begin`n", A_WorkingDir "\boot-log.txt")
 InitTrayMenu()
 InitKeymap()
+FileAppend(A_TickCount " engine-ready`n", A_WorkingDir "\boot-log.txt")
 OnExit(KeyFluxExit)
 #include ../data/custom_functions.ahk
 

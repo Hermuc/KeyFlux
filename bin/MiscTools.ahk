@@ -47,18 +47,57 @@ if A_Args[1] = "GenerateShortcuts" {
 }
 
 if A_Args[1] = "RunAtStartup" {
-  ; 开机自启使用 HKCU\Run 注册表键 (2026-08-23 迁移, 替代旧版启动文件夹快捷方式)
-  ; 键名 0 开头: Run 键按值名字母序枚举启动, 0KeyFlux 抢到第一批 (KeyFlux 的 K 恰排常见自启软件末位, 2026-09-10)
+  ; 2026-09-10 起改用计划任务 (替代 HKCU\Run 注册表方案):
+  ; 登录+3s 触发早于 explorer Run 批次, 最高权限免提权重启 (省一段进程链);
+  ; 稳定性: 电池可启动/失败重试 1min×3/IgnoreNew/不限时 (见 bin/templates/KeyFlux-task.xml)
+  ; 可移植性: RepairStartupTask 子命令自愈 (目录移动/换机后重建任务)
   runKey := "HKCU\Software\Microsoft\Windows\CurrentVersion\Run"
   if A_Args[2] = "On" {
-    ; 值数据为带引号的完整路径, 路径含空格时也能正确启动
-    RegWrite('"' A_WorkingDir '\KeyFlux.exe"', "REG_SZ", runKey, "0KeyFlux")
-    try RegDelete(runKey, "KeyFlux") ; 清理旧键名 (迁移, 2026-09-10 前的键名)
+    ; 注册 HIGHEST 任务需管理员令牌: 非提权时自提权重跑 (用户 UAC 静默则无感)
+    if !A_IsAdmin {
+      Run '*RunAs "' A_ScriptFullPath '" RunAtStartup On'
+      return
+    }
+    CreateStartupTask()
+    ; 清理旧注册表方案残留 (0KeyFlux/KeyFlux, 2026-09-10 前机制)
+    try RegDelete(runKey, "0KeyFlux")
+    try RegDelete(runKey, "KeyFlux")
   } else if (A_Args[2] = "Off") {
+    RunWait(A_ComSpec ' /c schtasks /delete /tn "KeyFlux" /f', , "Hide")
     try RegDelete(runKey, "0KeyFlux")
     try RegDelete(runKey, "KeyFlux")
   }
   return
+}
+
+if A_Args[1] = "RepairStartupTask" {
+  ; 自愈: 任务存在但 action 路径与当前安装目录不符 (目录移动/改名/换机) 时重建;
+  ; 任务不存在则不动 (由 UI 开关 RunAtStartup On 创建)
+  tmpXml := A_WorkingDir "\bin\tmp-task.xml"
+  try FileDelete(tmpXml)
+  RunWait(A_ComSpec ' /c schtasks /query /tn "KeyFlux" /xml "' tmpXml '"', , "Hide")
+  if FileExist(tmpXml) {
+    xml := FileRead(tmpXml, "UTF-16")
+    if !InStr(StrLower(xml), StrLower(A_WorkingDir)) {
+      CreateStartupTask()
+    }
+    try FileDelete(tmpXml)
+  }
+  return
+}
+
+/**
+ * 创建/覆盖自启动计划任务 KeyFlux: 模板替换安装目录后经 schtasks /xml 注册。
+ * 文件须为 UTF-16 (与 XML 声明一致), 否则 schtasks 解析失败。
+ */
+CreateStartupTask() {
+  tmpXml := A_WorkingDir "\bin\tmp-task.xml"
+  tmpl := FileRead(A_WorkingDir "\bin\templates\KeyFlux-task.xml", "UTF-8")
+  xml := StrReplace(StrReplace(tmpl, "{{DIR}}", A_WorkingDir), "{{USER}}", A_UserName)
+  try FileDelete(tmpXml)
+  FileAppend(xml, tmpXml, "UTF-16")
+  RunWait(A_ComSpec ' /c schtasks /create /tn "KeyFlux" /xml "' tmpXml '" /f', , "Hide")
+  try FileDelete(tmpXml)
 }
 
 copyFiles(pattern, dest, ignore := "") {
