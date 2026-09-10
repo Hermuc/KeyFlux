@@ -1178,5 +1178,41 @@
   "2417": {
     "zh": "操作失败",
     "en": "Operation failed"
+  },
+  "2418": {
+    "zh": "插件",
+    "en": "Plugins"
+  },
+  "2419": {
+    "zh": "内置插件",
+    "en": "Built-in plugins"
+  },
+  "2420": {
+    "zh": "第三方插件",
+    "en": "Third-party plugins"
+  },
+  "2421": {
+    "zh": "插件市场尚未开放",
+    "en": "Plugin marketplace is not open yet"
+  },
+  "2422": {
+    "zh": "在文件对话框里一键跳转到最近使用或历史记录中的文件夹。",
+    "en": "Jump to a recently used or historical folder in one keystroke inside a file dialog."
+  },
+  "2423": {
+    "zh": "已启用",
+    "en": "Enabled"
+  },
+  "2424": {
+    "zh": "已停用",
+    "en": "Disabled"
+  },
+  "2425": {
+    "zh": "契约层已就绪，但运行时接口尚未完成，暂不支持下装或管理第三方插件。",
+    "en": "The contract layer is ready, but the runtime interface is not yet complete, so installing or managing third-party plugins is not supported yet."
+  },
+  "2426": {
+    "zh": "可在「设置」页的「快速切换」分区中调整。",
+    "en": "You can adjust it in the Quick Switch section of the Settings page."
   }
 }

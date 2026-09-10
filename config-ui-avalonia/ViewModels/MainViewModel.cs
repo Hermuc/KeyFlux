@@ -62,6 +62,7 @@ public sealed partial class MainViewModel : ObservableObject
     public HomePageViewModel? HomeVm { get; private set; }
     public SettingsPageViewModel? SettingsVm { get; private set; }
     public SelectedActionPageViewModel? ActionVm { get; private set; }
+    public PluginsPageViewModel? PluginsVm { get; private set; }
 
     private readonly Dictionary<int, object> _keymapPages = [];
 
@@ -111,6 +112,7 @@ public sealed partial class MainViewModel : ObservableObject
         HomeVm = new HomePageViewModel(Session, this);
         SettingsVm = new SettingsPageViewModel(this);
         ActionVm = new SelectedActionPageViewModel(this);
+        PluginsVm = new PluginsPageViewModel(this);
         _keymapPages.Clear();
 
         BuildNav();
@@ -157,7 +159,7 @@ public sealed partial class MainViewModel : ObservableObject
     public void OnNavInvalidated() => BuildNav();
 
     /// <summary>
-    /// 复刻 NavigationDrawer: 总览 + 选中动作 + 启用的 keymap 列表。
+    /// 复刻 NavigationDrawer: 总览 + 选中动作 + 插件 + 启用的 keymap 列表。
     /// keymap/1 (自定义热键) 不再入导航 —— 2026-09-08 迁入设置页「其他设置」卡片。
     /// 重建时保持原选中项 (按稳定 Id)。
     /// </summary>
@@ -188,6 +190,14 @@ public sealed partial class MainViewModel : ObservableObject
                 BadgeColorHex = "#4169E1",
                 Page = ActionVm!,
             },
+            new()
+            {
+                Id = "plugins",
+                Title = I18n.T("2418"),
+                IconName = "puzzle-outline",
+                BadgeColorHex = "#4169E1",
+                Page = PluginsVm!,
+            },
         };
 
         foreach (var km in Config.Keymaps.Where(k => k.Enable && k.Id != 1))
@@ -203,6 +213,7 @@ public sealed partial class MainViewModel : ObservableObject
             });
         }
 
+        PluginsVm?.Refresh(); // 配置保存/启用状态变化后刷新插件页状态文案
         NavItems.Clear();
         foreach (var item in items) NavItems.Add(item);
         CurrentNavItem = NavItems.FirstOrDefault(n => n.Id == selectedId) ?? NavItems.FirstOrDefault();
@@ -314,6 +325,7 @@ public sealed partial class MainViewModel : ObservableObject
         SettingsVm?.OnLanguageChanged();
         if (HomeVm is not null) HomeVm.LanguageTick++;
         ActionVm?.OnLanguageChanged();
+        PluginsVm?.OnLanguageChanged();
         foreach (var page in _keymapPages.Values.OfType<ILanguageRefresh>()) page.OnLanguageChanged();
         BuildNav();
     }

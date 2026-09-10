@@ -76,8 +76,21 @@ public partial class WindowPickButton : UserControl
         };
     }
 
-    private void OnLanguageChanged() =>
+    private void OnLanguageChanged()
+    {
+        // I18n.Changed 可能来自非 UI 线程:
+        //   - 生产: MainViewModel.InitializeAsync 里 I18n.ApplyConfigLanguage 位于 await 续体,
+        //     续体可能落在线程池线程, 而此时控件可能已挂载 (选中动作编辑面板);
+        //   - 测试: 跨用例的订阅残留 (控件未及时 Detach) 遇上 [Fact] 用例在池线程改语言。
+        // DirectProperty 的 SetAndRaise 要求 UI 线程, 否则抛 "Call from invalid thread";
+        // 与控件内其它异步回写一致, 非 UI 线程一律封送后再更新。
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => SetAndRaise(LanguageTickProperty, ref _languageTick, _languageTick + 1));
+            return;
+        }
         SetAndRaise(LanguageTickProperty, ref _languageTick, _languageTick + 1);
+    }
 
     public string Text
     {

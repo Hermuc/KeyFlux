@@ -14,8 +14,10 @@ namespace KeyFlux.Settings.Tests;
 /// </summary>
 /// <remarks>
 /// 本类会改写全局静态 <see cref="I18n.Language"/>, 每个用例都在 finally 里还原;
-/// xunit 同类内串行, 且其余测试类对 I18n 的引用数为 0, 故不存在并行串扰。
+/// xunit 同类内串行。与同样读写 I18n 的 <c>PluginsPageViewSmokeTests</c> 同属
+/// [Collection("I18nSerial")], 两类用例跨类串行, 杜绝并行串扰。
 /// </remarks>
+[Collection("I18nSerial")]
 public sealed class I18nResourceTests
 {
     /// <summary>外置前 C# 字典的键数: 307 个数字键 + 301err / 301hint 两个非数字键;
@@ -34,7 +36,9 @@ public sealed class I18nResourceTests
     /// 单行为匹配类型禁止再加行为提示 1119 -> 285。
     /// 2026-09 QuickSwitch 阶段 1: 新增 10 键 (2408 快速切换 / 2409-2416 开关与排除目录 /
     /// 2417 操作失败) -> 295。
-    private const int ExpectedKeyCount = 295;
+    /// 2026-09 插件页 (Plugins): 新增 9 键 (2418 插件 / 2419 内置插件 / 2420 第三方插件 /
+    /// 2421 市场未开放 / 2422 快速切换说明 / 2423 已启用 / 2424 已停用 / 2425 原因 / 2426 配置指引) -> 304。
+    private const int ExpectedKeyCount = 304;
 
     private const string LabelPrefix = "label:";
 

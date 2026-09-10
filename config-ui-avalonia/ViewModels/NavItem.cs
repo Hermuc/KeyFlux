@@ -88,6 +88,8 @@ public static class MdiIcon
         { "cursor-default-outline", 0xF01BF },
         { "rhombus", 0xF070B },
         { "content-save-outline", 0xF0818 },
+        // 插件页 (Plugins) 导航图标; 码位直接实测自内嵌 materialdesignicons.ttf 的 post/cmap 表
+        { "puzzle-outline", 0xF0A66 },
         { "alpha-a-box", 0xF0B08 }, { "alpha-b-box", 0xF0B09 },
         { "alpha-c-box", 0xF0B0A }, { "alpha-d-box", 0xF0B0B },
         { "alpha-e-box", 0xF0B0C }, { "alpha-f-box", 0xF0B0D },

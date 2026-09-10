@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using KeyFlux.Settings.Controls;
@@ -27,6 +28,11 @@ public sealed class WindowPickBindingTestApp : Application
         Resources["Tr"] = new I18nConverter();
         Resources["NotEmpty"] = new StringNotEmptyConverter();
         Resources["IntStr"] = new IntToStringConverter();
+        // 补全被测 App.axaml 的注册 (MainWindow 的导航图标绑定与部分视图的 IsVisible 依赖);
+        // 插件页注册测试需实例化真实 MainWindow 以读取其 ContentControl.DataTemplates。
+        Resources["NotNull"] = new NotNullConverter();
+        Resources["MdiFont"] = new FontFamily(
+            "avares://KeyFlux.Settings/Assets/Fonts/materialdesignicons.ttf#Material Design Icons");
     }
 }
 
@@ -84,10 +90,20 @@ public sealed class WindowPickButtonBindingTests
 
         var window = new Window { Content = button, DataContext = vm };
         window.Show();
+        try
+        {
+            button.WriteBack("记事本 ahk_exe notepad.exe");
 
-        button.WriteBack("记事本 ahk_exe notepad.exe");
-
-        Assert.Equal("记事本 ahk_exe notepad.exe", vm.WinTitle);
+            Assert.Equal("记事本 ahk_exe notepad.exe", vm.WinTitle);
+        }
+        finally
+        {
+            // 关闭窗口 -> 触发控件 DetachedFromVisualTree -> 退订 I18n.Changed。
+            // 不关闭会留下订阅泄漏: 后续任何【非 UI 线程】的 I18n.Language 变更
+            // (如 I18nResourceTests 的 [Fact] 用例) 都会命中该订阅, 在 UI 线程外
+            // SetAndRaise DirectProperty 抛 "Call from invalid thread"。
+            window.Close();
+        }
     }
 
     /// <summary>对照实验: 无论绑定是否断裂, WriteBack 至少要更新控件本地 Text (区分"没写回"与"绑定断")。</summary>
@@ -100,10 +116,16 @@ public sealed class WindowPickButtonBindingTests
             new Binding(nameof(PickHostTestVm.WinTitle)) { Mode = BindingMode.TwoWay });
         var window = new Window { Content = button, DataContext = vm };
         window.Show();
+        try
+        {
+            button.WriteBack("记事本 ahk_exe notepad.exe");
 
-        button.WriteBack("记事本 ahk_exe notepad.exe");
-
-        Assert.Equal("记事本 ahk_exe notepad.exe", button.Text);
+            Assert.Equal("记事本 ahk_exe notepad.exe", button.Text);
+        }
+        finally
+        {
+            window.Close(); // 关窗退订 I18n.Changed, 防跨用例订阅泄漏 (见首个用例注释)
+        }
     }
 
     /// <summary>AppendMode 追加语义: 首次写回整值替换, 已有内容时合并为新行。</summary>
@@ -116,10 +138,16 @@ public sealed class WindowPickButtonBindingTests
             new Binding(nameof(PickHostTestVm.WinTitle)) { Mode = BindingMode.TwoWay });
         var window = new Window { Content = button, DataContext = vm };
         window.Show();
+        try
+        {
+            button.WriteBack("第二行");
 
-        button.WriteBack("第二行");
-
-        Assert.Equal("已有内容\n第二行", vm.WinTitle);
+            Assert.Equal("已有内容\n第二行", vm.WinTitle);
+        }
+        finally
+        {
+            window.Close(); // 关窗退订 I18n.Changed, 防跨用例订阅泄漏 (见首个用例注释)
+        }
     }
 
     /// <summary>

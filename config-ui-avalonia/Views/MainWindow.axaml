@@ -98,6 +98,9 @@
           <DataTemplate DataType="vm:SelectedActionPageViewModel">
             <views:SelectedActionPageView />
           </DataTemplate>
+          <DataTemplate DataType="vm:PluginsPageViewModel">
+            <views:PluginsPageView />
+          </DataTemplate>
         </ContentControl.DataTemplates>
       </ContentControl>
 
