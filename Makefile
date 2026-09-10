@@ -97,9 +97,14 @@ $(OUT_DIR):
 DEPLOY_DIR := $(OUT_DIR)
 CHECK_CONFIG := $(DEPLOY_DIR)/data/config.json
 
-# check: 一键回归 = Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
+# lint: 标识符冲突静态闸门 (AHK 大小写不敏感, /Validate 查不出「局部变量遮蔽同名函数」类
+# 运行时崩溃; 详见阶段 0 §7.3)。扫描 bin/lib 下全部 AHK 源文件, 有 ERROR 即非零退出。
+lint:
+	python tools/lint_ident.py $$(find bin/lib -name '*.ahk')
+
+# check: 一键回归 = 标识符 lint + Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
 # (MSYS_NO_PATHCONV: 防止 Git Bash 把 /ErrorStdOut /Validate 等开关误转换为路径)
-check: buildServer
+check: buildServer lint
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./config-server/templates/keyflux.tmpl ./bin/KeyFlux.ahk
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate ./bin/KeyFlux.ahk
 	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/oracle.ps1
@@ -126,4 +131,4 @@ out: buildServer buildClientAvalonia sync-out
 deploy: check buildClientAvalonia sync-out
 	pwsh -NoProfile -Command "$$d=(Resolve-Path '$(OUT_DIR)').Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d 'KeyFlux.exe') -WorkingDirectory $$d"
 
-.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-cs sync-out out deploy
+.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-cs lint sync-out out deploy
