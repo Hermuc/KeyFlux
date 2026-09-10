@@ -168,28 +168,10 @@ public sealed partial class KeymapPageViewModel : ObservableObject, ILanguageRef
     [RelayCommand]
     private void SelectKey(KeyCellVm cell) => Core.SelectKey(cell.Hotkey);
 
-    /// <summary>复刻 getKeyText: 去掉 "*" 前缀并首字母大写。
-    /// 用户圈定的非键帽词与常用键名显示中文 (网格不随语言切换重建, 故硬编码);
-    /// 其余键帽词 (alt/ctrl/tab/pgup...) 保持原样不动。</summary>
+    /// <summary>复刻 getKeyText: 去掉 "*" 前缀并首字母大写。</summary>
     public static string KeyText(string hotkey)
     {
         var s = hotkey.TrimStart('*');
-        var cn = s.ToLowerInvariant() switch
-        {
-            "space" => "空格",
-            "enter" => "回车",
-            "backspace" => "退格",
-            "singlepress" => "短按",
-            "LButton" => "左键",
-            "MButton" => "中键",
-            "RButton" => "右键",
-            "WheelUp" => "滚轮上",
-            "WheelDown" => "滚轮下",
-            "XButton1" => "侧键1",
-            "XButton2" => "侧键2",
-            _ => null,
-        };
-        if (cn != null) return cn;
         return s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
     }
 
