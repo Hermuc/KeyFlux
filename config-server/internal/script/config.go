@@ -57,6 +57,13 @@ func ParseConfig(file string) (*Config, error) {
 	if config.Options.CommandInputSkin == (CommandInputSkin{}) {
 		config.Options.CommandInputSkin = DefaultCommandInputSkin()
 	}
+	// QuickSwitch 段整段为零 (旧配置缺失该段 -> 反序列化为全零) 时整体填充默认值。
+	// 边界: 只做「整段为零才补齐」, 绝不逐字段补齐 —— 用户合法地把 autoJumpSave 设为 false
+	// (其余字段为默认) 必须原样保留, 故以「全零签名」而非「单字段空值」判定 (同 C# 侧口径)。
+	// 默认值真源见 DefaultQuickSwitchOption (三端一致, 有单测守护)。
+	if isQuickSwitchZero(config.Options.QuickSwitch) {
+		config.Options.QuickSwitch = DefaultQuickSwitchOption()
+	}
 	// 存量迁移: 旧 actionSchemes → selectedAction 单键分发 (读时一次性, 硬切不回写;
 	// 迁移后 ActionSchemes 置 nil, save 序列化不再输出旧段)
 	MigrateSelectedAction(&config)
@@ -88,6 +95,35 @@ func DefaultCommandInputSkin() CommandInputSkin {
 		WindowShadowOpacity:   "0.5",
 		WindowShadowSize:      "3.0",
 	}
+}
+
+// DefaultQuickSwitchOption 返回「快速切换 QuickSwitch」配置段的出厂默认值
+// (设计 §3.1 / PRD §8 裁决)。字面量必须与 AHK 侧 bin/lib/quickswitch/QuickSwitch.ahk 的
+// QuickSwitchDefaultConfig() 以及 C# 侧 Models/ConfigReadDefaults.cs 的 QuickSwitchDefaults()
+// 逐字段一致, 有单测守护: internal/script/quickswitch_defaults_test.go 逐字段比对 Go 与 AHK 字面量,
+// 不一致即 fail, 防止默认值在三端之间漂移。
+func DefaultQuickSwitchOption() QuickSwitchOption {
+	return QuickSwitchOption{
+		CollectEnabled:     true,
+		AutoShow:           true,
+		AutoJumpOpen:       true,
+		AutoJumpSave:       false,
+		PollIntervalMs:     800,
+		MaxHistory:         200,
+		OverlayRows:        8,
+		OverlayRowsCompact: 4,
+		ExcludedPrefixes:   []string{},
+	}
+}
+
+// isQuickSwitchZero 判定 quickSwitch 是否为「旧配置缺失该段」的全零签名。
+// 因 QuickSwitchOption 含切片字段 (不可用 == 比较结构体), 故逐字段判定;
+// 口径与 C# ConfigReadDefaults.IsQuickSwitchUnset 完全一致, 保证引擎与 UI 判定同步。
+func isQuickSwitchZero(q QuickSwitchOption) bool {
+	return !q.CollectEnabled && !q.AutoShow && !q.AutoJumpOpen && !q.AutoJumpSave &&
+		q.PollIntervalMs == 0 && q.MaxHistory == 0 &&
+		q.OverlayRows == 0 && q.OverlayRowsCompact == 0 &&
+		len(q.ExcludedPrefixes) == 0
 }
 
 func SaveConfigFile(config *Config) {
