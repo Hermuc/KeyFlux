@@ -1138,5 +1138,45 @@
   "1119": {
     "zh": "该匹配类型的可用行为都已添加，无法重复添加",
     "en": "All available behaviors for this match type have been added"
+  },
+  "2408": {
+    "zh": "快速切换",
+    "en": "Quick Switch"
+  },
+  "2409": {
+    "zh": "完全禁用采集",
+    "en": "Disable all folder collection"
+  },
+  "2410": {
+    "zh": "自动显示候选浮层",
+    "en": "Auto-show suggestion overlay"
+  },
+  "2411": {
+    "zh": "自动跳转: 打开对话框",
+    "en": "Auto-jump: open dialog"
+  },
+  "2412": {
+    "zh": "自动跳转: 保存对话框",
+    "en": "Auto-jump: save dialog"
+  },
+  "2413": {
+    "zh": "历史保留条数上限",
+    "en": "Max saved history entries"
+  },
+  "2414": {
+    "zh": "排除目录 (路径前缀)",
+    "en": "Excluded folders (path prefixes)"
+  },
+  "2415": {
+    "zh": "添加排除目录",
+    "en": "Add excluded folder"
+  },
+  "2416": {
+    "zh": "清空历史",
+    "en": "Clear history"
+  },
+  "2417": {
+    "zh": "操作失败",
+    "en": "Operation failed"
   }
 }

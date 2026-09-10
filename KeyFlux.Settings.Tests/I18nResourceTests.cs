@@ -32,7 +32,9 @@ public sealed class I18nResourceTests
     /// ConverterParameter=301hint 引用, 非数字键勿用纯数字正则扫描。</summary>
     /// 2026-09-08 自定义热键迁入设置页: 新增 1116 自定义热键 / 1117 功能 / 1118 新建 -> 284;
     /// 单行为匹配类型禁止再加行为提示 1119 -> 285。
-    private const int ExpectedKeyCount = 285;
+    /// 2026-09 QuickSwitch 阶段 1: 新增 10 键 (2408 快速切换 / 2409-2416 开关与排除目录 /
+    /// 2417 操作失败) -> 295。
+    private const int ExpectedKeyCount = 295;
 
     private const string LabelPrefix = "label:";
 

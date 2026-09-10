@@ -38,6 +38,7 @@ ProcessSetPriority "High"
 SetWorkingDir("../")
 InitTrayMenu()
 InitKeymap()
+InitQuickSwitch({collectEnabled: {{ .Options.QuickSwitch.CollectEnabled }}, autoShow: {{ .Options.QuickSwitch.AutoShow }}, autoJumpOpen: {{ .Options.QuickSwitch.AutoJumpOpen }}, autoJumpSave: {{ .Options.QuickSwitch.AutoJumpSave }}, pollIntervalMs: {{ .Options.QuickSwitch.PollIntervalMs }}, maxHistory: {{ .Options.QuickSwitch.MaxHistory }}, overlayRows: {{ .Options.QuickSwitch.OverlayRows }}, overlayRowsCompact: {{ .Options.QuickSwitch.OverlayRowsCompact }}, excludedPrefixes: [{{ range $i, $p := .Options.QuickSwitch.ExcludedPrefixes }}{{ if $i }}, {{ end }}{{ ahkString $p }}{{ end }}]})
 OnExit(KeyFluxExit)
 #include ../data/custom_functions.ahk
 

@@ -38,6 +38,7 @@ ProcessSetPriority "High"
 SetWorkingDir("../")
 InitTrayMenu()
 InitKeymap()
+InitQuickSwitch({collectEnabled: true, autoShow: true, autoJumpOpen: true, autoJumpSave: false, pollIntervalMs: 800, maxHistory: 200, overlayRows: 8, overlayRowsCompact: 4, excludedPrefixes: ["D:\Archive", "C:\Temp"]})
 OnExit(KeyFluxExit)
 #include ../data/custom_functions.ahk
 
@@ -113,6 +114,7 @@ InitKeymap()
   km.Map("*q", _ => EnterCapslockAbbr(capsHook))
   km.Map("*r", km.ToggleLock)
   km.Map("*w", _ => EnterSemicolonAbbr(semiHook, semiHookAbbrWindow))
+  km.Map("*z", _ => QuickSwitchGoto())
 
   ; 媒体控制
   km6 := KeymapManager.NewKeymap("*F13", "媒体控制", "", "ahk_group GROUP_DISABLE_KEYMAP_6")

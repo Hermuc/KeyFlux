@@ -102,6 +102,7 @@ func TestSyntheticConfigCoversMatrix(t *testing.T) {
 		{`TypeID8 builtinFunctions8 (AHKCode 直出)`, `MsgBox("hello")`},
 		{`TypeID9 ValueID6 capslock 缩写启用`, `EnterCapslockAbbr(capsHook)`},
 		{`TypeID9 ValueID5 semicolon 缩写启用`, `EnterSemicolonAbbr(semiHook, semiHookAbbrWindow)`},
+		{`TypeID9 ValueID9 QuickSwitch 薄壳 (callMap[9])`, `km.Map("*z", _ => QuickSwitchGoto())`},
 		// TypeID5 重映射特殊路径 -> 模板尾部 .KeyMapping
 		{`.KeyMapping 渲染重映射 (a::b, WindowGroupID0)`, `a::b`},
 		{`.KeyMapping 渲染重映射 (k::l, WindowGroupID5)`, `k::l`},
@@ -129,6 +130,9 @@ func TestSyntheticConfigCoversMatrix(t *testing.T) {
 		// pathVariables: 普通值 vs ahk-expression 前缀
 		{`pathVariable 普通值 (AhkString)`, `editor := "D:\tools\edit.exe"`},
 		{`pathVariable ahk-expression 前缀原样输出`, `desktop := A_Desktop`},
+		// QuickSwitch 配置段注入 (模板 -> InitQuickSwitch)
+		{`QuickSwitch 配置注入 (模板渲染 InitQuickSwitch)`, `InitQuickSwitch({collectEnabled: true`},
+		{`QuickSwitch excludedPrefixes 数组渲染`, `excludedPrefixes: ["D:\Archive", "C:\Temp"]`},
 	}
 
 	for _, m := range matrix {
@@ -268,7 +272,8 @@ func syntheticConfig() *Config {
 				},
 			},
 			// ID5: 被渲染的模式, 覆盖 TypeID 1/2/3/4/5/6/7/8/9, 并承载缩写启用触发
-			// (TypeID9 ValueID6/5)。单行 disableAt。每 hotkey 一 Action (约束1)。
+			// (TypeID9 ValueID6/5) 与 QuickSwitch 薄壳 (TypeID9 ValueID9)。单行 disableAt。
+			// 每 hotkey 一 Action (约束1)。
 			{
 				ID: 5, Name: "CapsLock", Enable: true,
 				Hotkey: "*CapsLock", ParentID: 0, Delay: 0, DisableAt: "ahk_exe steam.exe",
@@ -288,6 +293,7 @@ func syntheticConfig() *Config {
 					"*w": {{TypeID: 9, ValueID: 5, WindowGroupID: 0}},
 					"*e": {{TypeID: 9, ValueID: 1, WindowGroupID: 0}},
 					"*r": {{TypeID: 9, ValueID: 8, WindowGroupID: 0}},
+					"*z": {{TypeID: 9, ValueID: 9, WindowGroupID: 0}},
 				},
 			},
 			// ID6: 第二个被渲染模式 (中文名 -> 走 UTF-8), 带窗口组守卫 (ct1/ct2/ct5)、
@@ -332,6 +338,13 @@ func syntheticConfig() *Config {
 				{Name: "desktop", Value: "ahk-expression: A_Desktop"},
 				{Name: "", Value: "ignored-blank-name"},
 				{Name: "   ", Value: "ignored-space-name"},
+			},
+			// 快速切换配置段 (设计 §3.1): 模板注入 InitQuickSwitch(...) 覆盖默认初始化;
+			// excludedPrefixes 覆盖 ahkString 数组渲染与反斜杠路径。
+			QuickSwitch: QuickSwitchOption{
+				CollectEnabled: true, AutoShow: true, AutoJumpOpen: true, AutoJumpSave: false,
+				PollIntervalMs: 800, MaxHistory: 200, OverlayRows: 8, OverlayRowsCompact: 4,
+				ExcludedPrefixes: []string{`D:\Archive`, `C:\Temp`},
 			},
 		},
 		// 选中动作 (方案 D 单键分发): textType/fileExt 两类匹配; entry 覆盖空 actionValue

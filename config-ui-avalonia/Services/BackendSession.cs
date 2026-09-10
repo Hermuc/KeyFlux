@@ -94,6 +94,28 @@ public sealed class BackendSession : IAsyncDisposable
     /// <summary>连接成功后可用的 API 客户端 (12 个契约端点)。</summary>
     public ISettingsApi? Api => _client;
 
+    /// <summary>
+    /// 后端工作目录 (bin\): 相对路径 ../data、./site、./templates 的基准。
+    /// 供设置页定位同部署根下的数据文件 (如 data/quickswitch/history.tsv);
+    /// 显式工作目录优先, 否则取 settings.exe 所在目录, 再回退 AppContext.BaseDirectory。
+    /// </summary>
+    public string BackendDirectory
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(_options.WorkingDirectory))
+            {
+                return Path.GetFullPath(_options.WorkingDirectory);
+            }
+            var exe = ResolveSettingsExe();
+            if (exe is not null)
+            {
+                return Path.GetDirectoryName(Path.GetFullPath(exe))!;
+            }
+            return AppContext.BaseDirectory;
+        }
+    }
+
     /// <summary>后端实际监听端口。</summary>
     public int Port { get; private set; }
 

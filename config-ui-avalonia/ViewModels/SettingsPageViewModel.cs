@@ -136,6 +136,8 @@ public sealed partial class SettingsPageViewModel : ObservableObject
         if (customKeymap is not null) CustomHotkeys = new CustomHotkeyPageViewModel(main, customKeymap);
         BuildSkinFields();
         foreach (var pv in Options.PathVariables) PathVariables.Add(pv);
+        Options.QuickSwitch.ExcludedPrefixes ??= [];
+        BuildExcludedPrefixRows();
         RefreshKeymapSection();
     }
 
@@ -168,6 +170,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     [ObservableProperty] private bool _showSkin;
     [ObservableProperty] private bool _showPathVariables;
     [ObservableProperty] private bool _showCustomHotkeys;
+    [ObservableProperty] private bool _showQuickSwitch;
 
     [RelayCommand]
     private void ToggleSection(string? which)
@@ -181,10 +184,11 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             "skin" => ShowSkin,
             "pathvars" => ShowPathVariables,
             "customhotkeys" => ShowCustomHotkeys,
+            "quickswitch" => ShowQuickSwitch,
             _ => false,
         };
         ShowMouseOption = ShowLanguageOption = ShowKeyboardLayout = false;
-        ShowKeymapDelay = ShowSkin = ShowPathVariables = ShowCustomHotkeys = false;
+        ShowKeymapDelay = ShowSkin = ShowPathVariables = ShowCustomHotkeys = ShowQuickSwitch = false;
         if (wasOpen) return;
         switch (which)
         {
@@ -195,6 +199,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             case "skin": ShowSkin = true; break;
             case "pathvars": ShowPathVariables = true; break;
             case "customhotkeys": ShowCustomHotkeys = true; break;
+            case "quickswitch": ShowQuickSwitch = true; break;
         }
     }
 
@@ -320,6 +325,60 @@ public sealed partial class SettingsPageViewModel : ObservableObject
         Options.PathVariables.Remove(pv);
     }
 
+    // ------------------------------------------------------------- 快速切换 (QuickSwitch)
+
+    /// <summary>快速切换配置段 (三开关 / 自动跳转 / 条数上限 / 排除目录)。</summary>
+    public QuickSwitchOption QuickSwitch => Options.QuickSwitch;
+
+    /// <summary>排除目录行 (与 Options.QuickSwitch.ExcludedPrefixes 索引对齐, 编辑即时回写)。</summary>
+    public ObservableCollection<ExcludedPrefixRowVm> ExcludedPrefixRows { get; } = [];
+
+    private void BuildExcludedPrefixRows()
+    {
+        ExcludedPrefixRows.Clear();
+        var list = Options.QuickSwitch.ExcludedPrefixes;
+        for (var i = 0; i < list.Count; i++)
+        {
+            ExcludedPrefixRows.Add(new ExcludedPrefixRowVm(list, i));
+        }
+    }
+
+    [RelayCommand]
+    private void AddExcludedPrefix()
+    {
+        Options.QuickSwitch.ExcludedPrefixes.Add("");
+        BuildExcludedPrefixRows();
+    }
+
+    [RelayCommand]
+    private void RemoveExcludedPrefix(ExcludedPrefixRowVm? row)
+    {
+        if (row is null || row.Index < 0 || row.Index >= Options.QuickSwitch.ExcludedPrefixes.Count) return;
+        Options.QuickSwitch.ExcludedPrefixes.RemoveAt(row.Index);
+        BuildExcludedPrefixRows();
+        OnPropertyChanged(nameof(QuickSwitch));
+    }
+
+    /// <summary>
+    /// 清空历史 (一次性动作, 非持久字段): 截断同部署根 data/quickswitch/history.tsv 为空文件
+    /// (文件保留)。引擎在每次对话框实例切换时经 HistLoad 重读该文件, 故截断后历史立即空态。
+    /// </summary>
+    [RelayCommand]
+    private void ClearHistory()
+    {
+        try
+        {
+            var dir = Path.GetFullPath(
+                Path.Combine(_main.Session.BackendDirectory, "..", "data", "quickswitch"));
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "history.tsv"), "", new System.Text.UTF8Encoding(false));
+        }
+        catch (Exception ex)
+        {
+            _main.ShowMessage(I18n.T("2417"), ex.Message);
+        }
+    }
+
     // ------------------------------------------------------------- keymap 表
 
     public ObservableCollection<KeymapRowViewModel> KeymapRows { get; } = [];
@@ -438,5 +497,33 @@ public sealed partial class SettingsPageViewModel : ObservableObject
         foreach (var f in SkinFields) f.RefreshLabel();
         foreach (var r in KeymapRows) r.RefreshComputed();
         OnPropertyChanged(nameof(SelectedLanguage));
+    }
+}
+
+/// <summary>
+/// 「排除目录」表行: 包装 Options.QuickSwitch.ExcludedPrefixes[index],
+/// Value 编辑即时回写底层字符串列表 (列表本身不可观测, 故用行 VM 驱动 UI 刷新)。
+/// </summary>
+public sealed partial class ExcludedPrefixRowVm : ObservableObject
+{
+    private readonly List<string> _backing;
+
+    public ExcludedPrefixRowVm(List<string> backing, int index)
+    {
+        _backing = backing;
+        Index = index;
+    }
+
+    public int Index { get; }
+
+    public string Value
+    {
+        get => Index >= 0 && Index < _backing.Count ? _backing[Index] : "";
+        set
+        {
+            if (Index < 0 || Index >= _backing.Count || _backing[Index] == value) return;
+            _backing[Index] = value;
+            OnPropertyChanged();
+        }
     }
 }

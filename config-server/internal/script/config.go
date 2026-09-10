@@ -12,22 +12,23 @@ import (
 // 类型别名: 数据模型已迁移到 model 包 (阶段 3 拆分),
 // 别名保持既有调用方 (main.go handler 等) 无需改动。
 type (
-	Config           = model.Config
-	Keymap           = model.Keymap
-	Action           = model.Action
-	SelectedAction   = model.SelectedAction
-	SelectedMapping  = model.SelectedMapping
-	SelectedEntry    = model.SelectedEntry
-	ActionScheme     = model.ActionScheme
-	ActionRule       = model.ActionRule
-	FileGroup        = model.FileGroup
-	RuleOptions      = model.RuleOptions
-	Options          = model.Options
-	WindowGroup      = model.WindowGroup
-	Mouse            = model.Mouse
-	Scroll           = model.Scroll
-	PathVariable     = model.PathVariable
-	CommandInputSkin = model.CommandInputSkin
+	Config            = model.Config
+	Keymap            = model.Keymap
+	Action            = model.Action
+	SelectedAction    = model.SelectedAction
+	SelectedMapping   = model.SelectedMapping
+	SelectedEntry     = model.SelectedEntry
+	ActionScheme      = model.ActionScheme
+	ActionRule        = model.ActionRule
+	FileGroup         = model.FileGroup
+	RuleOptions       = model.RuleOptions
+	Options           = model.Options
+	WindowGroup       = model.WindowGroup
+	Mouse             = model.Mouse
+	Scroll            = model.Scroll
+	PathVariable      = model.PathVariable
+	CommandInputSkin  = model.CommandInputSkin
+	QuickSwitchOption = model.QuickSwitchOption
 )
 
 var KeyfluxVersion string

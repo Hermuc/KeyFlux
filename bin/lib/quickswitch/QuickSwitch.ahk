@@ -45,8 +45,10 @@ InitQuickSwitch(cfg := 0) {
   global QSCFG, QSSTATE
   c := QuickSwitchDefaultConfig()
   if (IsObject(cfg)) {
-    for k, v in cfg {
-      c[k] := v
+    ; 注意: AHK v2.0.19 普通 Object 不能直接 `for k, v in cfg` (报 "Value not enumerable"),
+    ; 也不能用 `c[k] :=` 下标赋值 (普通 Object 无 __Item); 必须经 OwnProps() + 动态属性语法。
+    for k in cfg.OwnProps() {
+      c.%k% := cfg.%k%
     }
   }
   QSCFG := c
