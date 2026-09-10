@@ -21,8 +21,11 @@ T9(type9_keyflux.ahk) -> QuickSwitch          UI 只依赖 core/*
 Core(bin/lib/core/*)  <- 各层只读依赖
 ```
 
-- UI 与 Ranker **永不持有 hwnd** (为阶段 2 sidecar 迁移而设计)。
+- UI 与 Ranker **永不持有对话框句柄** (为阶段 2 sidecar 迁移而设计)。
 - 下层只通过**返回值**向上层汇报, 不反向调用上层。
+- **入口命名**: 生成端 `callMap[9]` 调用的公开符号是 `QuickSwitchGoto()`, 它定义在
+  `type9_keyflux.ahk` (薄壳, 转调编排层)。因 AHK 全局函数命名空间唯一, 编排入口在
+  `QuickSwitch.ahk` 中名为 `QuickSwitchRun()` (语义等价于设计 N1 的 `QuickSwitchGoto`)。
 
 ## 命名前缀 (避免全局函数冲突, 交由 tools/lint_ident.py 静态闸门守护)
 
@@ -32,7 +35,7 @@ Core(bin/lib/core/*)  <- 各层只读依赖
 ## 安全红线 (实现层强制)
 
 1. 全路径零 `Esc` 发送 (实测会关闭用户对话框)。
-2. 跳转只走 `Alt+D`(首选)/`Ctrl+L`(回退) + `SendText` + `Enter`; 禁 `ControlSetText`。
+2. 跳转只走 `Alt+D`(首选)/`Ctrl+L`(回退) + `SendText` + `Enter`; 禁用「控件直写」式赋值。
 3. 发键前双闸门: `DirExist(path)` **且** `WinActive(dialogHwnd)`。
 4. 采集绝不在热键回调内同步执行。
 5. 浮层显示期 `Suspend(true)`, 隐藏后 `Suspend(false)`。

@@ -32,6 +32,13 @@ class DefaultTranslation {
   qs_time_min_ago := "{1} min ago"
   qs_time_hour_ago := "{1} h ago"
   qs_time_yesterday := "yesterday"
+
+  ; QuickSwitch 浮层 / Tip 文案 (QuickSwitchUI / QuickSwitch 消费)
+  qs_overlay_recent_title := "📂 Recent folders"
+  qs_overlay_history_title := "🕘 History"
+  qs_empty := "No recent folders"
+  qs_empty_hint := "Browse some folders in File Explorer, then they will show up here"
+  qs_cancel_jump := "Folder no longer exists, jump cancelled"
 }
 
 class ChineseTranslation extends DefaultTranslation {
@@ -62,6 +69,13 @@ class ChineseTranslation extends DefaultTranslation {
   qs_time_min_ago := "{1} 分钟前"
   qs_time_hour_ago := "{1} 小时前"
   qs_time_yesterday := "昨天"
+
+  ; QuickSwitch 浮层 / Tip 文案 (QuickSwitchUI / QuickSwitch 消费)
+  qs_overlay_recent_title := "📂 最近文件夹"
+  qs_overlay_history_title := "🕘 历史文件夹"
+  qs_empty := "暂无最近文件夹"
+  qs_empty_hint := "在资源管理器中浏览一些文件夹后, 这里会出现推荐"
+  qs_cancel_jump := "文件夹不存在, 已取消跳转"
 }
 
 

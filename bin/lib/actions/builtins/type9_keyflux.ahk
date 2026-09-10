@@ -65,3 +65,13 @@ ToggleCapslock() {
     send("{blind}{LCtrl}{LAlt Up}")
   send("{blind}{CapsLock}")
 }
+
+/**
+ * 快速切换 (QuickSwitch): 跳转到推荐的首个候选文件夹 (默认热键 Ctrl+G)。
+ * 薄壳: 仅转调编排层 QuickSwitchRun(); 不含任何窗口/枚举/磁盘逻辑。
+ * 注: AHK 全局函数命名空间唯一, 故编排入口在 QuickSwitch.ahk 中名为 QuickSwitchRun,
+ *     本薄壳独占 QuickSwitchGoto 这一名字 (生成端 callMap[9] 调用的即本函数)。
+ */
+QuickSwitchGoto() {
+  QuickSwitchRun()
+}
