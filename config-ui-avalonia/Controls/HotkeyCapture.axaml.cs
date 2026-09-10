@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using KeyFlux.Settings.Services;
 
@@ -63,6 +64,19 @@ public partial class HotkeyCapture : UserControl
 
     private void OnLanguageChanged()
     {
+        // I18n.Changed 是全局静态事件, 触发线程不受本控件控制。
+        // 当前生产路径 (MainWindow.Opened -> InitializeAsync, 且无 ConfigureAwait(false))
+        // 的 await 续体会回到 UI 线程, 故生产侧暂不可达; 但【测试并行串扰】会让 [Fact] 用例
+        // 在线程池线程改 I18n.Language, 从而命中本控件的订阅。本回调会 SetAndRaise 多个
+        // DirectProperty 并经 RefreshPresentation 触碰 BoxBorder, 全部要求 UI 线程,
+        // 否则抛 "Call from invalid thread"。
+        // 故此处为【防御性加固 (同时消除测试并行串扰)】: 非 UI 线程一律把整个回调封送到
+        // UI 线程 (与 WindowPickButton 同形态同处理), UI 线程路径内联、行为不变。
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(OnLanguageChanged);
+            return;
+        }
         SetAndRaise(LanguageTickProperty, ref _languageTick, _languageTick + 1);
         RefreshPresentation();
     }

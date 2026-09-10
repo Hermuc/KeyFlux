@@ -77,6 +77,12 @@ public sealed class PickHostTestVm : INotifyPropertyChanged
 ///   ③ 挂入窗口 (窗口 DataContext = vm) 并 Show;
 ///   ④ 以 Success 语义调 <see cref="WindowPickButton.WriteBack"/>。
 /// </summary>
+/// <remarks>
+/// 本类宿主的控件订阅 <see cref="I18n.Changed"/> 且其回调 SetAndRaise DirectProperty
+/// (要求 UI 线程), 故纳入 I18nSerial 集合: 与会在(可能非 UI 的)线程上翻转
+/// I18n.Language 的用例互斥, 否则抛 "Call from invalid thread"。
+/// </remarks>
+[Collection("I18nSerial")]
 public sealed class WindowPickButtonBindingTests
 {
     /// <summary>裁决主实验: Success 写回必须沿 TwoWay 绑定更新宿主 VM 源。</summary>

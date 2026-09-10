@@ -14,7 +14,7 @@ namespace KeyFlux.Settings.Tests;
 /// 清空值解除 / 初始按值推导 / 手改后缀保持; 写回经 ApplyFileGroupWriteBack (SaveAsync 咽喉调用)。
 /// 行 VM 生命周期 = mapping 生命周期, 无旧编辑器的页面级关联映射 (F5-3 场景由「收起再展开」承接)。
 /// </summary>
-[Collection("BehaviorCatalogSerial")]
+[Collection("I18nSerial")]
 public sealed class FileGroupActionFilterTests
 {
     /// <summary>与 data/config.json 默认分组一致的夹具 (image/code 两组足够覆盖过滤与写回)。</summary>

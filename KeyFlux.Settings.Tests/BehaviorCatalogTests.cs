@@ -4,11 +4,18 @@ using KeyFlux.Settings.Services;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
-/// 行为目录串行集合: BehaviorCatalog 为静态单例, 6 个测试类各自 SeedForTests 播种,
-/// 并行运行时会互踩 (含 PsEdit 的播种泄漏进通配断言 -> Count 6 变 7)。禁并行修复。
+/// 全局可变状态串行集合 (I18nSerial)。合并了两类原先各自为政的串行需求:
+/// ① BehaviorCatalog 为静态单例, 多个测试类各自 SeedForTests 播种, 并行运行会互踩
+///    (含 PsEdit 的播种泄漏进通配断言 -&gt; Count 6 变 7);
+/// ② I18n.Language 为全局静态, I18nResourceTests 会在(可能非 UI 的)线程上翻转语言,
+///    而挂载了订阅 I18n.Changed 控件 (HotkeyCapture / WindowPickButton, 其回调
+///    SetAndRaise DirectProperty, 要求 UI 线程) 的用例必须与它互斥, 否则抛
+///    "Call from invalid thread"。
+/// xUnit 规定一个类只能属于一个集合, 而 SelectedActionPageViewSmokeTests 同时需要
+/// ① 与 ②, 故二者合并为单一集合并整体禁并行。
 /// </summary>
-[CollectionDefinition("BehaviorCatalogSerial", DisableParallelization = true)]
-public sealed class BehaviorCatalogSerialCollection;
+[CollectionDefinition("I18nSerial", DisableParallelization = true)]
+public sealed class I18nSerialCollection;
 
 /// <summary>
 /// 内置行为包测试夹具: 与 bin/behaviors/ 11 个 manifest 的 appliesTo/entry 语义一致
@@ -61,7 +68,7 @@ public static class BehaviorFixtures
         };
 }
 
-[Collection("BehaviorCatalogSerial")]
+[Collection("I18nSerial")]
 public sealed class BehaviorCatalogTests
 {
     /// <summary>文件语境覆盖集: 通配行为 6 项, 按目录序; 文本专用行为不覆盖文件前提。</summary>

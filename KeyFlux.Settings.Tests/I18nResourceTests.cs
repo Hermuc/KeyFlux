@@ -14,8 +14,10 @@ namespace KeyFlux.Settings.Tests;
 /// </summary>
 /// <remarks>
 /// 本类会改写全局静态 <see cref="I18n.Language"/>, 每个用例都在 finally 里还原;
-/// xunit 同类内串行。与同样读写 I18n 的 <c>PluginsPageViewSmokeTests</c> 同属
-/// [Collection("I18nSerial")], 两类用例跨类串行, 杜绝并行串扰。
+/// xunit 同类内串行。跨类串行由 [Collection("I18nSerial")] 承担: 该集合
+/// (DisableParallelization) 同时收纳挂载了订阅 I18n.Changed 控件
+/// (HotkeyCapture / WindowPickButton) 的视图冒烟用例与行为目录播种用例,
+/// 因为 I18n.Language 与 BehaviorCatalog 都是不可并行触碰的全局静态。
 /// </remarks>
 [Collection("I18nSerial")]
 public sealed class I18nResourceTests
