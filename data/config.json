@@ -1756,6 +1756,14 @@
             "comment": "重映射为 LControl",
             "remapToKey": "LControl"
           }
+        ],
+        "^g": [
+          {
+            "windowGroupID": 2,
+            "actionTypeID": 9,
+            "comment": "label:2408",
+            "actionValueID": 9
+          }
         ]
       }
     },
@@ -2216,6 +2224,12 @@
         "conditionType": 1
       },
       {
+        "id": 2,
+        "name": "📂 文件对话框",
+        "value": "ahk_class #32770",
+        "conditionType": 1
+      },
+      {
         "id": 3,
         "name": "📁 File Explorer",
         "value": "ahk_exe explorer.exe",
@@ -2267,7 +2281,18 @@
     "startup": false,
     "language": "",
     "keyMapping": "",
-    "keyboardLayout": "1 2 3 4 5 6 7 8 9 0\nq w e r t y u i o p\na s d f g h j k l ;\nz x c v b n m , . /\nspace enter backspace - [ ' singlePress"
+    "keyboardLayout": "1 2 3 4 5 6 7 8 9 0\nq w e r t y u i o p\na s d f g h j k l ;\nz x c v b n m , . /\nspace enter backspace - [ ' singlePress",
+    "quickSwitch": {
+      "collectEnabled": true,
+      "autoShow": true,
+      "autoJumpOpen": true,
+      "autoJumpSave": false,
+      "pollIntervalMs": 800,
+      "maxHistory": 200,
+      "overlayRows": 8,
+      "overlayRowsCompact": 4,
+      "excludedPrefixes": []
+    }
   },
   "selectedAction": {
     "hotkey": "",

@@ -17,6 +17,7 @@ func keyfluxActions9(a model.Action, inAbbrContext bool) string {
 		6: `EnterCapslockAbbr(capsHook)`,
 		7: `ToggleCapslock()`,
 		8: `km.ToggleLock`,
+		9: `QuickSwitchGoto()`,
 	}
 
 	call, ok := callMap[a.ValueID]

@@ -93,8 +93,18 @@ public sealed class ModelSerializationTests
             {
                 "hideMatrix", "keyfluxVersion", "windowGroups", "mouse", "scroll",
                 "commandInputSkin", "pathVariables", "startup", "language", "keyMapping", "keyboardLayout",
+                "quickSwitch",
             },
             keys);
+
+        var qsKeys = doc.RootElement.GetProperty("quickSwitch").EnumerateObject().Select(p => p.Name).ToHashSet();
+        Assert.Equal(
+            new HashSet<string>
+            {
+                "collectEnabled", "autoShow", "autoJumpOpen", "autoJumpSave",
+                "pollIntervalMs", "maxHistory", "overlayRows", "overlayRowsCompact", "excludedPrefixes",
+            },
+            qsKeys);
 
         var mouseKeys = doc.RootElement.GetProperty("mouse").EnumerateObject().Select(p => p.Name).ToHashSet();
         Assert.Equal(
@@ -247,13 +257,14 @@ public sealed class ConfigReadDefaultsTests
 
         ConfigReadDefaults.Apply(config);
 
-        Assert.Equal(2, config.Options.WindowGroups.Count);
+        // Exclude 哨兵 (id=-1) 插到头部; 另叠加读时补齐的「📂 文件对话框」组 (id=2, QuickSwitch)
+        Assert.Equal(3, config.Options.WindowGroups.Count);
         Assert.Equal(ConfigReadDefaults.ExcludeGroupId, config.Options.WindowGroups[0].Id);
         Assert.Equal("🚫 Exclude", config.Options.WindowGroups[0].Name);
 
         // 已存在排除项时不重复插入
         ConfigReadDefaults.Apply(config);
-        Assert.Equal(2, config.Options.WindowGroups.Count);
+        Assert.Equal(3, config.Options.WindowGroups.Count);
     }
 
     [Fact]

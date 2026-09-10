@@ -133,6 +133,20 @@ type Options struct {
 	Language         string           `json:"language"`
 	KeyMapping       string           `json:"keyMapping"`
 	KeyboardLayout   string           `json:"keyboardLayout"`
+	QuickSwitch      QuickSwitchOption `json:"quickSwitch"`
+}
+
+// QuickSwitchOption 「快速切换 QuickSwitch」阶段 1 配置段 (config.json 的 options.quickSwitch)。
+type QuickSwitchOption struct {
+	CollectEnabled     bool     `json:"collectEnabled"`
+	AutoShow           bool     `json:"autoShow"`
+	AutoJumpOpen       bool     `json:"autoJumpOpen"`
+	AutoJumpSave       bool     `json:"autoJumpSave"`
+	PollIntervalMs     int      `json:"pollIntervalMs"`
+	MaxHistory         int      `json:"maxHistory"`
+	OverlayRows        int      `json:"overlayRows"`
+	OverlayRowsCompact int      `json:"overlayRowsCompact"`
+	ExcludedPrefixes   []string `json:"excludedPrefixes"`
 }
 
 type WindowGroup struct {

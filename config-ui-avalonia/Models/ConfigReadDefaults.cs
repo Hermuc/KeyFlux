@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -65,12 +67,24 @@ public static class ConfigReadDefaults
     /// <summary>窗口分组排除项 (windowGroups 首项固定哨兵, id = -1)。</summary>
     public const int ExcludeGroupId = -1;
 
+    /// <summary>「📂 文件对话框」窗口组的固定 id (默认集 {-1,0,1,3}, 自动新增用 Rows.Count+1, 故 2 恒空闲)。</summary>
+    public const int FileDialogGroupId = 2;
+
+    /// <summary>「📂 文件对话框」窗口组条件值 (QuickSwitch 以此为生效范围)。</summary>
+    public const string FileDialogGroupValue = "ahk_class #32770";
+
+    /// <summary>「📂 文件对话框」窗口组显示名。</summary>
+    public const string FileDialogGroupName = "📂 文件对话框";
+
     /// <summary>
     /// 就地补齐默认值 (内存对象, 不回写磁盘):
     /// 1. keyboardLayout 为空 -> 默认键盘布局;
     /// 2. language 为空 -> 按当前系统语言环境选 "zh" / "en" (前端按 navigator.language);
     /// 3. windowGroups 首项不是 id=-1 的排除项 -> 头部插入 "🚫 Exclude";
-    /// 4. selectedAction 缺失 -> 空对象 (恒对象契约; 属性默认值已保证, 此处显式兜底)。
+    /// 4. 缺少「📂 文件对话框」窗口组 (value == "ahk_class #32770") 且 id=2 未被占用 -> 追加该组;
+    ///    (id=2 已被用户占用时不覆盖用户数据, 保持原样);
+    /// 5. 旧配置缺少 quickSwitch 段 (全零签名) -> 补齐设计默认值;
+    /// 6. selectedAction 缺失 -> 空对象 (恒对象契约; 属性默认值已保证, 此处显式兜底)。
     /// </summary>
     public static Config Apply(Config config)
     {
@@ -99,8 +113,51 @@ public static class ConfigReadDefaults
             });
         }
 
+        // 读时补齐「📂 文件对话框」窗口组 (先例: 上方的 Exclude 哨兵)。绝不回写磁盘。
+        if (!options.WindowGroups.Any(g => g.Value == FileDialogGroupValue)
+            && !options.WindowGroups.Any(g => g.Id == FileDialogGroupId))
+        {
+            options.WindowGroups.Add(new WindowGroup
+            {
+                Id = FileDialogGroupId,
+                Name = FileDialogGroupName,
+                Value = FileDialogGroupValue,
+                ConditionType = 1,
+            });
+        }
+
+        // 读时补齐 quickSwitch 段: 旧配置无该段时反序列化为全零, 以「全零签名」判定缺失。
+        if (options.QuickSwitch is null || IsQuickSwitchUnset(options.QuickSwitch))
+        {
+            options.QuickSwitch = QuickSwitchDefaults();
+        }
+
         config.SelectedAction ??= new SelectedAction();
 
         return config;
     }
+
+    /// <summary>设计 §3.1 默认值 (autoShow/autoJumpOpen=true、autoJumpSave=false、poll=800、maxHistory=200、rows=8、compact=4)。</summary>
+    public static QuickSwitchOption QuickSwitchDefaults() => new()
+    {
+        CollectEnabled = true,
+        AutoShow = true,
+        AutoJumpOpen = true,
+        AutoJumpSave = false,
+        PollIntervalMs = 800,
+        MaxHistory = 200,
+        OverlayRows = 8,
+        OverlayRowsCompact = 4,
+        ExcludedPrefixes = [],
+    };
+
+    /// <summary>
+    /// 判定 quickSwitch 是否为「旧配置缺失」的全零签名。用户合法地把三个开关全关时,
+    /// 数值字段仍保留默认 (800/200/8/4), 故不会误判为缺失。
+    /// </summary>
+    private static bool IsQuickSwitchUnset(QuickSwitchOption q)
+        => !q.CollectEnabled && !q.AutoShow && !q.AutoJumpOpen && !q.AutoJumpSave
+           && q.PollIntervalMs == 0 && q.MaxHistory == 0
+           && q.OverlayRows == 0 && q.OverlayRowsCompact == 0
+           && (q.ExcludedPrefixes is null || q.ExcludedPrefixes.Count == 0);
 }

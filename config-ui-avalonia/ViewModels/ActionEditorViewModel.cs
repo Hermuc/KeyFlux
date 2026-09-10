@@ -439,6 +439,7 @@ public static class RadioCatalog
         [
             [I(1, "71", true), I(2, "72"), I(3, "73"), I(4, "74")],
             [I(5, "75", true), I(6, "76", true), I(7, "77"), I(8, "78", true)],
+            [I(9, "2408")],
         ],
         _ => [],
     };

@@ -286,6 +286,40 @@ public sealed class Options
 
     [JsonPropertyName("keyboardLayout")]
     public string KeyboardLayout { get; set; } = "";
+
+    [JsonPropertyName("quickSwitch")]
+    public QuickSwitchOption QuickSwitch { get; set; } = new();
+}
+
+/// <summary>对应 Go struct QuickSwitchOption。快速切换 (QuickSwitch) 配置段。</summary>
+public sealed class QuickSwitchOption
+{
+    [JsonPropertyName("collectEnabled")]
+    public bool CollectEnabled { get; set; }
+
+    [JsonPropertyName("autoShow")]
+    public bool AutoShow { get; set; }
+
+    [JsonPropertyName("autoJumpOpen")]
+    public bool AutoJumpOpen { get; set; }
+
+    [JsonPropertyName("autoJumpSave")]
+    public bool AutoJumpSave { get; set; }
+
+    [JsonPropertyName("pollIntervalMs")]
+    public int PollIntervalMs { get; set; }
+
+    [JsonPropertyName("maxHistory")]
+    public int MaxHistory { get; set; }
+
+    [JsonPropertyName("overlayRows")]
+    public int OverlayRows { get; set; }
+
+    [JsonPropertyName("overlayRowsCompact")]
+    public int OverlayRowsCompact { get; set; }
+
+    [JsonPropertyName("excludedPrefixes")]
+    public List<string> ExcludedPrefixes { get; set; } = [];
 }
 
 /// <summary>对应 Go struct WindowGroup。窗口分组 (动作生效的窗口条件)。</summary>
