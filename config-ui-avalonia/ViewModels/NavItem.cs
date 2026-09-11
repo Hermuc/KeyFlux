@@ -67,6 +67,7 @@ public static class MdiIcon
         { "rocket-launch-outline", 0xF14DF },
         { "format-text-variant-outline", 0xF150F },
         { "cursor-default-outline", 0xF01BF },
+        { "play", 0xF040A },
         { "rhombus", 0xF070B },
         { "content-save-outline", 0xF0818 },
         // 插件页 (Plugins) 导航图标; 码位直接实测自内嵌 materialdesignicons.ttf 的 post/cmap 表
