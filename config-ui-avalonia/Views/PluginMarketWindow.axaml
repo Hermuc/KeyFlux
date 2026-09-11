@@ -80,7 +80,7 @@
     </Style>
   </Window.Styles>
 
-  <Border Background="{StaticResource ClaudeParchmentBrush}" Padding="20">
+  <Border Background="Transparent" Padding="20">
     <DockPanel>
 
       <!-- 底部: 关闭 (611) -->

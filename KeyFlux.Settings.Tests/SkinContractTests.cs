@@ -120,7 +120,9 @@ public sealed class SkinContractTests
         "ClaudeStoneGrayBrush", "ClaudeDarkWarmBrush", "ClaudeTerracottaBrush",
         "ClaudeCoralBrush", "ClaudeErrorBrush", "ClaudeMutedGreenBrush",
         "ClaudeMutedGreenSoftBrush", "ClaudeBorderCreamBrush", "ClaudeBorderWarmBrush",
-        "ClaudeRingWarmBrush", "ClaudeRingDeepBrush", "ClaudeWindowSurfaceBrush",
+        "ClaudeRingWarmBrush", "ClaudeRingDeepBrush",
+        // 亚克力分层: 画布 (窗口根) + 侧栏面, 二者必须带 alpha 且存在于任何皮肤中
+        "ClaudeWindowSurfaceBrush", "ClaudeSidebarSurfaceBrush",
         // 暗色桩: 定义但不接线, 仍纳入契约以免新增皮肤时漏掉
         "ClaudeDarkSurfaceBrush", "ClaudeDeepDarkBrush", "ClaudeWarmSilverBrush",
         "ClaudeBorderDarkBrush",
@@ -187,5 +189,26 @@ public sealed class SkinContractTests
             Assert.True(app.TryFindResource(key, out var value), $"皮肤覆盖键缺失: {key}");
             Assert.IsAssignableFrom<IBrush>(value);
         }
+    }
+
+    /// <summary>
+    /// 契约: 亚克力画布必须是**真的半透明**, 且透明度要够 (alpha ≤ 0xCC)。
+    /// 历史事故回归锁 —— 初版 alpha 取 0xE6 (90%) 且页面根另铺不透明 Parchment,
+    /// 磨砂从任何角度看都不可能显示。此处锁住 alpha 上限, 避免再被"保守化"回去。
+    /// </summary>
+    [AvaloniaFact]
+    public void Skin_Contract_Acrylic_Canvas_Is_Actually_Translucent()
+    {
+        var app = Application.Current!;
+
+        Assert.True(app.TryFindResource("ClaudeWindowSurfaceBrush", out var canvas));
+        var canvasColor = ((ISolidColorBrush)canvas!).Color;
+        Assert.True(canvasColor.A < 255, "亚克力画布不能完全不透明, 否则磨砂永远不可见");
+        Assert.True(canvasColor.A <= 0xCC,
+            $"亚克力画布 alpha=0x{canvasColor.A:X2} 过高 (>0xCC≈80%), 磨砂将几乎不可见");
+
+        // 侧栏同为半透明面
+        Assert.True(app.TryFindResource("ClaudeSidebarSurfaceBrush", out var sidebar));
+        Assert.True(((ISolidColorBrush)sidebar!).Color.A < 255);
     }
 }

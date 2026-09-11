@@ -9,7 +9,7 @@
   <!-- 键位图页 (复刻 views/Keymap.vue): 物理键盘网格 + 动作编辑面板 + 右侧备注汇总
        布局: 外层 Grid 只承载页面背景 (铺满内容区, 避免 Margin 露白),
        内层 Grid 带边距与裁剪; 左列 (页头/键盘/编辑面板) 固定不滚动, 右列备注汇总独立滚动 -->
-  <Grid Background="{StaticResource ClaudeParchmentBrush}">
+  <Grid Background="Transparent">
     <!-- 右边距 4 (原 24): 右列备注滚动区向右扩 20, 滚动条右移远离文字;
          文字宽度由 CommentSummaryPanel 内容右 Margin 20 保持不变 -->
     <Grid ColumnDefinitions="Auto,*" Margin="24,20,4,28" ClipToBounds="True">

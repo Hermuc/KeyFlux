@@ -111,7 +111,7 @@
     </Style>
   </UserControl.Styles>
 
-  <ScrollViewer Background="{StaticResource ClaudeParchmentBrush}">
+  <ScrollViewer Background="Transparent">
     <StackPanel Margin="36,32,36,40" Spacing="16" MaxWidth="820" HorizontalAlignment="Left">
 
       <!-- 标题行: 页面标题 (共用 2418) + 两个入口 (市场 2428 / 导入 2427) -->

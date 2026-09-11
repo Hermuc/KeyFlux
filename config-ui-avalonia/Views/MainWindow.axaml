@@ -118,7 +118,7 @@
     <Grid ColumnDefinitions="264,*">
 
     <!-- ===================== 左侧导航 (复刻 NavigationDrawer.vue) ===================== -->
-    <Border Grid.Column="0" Background="{StaticResource ClaudeIvoryBrush}"
+    <Border Grid.Column="0" Background="{StaticResource ClaudeSidebarSurfaceBrush}"
             BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="0,0,1,0">
       <DockPanel>
 
@@ -172,7 +172,7 @@
     </Border>
 
     <!-- ===================== 右侧内容区 ===================== -->
-    <Grid Grid.Column="1" Background="{StaticResource ClaudeParchmentBrush}">
+    <Grid Grid.Column="1" Background="Transparent">
       <ContentControl Content="{Binding CurrentPage}">
         <ContentControl.DataTemplates>
           <DataTemplate DataType="vm:HomePageViewModel">

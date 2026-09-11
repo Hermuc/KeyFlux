@@ -87,7 +87,8 @@
               ClaudeMutedGreenBrush / ClaudeMutedGreenSoftBrush /
               ClaudeBorderCreamBrush / ClaudeBorderWarmBrush /
               ClaudeRingWarmBrush / ClaudeRingDeepBrush /
-              ClaudeWindowSurfaceBrush  ← 窗口亚克力半透明底 (带 alpha)
+              ClaudeWindowSurfaceBrush   ← 亚克力画布 (半透明 Parchment, 铺在窗口根)
+              ClaudeSidebarSurfaceBrush  ← 侧栏面 (半透明 Ivory)
               暗色桩 (定义但不接线): ClaudeDarkSurfaceBrush / ClaudeDeepDarkBrush /
               ClaudeWarmSilverBrush / ClaudeBorderDarkBrush
     阴影 (5):  ClaudeShadowHoverRing / ClaudeShadowCtaRing /
@@ -104,6 +105,16 @@
     · 不得引入高饱和色 (仅允许品牌色做强调)
     · 互动态一律用 ring 阴影 (0 0 0 1) 而非投影; pressed 用 inset 环 (Level 4)
     · 标题用 serif, 字重上限 Medium; 正文行高 1.60
+
+  【★ 亚克力分层规则 (换肤必读, 踩过一次)】
+    窗口亚克力要真正可见, 必须三层各司其职, **任何一层放不透明底都会把磨砂彻底盖住**:
+      ① 窗口根 Border  → ClaudeWindowSurfaceBrush (半透明, 让底层模糊透出)
+      ② 侧栏 / 分栏面  → ClaudeSidebarSurfaceBrush (半透明 Ivory, 与画布形成层次)
+      ③ 页面根 / 内容区 → **Transparent** (绝对不要在这里再铺 Parchment!)
+    卡片 (Ivory/Sand) 保持**不透明** —— 半透明画布 + 实心卡片才是正确的视觉层次。
+    历史事故: 初版把页面根与内容区都设成不透明 ClaudeParchmentBrush, 又在画布上用
+    90% alpha, 结果磨砂从任何角度看都不可能显示 (被上层不透明面完全遮住)。
+    调磨砂强度只改 ClaudeWindowSurfaceBrush 的 alpha: 越小越透 (当前 0xB3≈70%)。
   ############################################################################
 -->
 <Styles xmlns="https://github.com/avaloniaui"
@@ -163,7 +174,8 @@
          平台不支持时 Avalonia 会回落到 None —— 此时若 alpha 过低, 暖底会明显发灰发脏。
          90% 在 None 下与实心 Parchment 肉眼几乎无差, 在有模糊时能透出材质感。
          若要更明显的磨砂效果, 只需下调这一个 alpha 值 (越小越透)。 -->
-    <SolidColorBrush x:Key="ClaudeWindowSurfaceBrush" Color="#E6f5f4ed" />
+    <SolidColorBrush x:Key="ClaudeWindowSurfaceBrush"   Color="#B3f5f4ed" />
+    <SolidColorBrush x:Key="ClaudeSidebarSurfaceBrush"  Color="#C4faf9f5" />
 
   </Styles.Resources>
 

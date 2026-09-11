@@ -30,7 +30,7 @@
        460->368 后 MaxWidth 同步 1088->988, 否则基准变窄会推高整体倍率使左列连带变大); 要调上限改 MaxWidth;
        HorizontalAlignment=Left 使封顶后内容左对齐 (同自定义热键页), 避免居中在两侧留大白;
        纵向默认 Auto -> Viewbox 纵向不放大, 放大溢出由 ScrollViewer 滚动承接 -->
-  <ScrollViewer Background="{StaticResource ClaudeParchmentBrush}">
+  <ScrollViewer Background="Transparent">
     <Viewbox Stretch="Uniform" MaxWidth="988" HorizontalAlignment="Left">
     <Grid ColumnDefinitions="500,*" Margin="24,20,24,28">
 
