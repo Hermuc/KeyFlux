@@ -17,18 +17,30 @@
   </Window.KeyBindings>
 
   <Window.Styles>
-    <!-- 导航条目: 悬停与选中的轻量高亮 -->
+    <!-- 导航条目: Claude 暖色态 (Sand 高亮 + Ring 按动)
+         注意: Fluent 模板把 Background 设在 ContentPresenter#PART_ContentPresenter 上,
+         故三态必须指名该部件, 否则被模板值压住 (本地值/模板值优先级高于裸控件样式)。 -->
     <Style Selector="ListBoxItem">
       <Setter Property="Padding" Value="8,6" />
-      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
       <Setter Property="Margin" Value="0,1" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeRingWarmBrush}" />
     </Style>
   </Window.Styles>
 
   <Grid ColumnDefinitions="264,*">
 
     <!-- ===================== 左侧导航 (复刻 NavigationDrawer.vue) ===================== -->
-    <Border Grid.Column="0" Background="#F7F8FB" BorderBrush="#E3E6EC" BorderThickness="0,0,1,0">
+    <Border Grid.Column="0" Background="{StaticResource ClaudeIvoryBrush}"
+            BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="0,0,1,0">
       <DockPanel>
 
         <!-- 头部: Logo + 名称 + 版本号 -->
@@ -40,21 +52,22 @@
             <Image Source="avares://KeyFlux.Settings/Assets/logo.png"
                    Width="52" Height="52" />
             <TextBlock VerticalAlignment="Center" Text="KeyFlux"
-                       FontSize="18" FontWeight="SemiBold" />
+                       FontFamily="{StaticResource ClaudeSerifFont}"
+                       FontSize="18" FontWeight="Medium"
+                       Foreground="{StaticResource ClaudeNearBlackBrush}" />
           </StackPanel>
-          <Border Height="1" Background="#E3E6EC" />
+          <Border Height="1" Background="{StaticResource ClaudeBorderCreamBrush}" />
         </StackPanel>
 
         <!-- 底部: 保存按钮 (label:507) + 保存成功提示 -->
         <StackPanel DockPanel.Dock="Bottom" Margin="16,10,16,16" Spacing="6">
-          <Border Height="1" Background="#E3E6EC" Margin="0,0,0,10" />
+          <Border Height="1" Background="{StaticResource ClaudeBorderCreamBrush}" Margin="0,0,0,10" />
           <TextBlock Text="{Binding SaveNotice}"
                      IsVisible="{Binding SaveNotice, Converter={StaticResource NotEmpty}}"
-                     Foreground="#2E7D32" FontSize="12" HorizontalAlignment="Center" />
-          <Button Command="{Binding SaveCommand}"
-                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                  Background="White" BorderBrush="#4169E1" BorderThickness="1"
-                  Foreground="#4169E1" Padding="10,8" CornerRadius="8">
+                     Foreground="{StaticResource ClaudeMutedGreenBrush}" FontSize="12" HorizontalAlignment="Center" />
+          <!-- 主操作: Terracotta CTA; 内联底色/描边/圆角全部去掉, 交给 claudeCta 样式接管 -->
+          <Button Command="{Binding SaveCommand}" Classes="claudeCta"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=507}" />
           </Button>
         </StackPanel>
@@ -80,7 +93,7 @@
     </Border>
 
     <!-- ===================== 右侧内容区 ===================== -->
-    <Grid Grid.Column="1" Background="#FCFCFE">
+    <Grid Grid.Column="1" Background="{StaticResource ClaudeParchmentBrush}">
       <ContentControl Content="{Binding CurrentPage}">
         <ContentControl.DataTemplates>
           <DataTemplate DataType="vm:HomePageViewModel">
@@ -105,25 +118,27 @@
       </ContentControl>
 
       <!-- 加载遮罩 -->
-      <Border IsVisible="{Binding IsLoading}" Background="#F0F2F7">
+      <Border IsVisible="{Binding IsLoading}" Background="{StaticResource ClaudeParchmentBrush}">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
-          <ProgressBar IsIndeterminate="True" Width="220" Foreground="#4169E1" />
+          <ProgressBar IsIndeterminate="True" Width="220" Foreground="{StaticResource ClaudeTerracottaBrush}" />
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=917}"
-                     Foreground="#8A8F98" HorizontalAlignment="Center" />
+                     Foreground="{StaticResource ClaudeStoneGrayBrush}" HorizontalAlignment="Center" />
         </StackPanel>
       </Border>
 
       <!-- 友好错误页: 后端不可达时展示原因与重试 -->
-      <Border IsVisible="{Binding HasError}" Background="#F0F2F7">
+      <Border IsVisible="{Binding HasError}" Background="{StaticResource ClaudeParchmentBrush}">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="560">
           <TextBlock Text="⚠" FontSize="42" HorizontalAlignment="Center" />
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=919}"
-                     FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"
+                     FontFamily="{StaticResource ClaudeSerifFont}"
+                     FontSize="18" FontWeight="Medium" HorizontalAlignment="Center"
+                     Foreground="{StaticResource ClaudeNearBlackBrush}"
                      TextWrapping="Wrap" TextAlignment="Center" />
-          <TextBlock Text="{Binding ErrorMessage}" Foreground="#8A8F98"
+          <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                      TextWrapping="Wrap" TextAlignment="Center" />
-          <Button Command="{Binding RetryCommand}" HorizontalAlignment="Center"
-                  Background="#4169E1" Foreground="White" Padding="18,8" CornerRadius="8"
+          <Button Command="{Binding RetryCommand}" Classes="claudeCta" HorizontalAlignment="Center"
+                  Padding="18,8"
                   Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=920}" />
         </StackPanel>
       </Border>

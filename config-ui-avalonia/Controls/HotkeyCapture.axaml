@@ -10,23 +10,24 @@
        Esc 单独按下或焦点丢失取消; 冲突时红字提示 (保守归一化比较)。 -->
   <StackPanel Spacing="3">
     <Border x:Name="BoxBorder"
-            Background="White" BorderBrush="#C9CDD4" BorderThickness="1"
-            CornerRadius="6" Padding="8,6" Cursor="Hand">
+            Background="{StaticResource ClaudeIvoryBrush}"
+            BorderBrush="{StaticResource ClaudeRingWarmBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="8,6" Cursor="Hand">
       <Grid ColumnDefinitions="20,*,Auto">
         <TextBlock Text="{Binding IconText}" FontSize="14"
-                   VerticalAlignment="Center" Foreground="#5F6368" />
+                   VerticalAlignment="Center" Foreground="{StaticResource ClaudeStoneGrayBrush}" />
         <TextBlock Grid.Column="1" Text="{Binding DisplayText}"
                    VerticalAlignment="Center" Margin="6,0"
                    Foreground="{Binding TextBrush}" TextTrimming="CharacterEllipsis" />
         <Button Grid.Column="2" x:Name="ClearButton"
                 IsVisible="{Binding ShowClearButton}"
                 Background="Transparent" BorderThickness="0" Padding="2"
-                Foreground="#8A8F98" FontSize="11" Content="✕"
+                Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="11" Content="✕"
                 Click="OnClearClick" />
       </Grid>
     </Border>
     <TextBlock IsVisible="{Binding HasConflict}"
                Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1025}"
-               Foreground="#D32F2F" FontSize="11" TextWrapping="Wrap" />
+               Foreground="{StaticResource ClaudeErrorBrush}" FontSize="11" TextWrapping="Wrap" />
   </StackPanel>
 </UserControl>

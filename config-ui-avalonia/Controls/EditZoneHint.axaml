@@ -2,29 +2,29 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="KeyFlux.Settings.Controls.EditZoneHint">
 
-  <!-- 悬停反馈: 背景提亮 + 边框转主题蓝 (复刻 scheme-card:hover 风格, 提示区域可点击)
+  <!-- 悬停反馈: 背景提亮 + 边框转陶土色 (提示区域可点击)
        注意: 默认背景/边框也放样式里而非控件本地值 —— 本地值优先级高于样式,
        否则 :pointerover 的 Setter 永远无法覆盖 (Avalonia 样式优先级规则)。 -->
   <UserControl.Styles>
     <Style Selector="Border.edit-zone">
-      <Setter Property="Background" Value="White" />
-      <Setter Property="BorderBrush" Value="#E3E6EC" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderWarmBrush}" />
     </Style>
     <Style Selector="Border.edit-zone:pointerover">
-      <Setter Property="Background" Value="#EEF3FC" />
-      <Setter Property="BorderBrush" Value="#4169E1" />
+      <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
     </Style>
   </UserControl.Styles>
 
   <StackPanel>
     <!-- 水平虚线分割线: 视觉上隔开上方正文内容与下方编辑区 -->
-    <Rectangle Height="1" Stroke="#D0D4DC" StrokeThickness="1"
+    <Rectangle Height="1" Stroke="{StaticResource ClaudeRingWarmBrush}" StrokeThickness="1"
                StrokeDashArray="4,4" Margin="0,0,0,14" />
     <!-- 可点击编辑区: 全宽浅边框卡片, 手型光标, 悬停高亮 (见上方样式) -->
     <Border Classes="edit-zone" BorderThickness="1"
-            CornerRadius="8" Padding="0,11" Cursor="Hand" Tapped="OnZoneTapped">
+            CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="0,11" Cursor="Hand" Tapped="OnZoneTapped">
       <TextBlock x:Name="HintText"
-                 FontSize="13" Foreground="#4169E1" HorizontalAlignment="Center" />
+                 FontSize="13" Foreground="{StaticResource ClaudeTerracottaBrush}" HorizontalAlignment="Center" />
     </Border>
   </StackPanel>
 

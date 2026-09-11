@@ -12,7 +12,9 @@
 
     <!-- 标题 (label:305; LanguageTick 变化驱动文案重算) -->
     <TextBlock Text="{Binding LanguageTick, RelativeSource={RelativeSource AncestorType=local:CommentSummaryPanel}, Converter={StaticResource Tr}, ConverterParameter=305}"
-               FontSize="15" FontWeight="SemiBold" Margin="0,0,0,10" />
+               FontFamily="{StaticResource ClaudeSerifFont}"
+               FontSize="15" FontWeight="Medium" Margin="0,0,0,10"
+               Foreground="{StaticResource ClaudeNearBlackBrush}" />
 
     <!-- 条目列表: 独立纵向滚动 (横向禁用, 长备注换行);
          文字与滚动条的空隙全部来自「滚动条右移」而非压缩文字:
@@ -27,9 +29,9 @@
             <StackPanel Margin="0,0,0,12">
               <!-- 单行条目: 加粗按键 - 灰色备注, 长备注自动换行; 字号 13→14 (适当增大, 与标题 15 协调) -->
               <TextBlock TextWrapping="Wrap" FontSize="14">
-                <Run Text="{Binding KeyText}" FontWeight="SemiBold" Foreground="#20242B" />
-                <Run Text=" - " Foreground="#5A5F68" />
-                <Run Text="{Binding Comment}" Foreground="#5A5F68" />
+                <Run Text="{Binding KeyText}" FontWeight="SemiBold" Foreground="{StaticResource ClaudeNearBlackBrush}" />
+                <Run Text=" - " Foreground="{StaticResource ClaudeOliveGrayBrush}" />
+                <Run Text="{Binding Comment}" Foreground="{StaticResource ClaudeOliveGrayBrush}" />
               </TextBlock>
             </StackPanel>
           </DataTemplate>

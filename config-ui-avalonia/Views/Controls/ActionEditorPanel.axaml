@@ -13,7 +13,9 @@
        若自然高度变化 (实测类型 3/7 = 422 > 空态 380), 缩放比随之变小, 整页 (键盘网格+编辑框)
        被等比缩小 (点选键后页面抖动 bug)。固定 430 = 最高编辑器 422 + 字体度量余量;
        编辑器内容区包 ScrollViewer 兜底, 超出时滚动而非撑高, 保证缩放比恒定 -->
-  <Border Background="White" CornerRadius="12" BorderBrush="#E3E6EC" BorderThickness="1"
+  <Border Background="{StaticResource ClaudeIvoryBrush}"
+          CornerRadius="{StaticResource ClaudeRadiusLg}"
+          BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
           Height="430" Padding="16,12" HorizontalAlignment="Stretch">
     <DockPanel>
 
@@ -40,18 +42,18 @@
             <StackPanel Spacing="6">
               <Grid ColumnDefinitions="140,*,Auto" ColumnSpacing="10" Margin="0,6,0,0">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=301}"
-                           Foreground="#8A8F98" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
+                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
                 <TextBox Grid.Column="1" Text="{Binding WinTitle}" Padding="8,6" />
                 <controls:WindowPickButton Grid.Column="2" Text="{Binding WinTitle}" Kind="TitleAndExe"
                                            Margin="6,0,0,0" VerticalAlignment="Center" />
               </Grid>
-              <TextBlock Text="{Binding WinTitleError}" Foreground="#C62828" FontSize="12" TextWrapping="Wrap"
+              <TextBlock Text="{Binding WinTitleError}" Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12" TextWrapping="Wrap"
                          IsVisible="{Binding WinTitleError, Converter={StaticResource NotEmpty}}" />
               <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=301hint}"
-                         Foreground="#8A8F98" FontSize="12" TextWrapping="Wrap" />
+                         Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" TextWrapping="Wrap" />
               <Grid ColumnDefinitions="140,*" ColumnSpacing="10" Margin="0,6,0,0">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=302}"
-                           Foreground="#8A8F98" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
+                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
                 <AutoCompleteBox Grid.Column="1" Text="{Binding Target, Mode=TwoWay}"
                                  ItemsSource="{Binding Shortcuts}"
                                  Padding="8,6" />
@@ -59,17 +61,17 @@
 
               <Grid ColumnDefinitions="140,*" ColumnSpacing="10" Margin="0,6,0,0">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=303}"
-                           Foreground="#8A8F98" FontSize="12" VerticalAlignment="Center" />
+                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding Args}" Padding="8,6" />
               </Grid>
               <Grid ColumnDefinitions="140,*" ColumnSpacing="10">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=304}"
-                           Foreground="#8A8F98" FontSize="12" VerticalAlignment="Center" />
+                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding WorkingDir}" Padding="8,6" />
               </Grid>
               <Grid ColumnDefinitions="140,*" ColumnSpacing="10">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=305}"
-                           Foreground="#8A8F98" FontSize="12" VerticalAlignment="Center" />
+                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding Comment}" Padding="8,6" />
               </Grid>
 
@@ -83,8 +85,7 @@
               </WrapPanel>
 
               <Button Command="{Binding RunWindowSpyCommand}" Margin="0,6,0,0"
-                      Background="Transparent" BorderBrush="#4169E1" BorderThickness="1"
-                      Foreground="#4169E1" Padding="10,5" CornerRadius="8">
+                      Classes="claudeGhost">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=309}" />
               </Button>
             </StackPanel>
@@ -124,16 +125,17 @@
           <DataTemplate DataType="vm:RemapEditorVm" x:DataType="vm:RemapEditorVm">
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=401}"
-                         Foreground="#8A8F98" FontSize="12" />
+                         Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
               <AutoCompleteBox Text="{Binding RemapToKey, Mode=TwoWay}"
                                ItemsSource="{Binding Items}"
                                IsEnabled="{Binding !IsSinglePress}"
                                Padding="8,6" />
               <!-- 复刻 RemapKey.vue 的 singlePress 报错卡片 -->
-              <Border BorderBrush="#C62828" BorderThickness="1" CornerRadius="8" Padding="10,6"
+              <Border BorderBrush="{StaticResource ClaudeErrorBrush}" BorderThickness="1"
+                      CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="10,6"
                       IsVisible="{Binding IsSinglePress}">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=954}"
-                           Foreground="#C62828" FontSize="12" TextWrapping="Wrap" />
+                           Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12" TextWrapping="Wrap" />
               </Border>
             </StackPanel>
           </DataTemplate>
@@ -142,11 +144,11 @@
           <DataTemplate DataType="vm:SendKeysEditorVm" x:DataType="vm:SendKeysEditorVm">
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=402}"
-                         Foreground="#8A8F98" FontSize="12" />
+                         Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
               <TextBox Text="{Binding KeysToSend}" AcceptsReturn="True" MinHeight="80"
                        FontFamily="Consolas,Courier New" FontSize="13" Padding="8,6" />
               <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=305}"
-                         Foreground="#8A8F98" FontSize="12" />
+                         Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
               <TextBox Text="{Binding Comment}" Padding="8,6" />
             </StackPanel>
           </DataTemplate>
@@ -155,20 +157,20 @@
           <DataTemplate DataType="vm:AhkCodeEditorVm" x:DataType="vm:AhkCodeEditorVm">
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=403}"
-                         Foreground="#8A8F98" FontSize="12" />
+                         Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
               <!-- 跟随面板宽度铺满 (原先 MinWidth=420 在动态窄面板下强制溢出, 已移除; 720 页本就满宽无副作用) -->
               <ComboBox ItemsSource="{Binding Examples}" SelectionChanged="OnAhkExampleSelected"
                         HorizontalAlignment="Stretch" />
               <TextBox Text="{Binding AhkCode}" AcceptsReturn="True" AcceptsTab="True" MinHeight="100"
                        FontFamily="Consolas,Courier New" FontSize="13" Padding="8,6" />
               <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=305}"
-                         Foreground="#8A8F98" FontSize="12" />
+                         Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
               <TextBox Text="{Binding Comment}" Padding="8,6" />
               <TextBlock Text="Tips:" FontWeight="SemiBold" Margin="0,8,0,0" />
               <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=955}"
-                         Foreground="#8A8F98" FontSize="12" TextWrapping="Wrap" />
+                         Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" TextWrapping="Wrap" />
               <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=956}"
-                         Foreground="#8A8F98" FontSize="12" TextWrapping="Wrap" />
+                         Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>
           </DataTemplate>
 

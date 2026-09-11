@@ -20,8 +20,9 @@
     <Button x:Name="PickButton"
             Click="OnPickClick"
             IsEnabled="{Binding !$parent[controls:WindowPickButton].IsPicking}"
-            Background="Transparent" BorderBrush="#4169E1" BorderThickness="1"
-            Foreground="#4169E1" Padding="0" CornerRadius="6"
+            Background="Transparent" BorderBrush="{StaticResource ClaudeBorderWarmBrush}" BorderThickness="1"
+            Foreground="{StaticResource ClaudeTerracottaBrush}" Padding="0"
+            CornerRadius="{StaticResource ClaudeRadiusSm}"
             Width="30" Height="30" Cursor="Hand"
             HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
             ToolTip.Tip="{Binding $parent[controls:WindowPickButton].LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1080}">
@@ -36,9 +37,11 @@
            Focusable="False"
            IsLightDismissEnabled="False"
            IsOpen="{Binding $parent[controls:WindowPickButton].MessageText, Mode=OneWay, Converter={StaticResource NotEmpty}}">
-      <Border Background="#FFF3F3" BorderBrush="#C62828" BorderThickness="1"
-              CornerRadius="6" Padding="10,6" MaxWidth="240" Focusable="False">
-        <TextBlock Text="{Binding $parent[controls:WindowPickButton].MessageText}" Foreground="#C62828" FontSize="12" TextWrapping="Wrap" />
+      <Border Background="{StaticResource ClaudeIvoryBrush}"
+              BorderBrush="{StaticResource ClaudeErrorBrush}" BorderThickness="1"
+              CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="10,6" MaxWidth="240" Focusable="False">
+        <TextBlock Text="{Binding $parent[controls:WindowPickButton].MessageText}"
+                   Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12" TextWrapping="Wrap" />
       </Border>
     </Popup>
   </Panel>
