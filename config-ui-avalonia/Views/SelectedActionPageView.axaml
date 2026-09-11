@@ -80,8 +80,11 @@
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
               <Button Classes="icon-btn" Command="{Binding TestRowCommand}" Content="▶"
+                      ToolTip.ShowDelay="200"
                       ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
-              <Button Classes="icon-btn danger" Command="{Binding AskRemoveCommand}" Content="✕" />
+              <Button Classes="icon-btn danger" Command="{Binding AskRemoveCommand}" Content="✕"
+                      ToolTip.ShowDelay="200"
+                      ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1108}" />
             </StackPanel>
           </Grid>
 
@@ -237,10 +240,18 @@
     <Style Selector="Button.icon-btn">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="6,2" />
-      <Setter Property="MinWidth" Value="28" />
-      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Padding" Value="9,4" />
+      <Setter Property="MinWidth" Value="34" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="FontSize" Value="15" />
       <Setter Property="Foreground" Value="{StaticResource ClaudeDarkWarmBrush}" />
+      <Setter Property="ToolTip.ShowDelay" Value="200" />
+    </Style>
+    <!-- 基态也要压掉模板部件底色: Fluent 在 PART_ContentPresenter 上设背景
+         (默认是系统强调色蓝), 只改控件属性会在基态被模板值压住 ——
+         这正是"▶ 按钮是蓝色方框"的根因, 与皮肤契约里记录的坑同源。 -->
+    <Style Selector="Button.icon-btn /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
     </Style>
     <Style Selector="Button.icon-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
@@ -377,7 +388,8 @@
               <CheckBox Grid.Column="1" IsChecked="{Binding TestIsFile}" VerticalAlignment="Center"
                         Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=989}" />
               <Button Grid.Column="2" Command="{Binding RunTestCommand}" Background="{StaticResource ClaudeTerracottaBrush}"
-                      Foreground="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="16,7" VerticalAlignment="Center"
+                      Foreground="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="20,9" FontSize="14"
+                      VerticalAlignment="Center" ToolTip.ShowDelay="200"
                       IsEnabled="{Binding !Testing}"
                       Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
             </Grid>
