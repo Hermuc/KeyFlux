@@ -60,6 +60,51 @@
       App.axaml 通过 StyleInclude 引入本文件 (根节点即 Styles, 其 Styles.Resources
       随 StyleInclude 合并进应用资源字典, 故 StaticResource 令牌在全部页面/窗口中均可解析)。
   ============================================================================
+
+  ############################################################################
+  ##  皮肤契约 (Skin Contract) —— 换肤功能的唯一接口面                       ##
+  ############################################################################
+  本文件是**皮肤 1 (Claude 暖色)**。切换皮肤功能尚未实现, 但配色已完全模块化:
+  换肤 = 替换下表中的三处, 无需触碰任何页面 XAML 或 ViewModel。
+
+  【换肤点 · 共 3 处】
+    1. 本文件 (Styles/Skins/<皮肤名>.axaml)
+       —— 定义下方「必需令牌清单」的全部键 + 全部 claude* 类样式。
+    2. App.axaml 的 <StyleInclude> 一行 —— 指向 1 中的文件。(真正的开关)
+    3. App.axaml 的 Application.Resources 里 3 个 ToggleSwitch* 覆盖值
+       —— 之所以不在本文件: Fluent 模板内部用 {DynamicResource} 取它们,
+          而模板资源查找沿【逻辑树】走, 不经过样式集合资源 (与 ScrollBarSize 同理)。
+    另: C# 侧色值真源是 ViewModels/ClaudePalette.cs, 新增皮肤需同步提供对应 palette;
+        它已被 8 个文件引用 (HotkeyCapture / SelectedActionPageView / NavItem /
+        MainViewModel / Keymap·Abbr·CustomHotkey·SelectedAction PageViewModel /
+        MappingRowVm / MarkdownRenderer / WindowPickerSession)。
+
+  【必需令牌清单 —— 新皮肤必须提供同名同类型的全部键, 否则 SkinContractTests 会红】
+    画刷 (22): ClaudeParchmentBrush / ClaudeIvoryBrush / ClaudeWhiteBrush /
+              ClaudeSandBrush / ClaudeNearBlackBrush / ClaudeCharcoalWarmBrush /
+              ClaudeOliveGrayBrush / ClaudeStoneGrayBrush / ClaudeDarkWarmBrush /
+              ClaudeTerracottaBrush / ClaudeCoralBrush / ClaudeErrorBrush /
+              ClaudeMutedGreenBrush / ClaudeMutedGreenSoftBrush /
+              ClaudeBorderCreamBrush / ClaudeBorderWarmBrush /
+              ClaudeRingWarmBrush / ClaudeRingDeepBrush /
+              ClaudeWindowSurfaceBrush  ← 窗口亚克力半透明底 (带 alpha)
+              暗色桩 (定义但不接线): ClaudeDarkSurfaceBrush / ClaudeDeepDarkBrush /
+              ClaudeWarmSilverBrush / ClaudeBorderDarkBrush
+    阴影 (5):  ClaudeShadowHoverRing / ClaudeShadowCtaRing /
+              ClaudeShadowPressedInset / ClaudeShadowFocusRing / ClaudeShadowWhisper
+    尺寸 (4):  ClaudeRadiusSm / ClaudeRadiusMd / ClaudeRadiusLg / ClaudeRadiusXl
+              ⚠ 类型必须是 CornerRadius (不是 x:Double) —— 历史事故: 曾定义成 Double,
+                构建 0 错误但所有窗口加载即抛 InvalidCastException。
+    字体 (1):  ClaudeSerifFont
+    类样式:    TextBlock.claude{Title,Subtitle,Body,Muted,Dim} /
+              Border.claudeCard / Button.claude{Cta,Sand,Ghost,Danger} /
+              ToggleSwitch.claudeCompact / TextBox·ComboBox.claudeInput
+
+  【本皮肤仍需遵守的设计约束 (来自 DESIGN.md, 换肤时按新皮肤规范替换)】
+    · 不得引入高饱和色 (仅允许品牌色做强调)
+    · 互动态一律用 ring 阴影 (0 0 0 1) 而非投影; pressed 用 inset 环 (Level 4)
+    · 标题用 serif, 字重上限 Medium; 正文行高 1.60
+  ############################################################################
 -->
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">

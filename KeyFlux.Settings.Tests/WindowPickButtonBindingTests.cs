@@ -32,7 +32,7 @@ public sealed class WindowPickBindingTestApp : Application
         // 注意 StyleInclude 的 Source 必须显式赋值 —— 构造函数参数是 baseUri, 不是加载目标。
         Styles.Add(new StyleInclude(new Uri("avares://KeyFlux.Settings/"))
         {
-            Source = new Uri("avares://KeyFlux.Settings/Styles/ClaudeTheme.axaml"),
+            Source = new Uri("avares://KeyFlux.Settings/Styles/Skins/Claude.axaml"),
         });
         Resources["Tr"] = new I18nConverter();
         Resources["NotEmpty"] = new StringNotEmptyConverter();
@@ -42,6 +42,12 @@ public sealed class WindowPickBindingTestApp : Application
         Resources["NotNull"] = new NotNullConverter();
         Resources["MdiFont"] = new FontFamily(
             "avares://KeyFlux.Settings/Assets/Fonts/materialdesignicons.ttf#Material Design Icons");
+        // 镜像 App.axaml 的皮肤侧 Fluent 模板覆盖 (夹具不加载 App.axaml, 故需手动同步;
+        // 与上方 Tr/NotEmpty/... 同一做法)。缺它们则 ToggleSwitch 开启态退回系统强调色,
+        // SkinContractTests 的覆盖键校验也会红。
+        Resources["ToggleSwitchFillOn"] = new SolidColorBrush(Color.Parse("#c96442"));
+        Resources["ToggleSwitchStrokeOn"] = new SolidColorBrush(Color.Parse("#c96442"));
+        Resources["ToggleSwitchKnobFillOn"] = new SolidColorBrush(Color.Parse("#faf9f5"));
     }
 }
 

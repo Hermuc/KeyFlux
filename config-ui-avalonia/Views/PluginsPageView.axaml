@@ -9,16 +9,9 @@
        统一插件列表 (首卡内置「快速切换」+ 用户插件, 不分区), 每卡 = 插件信息 + 开关一体化:
        开关在右, 状态文字 (已启用/已停用) 在开关正下方。入口 = 插件市场 (terracotta CTA) + 导入插件。
        诚实边界: 引擎侧插件运行时为阶段 2, 用户插件卡带「运行时支持开发中」标注。
-       样式全部页面级自包含, 不动 App.axaml (其他页面留待后续统一重构)。
-       本次(提交 2)补按动/焦点态, 并将硬编码 hex 改为引用 ClaudeTheme.axaml 资源键。 -->
-
-  <UserControl.Resources>
-    <!-- ToggleSwitch 开启态 Fluent 画刷覆盖为 Terracotta (仅本页; 其 Color 为 Fluent 覆盖键,
-         保留 hex 以维持与 Fluent 资源键类型一致, 不属于冷色残留扫描范围) -->
-    <SolidColorBrush x:Key="ToggleSwitchFillOn">#c96442</SolidColorBrush>
-    <SolidColorBrush x:Key="ToggleSwitchStrokeOn">#c96442</SolidColorBrush>
-    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn">#faf9f5</SolidColorBrush>
-  </UserControl.Resources>
+       本页样式页面级自包含; 令牌与类样式来自皮肤文件 Styles/Skins/Claude.axaml。
+       原页内的 ToggleSwitch 开启态覆盖已上移到 App.axaml 的 Application.Resources
+       (模板内部 {DynamicResource} 沿逻辑树查找, 放在页面里只对本页生效且属皮肤值外泄)。 -->
 
   <UserControl.Styles>
     <!-- 标题 serif: Georgia (中文回退雅黑), DESIGN.md「serif 承载标题」 -->

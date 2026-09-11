@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using KeyFlux.Settings.Services.Win32;
 using static KeyFlux.Settings.Services.Win32.NativeMethods;
 
@@ -154,7 +155,18 @@ internal sealed class PickSession
 {
     private const string HighlightClassName = "KeyFlux.WindowPicker.Highlight";
     private const int FrameThickness = 3;      // 高亮框空心边宽 (px)
-    private const uint HighlightColorRef = 0x004264C9; // #c96442 (Terracotta) -> COLORREF 0x00BBGGRR
+    /// <summary>
+    /// 拾取高亮框颜色 (Win32 COLORREF, 0x00BBGGRR 字节序)。
+    /// 由皮肤令牌 Terracotta 推导, **不写字面量** —— 换肤时随令牌自动跟随。
+    /// </summary>
+    private static readonly uint HighlightColorRef = ToColorRef(ClaudePalette.Terracotta);
+
+    /// <summary>#RRGGBB → Win32 COLORREF (0x00BBGGRR)。</summary>
+    private static uint ToColorRef(string hexRgb)
+    {
+        var c = Color.Parse(hexRgb);
+        return (uint)(c.R | (c.G << 8) | (c.B << 16));
+    }
     private static readonly IntPtr TimerId = new(1);
 
     private readonly Window _owner;

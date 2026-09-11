@@ -3,7 +3,7 @@ using Avalonia.Media;
 namespace KeyFlux.Settings;
 
 /// <summary>
-/// Claude / Anthropic 暖色令牌的 C# 真源, 与 <c>Styles/ClaudeTheme.axaml</c> 同值同源。
+/// Claude / Anthropic 暖色令牌的 C# 真源, 与 <c>Styles/Skins/Claude.axaml</c> 同值同源。
 /// <para>
 /// 资源字典 (XAML) 不会被 C# 自动查找, 故 8 处 C# 色值引用点 (计划书 §三) 改为引用本类,
 /// 与 XAML 资源键保持单一事实来源, 避免两处各写一份 hex 导致日后漂移。
@@ -12,7 +12,7 @@ namespace KeyFlux.Settings;
 /// </summary>
 public static class ClaudePalette
 {
-    // ── 画刷 / 颜色令牌 (浅色 18 项, 与 ClaudeTheme.axaml 一一对应) ──
+    // ── 画刷 / 颜色令牌 (浅色 18 项, 与 Styles/Skins/Claude.axaml 一一对应) ──
     public const string Parchment      = "#f5f4ed";
     public const string Ivory          = "#faf9f5";
     public const string White          = "#ffffff";

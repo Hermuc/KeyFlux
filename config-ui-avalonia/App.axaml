@@ -1,6 +1,6 @@
 <!-- 强制浅色主题变体: 全部页面的底色/前景均为浅色系 (Claude 暖色令牌 Parchment/Ivory + 浅底深字),
      若跟随系统深色主题则 Fluent 默认前景变白, 形成白底白字,
-     故固定 Light 以保证文字为深色可读。暗色主题接线方式见 Styles/ClaudeTheme.axaml 文末注释。 -->
+     故固定 Light 以保证文字为深色可读。暗色主题接线方式见 Styles/Skins/Claude.axaml 文末注释。 -->
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:services="using:KeyFlux.Settings.Services"
@@ -21,6 +21,22 @@
          注意: 必须放在 Application.Resources (逻辑树根) 而非 Styles.Resources ——
          主题模板内的 {DynamicResource ScrollBarSize} 沿逻辑树查找资源, 不经过样式集合资源. -->
     <x:Double x:Key="ScrollBarSize">10</x:Double>
+
+    <!-- ===================== 皮肤可替换资源 · Fluent 模板覆盖 =====================
+         Fluent 的 ToggleSwitch 模板用 {DynamicResource ToggleSwitchFillOn/StrokeOn/KnobFillOn}
+         取开启态配色, 默认取系统强调色 (本机为蓝) —— 与暖色体系冲突。
+
+         为什么必须放在 Application.Resources (逻辑树根) 而不是皮肤文件的 Styles.Resources:
+         模板内部的 {DynamicResource} 沿【逻辑树】查找, 不经过样式集合资源
+         (与上方 ScrollBarSize 同一原因, 见其注释; 该限制已在真实控件上验证过)。
+
+         为什么要有 Key 而不是直接写 Color: 这三个是 Fluent 的资源键, 类型必须是画刷,
+         Fluent 绑定的是画刷而非颜色, 故此处仍以字面量 hex 给出 (无法引用令牌)。
+
+         >> 换肤须知: 下面 3 个值属于皮肤配色, 新增皮肤时需同步替换 << -->
+    <SolidColorBrush x:Key="ToggleSwitchFillOn">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOn">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn">#faf9f5</SolidColorBrush>
   </Application.Resources>
 
   <!-- 应用级样式：使用 Fluent 主题 (变体由 Application.RequestedThemeVariant 决定) -->
@@ -28,9 +44,15 @@
     <FluentTheme />
     <!-- 滚动条交互手感与外观优化 (悬停即时加粗/移开即时变细/Thumb 圆角), 详见 Styles/ScrollBarStyles.axaml -->
     <StyleInclude Source="avares://KeyFlux.Settings/Styles/ScrollBarStyles.axaml" />
-    <!-- Claude / Anthropic 暖色共享主题 (令牌 + 复用类样式); 其 Styles.Resources 随 StyleInclude
-         合并进应用资源字典, 故 {StaticResource} 令牌在全部页面/窗口均可解析。详见 Styles/ClaudeTheme.axaml -->
-    <StyleInclude Source="avares://KeyFlux.Settings/Styles/ClaudeTheme.axaml" />
+
+    <!-- ===================== ★ 换肤点 (Skin Swap Point) ★ =====================
+         下面这一行就是切换皮肤的唯一开关: 把 Source 指向 Styles/Skins/<皮肤名>.axaml
+         即可整体换肤, 无需改动任何页面 XAML 或 ViewModel。
+         皮肤契约 (必需令牌清单 / 新皮肤要改哪三处) 写在被指向的皮肤文件顶部。
+         皮肤 1 = Claude 暖色 (Styles/Skins/Claude.axaml), 其 Styles.Resources 随
+         StyleInclude 合并进应用资源字典, 故 {StaticResource} 令牌在全部页面/窗口均可解析。
+         校验皮肤是否完整: KeyFlux.Settings.Tests/SkinContractTests.cs (漏键即红)。 -->
+    <StyleInclude Source="avares://KeyFlux.Settings/Styles/Skins/Claude.axaml" />
   </Application.Styles>
 
 </Application>
