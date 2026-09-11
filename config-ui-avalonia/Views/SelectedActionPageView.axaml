@@ -79,7 +79,7 @@
             </StackPanel>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
-              <Button Classes="icon-btn" Command="{Binding TestRowCommand}" Content="󰐊" FontFamily="{StaticResource MdiFont}"
+              <Button Classes="icon-btn" Command="{Binding TestRowCommand}" Content="󰐊" FontFamily="{StaticResource MdiFont}" Margin="0,3,0,0" FontSize="18"
                       Background="Transparent"
                       ToolTip.ShowDelay="200"
                       ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
