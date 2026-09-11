@@ -155,64 +155,6 @@
           </Button>
         </Border>
 
-        <!-- 📂 快速切换 (label:2408, QuickSwitch 阶段 1):
-             三开关 (完全禁用采集 / 自动显示浮层) + 自动跳转 (打开/保存对话框) + 条数上限 + 排除目录 + 清空历史 -->
-        <Border Background="White" CornerRadius="12" Padding="16">
-          <StackPanel Spacing="10">
-            <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="quickswitch">
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2408}"
-                         FontWeight="SemiBold" />
-            </Button>
-            <StackPanel IsVisible="{Binding ShowQuickSwitch}" Spacing="8">
-              <!-- 完全禁用采集 (collectEnabled=false: 零 Shell 枚举、零 history 写入) -->
-              <CheckBox IsChecked="{Binding QuickSwitch.CollectEnabled}"
-                        Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2409}" />
-              <!-- 自动显示候选浮层 -->
-              <CheckBox IsChecked="{Binding QuickSwitch.AutoShow}"
-                        Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2410}" />
-              <!-- 自动跳转: 打开对话框 -->
-              <CheckBox IsChecked="{Binding QuickSwitch.AutoJumpOpen}"
-                        Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2411}" />
-              <!-- 自动跳转: 保存对话框 -->
-              <CheckBox IsChecked="{Binding QuickSwitch.AutoJumpSave}"
-                        Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2412}" />
-              <!-- 历史保留条数上限 -->
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2413}"
-                           VerticalAlignment="Center" TextWrapping="Wrap" />
-                <TextBox Grid.Column="1" Text="{Binding QuickSwitch.MaxHistory, Converter={StaticResource IntStr}}" />
-              </Grid>
-              <!-- 排除目录 (路径前缀, 命中的既不记录也不推荐) -->
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2414}"
-                         Foreground="#8A8F98" FontSize="12" Margin="0,4,0,0" />
-              <ItemsControl ItemsSource="{Binding ExcludedPrefixRows}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:ExcludedPrefixRowVm">
-                    <Grid ColumnDefinitions="*,26" Margin="0,2">
-                      <TextBox Text="{Binding Value}" Padding="6,4" FontSize="13" />
-                      <Button Grid.Column="1" Content="✕"
-                              Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).RemoveExcludedPrefixCommand}"
-                              CommandParameter="{Binding}"
-                              Background="Transparent" Foreground="#C62828" Padding="6,3" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <Button Command="{Binding AddExcludedPrefixCommand}"
-                      Background="Transparent" BorderBrush="#4169E1" BorderThickness="1"
-                      Foreground="#4169E1" Padding="8,5" CornerRadius="8" HorizontalAlignment="Left">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2415}" />
-              </Button>
-              <!-- 清空历史 (一次性动作, 截断 history.tsv 为空文件) -->
-              <Button Command="{Binding ClearHistoryCommand}"
-                      Background="Transparent" BorderBrush="#C62828" BorderThickness="1"
-                      Foreground="#C62828" Padding="8,5" CornerRadius="8" HorizontalAlignment="Left" Margin="0,4,0,0">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2416}" />
-              </Button>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-
         <!-- ⌨️ 自定义热键 (label:1116, 原 Custom Hotkeys 页迁入 2026-09-08):
              展开 = 热键/功能 两列同行列表; 热键列点击聚焦即编辑 (失焦提交复刻 @change),
              功能列 (原「备注」) 点击弹 ActionEditorWindow 编辑动作; 底部新建 (label:1118) -->

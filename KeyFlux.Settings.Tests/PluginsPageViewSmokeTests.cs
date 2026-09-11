@@ -114,4 +114,63 @@ public sealed class PluginsPageViewSmokeTests
             shell.Close();
         }
     }
+
+    /// <summary>
+    /// ④ 内置插件卡片为 Button (可点击): 包含 2408 文案的 TextBlock 祖先链中存在 Button。
+    /// ⑤ 第三方插件区域仍为 Border (不可点击): 包含 2420/2421 文案的区域不存在 Button。
+    /// </summary>
+    [AvaloniaFact]
+    public void BuiltIn_Card_Is_Button_And_ThirdParty_Is_Border()
+    {
+        var original = I18n.Language;
+        I18n.Language = I18n.Zh;
+        var (page, _) = CreateVm(collectEnabled: true);
+        var view = new PluginsPageView { DataContext = page };
+        var window = new Window { Width = 1200, Height = 760, Content = view };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        try
+        {
+            var textBlocks = window.GetVisualDescendants().OfType<TextBlock>().ToList();
+
+            // ④ 内置插件卡片: 找到 2408 (快速切换) 文案, 祖先链应包含 Button
+            var quickSwitchText = textBlocks.FirstOrDefault(t => t.Text == I18n.T("2408"));
+            Assert.NotNull(quickSwitchText);
+            var hasButtonAncestor = GetVisualAncestorTypes(quickSwitchText!).Contains(typeof(Button));
+            Assert.True(hasButtonAncestor,
+                "内置插件卡片 (2408 快速切换) 应为 Button 包裹, 使其可点击打开配置对话框");
+
+            // ⑤ 第三方插件区域: 找到 2420 (第三方插件) 文案, 祖先链不应包含 Button
+            var thirdPartyText = textBlocks.FirstOrDefault(t => t.Text == I18n.T("2420"));
+            Assert.NotNull(thirdPartyText);
+            var thirdPartyHasButton = GetVisualAncestorTypes(thirdPartyText!).Contains(typeof(Button));
+            Assert.False(thirdPartyHasButton,
+                "第三方插件标题 (2420) 不应位于 Button 内, 该区域不可点击");
+
+            // 同样验证 2421 (插件市场尚未开放)
+            var marketText = textBlocks.FirstOrDefault(t => t.Text == I18n.T("2421"));
+            Assert.NotNull(marketText);
+            var marketHasButton = GetVisualAncestorTypes(marketText!).Contains(typeof(Button));
+            Assert.False(marketHasButton,
+                "第三方插件说明 (2421) 不应位于 Button 内, 该区域不可点击");
+        }
+        finally
+        {
+            window.Close();
+            I18n.Language = original;
+        }
+    }
+
+    /// <summary>收集 Visual 的全部祖先类型 (向上遍历直到根)。</summary>
+    private static HashSet<Type> GetVisualAncestorTypes(Avalonia.Visual visual)
+    {
+        var types = new HashSet<Type>();
+        Avalonia.Visual? current = visual;
+        while (current is not null)
+        {
+            types.Add(current.GetType());
+            current = current.GetVisualParent();
+        }
+        return types;
+    }
 }

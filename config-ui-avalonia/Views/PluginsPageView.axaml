@@ -7,7 +7,7 @@
   <!-- 插件页 (左侧导航「插件」): 诚实最小版。
        阶段 0 实测结论: 插件生态契约层完成度高、运行时约 20-30%, 不足以支撑插件市场,
        故本页不做「可安装插件列表」的假象 —— 只展示内置插件现状 + 第三方市场的诚实说明。
-       本页只读 Config.Options.QuickSwitch, 不引入新配置字段、不读写磁盘、不改 config.json。 -->
+       内置插件卡片可点击, 点击后经 QuickSwitchDialogWindow 编辑 Config.Options.QuickSwitch 并落盘。 -->
   <ScrollViewer>
     <StackPanel Margin="36,28,36,40" Spacing="16" MaxWidth="820" HorizontalAlignment="Left">
 
@@ -20,7 +20,7 @@
         <StackPanel Spacing="12">
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2419}"
                      FontWeight="SemiBold" FontSize="16" />
-          <Border Background="#F7F8FB" CornerRadius="8" Padding="14">
+          <Button Background="#F7F8FB" CornerRadius="8" Padding="14" HorizontalContentAlignment="Stretch" Click="OnQuickSwitchCardClick">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Grid.Column="0" Spacing="5">
                 <!-- 插件名复用 QuickSwitch 文案 2408 (与设置页分区同名) -->
@@ -38,7 +38,7 @@
                            FontSize="12" FontWeight="SemiBold" />
               </Border>
             </Grid>
-          </Border>
+          </Button>
         </StackPanel>
       </Border>
 

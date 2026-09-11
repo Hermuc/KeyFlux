@@ -8,11 +8,14 @@ namespace KeyFlux.Settings.ViewModels;
 /// 运行时约 20-30%」, 不足以支撑插件市场, 故本页不做「可安装插件列表」的假象:
 ///   - 内置插件: 仅列「快速切换 (QuickSwitch)」一行, 展示名称/说明/当前启用状态/配置指引;
 ///   - 第三方插件: 明确告知「插件市场尚未开放」+ 原因 (契约层已就绪, 运行时接口未完成)。
-/// 不引入任何新配置字段、不读写磁盘、不改 config.json (只读展示 Config.Options.QuickSwitch)。
+/// 读 Config.Options.QuickSwitch 展示状态; 点击卡片经 QuickSwitchDialogWindow 编辑配置并落盘。
 /// </summary>
 public sealed partial class PluginsPageViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
+
+    /// <summary>主 VM (打开 QuickSwitch 配置对话框等场景使用)。</summary>
+    public MainViewModel Main => _main;
 
     public PluginsPageViewModel(MainViewModel main) => _main = main;
 

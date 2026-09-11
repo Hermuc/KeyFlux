@@ -1212,7 +1212,7 @@
     "en": "The contract layer is ready, but the runtime interface is not yet complete, so installing or managing third-party plugins is not supported yet."
   },
   "2426": {
-    "zh": "可在「设置」页的「快速切换」分区中调整。",
-    "en": "You can adjust it in the Quick Switch section of the Settings page."
+    "zh": "点击卡片即可调整该插件的配置。",
+    "en": "Click the card to adjust this plugin's settings."
   }
 }

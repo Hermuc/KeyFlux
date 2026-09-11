@@ -27,8 +27,8 @@ namespace KeyFlux.Settings.Services;
 //
 // 键段索引 (原字典的分节注释; JSON 承载不了注释, 迁移到此):
 //   1-16 window | 17-24,2401-2402 system | 2404-2407 总览页 (Home) 编辑
-//   2408-2417 QuickSwitch 阶段 1 (设置页「快速切换」分区)
-//   2418-2426 插件页 (Plugins 左侧导航页: 标题/内置插件/第三方插件/市场未开放说明/状态)
+//   2408-2417 QuickSwitch 阶段 1 (插件页 QuickSwitch 配置对话框)
+//   2418-2426 插件页 (Plugins 左侧导航页: 标题/内置插件/第三方插件/市场未开放说明/状态/插件卡片配置指引)
 //   25-37 mouse | 38-70 text (62-70 为英文专属键名, zh=null) | 71-78 KeyFlux
 //   200-209 Action types | 301-309 App Launcher (含 301err/301hint 两个非数字键)
 //   401-406 Other | 501-507 Settings | 601-612 Window Groups
