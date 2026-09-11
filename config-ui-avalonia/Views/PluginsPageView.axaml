@@ -130,8 +130,11 @@
       <TextBlock Text="{Binding StatusText}" FontSize="13" Foreground="{StaticResource ClaudeTerracottaBrush}" FontWeight="SemiBold"
                  IsVisible="{Binding StatusText, Converter={StaticResource NotEmpty}}" />
 
-      <!-- 统一插件列表: 首卡内置「快速切换」+ 用户插件 (不区分来源) -->
-      <ItemsControl ItemsSource="{Binding Plugins}">
+      <!-- 统一插件列表: 首卡内置「快速切换」+ 用户插件 (不区分来源)
+           ClipToBounds=False: 卡片悬停时的 ring 阴影画在自身边界外 1px, 而 ItemsControl
+           默认会裁剪到自身边界 (下侧因卡片有 10px 底边距而幸免) —— 不关掉就会
+           出现"阴影只有下侧, 左/右/上缺失"的裁剪。 -->
+      <ItemsControl ItemsSource="{Binding Plugins}" ClipToBounds="False">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:PluginCardVm">
             <Border Classes="pluginCard">
