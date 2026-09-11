@@ -137,6 +137,11 @@ public static class ConfigReadDefaults
         options.Plugins ??= new();
         options.Plugins.Disabled ??= [];
 
+        // 亚克力材质: 缺段时给默认 —— 启用 + 透明度 30 (半透明可辨, 又不影响文字可读)。
+        // 与 QuickSwitch 不同这里【不】做"整段为零才补": Enabled=false 是用户显式选择,
+        // 会被覆盖掉。故仅在整段缺失 (null) 时补默认。
+        options.Acrylic ??= new AcrylicOption { Enabled = true, Transparency = 30 };
+
         config.SelectedAction ??= new SelectedAction();
 
         return config;

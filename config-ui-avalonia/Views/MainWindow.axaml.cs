@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using KeyFlux.Settings.Services;
+using KeyFlux.Settings.Theming;
 using KeyFlux.Settings.ViewModels;
 
 namespace KeyFlux.Settings.Views;
@@ -31,16 +32,22 @@ public partial class MainWindow : Window
         // 标题栏小图标透明化: 助手内部订阅 Opened(应用)/ScalingChanged(DPI 变化重放)/Closed(回收句柄)
         TitleBarIconSuppressor.Attach(this);
 
+        // 亚克力底色: 先用内存中已有的配置应用一次 (可能尚未加载 -> 退化为实心底,
+        // 属安全的初始态); 配置异步加载完成后在 Opened 里再应用一次。
+        WindowSurface.Apply(viewModel.Config?.Options?.Acrylic);
+
         // 唤起时自激活一次; 进程无前台授权时可能被系统拒绝, 由 AHK 侧 Z 序兜底补足
         // (刻意不设 Topmost: 非常驻置顶, 仍可手动切后台)
-        Opened += (_, _) =>
+        Opened += async (_, _) =>
         {
             if (WindowState == WindowState.Minimized)
             {
                 WindowState = WindowState.Normal;
             }
             Activate();
-            _ = viewModel.InitializeAsync();
+            await viewModel.InitializeAsync();
+            // 配置就绪后再应用 —— 用户保存过的透明度此时才可读到
+            WindowSurface.Apply(viewModel.Config?.Options?.Acrylic);
         };
         Closing += (_, _) => viewModel.Session.Shutdown();
     }

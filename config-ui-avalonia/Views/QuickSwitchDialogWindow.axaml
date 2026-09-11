@@ -3,7 +3,7 @@
         xmlns:vm="using:KeyFlux.Settings.ViewModels"
         x:Class="KeyFlux.Settings.Views.QuickSwitchDialogWindow"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{StaticResource ClaudeWindowSurfaceBrush}"
+        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
         x:Name="DlgRoot"
         x:DataType="vm:QuickSwitchDialogViewModel"
         Title="Setting"

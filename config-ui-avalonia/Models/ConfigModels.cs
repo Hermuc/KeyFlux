@@ -292,6 +292,32 @@ public sealed class Options
 
     [JsonPropertyName("plugins")]
     public PluginsOption? Plugins { get; set; } = new();
+
+    [JsonPropertyName("acrylic")]
+    public AcrylicOption? Acrylic { get; set; } = new();
+}
+
+/// <summary>
+/// 对应 Go struct AcrylicOption。设置面板窗口的亚克力(毛玻璃)材质配置。
+/// <para>
+/// 纯 UI 呈现项 —— 引擎不消费它, 只负责原样存取。之所以仍放 config.json 而不是
+/// UI 私有文件: 与 <see cref="CommandInputSkin"/> 等既有 UI 风格项保持一致,
+/// 且 config.json 位于部署目录 data/ 下, 不会被 sync-out 的 /MIR 镜像清掉。
+/// </para>
+/// </summary>
+public sealed class AcrylicOption
+{
+    /// <summary>是否启用毛玻璃。false 时忽略 <see cref="Transparency"/>, 等同 0 (实心)。</summary>
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
+
+    /// <summary>
+    /// 透明度 0..100。0 = 完全不透明 (窗口用实心 Parchment 背景, 必须给实色,
+    /// 否则半透明底叠在未知背景上会发灰/花屏); 100 = 尽量透明 (实际会夹一个
+    /// 最小不透明度以保文字可读)。
+    /// </summary>
+    [JsonPropertyName("transparency")]
+    public int Transparency { get; set; }
 }
 
 /// <summary>对应 Go struct PluginsOption。插件注册表 (第三方插件的启用状态)。</summary>

@@ -1258,5 +1258,17 @@
   "2439": {
     "zh": "加载中…",
     "en": "Loading…"
+  },
+  "2500": {
+    "zh": "窗口毛玻璃",
+    "en": "Window frosted glass"
+  },
+  "2501": {
+    "zh": "启用毛玻璃",
+    "en": "Enable frosted glass"
+  },
+  "2502": {
+    "zh": "透明度",
+    "en": "Transparency"
   }
 }

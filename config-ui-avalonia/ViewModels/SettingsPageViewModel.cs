@@ -1,3 +1,4 @@
+using KeyFlux.Settings.Theming;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -135,6 +136,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
         var customKeymap = Config.Keymaps.FirstOrDefault(k => k.Id == 1);
         if (customKeymap is not null) CustomHotkeys = new CustomHotkeyPageViewModel(main, customKeymap);
         BuildSkinFields();
+        LoadAcrylic();
         foreach (var pv in Options.PathVariables) PathVariables.Add(pv);
         RefreshKeymapSection();
     }
@@ -258,6 +260,42 @@ public sealed partial class SettingsPageViewModel : ObservableObject
         };
         OnPropertyChanged(nameof(Options));
     }
+
+    // ------------------------------------------------------------- 窗口亚克力(毛玻璃)
+
+    /// <summary>是否启用窗口毛玻璃。关闭时底色为实心 Parchment。</summary>
+    [ObservableProperty] private bool _acrylicEnabled;
+
+    /// <summary>透明度 0..100。0=完全不透明, 100=尽量透明 (内部仍夹最小不透明度)。</summary>
+    [ObservableProperty] private int _acrylicTransparency;
+
+    /// <summary>从配置载入亚克力设置 (构造期调用一次)。</summary>
+    private void LoadAcrylic()
+    {
+        var a = Options.Acrylic;
+        AcrylicEnabled = a?.Enabled ?? true;
+        AcrylicTransparency = a is null ? 30 : Math.Clamp(a.Transparency, 0, 100);
+        WindowSurface.Apply(CurrentAcrylic());
+    }
+
+    /// <summary>把 UI 上的两个值写回配置段, 并立即应用到底色 (配置段缺失时按需新建)。</summary>
+    private AcrylicOption? CurrentAcrylic()
+    {
+        var a = Options.Acrylic;
+        if (a is null)
+        {
+            a = new AcrylicOption();
+            Options.Acrylic = a;
+        }
+        a.Enabled = AcrylicEnabled;
+        a.Transparency = Math.Clamp(AcrylicTransparency, 0, 100);
+        return a;
+    }
+
+    private void ApplyAcrylicChange() => WindowSurface.Apply(CurrentAcrylic());
+
+    partial void OnAcrylicEnabledChanged(bool value) => ApplyAcrylicChange();
+    partial void OnAcrylicTransparencyChanged(int value) => ApplyAcrylicChange();
 
     // ------------------------------------------------------------- 命令框皮肤
 

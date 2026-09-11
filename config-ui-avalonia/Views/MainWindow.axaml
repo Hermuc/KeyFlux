@@ -91,7 +91,7 @@
     </Style>
   </Window.Styles>
 
-  <Border Background="{StaticResource ClaudeWindowSurfaceBrush}"
+  <Border Background="{DynamicResource ClaudeWindowSurfaceBrush}"
           BorderBrush="{StaticResource ClaudeBorderWarmBrush}"
           BorderThickness="1">
    <DockPanel>

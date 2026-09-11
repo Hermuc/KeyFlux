@@ -4,7 +4,7 @@
         xmlns:services="using:KeyFlux.Settings.Services"
         x:Class="KeyFlux.Settings.Views.BehaviorEditWindow"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{StaticResource ClaudeWindowSurfaceBrush}"
+        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
         x:Name="EditRoot"
         x:DataType="vm:BehaviorEditViewModel"
         Title="{Binding Title}"

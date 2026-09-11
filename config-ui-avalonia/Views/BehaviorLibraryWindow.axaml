@@ -3,7 +3,7 @@
         xmlns:vm="using:KeyFlux.Settings.ViewModels"
         x:Class="KeyFlux.Settings.Views.BehaviorLibraryWindow"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{StaticResource ClaudeWindowSurfaceBrush}"
+        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
         x:DataType="vm:BehaviorLibraryViewModel"
         Title="Setting"
         Width="860" Height="560"

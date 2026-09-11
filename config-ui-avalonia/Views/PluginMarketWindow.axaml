@@ -4,6 +4,8 @@
         x:Class="KeyFlux.Settings.Views.PluginMarketWindow"
         x:Name="DlgRoot"
         x:DataType="vm:PluginMarketViewModel"
+        TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
+        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
         Title="Setting"
         Width="640" Height="560"
         WindowStartupLocation="CenterOwner">

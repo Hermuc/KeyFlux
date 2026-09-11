@@ -6,13 +6,13 @@ package model
 const RemapKey = 5
 
 type Config struct {
-	Keymaps       []Keymap       `json:"keymaps,omitempty"`
-	Options       Options        `json:"options,omitempty"`
+	Keymaps        []Keymap        `json:"keymaps,omitempty"`
+	Options        Options         `json:"options,omitempty"`
 	SelectedAction *SelectedAction `json:"selectedAction,omitempty"` // 选中动作单键分发 (方案 D); 迁移后由 ParseConfig 保证非 nil, save 恒输出
-	ActionSchemes []ActionScheme `json:"actionSchemes,omitempty"`  // 旧多方案结构: 仅迁移读取用, ParseConfig 迁移后置 nil, save 不再输出
-	FileGroups    []FileGroup    `json:"fileGroups,omitempty"` // 文件分组: 前端「文件后缀」条件值的快捷填充数据, 非独立匹配类型
-	OverviewDocMd string         `json:"overviewDocMd,omitempty"` // 自定义总览页 Markdown, 设置界面优先展示; 为空时展示默认 config_doc.md
-	KeyMapping    string         `json:"-"`
+	ActionSchemes  []ActionScheme  `json:"actionSchemes,omitempty"`  // 旧多方案结构: 仅迁移读取用, ParseConfig 迁移后置 nil, save 不再输出
+	FileGroups     []FileGroup     `json:"fileGroups,omitempty"`     // 文件分组: 前端「文件后缀」条件值的快捷填充数据, 非独立匹配类型
+	OverviewDocMd  string          `json:"overviewDocMd,omitempty"`  // 自定义总览页 Markdown, 设置界面优先展示; 为空时展示默认 config_doc.md
+	KeyMapping     string          `json:"-"`
 }
 
 type Keymap struct {
@@ -80,9 +80,11 @@ type FileGroup struct {
 // 规则按 Priority 升序匹配, 第一个匹配的规则生效
 // MatchType: fileExt(文件后缀) / textType(文本特征) (default(兜底) 已于 2026-09 移除, 存量不再命中)
 //   - fileExt 条件值为逗号分隔后缀列表, 可用配置中的 fileGroups 快捷填充
+//
 // ActionType: open(程序打开) / search(搜索) / run(执行命令) / send_keys(发送按键) / script(AHK脚本) / copy(复制到剪贴板)
-//   + textType 专用行为: open_url(默认浏览器打开网址) / open_path(系统关联打开, 注册表路径自动转入注册表定位)
+//   - textType 专用行为: open_url(默认浏览器打开网址) / open_path(系统关联打开, 注册表路径自动转入注册表定位)
 //     / open_folder(打开文件夹) / magnet_download(磁力链接下载); 特征与行为的合法组合见行为包 appliesTo 声明
+//
 // 注: textType 特征的 actionValue 为「特征选择」而非条件值, 专用行为不接受命令模板 (actionValue 留空)
 type ActionRule struct {
 	Priority    int         `json:"priority"`
@@ -122,19 +124,34 @@ type Action struct {
 }
 
 type Options struct {
-	HideMatrix       bool             `json:"hideMatrix"`
-	KeyfluxVersion  string           `json:"keyfluxVersion"`
-	WindowGroups     []WindowGroup    `json:"windowGroups"`
-	Mouse            Mouse            `json:"mouse"`
-	Scroll           Scroll           `json:"scroll"`
-	CommandInputSkin CommandInputSkin `json:"commandInputSkin"`
-	PathVariables    []PathVariable   `json:"pathVariables"`
-	Startup          bool             `json:"startup"`
-	Language         string           `json:"language"`
-	KeyMapping       string           `json:"keyMapping"`
-	KeyboardLayout   string           `json:"keyboardLayout"`
+	HideMatrix       bool              `json:"hideMatrix"`
+	KeyfluxVersion   string            `json:"keyfluxVersion"`
+	WindowGroups     []WindowGroup     `json:"windowGroups"`
+	Mouse            Mouse             `json:"mouse"`
+	Scroll           Scroll            `json:"scroll"`
+	CommandInputSkin CommandInputSkin  `json:"commandInputSkin"`
+	PathVariables    []PathVariable    `json:"pathVariables"`
+	Startup          bool              `json:"startup"`
+	Language         string            `json:"language"`
+	KeyMapping       string            `json:"keyMapping"`
+	KeyboardLayout   string            `json:"keyboardLayout"`
 	QuickSwitch      QuickSwitchOption `json:"quickSwitch"`
-	Plugins          PluginsOption    `json:"plugins"`
+	Plugins          PluginsOption     `json:"plugins"`
+	Acrylic          AcrylicOption     `json:"acrylic"`
+}
+
+// AcrylicOption 设置面板窗口的亚克力(毛玻璃)材质配置 (config.json 的 options.acrylic)。
+// 纯 UI 呈现项: 引擎不消费, 仅供 config-ui-avalonia 读取后决定窗口底色。
+//
+// Transparency 语义 = "透明度", 取值 0..100:
+//
+//	0   -> 完全不透明, 窗口用实心 Parchment 背景 (背景色必须实, 否则会花屏/发灰)
+//	100 -> 尽量透明, 由平台模糊充当背景 (实际会夹一个最小不透明度以保文字可读)
+//
+// Enabled=false 时忽略 Transparency, 等同于 0 (实心)。
+type AcrylicOption struct {
+	Enabled      bool `json:"enabled"`
+	Transparency int  `json:"transparency"`
 }
 
 // PluginsOption 插件注册表 (第三方插件启用状态)。「disabled」= 已停用插件 ID 集,

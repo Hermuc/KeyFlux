@@ -4,6 +4,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
 using KeyFlux.Settings.Models;
+using KeyFlux.Settings.Theming;
 using KeyFlux.Settings.Services;
 using KeyFlux.Settings.ViewModels;
 using KeyFlux.Settings.Views;
@@ -227,6 +228,55 @@ public sealed class SkinContractTests
             Assert.NotEqual(Color.Parse("#0078d7"), c);
             Assert.NotEqual(Color.Parse("#00589e"), c);
         }
+    }
+
+    /// <summary>
+    /// 亚克力透明度的换算契约 —— 重点是用户明确要求的
+    /// **「透明度为零时必须设置好背景颜色」**: 透明度 0 表示"不要透明",
+    /// 此时底色 alpha 必须是 255 (实心 Parchment), 否则窗口会把画面叠在背后
+    /// 未知像素上, 表现为发灰/花屏/文字糊。
+    /// </summary>
+    [AvaloniaFact]
+    public void Acrylic_Transparency_Zero_Yields_Opaque_Background()
+    {
+        // 未启用 / 段缺失 -> 实心
+        Assert.Equal(1.0, WindowSurface.OpacityFor(null));
+        Assert.Equal(1.0, WindowSurface.OpacityFor(new AcrylicOption { Enabled = false, Transparency = 80 }));
+
+        // ★ 透明度 0 -> 完全不透明, 且画刷 alpha 必须是 255
+        var atZero = WindowSurface.CreateBrush(new AcrylicOption { Enabled = true, Transparency = 0 });
+        Assert.Equal(1.0, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 0 }));
+        Assert.Equal((byte)255, atZero.Color.A);
+
+        // 中间值按比例
+        Assert.Equal(0.7, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 30 }), 5);
+
+        // 100 -> 夹到最小不透明度 (不能真的全透明, 否则文字不可读)
+        Assert.Equal(WindowSurface.MinOpacity, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 100 }), 5);
+
+        // 越界值被夹紧, 不产生非法 alpha
+        Assert.Equal(1.0, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = -50 }));
+        Assert.Equal(WindowSurface.MinOpacity, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 9999 }), 5);
+    }
+
+    /// <summary>
+    /// Apply() 应真的改写应用资源, 使所有以 DynamicResource 取底色的窗口跟随。
+    /// </summary>
+    [AvaloniaFact]
+    public void Acrylic_Apply_Updates_The_Shared_Surface_Resource()
+    {
+        var app = Application.Current!;
+
+        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 0 });
+        Assert.True(app.TryFindResource(WindowSurface.SurfaceResourceKey, out var opaque));
+        Assert.Equal((byte)255, ((ISolidColorBrush)opaque!).Color.A);
+
+        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 60 });
+        Assert.True(app.TryFindResource(WindowSurface.SurfaceResourceKey, out var translucent));
+        Assert.True(((ISolidColorBrush)translucent!).Color.A < 255);
+
+        // 复原, 避免影响同集合内其它用例
+        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 30 });
     }
 
     /// <summary>

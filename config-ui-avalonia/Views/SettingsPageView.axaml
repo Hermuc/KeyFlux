@@ -346,6 +346,31 @@
           </StackPanel>
         </Border>
 
+        <!-- 🪟 窗口毛玻璃 (亚克力): 开关 + 透明度滑杆
+             透明度 = 0 时窗口底色为【实心】Parchment (不带 alpha), 避免叠在背后未知像素上发灰/花屏。
+             改动即时生效 (窗口底色走 DynamicResource), 按 Ctrl+S 才会写入 config.json。 -->
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+          <StackPanel Spacing="10">
+            <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2500}"
+                       FontFamily="{StaticResource ClaudeSerifFont}" FontSize="15" FontWeight="Medium" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2501}"
+                         VerticalAlignment="Center" />
+              <ToggleSwitch Grid.Column="1" Classes="claudeCompact" IsChecked="{Binding AcrylicEnabled}" />
+            </Grid>
+            <StackPanel Spacing="4" IsEnabled="{Binding AcrylicEnabled}">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2502}"
+                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+                <TextBlock Grid.Column="1" Text="{Binding AcrylicTransparency}" FontSize="12"
+                           Foreground="{StaticResource ClaudeStoneGrayBrush}" />
+              </Grid>
+              <Slider Minimum="0" Maximum="100" Value="{Binding AcrylicTransparency}"
+                      TickFrequency="5" IsSnapToTickEnabled="True" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
         <!-- 🧩 编辑路径变量 (label:907, Vue 中被注释, 按任务规格补齐) -->
         <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
           <StackPanel Spacing="10">

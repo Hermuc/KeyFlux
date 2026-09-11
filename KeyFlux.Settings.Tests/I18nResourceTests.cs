@@ -46,7 +46,7 @@ public sealed class I18nResourceTests
     /// 2437 文件选择器类型 / 2438 市场空 / 2439 加载中) -> 317。
     /// 2026-09 插件页 Claude 风格重构: 统一插件列表 (不分区), 删 2 键 (2419 内置插件 /
     /// 2420 已导入插件, 分区标题零引用) -> 315。
-    private const int ExpectedKeyCount = 315;
+    private const int ExpectedKeyCount = 318;
 
     private const string LabelPrefix = "label:";
 

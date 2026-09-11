@@ -4,7 +4,7 @@
         xmlns:controls="using:KeyFlux.Settings.Views.Controls"
         x:Class="KeyFlux.Settings.Views.ActionEditorWindow"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{StaticResource ClaudeWindowSurfaceBrush}"
+        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
         x:DataType="vm:CustomHotkeyPageViewModel"
         Title="Setting" Width="520" SizeToContent="Height"
         WindowStartupLocation="CenterOwner" CanResize="False">

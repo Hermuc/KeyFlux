@@ -4,7 +4,7 @@
         xmlns:controls="using:KeyFlux.Settings.Controls"
         x:Class="KeyFlux.Settings.Views.WindowGroupDialogWindow"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{StaticResource ClaudeWindowSurfaceBrush}"
+        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
         x:Name="DlgRoot"
         x:DataType="vm:WindowGroupDialogViewModel"
         Title="Setting"

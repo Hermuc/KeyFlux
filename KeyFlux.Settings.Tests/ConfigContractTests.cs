@@ -163,12 +163,22 @@ public sealed class ConfigContractTests : ServerTestBase
             "hideMatrix", "keyfluxVersion", "windowGroups", "mouse", "scroll",
             "commandInputSkin", "pathVariables", "startup", "language", "keyMapping", "keyboardLayout",
             "quickSwitch", "plugins",
+            // ⚠ 刻意【不】要求 acrylic: 它是本次新增段, 仓库 data\config.json 等既有配置
+            // 文件里没有它。新增配置段不该是"必须存在", 否则所有既有 config 都算违约;
+            // 缺失由 C# 侧 ConfigReadDefaults 的 `??= new()` 兜底。故仅在存在时校验其结构。
         })
         {
             Assert.True(options.TryGetProperty(prop, out _), $"options 缺少字段 {prop}");
         }
         // plugins.disabled 恒数组 (插件注册表; Go struct 无 omitempty)
         Assert.Equal(JsonValueKind.Array, options.GetProperty("plugins").GetProperty("disabled").ValueKind);
+        // acrylic 段若在则结构必须完整 (enabled 为布尔, transparency 为非负整数)
+        if (options.TryGetProperty("acrylic", out var acrylic))
+        {
+            Assert.Contains(acrylic.GetProperty("enabled").ValueKind,
+                new[] { JsonValueKind.True, JsonValueKind.False });
+            Assert.True(acrylic.GetProperty("transparency").GetInt32() >= 0);
+        }
         // Go ParseConfig 读路径注入: 版本号来自构建期 ldflags, 非空
         Assert.False(string.IsNullOrEmpty(options.GetProperty("keyfluxVersion").GetString()),
             "options.keyfluxVersion 应由 Go 侧注入构建版本号");
