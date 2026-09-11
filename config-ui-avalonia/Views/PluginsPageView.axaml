@@ -9,10 +9,12 @@
        统一插件列表 (首卡内置「快速切换」+ 用户插件, 不分区), 每卡 = 插件信息 + 开关一体化:
        开关在右, 状态文字 (已启用/已停用) 在开关正下方。入口 = 插件市场 (terracotta CTA) + 导入插件。
        诚实边界: 引擎侧插件运行时为阶段 2, 用户插件卡带「运行时支持开发中」标注。
-       样式全部页面级自包含, 不动 App.axaml (其他页面留待后续统一重构)。 -->
+       样式全部页面级自包含, 不动 App.axaml (其他页面留待后续统一重构)。
+       本次(提交 2)补按动/焦点态, 并将硬编码 hex 改为引用 ClaudeTheme.axaml 资源键。 -->
 
   <UserControl.Resources>
-    <!-- ToggleSwitch 开启态 Fluent 画刷覆盖为 Terracotta (仅本页) -->
+    <!-- ToggleSwitch 开启态 Fluent 画刷覆盖为 Terracotta (仅本页; 其 Color 为 Fluent 覆盖键,
+         保留 hex 以维持与 Fluent 资源键类型一致, 不属于冷色残留扫描范围) -->
     <SolidColorBrush x:Key="ToggleSwitchFillOn">#c96442</SolidColorBrush>
     <SolidColorBrush x:Key="ToggleSwitchStrokeOn">#c96442</SolidColorBrush>
     <SolidColorBrush x:Key="ToggleSwitchKnobFillOn">#faf9f5</SolidColorBrush>
@@ -24,25 +26,36 @@
       <Setter Property="FontFamily" Value="Georgia, Microsoft YaHei UI" />
       <Setter Property="FontSize" Value="24" />
       <Setter Property="FontWeight" Value="Medium" />
-      <Setter Property="Foreground" Value="#141413" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
     </Style>
     <Style Selector="TextBlock.pluginName">
       <Setter Property="FontFamily" Value="Georgia, Microsoft YaHei UI" />
       <Setter Property="FontSize" Value="15" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="#141413" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
     </Style>
     <!-- 插件卡: Ivory 面 + cream 细边 + 悬停 ring 阴影 (DESIGN.md 深度体系 Level 1/2) -->
     <Style Selector="Border.pluginCard">
-      <Setter Property="Background" Value="#faf9f5" />
-      <Setter Property="BorderBrush" Value="#f0eee6" />
+      <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
       <Setter Property="Padding" Value="20,16" />
       <Setter Property="Margin" Value="0,0,0,10" />
     </Style>
     <Style Selector="Border.pluginCard:pointerover">
-      <Setter Property="BoxShadow" Value="0 0 0 1 #d1cfc5" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowHoverRing}" />
+    </Style>
+    <!-- 按动: inset 环 (Border 自带 BoxShadow, 无需模板部件) -->
+    <Style Selector="Border.pluginCard:pressed">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
+    </Style>
+    <!-- 焦点环 (键盘聚焦卡片内开关/按钮时显示; Border 非可聚焦, 故补 :focus-within) -->
+    <Style Selector="Border.pluginCard:focus-visible">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+    </Style>
+    <Style Selector="Border.pluginCard:focus-within">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
     <!-- 卡片信息区按钮: 全透明 (视觉与 StackPanel 无异, 仅提供可点性) -->
     <Style Selector="Button.cardBody">
@@ -50,7 +63,18 @@
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+      <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
+    </Style>
+    <Style Selector="Button.cardBody:pressed">
+      <Setter Property="RenderTransform" Value="translate(0px, 1px)" />
+    </Style>
+    <Style Selector="Button.cardBody:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
+    </Style>
+    <!-- 焦点环 (声明在 :pressed 之后; BoxShadow 在模板 ContentPresenter 上, 因 Button 无 BoxShadow 属性) -->
+    <Style Selector="Button.cardBody:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
     <!-- 紧凑开关 (无右侧文字, 状态文字由卡内 TextBlock 承载) -->
     <Style Selector="ToggleSwitch.compact">
@@ -60,21 +84,41 @@
     </Style>
     <!-- 主 CTA: Terracotta -->
     <Style Selector="Button.cta">
-      <Setter Property="Background" Value="#c96442" />
-      <Setter Property="Foreground" Value="#faf9f5" />
-      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="{StaticResource ClaudeTerracottaBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
       <Setter Property="Padding" Value="14,7" />
+      <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
+    </Style>
+    <Style Selector="Button.cta:pressed">
+      <Setter Property="RenderTransform" Value="translate(0px, 1px)" />
+    </Style>
+    <Style Selector="Button.cta:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
+    </Style>
+    <Style Selector="Button.cta:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
     <!-- 次级按钮: Warm Sand -->
     <Style Selector="Button.sand">
-      <Setter Property="Background" Value="#e8e6dc" />
-      <Setter Property="Foreground" Value="#4d4c48" />
-      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeCharcoalWarmBrush}" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
       <Setter Property="Padding" Value="14,7" />
+      <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
+    </Style>
+    <Style Selector="Button.sand:pressed">
+      <Setter Property="RenderTransform" Value="translate(0px, 1px)" />
+    </Style>
+    <Style Selector="Button.sand:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
+    </Style>
+    <Style Selector="Button.sand:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
   </UserControl.Styles>
 
-  <ScrollViewer Background="#f5f4ed">
+  <ScrollViewer Background="{StaticResource ClaudeParchmentBrush}">
     <StackPanel Margin="36,32,36,40" Spacing="16" MaxWidth="820" HorizontalAlignment="Left">
 
       <!-- 标题行: 页面标题 (共用 2418) + 两个入口 (市场 2428 / 导入 2427) -->
@@ -90,7 +134,7 @@
       </Grid>
 
       <!-- 一次性操作回显 (导入成功等; Claude 体系内强调反馈用 terracotta) -->
-      <TextBlock Text="{Binding StatusText}" FontSize="13" Foreground="#c96442" FontWeight="SemiBold"
+      <TextBlock Text="{Binding StatusText}" FontSize="13" Foreground="{StaticResource ClaudeTerracottaBrush}" FontWeight="SemiBold"
                  IsVisible="{Binding StatusText, Converter={StaticResource NotEmpty}}" />
 
       <!-- 统一插件列表: 首卡内置「快速切换」+ 用户插件 (不区分来源) -->
@@ -107,25 +151,25 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <TextBlock Classes="pluginName" Text="{Binding DisplayName}" VerticalAlignment="Center" />
                       <!-- 版本徽标 (Warm Sand) -->
-                      <Border Background="#e8e6dc" CornerRadius="10" Padding="8,2"
+                      <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="10" Padding="8,2"
                               VerticalAlignment="Center"
                               IsVisible="{Binding VersionText, Converter={StaticResource NotEmpty}}">
-                        <TextBlock Text="{Binding VersionText}" FontSize="11" Foreground="#4d4c48" />
+                        <TextBlock Text="{Binding VersionText}" FontSize="11" Foreground="{StaticResource ClaudeCharcoalWarmBrush}" />
                       </Border>
                       <!-- 运行时标注 (仅用户插件): 引擎加载为阶段 2, 诚实边界 -->
-                      <Border Background="#e8e6dc" CornerRadius="10" Padding="8,2"
+                      <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="10" Padding="8,2"
                               VerticalAlignment="Center" IsVisible="{Binding !IsBuiltin}">
-                        <TextBlock FontSize="11" Foreground="#5e5d59"
+                        <TextBlock FontSize="11" Foreground="{StaticResource ClaudeOliveGrayBrush}"
                                    Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2421}" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="{Binding Description}" TextWrapping="Wrap"
-                               Foreground="#5e5d59" FontSize="13" />
-                    <TextBlock Text="{Binding Author}" Foreground="#87867f" FontSize="11"
+                               Foreground="{StaticResource ClaudeOliveGrayBrush}" FontSize="13" />
+                    <TextBlock Text="{Binding Author}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="11"
                                IsVisible="{Binding Author, Converter={StaticResource NotEmpty}}" />
                     <!-- 配置引导 (仅内置卡, terracotta 小字) -->
                     <TextBlock Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2426}"
-                               TextWrapping="Wrap" Foreground="#c96442" FontSize="11"
+                               TextWrapping="Wrap" Foreground="{StaticResource ClaudeTerracottaBrush}" FontSize="11"
                                IsVisible="{Binding CanConfigure}" />
                   </StackPanel>
                 </Button>
@@ -136,11 +180,11 @@
                   <ToggleSwitch Classes="compact" IsChecked="{Binding Enabled}" />
                   <TextBlock FontSize="10" HorizontalAlignment="Center"
                              Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2423}"
-                             Foreground="#5e5d59" FontWeight="SemiBold"
+                             Foreground="{StaticResource ClaudeOliveGrayBrush}" FontWeight="SemiBold"
                              IsVisible="{Binding Enabled}" />
                   <TextBlock FontSize="10" HorizontalAlignment="Center"
                              Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2424}"
-                             Foreground="#87867f"
+                             Foreground="{StaticResource ClaudeStoneGrayBrush}"
                              IsVisible="{Binding !Enabled}" />
                 </StackPanel>
 
@@ -150,7 +194,7 @@
                         ToolTip.Tip="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=912}"
                         Command="{Binding #Root.((vm:PluginsPageViewModel)DataContext).DeletePluginCommand}"
                         CommandParameter="{Binding}"
-                        Background="Transparent" Foreground="#b53333" Padding="6,3" />
+                        Background="Transparent" Foreground="{StaticResource ClaudeErrorBrush}" Padding="6,3" />
 
               </Grid>
             </Border>
@@ -160,30 +204,30 @@
 
       <!-- 加载中 -->
       <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2439}"
-                 Foreground="#87867f" FontSize="13"
+                 Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="13"
                  IsVisible="{Binding IsLoadingPlugins}" />
 
       <!-- 目录加载失败 (含逐包告警): Ivory 面 + crimson 文字 -->
-      <Border Background="#faf9f5" BorderBrush="#f0eee6" BorderThickness="1"
-              CornerRadius="8" Padding="14" IsVisible="{Binding ShowLoadError}">
+      <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
+              CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="14" IsVisible="{Binding ShowLoadError}">
         <TextBlock Text="{Binding PluginsLoadError}" TextWrapping="Wrap"
-                   Foreground="#b53333" FontSize="12" />
+                   Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12" />
       </Border>
 
       <!-- 空态引导 (无用户插件时): Warm Sand 面 -->
-      <Border Background="#e8e6dc" CornerRadius="8" Padding="14"
+      <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="14"
               IsVisible="{Binding ShowEmptyState}">
         <StackPanel Spacing="5">
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2429}"
-                     FontWeight="SemiBold" FontSize="13" Foreground="#4d4c48" />
+                     FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource ClaudeCharcoalWarmBrush}" />
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2430}"
-                     TextWrapping="Wrap" Foreground="#5e5d59" FontSize="12" />
+                     TextWrapping="Wrap" Foreground="{StaticResource ClaudeOliveGrayBrush}" FontSize="12" />
         </StackPanel>
       </Border>
 
       <!-- 运行时说明 (诚实边界) -->
       <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2425}"
-                 TextWrapping="Wrap" Foreground="#87867f" FontSize="12" />
+                 TextWrapping="Wrap" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
 
     </StackPanel>
   </ScrollViewer>
