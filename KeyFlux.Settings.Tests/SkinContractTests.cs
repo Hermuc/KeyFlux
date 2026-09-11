@@ -118,7 +118,7 @@ public sealed class SkinContractTests
         "ClaudeParchmentBrush", "ClaudeIvoryBrush", "ClaudeWhiteBrush", "ClaudeSandBrush",
         "ClaudeNearBlackBrush", "ClaudeCharcoalWarmBrush", "ClaudeOliveGrayBrush",
         "ClaudeStoneGrayBrush", "ClaudeDarkWarmBrush", "ClaudeTerracottaBrush",
-        "ClaudeCoralBrush", "ClaudeErrorBrush", "ClaudeMutedGreenBrush",
+        "ClaudeCoralBrush", "ClaudeCoralLightBrush", "ClaudeErrorBrush", "ClaudeMutedGreenBrush",
         "ClaudeMutedGreenSoftBrush", "ClaudeBorderCreamBrush", "ClaudeBorderWarmBrush",
         "ClaudeRingWarmBrush", "ClaudeRingDeepBrush",
         // 亚克力分层: 画布 (窗口根) + 侧栏面, 二者必须带 alpha 且存在于任何皮肤中
@@ -188,6 +188,44 @@ public sealed class SkinContractTests
         {
             Assert.True(app.TryFindResource(key, out var value), $"皮肤覆盖键缺失: {key}");
             Assert.IsAssignableFrom<IBrush>(value);
+        }
+    }
+
+    /// <summary>
+    /// 契约: ToggleSwitch **开启态的悬停/按下变体**也必须是暖色。
+    /// 历史事故回归锁 —— Fluent 只为非悬停态提供了 <c>ToggleSwitchFillOn</c> 等 3 个键,
+    /// 悬停/按下走的是 <c>*_PointerOver</c> / <c>*_Pressed</c> 变体, 其内置值是**硬编码蓝**
+    /// (<c>#269fff</c> / <c>#0078d7</c> / <c>#00589e</c>)。只覆盖非悬停键时,
+    /// 表现为「开关平时是陶土色, 鼠标一放上去就变蓝」。
+    /// 这些键同样必须放在 Application.Resources (模板内部走 {DynamicResource})。
+    /// </summary>
+    [AvaloniaFact]
+    public void Skin_Contract_ToggleSwitch_Hover_And_Pressed_Are_Warm()
+    {
+        var app = Application.Current!;
+
+        // 悬停 = 比焦点色 Coral(#d97757) 浅一档的浅珊瑚
+        foreach (var key in new[] { "ToggleSwitchFillOnPointerOver", "ToggleSwitchStrokeOnPointerOver" })
+        {
+            Assert.True(app.TryFindResource(key, out var v), $"皮肤覆盖键缺失: {key}");
+            Assert.Equal(Color.Parse("#e1957a"), ((ISolidColorBrush)v!).Color);
+        }
+
+        // 按下 = 主陶土色
+        foreach (var key in new[] { "ToggleSwitchFillOnPressed", "ToggleSwitchStrokeOnPressed" })
+        {
+            Assert.True(app.TryFindResource(key, out var v), $"皮肤覆盖键缺失: {key}");
+            Assert.Equal(Color.Parse("#c96442"), ((ISolidColorBrush)v!).Color);
+        }
+
+        // 反向断言: 绝不能残留 Fluent 的蓝色变体
+        foreach (var key in new[] { "ToggleSwitchFillOnPointerOver", "ToggleSwitchStrokeOnPointerOver", "ToggleSwitchFillOnPressed" })
+        {
+            app.TryFindResource(key, out var v);
+            var c = ((ISolidColorBrush)v!).Color;
+            Assert.NotEqual(Color.Parse("#269fff"), c);
+            Assert.NotEqual(Color.Parse("#0078d7"), c);
+            Assert.NotEqual(Color.Parse("#00589e"), c);
         }
     }
 

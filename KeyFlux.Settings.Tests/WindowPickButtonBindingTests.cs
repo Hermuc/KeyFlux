@@ -48,6 +48,17 @@ public sealed class WindowPickBindingTestApp : Application
         Resources["ToggleSwitchFillOn"] = new SolidColorBrush(Color.Parse("#c96442"));
         Resources["ToggleSwitchStrokeOn"] = new SolidColorBrush(Color.Parse("#c96442"));
         Resources["ToggleSwitchKnobFillOn"] = new SolidColorBrush(Color.Parse("#faf9f5"));
+        // 开启态的悬停/按下变体 —— Fluent 内置值是硬编码蓝, 必须一并覆盖
+        Resources["ToggleSwitchFillOnPointerOver"] = new SolidColorBrush(Color.Parse("#e1957a"));
+        Resources["ToggleSwitchStrokeOnPointerOver"] = new SolidColorBrush(Color.Parse("#e1957a"));
+        Resources["ToggleSwitchKnobFillOnPointerOver"] = new SolidColorBrush(Color.Parse("#faf9f5"));
+        Resources["ToggleSwitchFillOnPressed"] = new SolidColorBrush(Color.Parse("#c96442"));
+        Resources["ToggleSwitchStrokeOnPressed"] = new SolidColorBrush(Color.Parse("#c96442"));
+        Resources["ToggleSwitchKnobFillOnPressed"] = new SolidColorBrush(Color.Parse("#faf9f5"));
+        Resources["ToggleSwitchFillOffPointerOver"] = new SolidColorBrush(Colors.Transparent);
+        Resources["ToggleSwitchStrokeOffPointerOver"] = new SolidColorBrush(Color.Parse("#87867f"));
+        Resources["ToggleSwitchFillOffPressed"] = new SolidColorBrush(Colors.Transparent);
+        Resources["ToggleSwitchStrokeOffPressed"] = new SolidColorBrush(Color.Parse("#5e5d59"));
     }
 }
 

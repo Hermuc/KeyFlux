@@ -37,6 +37,23 @@
     <SolidColorBrush x:Key="ToggleSwitchFillOn">#c96442</SolidColorBrush>
     <SolidColorBrush x:Key="ToggleSwitchStrokeOn">#c96442</SolidColorBrush>
     <SolidColorBrush x:Key="ToggleSwitchKnobFillOn">#faf9f5</SolidColorBrush>
+
+    <!-- 开启态的【悬停/按下】必须单独覆盖 —— Fluent 只为非悬停态留了上面 3 个键,
+         悬停/按下走的是 *_PointerOver / *_Pressed 变体, 其内置值是硬编码蓝
+         (#269fff / #0078d7 / #00589e), 不覆盖就会"鼠标一放上开关就变蓝"。
+         (2026-09 实测: SwitchKnobBounds 非悬停=#c96442 正确, 悬停=#269fff 蓝。) -->
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver">#e1957a</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver">#e1957a</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver">#faf9f5</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed">#faf9f5</SolidColorBrush>
+
+    <!-- 关闭态悬停: Fluent 默认也会转蓝, 改为暖灰描边 -->
+    <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver">Transparent</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver">#87867f</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchFillOffPressed">Transparent</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffPressed">#5e5d59</SolidColorBrush>
   </Application.Resources>
 
   <!-- 应用级样式：使用 Fluent 主题 (变体由 Application.RequestedThemeVariant 决定) -->

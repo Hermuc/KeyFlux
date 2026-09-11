@@ -74,6 +74,16 @@
     3. App.axaml 的 Application.Resources 里 3 个 ToggleSwitch* 覆盖值
        —— 之所以不在本文件: Fluent 模板内部用 {DynamicResource} 取它们,
           而模板资源查找沿【逻辑树】走, 不经过样式集合资源 (与 ScrollBarSize 同理)。
+       ⚠ 实际是【11 个】键, 不止 3 个 —— Fluent 只为非悬停态提供了
+          ToggleSwitchFillOn / StrokeOn / KnobFillOn 三个键;
+          **悬停与按下走的是 *_PointerOver / *_Pressed 变体, 其内置值是硬编码蓝
+          (#269fff / #0078d7 / #00589e)**, 只覆盖那三个键会表现为
+          「开关平时是陶土色, 鼠标一放上去就变蓝」。
+          完整清单: ToggleSwitchFillOn / StrokeOn / KnobFillOn
+                  + FillOnPointerOver / StrokeOnPointerOver / KnobFillOnPointerOver
+                  + FillOnPressed / StrokeOnPressed / KnobFillOnPressed
+                  + FillOffPointerOver / StrokeOffPointerOver / FillOffPressed / StrokeOffPressed
+          新皮肤必须整组替换, 且悬停色建议取「比该皮肤焦点色浅一档」的值。
     另: C# 侧色值真源是 ViewModels/ClaudePalette.cs, 新增皮肤需同步提供对应 palette;
         它已被 8 个文件引用 (HotkeyCapture / SelectedActionPageView / NavItem /
         MainViewModel / Keymap·Abbr·CustomHotkey·SelectedAction PageViewModel /
@@ -83,7 +93,7 @@
     画刷 (22): ClaudeParchmentBrush / ClaudeIvoryBrush / ClaudeWhiteBrush /
               ClaudeSandBrush / ClaudeNearBlackBrush / ClaudeCharcoalWarmBrush /
               ClaudeOliveGrayBrush / ClaudeStoneGrayBrush / ClaudeDarkWarmBrush /
-              ClaudeTerracottaBrush / ClaudeCoralBrush / ClaudeErrorBrush /
+              ClaudeTerracottaBrush / ClaudeCoralBrush / ClaudeCoralLightBrush / ClaudeErrorBrush /
               ClaudeMutedGreenBrush / ClaudeMutedGreenSoftBrush /
               ClaudeBorderCreamBrush / ClaudeBorderWarmBrush /
               ClaudeRingWarmBrush / ClaudeRingDeepBrush /
@@ -135,6 +145,7 @@
     <SolidColorBrush x:Key="ClaudeDarkWarmBrush"     Color="#3d3d3a" />
     <SolidColorBrush x:Key="ClaudeTerracottaBrush"   Color="#c96442" />
     <SolidColorBrush x:Key="ClaudeCoralBrush"        Color="#d97757" />
+    <SolidColorBrush x:Key="ClaudeCoralLightBrush"   Color="#e1957a" />
     <SolidColorBrush x:Key="ClaudeErrorBrush"        Color="#b53333" />
     <SolidColorBrush x:Key="ClaudeMutedGreenBrush"   Color="#5e7d5a" />
     <SolidColorBrush x:Key="ClaudeMutedGreenSoftBrush" Color="#e7ebe3" />
