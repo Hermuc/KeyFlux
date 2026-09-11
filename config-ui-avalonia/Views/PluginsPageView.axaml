@@ -27,7 +27,9 @@
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
     </Style>
-    <!-- 插件卡: Ivory 面 + cream 细边 + 悬停 ring 阴影 (DESIGN.md 深度体系 Level 1/2) -->
+    <!-- 插件卡: Ivory 面 + cream 细边 + 静止态柔和投影 (2026-09-11 用户反馈:
+         此前静止态只有 1px 细边, 视觉上"阴影边界紧贴文字";
+         投影 blur 超出卡片边界约 20px, 依赖下方 ItemsControl 的 ClipToBounds=False 才不被裁) -->
     <Style Selector="Border.pluginCard">
       <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
@@ -35,9 +37,10 @@
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
       <Setter Property="Padding" Value="20,16" />
       <Setter Property="Margin" Value="0,0,0,10" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
     </Style>
     <Style Selector="Border.pluginCard:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowHoverRing}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHover}" />
     </Style>
     <!-- 按动: inset 环 (Border 自带 BoxShadow, 无需模板部件) -->
     <Style Selector="Border.pluginCard:pressed">
@@ -50,17 +53,32 @@
     <Style Selector="Border.pluginCard:focus-within">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
-    <!-- 卡片信息区按钮: 全透明 (视觉与 StackPanel 无异, 仅提供可点性) -->
+    <!-- 卡片信息区按钮: 全透明 (视觉与 StackPanel 无异, 仅提供可点性)。
+         ⚠ 必须在 基态/:pointerover/:pressed 三态都压 /template/ PART_ContentPresenter 的背景 ——
+         Fluent 模板部件的自带灰底会压过控件级 Background=Transparent (坑: 「模板部件压过控件属性」),
+         否则指针进入卡片时文字区会出现一块紧贴文字的 Fluent 灰底,
+         视觉上正是用户报的"边界紧贴文字的阴影" (2026-09-11)。 -->
     <Style Selector="Button.cardBody">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="0" />
+      <!-- Padding 把按压 inset 环从文字边撑开 (环画在按钮边界上, Padding=0 时左侧贴死文字);
+           负 Margin 等量抵消 (见 DataTemplate 内 Button), 布局占位与无 Padding 时完全一致 -->
+      <Setter Property="Padding" Value="10,6" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
       <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
     </Style>
+    <Style Selector="Button.cardBody /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.cardBody:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
     <Style Selector="Button.cardBody:pressed">
       <Setter Property="RenderTransform" Value="translate(0px, 1px)" />
+    </Style>
+    <Style Selector="Button.cardBody:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
     </Style>
     <Style Selector="Button.cardBody:pressed /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
@@ -140,8 +158,9 @@
             <Border Classes="pluginCard">
               <Grid ColumnDefinitions="*,Auto,Auto">
 
-                <!-- 信息区: 内置卡点击打开配置对话框 (CanConfigure); 用户卡暂无配置 (阶段 2) -->
-                <Button Grid.Column="0" Classes="cardBody" Margin="0,0,16,0"
+                <!-- 信息区: 内置卡点击打开配置对话框 (CanConfigure); 用户卡暂无配置 (阶段 2)
+                     负 Margin 与 cardBody 样式的 Padding(10,6) 等量抵消, 占位不变 -->
+                <Button Grid.Column="0" Classes="cardBody" Margin="-10,-6,6,-6"
                         Click="OnCardConfigureClick" CommandParameter="{Binding}">
                   <StackPanel Spacing="4">
                     <StackPanel Orientation="Horizontal" Spacing="8">

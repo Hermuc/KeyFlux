@@ -33,12 +33,16 @@
       ClaudeWarmSilverBrush   #b0aea5  Warm Silver    暗底文字
       ClaudeBorderDarkBrush   #30302e  Border Dark    暗底边
 
-    【阴影 5 项 · BoxShadows】
+    【阴影 7 项 · BoxShadows】
       ClaudeShadowHoverRing    0 0 0 1 #d1cfc5               卡片 :pointerover (Ring Warm)
       ClaudeShadowCtaRing      0 0 0 1 #c96442               主 CTA 静止态环 (DESIGN.md L126)
       ClaudeShadowPressedInset inset 0 0 0 1 #26262526       按钮 :pressed (Level 4; 0x26=15% 深)
       ClaudeShadowFocusRing    0 0 0 2 #d97757               键盘焦点环 (Coral, 2px) [焦点环裁定 见 第4节]
       ClaudeShadowWhisper      0 4 24 0 #0d000000            浮层/对话框/窗口 (Level 3; 0x0d=5% 黑)
+      ClaudeShadowCard         0 2 4 0 #1c000000, 0 6 18 0 #14000000
+                                                              卡片静止态柔和投影 (双层: 贴边 + 弥散)
+      ClaudeShadowCardHover    0 0 0 1 #d1cfc5, 0 6 20 0 #1a000000
+                                                              卡片悬停 = Ring + 略深投影 (不丢层次)
 
     【尺寸 4 项 · x:Double】
       ClaudeRadiusSm=6  ClaudeRadiusMd=8  ClaudeRadiusLg=12  ClaudeRadiusXl=16
@@ -101,8 +105,9 @@
               ClaudeSidebarSurfaceBrush  ← 侧栏面 (半透明 Ivory)
               暗色桩 (定义但不接线): ClaudeDarkSurfaceBrush / ClaudeDeepDarkBrush /
               ClaudeWarmSilverBrush / ClaudeBorderDarkBrush
-    阴影 (5):  ClaudeShadowHoverRing / ClaudeShadowCtaRing /
-              ClaudeShadowPressedInset / ClaudeShadowFocusRing / ClaudeShadowWhisper
+    阴影 (7):  ClaudeShadowHoverRing / ClaudeShadowCtaRing /
+              ClaudeShadowPressedInset / ClaudeShadowFocusRing / ClaudeShadowWhisper /
+              ClaudeShadowCard / ClaudeShadowCardHover
     尺寸 (4):  ClaudeRadiusSm / ClaudeRadiusMd / ClaudeRadiusLg / ClaudeRadiusXl
               ⚠ 类型必须是 CornerRadius (不是 x:Double) —— 历史事故: 曾定义成 Double,
                 构建 0 错误但所有窗口加载即抛 InvalidCastException。
@@ -160,12 +165,19 @@
     <SolidColorBrush x:Key="ClaudeWarmSilverBrush"   Color="#b0aea5" />
     <SolidColorBrush x:Key="ClaudeBorderDarkBrush"   Color="#30302e" />
 
-    <!-- 阴影 (5) · BoxShadows -->
+    <!-- 阴影 (7) · BoxShadows
+         ClaudeShadowCard/CardHover (2026-09-11): 插件卡静止态此前只有 1px cream 细边,
+         用户反馈"阴影边界紧贴内容" —— 补双层柔和投影 (贴边 + 弥散) 让卡片与画布拉开层次。
+         悬停必须在 Ring 之外保留投影: BoxShadow 是单属性, 悬停若只给 Ring 会把静止投影整个替换掉。
+         ⚠ 首版 (8%/6% alpha, blur 10) 在浅米底上肉眼不可见, 用户复验"没有变化" ——
+         浅色背景上的卡片投影 alpha 要 ≥10% 量级才可感知, 现为 11%/8% + blur 18。 -->
     <BoxShadows x:Key="ClaudeShadowHoverRing">0 0 0 1 #d1cfc5</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowCtaRing">0 0 0 1 #c96442</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowPressedInset">inset 0 0 0 1 #26262526</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowFocusRing">0 0 0 2 #d97757</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowWhisper">0 4 24 0 #0d000000</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowCard">0 2 4 0 #1c000000, 0 6 18 0 #14000000</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowCardHover">0 0 0 1 #d1cfc5, 0 6 20 0 #1a000000</BoxShadows>
 
     <!-- 尺寸 (4) · CornerRadius 类型
          注意: 令牌被赋给 CornerRadius 属性, 必须用 CornerRadius 类型。

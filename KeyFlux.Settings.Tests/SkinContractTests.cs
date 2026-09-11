@@ -132,7 +132,8 @@ public sealed class SkinContractTests
     private static readonly string[] ShadowKeys =
     [
         "ClaudeShadowHoverRing", "ClaudeShadowCtaRing", "ClaudeShadowPressedInset",
-        "ClaudeShadowFocusRing", "ClaudeShadowWhisper",
+        "ClaudeShadowFocusRing", "ClaudeShadowWhisper", "ClaudeShadowCard",
+        "ClaudeShadowCardHover",
     ];
 
     private static readonly string[] RadiusKeys =
