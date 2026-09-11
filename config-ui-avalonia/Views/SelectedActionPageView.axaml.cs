@@ -112,7 +112,7 @@ public partial class SelectedActionPageView : UserControl
         var ok = new Button
         {
             Content = "OK",
-            Background = new SolidColorBrush(Color.Parse("#D32F2F")),
+            Background = new SolidColorBrush(Color.Parse(ClaudePalette.Error)),
             Foreground = Brushes.White,
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(20, 7),

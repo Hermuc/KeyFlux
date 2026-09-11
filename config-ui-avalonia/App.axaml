@@ -1,6 +1,6 @@
-<!-- 强制浅色主题变体: 页面背景全部为硬编码浅色系 (White / #F7F8FB / #FCFCFE 等),
-     若跟随系统深色主题则默认前景变白, 形成白底白字 / 灰底白字,
-     故固定 Light 以保证文字为深色可读。 -->
+<!-- 强制浅色主题变体: 全部页面的底色/前景均为浅色系 (Claude 暖色令牌 Parchment/Ivory + 浅底深字),
+     若跟随系统深色主题则 Fluent 默认前景变白, 形成白底白字,
+     故固定 Light 以保证文字为深色可读。暗色主题接线方式见 Styles/ClaudeTheme.axaml 文末注释。 -->
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:services="using:KeyFlux.Settings.Services"

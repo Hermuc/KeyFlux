@@ -18,7 +18,9 @@ public sealed class BoolToSeparatorHeightConverter : IValueConverter
 }
 
 /// <summary>
-/// 分隔行背景转换: IsSeparator=true → 弹层同色 (Fluent 浅灰 #F9F9F9),
+/// 分隔行背景转换: IsSeparator=true → 弹层同色。
+/// 例外说明: 此处的 #F9F9F9 刻意保留 —— 它要匹配的是 **Fluent ComboBox 弹层** 自身的浅灰底
+/// (弹层尚未纳入 Claude 主题化), 若改暖色反而会在弹层内形成可见色缝。
 /// 使分隔行的 ComboBoxItem 容器与弹层背景无缝衔接 (消除「白色一圈」), 
 /// 同时压掉 pointerover 主题高亮的可见性; false → 透明 (正常项保留主题反馈)。
 /// </summary>

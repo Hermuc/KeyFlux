@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:KeyFlux.Settings.ViewModels"
         x:Class="KeyFlux.Settings.Views.BehaviorLibraryWindow"
+        Background="{StaticResource ClaudeParchmentBrush}"
         x:DataType="vm:BehaviorLibraryViewModel"
         Title="Setting"
         Width="860" Height="560"
@@ -12,7 +13,7 @@
     <Grid RowDefinitions="Auto,*,Auto">
 
       <!-- 顶部: 提示行 -->
-      <TextBlock Grid.Row="0" FontSize="12" Foreground="#8A8F98" Margin="0,0,0,10" TextWrapping="Wrap"
+      <TextBlock Grid.Row="0" FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" Margin="0,0,0,10" TextWrapping="Wrap"
                  Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1095}" />
 
       <!-- 中部: 主从布局 -->
@@ -25,9 +26,9 @@
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                   <TextBlock Grid.Column="1" Text="{Binding SourceLabel}" FontSize="11"
-                             Foreground="#8A8F98" Margin="8,0,0,0" />
+                             Foreground="{StaticResource ClaudeStoneGrayBrush}" Margin="8,0,0,0" />
                 </Grid>
-                <TextBlock Text="{Binding PremiseSummary}" FontSize="11" Foreground="#8A8F98"
+                <TextBlock Text="{Binding PremiseSummary}" FontSize="11" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                            TextWrapping="Wrap" Margin="0,2,0,0" />
               </StackPanel>
             </DataTemplate>
@@ -37,9 +38,9 @@
         <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="8" Margin="4,0,0,0">
             <TextBlock Text="{Binding SelectedRow.Name}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding SelectedRow.Id}" FontSize="12" Foreground="#8A8F98" />
+            <TextBlock Text="{Binding SelectedRow.Id}" FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" />
             <TextBlock Text="{Binding SelectedRow.PremiseSummary}" FontSize="12" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding SelectedRow.Description}" FontSize="12" Foreground="#5F6368"
+            <TextBlock Text="{Binding SelectedRow.Description}" FontSize="12" Foreground="{StaticResource ClaudeOliveGrayBrush}"
                        TextWrapping="Wrap" />
           </StackPanel>
         </ScrollViewer>
@@ -47,27 +48,27 @@
 
       <!-- 底部: 状态栏 + 操作按钮 -->
       <StackPanel Grid.Row="2" Margin="0,14,0,0">
-        <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#37474F" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource ClaudeDarkWarmBrush}" TextWrapping="Wrap" />
         <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
-          <Button Click="OnNewClick" Background="Transparent" BorderBrush="#4169E1" BorderThickness="1"
-                  Foreground="#4169E1" Padding="12,6" CornerRadius="8">
+          <Button Click="OnNewClick" Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}" BorderThickness="1"
+                  Foreground="{StaticResource ClaudeTerracottaBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1085}" />
           </Button>
           <Button Click="OnEditClick" IsEnabled="{Binding SelectedRow.IsUser, Mode=OneWay}"
-                  Background="Transparent" BorderBrush="#4169E1" BorderThickness="1"
-                  Foreground="#4169E1" Padding="12,6" CornerRadius="8">
+                  Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}" BorderThickness="1"
+                  Foreground="{StaticResource ClaudeTerracottaBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1086}" />
           </Button>
           <Button Click="OnDeleteClick" IsEnabled="{Binding SelectedRow.IsUser, Mode=OneWay}"
-                  Background="Transparent" BorderBrush="#C62828" BorderThickness="1"
-                  Foreground="#C62828" Padding="12,6" CornerRadius="8">
+                  Background="Transparent" BorderBrush="{StaticResource ClaudeErrorBrush}" BorderThickness="1"
+                  Foreground="{StaticResource ClaudeErrorBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1096}" />
           </Button>
           <Button Click="OnApplyClick" IsEnabled="{Binding IsDirty}"
-                  Background="#4169E1" Foreground="White" Padding="12,6" CornerRadius="8">
+                  Background="{StaticResource ClaudeTerracottaBrush}" Foreground="{StaticResource ClaudeIvoryBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1094}" />
           </Button>
-          <Button Click="OnCloseClick" Padding="12,6" CornerRadius="8">
+          <Button Click="OnCloseClick" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=611}" />
           </Button>
         </StackPanel>

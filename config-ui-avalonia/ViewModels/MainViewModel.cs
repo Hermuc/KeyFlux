@@ -179,7 +179,6 @@ public sealed partial class MainViewModel : ObservableObject
                 Id = "home",
                 Title = I18n.T("913"),
                 IconName = "home-outline",
-                BadgeColorHex = "#4169E1",
                 Page = HomeVm,
             },
             new()
@@ -187,7 +186,6 @@ public sealed partial class MainViewModel : ObservableObject
                 Id = "action",
                 Title = I18n.T("914"),
                 IconName = "gesture-tap",
-                BadgeColorHex = "#4169E1",
                 Page = ActionVm!,
             },
             new()
@@ -195,7 +193,6 @@ public sealed partial class MainViewModel : ObservableObject
                 Id = "plugins",
                 Title = I18n.T("2418"),
                 IconName = "puzzle-outline",
-                BadgeColorHex = "#4169E1",
                 Page = PluginsVm!,
             },
         };
@@ -208,7 +205,6 @@ public sealed partial class MainViewModel : ObservableObject
                 Id = $"keymap-{km.Id}",
                 Title = string.IsNullOrEmpty(km.Name) ? hotkey : km.Name,
                 IconName = MdiIcon.IconFor(hotkey),
-                BadgeColorHex = NavBadge.ColorFor(hotkey),
                 Page = PageForKeymap(km),
             });
         }

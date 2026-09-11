@@ -154,7 +154,7 @@ internal sealed class PickSession
 {
     private const string HighlightClassName = "KeyFlux.WindowPicker.Highlight";
     private const int FrameThickness = 3;      // 高亮框空心边宽 (px)
-    private const uint HighlightColorRef = 0x00E16941; // #4169E1 -> COLORREF 0x00BBGGRR
+    private const uint HighlightColorRef = 0x004264C9; // #c96442 (Terracotta) -> COLORREF 0x00BBGGRR
     private static readonly IntPtr TimerId = new(1);
 
     private readonly Window _owner;
@@ -714,7 +714,7 @@ internal sealed class PickSession
     private static IntPtr WndProcImpl(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         => DefWindowProc(hWnd, msg, wParam, lParam);
 
-    /// <summary>进程内注册高亮窗口类一次 (背景刷填主题色 #4169E1, 区域裁剪成空心框)。</summary>
+    /// <summary>进程内注册高亮窗口类一次 (背景刷填陶土色 #c96442, 区域裁剪成空心框)。</summary>
     private static void EnsureHighlightClass()
     {
         if (s_classRegistered) return;

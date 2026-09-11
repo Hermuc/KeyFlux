@@ -36,7 +36,7 @@ public sealed partial class CustomHotkeyRowVm : ObservableObject
     partial void OnIsSelectedChanged(bool value) => OnPropertyChanged(nameof(RowBackground));
 
     /// <summary>行底色: 选中=浅蓝 (复刻 bg-blue-lighten-4), 其余透明。</summary>
-    public string RowBackground => IsSelected ? "#DCEBFF" : "Transparent";
+    public string RowBackground => IsSelected ? ClaudePalette.Sand : "Transparent";
 }
 
 /// <summary>

@@ -3,6 +3,7 @@
         xmlns:vm="using:KeyFlux.Settings.ViewModels"
         xmlns:controls="using:KeyFlux.Settings.Views.Controls"
         x:Class="KeyFlux.Settings.Views.ActionEditorWindow"
+        Background="{StaticResource ClaudeParchmentBrush}"
         x:DataType="vm:CustomHotkeyPageViewModel"
         Title="Setting" Width="520" SizeToContent="Height"
         WindowStartupLocation="CenterOwner" CanResize="False">

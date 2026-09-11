@@ -23,18 +23,18 @@ public sealed record MenuKeyVm(int Key, string Name, string ColorHex);
 /// <summary>行为徽章配色: 链接蓝 / 路径绿 / 磁力·注册表紫 / 其余灰 (浅色主题可读; 行类型徽章另用后缀橙)。</summary>
 public static class BehaviorBadgeColors
 {
-    public const string LinkBlue = "#4169E1";
-    public const string PathGreen = "#2E7D32";
-    public const string MagnetPurple = "#7B1FA2";
-    public const string PlainGray = "#5F6368";
-    public const string ExtOrange = "#E65100";
+    public const string LinkDarkWarm = ClaudePalette.DarkWarm;
+    public const string PathGreen = ClaudePalette.MutedGreen;
+    public const string MagnetCoral = ClaudePalette.Coral;
+    public const string PlainOlive = ClaudePalette.OliveGray;
+    public const string ExtTerracotta = ClaudePalette.Terracotta;
 
     public static string ForBehavior(string id) => BehaviorCatalog.BaseActionOf(id) switch
     {
-        "open_url" => LinkBlue,
+        "open_url" => LinkDarkWarm,
         "open_path" or "open_folder" => PathGreen,
-        "magnet_download" => MagnetPurple,
-        _ => PlainGray,
+        "magnet_download" => MagnetCoral,
+        _ => PlainOlive,
     };
 }
 

@@ -4,7 +4,8 @@ namespace KeyFlux.Settings.ViewModels;
 
 /// <summary>
 /// 导航条目 (复刻 NavigationDrawer.vue 的条目模型):
-/// 标题 + MDI 图标 + 哈希配色 (图标语义见 <see cref="MdiIcon"/>, 配色见 <see cref="NavBadge"/>) + 目标页。
+/// 标题 + MDI 图标 (图标语义见 <see cref="MdiIcon"/>) + 目标页。<br/>
+/// 图标配色不在此承载: 单色 + 选中强调由 MainWindow.axaml 的样式提供 (见 <see cref="NavBadge"/> 说明)。
 /// </summary>
 public sealed partial class NavItem : ObservableObject
 {
@@ -20,44 +21,24 @@ public sealed partial class NavItem : ObservableObject
     /// <summary>MDI 图标渲染字符 (由 <see cref="IconName"/> 查表得出, 供 XAML 绑定)。</summary>
     public string IconChar => string.IsNullOrEmpty(IconName) ? "" : MdiIcon.CharFor(IconName);
 
-    /// <summary>图标颜色 (十六进制, 按 Vue getColor 哈希算法计算)。</summary>
-    public string BadgeColorHex { get; init; } = "#8E8E93";
-
     /// <summary>点击后展示的内容区页面对象 (各页面 ViewModel)。</summary>
     public required object Page { get; init; }
 }
 
 /// <summary>
-/// 徽标配色逻辑, 复刻 NavigationDrawer.vue 的 getColor 语义 (图标配色哈希)。
+/// 导航徽标配色 —— **已废止**: 原 Vue 版按热键哈希给每个条目分配高饱和 Material 色
+/// (pink/blue/purple/deep-orange), 违反 DESIGN.md「不要引入 Terracotta 之外的饱和色」。
+/// 现改为导航整体单色 (Stone Gray), 选中态由 MainWindow.axaml 的
+/// <c>ListBoxItem:selected TextBlock.navIcon</c> 样式接管 Terracotta 强调。
+/// <para>
+/// 之所以由样式而非 VM 提供配色: 控件上的 <c>Foreground="{Binding ...}"</c> 是**本地值**,
+/// 而本地值优先级高于样式 Setter —— 只要保留绑定, 选中态样式就永远无法覆盖。
+/// 故 NavItem 不再暴露颜色属性。
+/// </para>
 /// </summary>
 public static class NavBadge
 {
-    // Vue colors = ["pink", "blue", "purple", "purple", "deep-orange", "purple", "blue"]
-    // 对应 Material 色值
-    private static readonly string[] Colors =
-    [
-        "#E91E63", // pink
-        "#2196F3", // blue
-        "#9C27B0", // purple
-        "#9C27B0", // purple
-        "#FF5722", // deep-orange
-        "#9C27B0", // purple
-        "#2196F3", // blue
-    ];
-
-    /// <summary>Vue getColor: 对首热键做 charCode*31 哈希, 取模选色。</summary>
-    public static string ColorFor(string hotkey)
-    {
-        var hash = 0;
-        foreach (var c in hotkey)
-        {
-            unchecked { hash = c + ((hash << 5) - hash); }
-        }
-        var index = (int)(Math.Abs((long)hash) % Colors.Length);
-        return Colors[index];
-    }
-
-    /// <summary>父键优先: 有 parentID 时展示父 keymap 的热键 (复刻 getHotkey)。</summary>
+    /// <summary>父键优先: 有 parentID 时展示父 keymap 的热键 (复刻 Vue 版 getHotkey)。</summary>
     public static string EffectiveHotkey(Models.Keymap keymap, IReadOnlyList<Models.Keymap> allKeymaps)
     {
         if (keymap.ParentId != 0)

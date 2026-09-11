@@ -34,6 +34,17 @@
     <Style Selector="ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{StaticResource ClaudeRingWarmBrush}" />
     </Style>
+    <!-- 导航图标: 整体单色 (Stone Gray), 选中态转 Terracotta 强调。
+         必须用样式而非 VM 配色绑定 —— 控件上的 Foreground 绑定属【本地值】,
+         优先级高于样式 Setter, 一旦保留绑定, 选中态样式永远无法覆盖。
+         原按热键哈希分配的高饱和 Material 色 (pink/blue/purple/deep-orange)
+         违反 DESIGN.md「不要引入 Terracotta 之外的饱和色」, 已废止。 -->
+    <Style Selector="ListBoxItem TextBlock.navIcon">
+      <Setter Property="Foreground" Value="{StaticResource ClaudeStoneGrayBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected TextBlock.navIcon">
+      <Setter Property="Foreground" Value="{StaticResource ClaudeTerracottaBrush}" />
+    </Style>
   </Window.Styles>
 
   <Grid ColumnDefinitions="264,*">
@@ -78,10 +89,10 @@
                  Background="Transparent" BorderThickness="0" Margin="10,0">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:NavItem">
-              <!-- 复刻 Vue 版导航: MDI 图标 (彩色) + 标题, 无背景方块 -->
+              <!-- 复刻 Vue 版导航: MDI 图标 + 标题, 无背景方块; 配色由 navIcon 样式接管 (单色 + 选中强调) -->
               <Grid ColumnDefinitions="34,*">
                 <TextBlock Text="{Binding IconChar}" FontFamily="{StaticResource MdiFont}"
-                           Foreground="{Binding BadgeColorHex}" FontSize="26"
+                           Classes="navIcon" FontSize="26"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
                            Margin="10,0,0,0" TextTrimming="CharacterEllipsis" />

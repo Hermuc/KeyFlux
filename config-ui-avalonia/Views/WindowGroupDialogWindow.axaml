@@ -3,6 +3,7 @@
         xmlns:vm="using:KeyFlux.Settings.ViewModels"
         xmlns:controls="using:KeyFlux.Settings.Controls"
         x:Class="KeyFlux.Settings.Views.WindowGroupDialogWindow"
+        Background="{StaticResource ClaudeParchmentBrush}"
         x:Name="DlgRoot"
         x:DataType="vm:WindowGroupDialogViewModel"
         Title="Setting"
@@ -15,26 +16,26 @@
 
       <!-- 顶部: 注意事项 (label:612) -->
       <TextBlock DockPanel.Dock="Top" Text="{Binding Tip}"
-                 FontSize="12" Foreground="#8A8F98" TextWrapping="Wrap" Margin="0,0,0,12" />
+                 FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
 
       <!-- 底部按钮: 窗口侦探 / 添加一行 / 取消 / 保存 -->
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="10"
                   HorizontalAlignment="Right" Margin="0,14,0,0">
         <Button Command="{Binding RunWindowSpyCommand}"
-                Background="Transparent" BorderBrush="#4169E1" BorderThickness="1"
-                Foreground="#4169E1" Padding="12,6" CornerRadius="8">
+                Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}" BorderThickness="1"
+                Foreground="{StaticResource ClaudeTerracottaBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=309}" />
         </Button>
         <Button Command="{Binding AddRowCommand}"
-                Background="Transparent" BorderBrush="#4169E1" BorderThickness="1"
-                Foreground="#4169E1" Padding="12,6" CornerRadius="8">
+                Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}" BorderThickness="1"
+                Foreground="{StaticResource ClaudeTerracottaBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=609}" />
         </Button>
-        <Button Click="OnCancelClick" Padding="12,6" CornerRadius="8">
+        <Button Click="OnCancelClick" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=611}" />
         </Button>
         <Button Click="OnSaveClick"
-                Background="#4169E1" Foreground="White" Padding="16,6" CornerRadius="8">
+                Background="{StaticResource ClaudeTerracottaBrush}" Foreground="{StaticResource ClaudeIvoryBrush}" Padding="16,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=610}" />
         </Button>
       </StackPanel>
@@ -42,11 +43,11 @@
       <!-- 表头: 组名 / 窗口标识符 / 条件 -->
       <StackPanel>
         <Grid ColumnDefinitions="200,*,Auto,220" Margin="0,0,0,8">
-          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=602}" Foreground="#8A8F98" FontSize="12" />
-          <TextBlock Grid.Column="1" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=603}" Foreground="#8A8F98" FontSize="12" />
+          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=602}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+          <TextBlock Grid.Column="1" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=603}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
           <!-- 占位: 与数据行准星按钮列 (控件 Width=30 + 右 Margin 8) 等宽, 使表头与数据行列几何严格一致 -->
           <Border Grid.Column="2" Width="30" Margin="0,0,8,0" />
-          <TextBlock Grid.Column="3" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=604}" Foreground="#8A8F98" FontSize="12" />
+          <TextBlock Grid.Column="3" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=604}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
         </Grid>
         <ScrollViewer>
           <ItemsControl ItemsSource="{Binding Rows}">

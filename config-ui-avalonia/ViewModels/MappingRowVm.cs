@@ -45,7 +45,7 @@ public sealed partial class MappingRowVm : ObservableObject
     public string TypeBadgeText => ActionSchemeCatalog.MatchTypeLabel(MatchType);
 
     /// <summary>类型徽章色: 文本蓝 / 后缀橙。</summary>
-    public string TypeBadgeColorHex => IsTextType ? BehaviorBadgeColors.LinkBlue : BehaviorBadgeColors.ExtOrange;
+    public string TypeBadgeColorHex => IsTextType ? BehaviorBadgeColors.LinkDarkWarm : BehaviorBadgeColors.ExtTerracotta;
 
     // ---- 条件值 ----
 

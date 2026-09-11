@@ -53,7 +53,7 @@ public sealed partial class AbbrPageViewModel : ObservableObject, ILanguageRefre
             {
                 Hotkey = hotkey,
                 Label = FormatSpace(hotkey),
-                Background = hotkey == Core.SelectedHotkey ? "#2196F3" : "#FFFFFF",
+                Background = hotkey == Core.SelectedHotkey ? ClaudePalette.Sand : ClaudePalette.Ivory,
                 IsEnabled = !Core.IsDisabledKey(hotkey),
             });
         }

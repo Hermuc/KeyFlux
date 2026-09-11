@@ -170,17 +170,17 @@ public partial class HotkeyCapture : UserControl
         if (capturing)
         {
             text = _core.DisplayText(Hotkey, I18n.T("1026"));
-            brush = new SolidColorBrush(Color.Parse("#5F6368"));
+            brush = new SolidColorBrush(Color.Parse(ClaudePalette.StoneGray));
         }
         else if (string.IsNullOrEmpty(Hotkey))
         {
             text = I18n.T("1027");
-            brush = new SolidColorBrush(Color.Parse("#8A8F98"));
+            brush = new SolidColorBrush(Color.Parse(ClaudePalette.StoneGray));
         }
         else
         {
             text = HotkeyLogic.AhkToDisplay(Hotkey);
-            brush = new SolidColorBrush(Color.Parse("#202124"));
+            brush = new SolidColorBrush(Color.Parse(ClaudePalette.NearBlack));
         }
         DisplayText = text;
         TextBrush = brush;
@@ -195,8 +195,8 @@ public partial class HotkeyCapture : UserControl
         if (BoxBorder is not null)
         {
             BoxBorder.BorderBrush = HasConflict
-                ? new SolidColorBrush(Color.Parse("#D32F2F"))
-                : new SolidColorBrush(capturing ? Color.Parse("#4169E1") : Color.Parse("#C9CDD4"));
+                ? new SolidColorBrush(Color.Parse(ClaudePalette.Error))
+                : new SolidColorBrush(capturing ? Color.Parse(ClaudePalette.Coral) : Color.Parse(ClaudePalette.RingWarm));
             BoxBorder.BorderThickness = new Avalonia.Thickness(capturing || HasConflict ? 1.5 : 1);
         }
     }

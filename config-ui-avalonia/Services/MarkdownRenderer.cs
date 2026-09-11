@@ -20,8 +20,8 @@ namespace KeyFlux.Settings.Services;
 // ============================================================================
 public static class MarkdownRenderer
 {
-    private const string LinkColor = "#4169E1";
-    private const string CodeColor = "#C7254E";
+    private const string LinkColor = ClaudePalette.DarkWarm;
+    private const string CodeColor = ClaudePalette.Coral;
     private const string CodeFont = "Consolas";
 
     /// <summary>

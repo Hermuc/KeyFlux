@@ -17,9 +17,9 @@ public sealed partial class KeyCellVm : ObservableObject
     public required string Hotkey { get; init; }
     public required string Label { get; init; }
 
-    /// <summary>格子底色 (选中 #2196F3 / 禁用 #AAAAAA / 已绑定 #98FB98 / 空键 白色)。</summary>
+    /// <summary>格子底色 (选中 Sand / 禁用 BorderCream / 已绑定 MutedGreenSoft / 空键 Ivory), 全部取自 ClaudePalette。</summary>
     [ObservableProperty]
-    private string _background = "#FFFFFF";
+    private string _background = ClaudePalette.Ivory;
 
     /// <summary>禁用键不可点 (触发键自身, 复刻 v-card :disabled)。</summary>
     [ObservableProperty]
@@ -151,10 +151,10 @@ public sealed partial class KeymapPageViewModel : ObservableObject, ILanguageRef
                 var disabled = Core.IsDisabledKey(cell.Hotkey);
                 var selected = cell.Hotkey == Core.SelectedHotkey;
                 cell.IsEnabled = !disabled;
-                cell.Background = selected ? "#2196F3"
-                    : disabled ? "#AAAAAA"
-                    : !abbr && IsBound(cell.Hotkey) ? "#98FB98"
-                    : "#FFFFFF";
+                cell.Background = selected ? ClaudePalette.Sand
+                    : disabled ? ClaudePalette.BorderCream
+                    : !abbr && IsBound(cell.Hotkey) ? ClaudePalette.MutedGreenSoft
+                    : ClaudePalette.Ivory;
             }
         }
     }
