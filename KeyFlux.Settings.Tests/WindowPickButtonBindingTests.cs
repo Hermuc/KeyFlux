@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
@@ -25,6 +26,14 @@ public sealed class WindowPickBindingTestApp : Application
     public override void Initialize()
     {
         Styles.Add(new FluentTheme());
+        // Claude 暖色共享主题 (令牌 + 复用类样式), 对应被测 App.axaml 的 StyleInclude 注册。
+        // 必须加载: 插件页/市场窗/主窗的页面级 {StaticResource Claude*} 全部依赖其 Styles.Resources,
+        // 缺它则构造 XAML 时立刻抛 KeyNotFoundException, 测试根本走不到真正的断言。
+        // 注意 StyleInclude 的 Source 必须显式赋值 —— 构造函数参数是 baseUri, 不是加载目标。
+        Styles.Add(new StyleInclude(new Uri("avares://KeyFlux.Settings/"))
+        {
+            Source = new Uri("avares://KeyFlux.Settings/Styles/ClaudeTheme.axaml"),
+        });
         Resources["Tr"] = new I18nConverter();
         Resources["NotEmpty"] = new StringNotEmptyConverter();
         Resources["IntStr"] = new IntToStringConverter();
