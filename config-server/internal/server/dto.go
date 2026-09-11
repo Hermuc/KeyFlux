@@ -92,6 +92,12 @@ type OptionsDTO struct {
 	KeyMapping       string               `json:"keyMapping"`
 	KeyboardLayout   string               `json:"keyboardLayout"`
 	QuickSwitch      QuickSwitchOptionDTO `json:"quickSwitch"`
+	Plugins          PluginsOptionDTO     `json:"plugins"`
+}
+
+// PluginsOptionDTO 对应 model.PluginsOption, 与 OptionsDTO 成对 (CONTRACTS §5.2 双侧同步)。
+type PluginsOptionDTO struct {
+	Disabled []string `json:"disabled"`
 }
 
 // QuickSwitchOptionDTO 对应 model.QuickSwitchOption, 与 OptionsDTO 成对 (CONTRACTS §5.2 双侧同步)。
@@ -336,6 +342,12 @@ func optionsToDTO(o model.Options) OptionsDTO {
 		dto.QuickSwitch.ExcludedPrefixes = make([]string, len(o.QuickSwitch.ExcludedPrefixes))
 		copy(dto.QuickSwitch.ExcludedPrefixes, o.QuickSwitch.ExcludedPrefixes)
 	}
+	if o.Plugins.Disabled != nil {
+		dto.Plugins.Disabled = make([]string, len(o.Plugins.Disabled))
+		copy(dto.Plugins.Disabled, o.Plugins.Disabled)
+	} else {
+		dto.Plugins.Disabled = []string{} // 空集合恒数组契约 (旧配置缺失该段 -> null -> [])
+	}
 	if o.WindowGroups != nil {
 		dto.WindowGroups = make([]WindowGroupDTO, len(o.WindowGroups))
 		for i, wg := range o.WindowGroups {
@@ -523,6 +535,10 @@ func dtoToOptions(o OptionsDTO) model.Options {
 	if o.QuickSwitch.ExcludedPrefixes != nil {
 		m.QuickSwitch.ExcludedPrefixes = make([]string, len(o.QuickSwitch.ExcludedPrefixes))
 		copy(m.QuickSwitch.ExcludedPrefixes, o.QuickSwitch.ExcludedPrefixes)
+	}
+	if o.Plugins.Disabled != nil {
+		m.Plugins.Disabled = make([]string, len(o.Plugins.Disabled))
+		copy(m.Plugins.Disabled, o.Plugins.Disabled)
 	}
 	if o.WindowGroups != nil {
 		m.WindowGroups = make([]model.WindowGroup, len(o.WindowGroups))

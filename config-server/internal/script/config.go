@@ -29,6 +29,7 @@ type (
 	PathVariable      = model.PathVariable
 	CommandInputSkin  = model.CommandInputSkin
 	QuickSwitchOption = model.QuickSwitchOption
+	PluginsOption     = model.PluginsOption
 )
 
 var KeyfluxVersion string

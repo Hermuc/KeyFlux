@@ -1,0 +1,147 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:KeyFlux.Settings.ViewModels"
+        x:Class="KeyFlux.Settings.Views.PluginMarketWindow"
+        x:Name="DlgRoot"
+        x:DataType="vm:PluginMarketViewModel"
+        Title="Setting"
+        Width="640" Height="560"
+        WindowStartupLocation="CenterOwner">
+
+  <!-- 插件市场 (插件页入口) —— Claude 暖色风格 (DESIGN.md), 与插件页同一配色体系:
+       拉取 marketplace.json 目录, 一键下载安装 (走本地导入 API)。
+       目录不可达时如实呈现错误 + 重试, 引导本地导入作为替代路径。 -->
+
+  <Window.Styles>
+    <Style Selector="TextBlock.pageTitle">
+      <Setter Property="FontFamily" Value="Georgia, Microsoft YaHei UI" />
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="#141413" />
+    </Style>
+    <Style Selector="TextBlock.pluginName">
+      <Setter Property="FontFamily" Value="Georgia, Microsoft YaHei UI" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#141413" />
+    </Style>
+    <Style Selector="Border.marketCard">
+      <Setter Property="Background" Value="#faf9f5" />
+      <Setter Property="BorderBrush" Value="#f0eee6" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="18,14" />
+      <Setter Property="Margin" Value="0,0,0,10" />
+    </Style>
+    <Style Selector="Border.marketCard:pointerover">
+      <Setter Property="BoxShadow" Value="0 0 0 1 #d1cfc5" />
+    </Style>
+    <Style Selector="Button.cta">
+      <Setter Property="Background" Value="#c96442" />
+      <Setter Property="Foreground" Value="#faf9f5" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="14,6" />
+    </Style>
+    <Style Selector="Button.sand">
+      <Setter Property="Background" Value="#e8e6dc" />
+      <Setter Property="Foreground" Value="#4d4c48" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="12,5" />
+    </Style>
+  </Window.Styles>
+
+  <Border Background="#f5f4ed" Padding="20">
+    <DockPanel>
+
+      <!-- 底部: 关闭 (611) -->
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="10"
+                  HorizontalAlignment="Right" Margin="0,14,0,0">
+        <Button Classes="sand" Click="OnCloseClick" Padding="12,6">
+          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=611}" />
+        </Button>
+      </StackPanel>
+
+      <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- 标题 (2428 与插件页入口按钮共用) -->
+        <TextBlock Grid.Row="0" Classes="pageTitle" Margin="0,0,0,14"
+                   Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2428}" />
+
+        <!-- 目录主体 -->
+        <ScrollViewer Grid.Row="1">
+          <StackPanel Spacing="10">
+
+            <!-- 加载中 -->
+            <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2439}"
+                       Foreground="#87867f" IsVisible="{Binding IsLoading}" />
+
+            <!-- 拉取失败: 原因 + 重试 (920) -->
+            <Border Background="#faf9f5" BorderBrush="#f0eee6" BorderThickness="1"
+                    CornerRadius="8" Padding="14" IsVisible="{Binding ShowError}">
+              <StackPanel Spacing="10">
+                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2433}"
+                           FontWeight="SemiBold" Foreground="#b53333" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding LoadError}" Foreground="#87867f" FontSize="12"
+                           TextWrapping="Wrap" />
+                <Button Classes="sand" Command="{Binding RetryCommand}" HorizontalAlignment="Left">
+                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=920}" />
+                </Button>
+              </StackPanel>
+            </Border>
+
+            <!-- 目录为空 -->
+            <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2438}"
+                       Foreground="#87867f" IsVisible="{Binding ShowEmpty}" />
+
+            <!-- 市场条目卡 -->
+            <ItemsControl ItemsSource="{Binding Entries}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MarketEntryVm">
+                  <Border Classes="marketCard">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Classes="pluginName" Text="{Binding DisplayName}"
+                                     VerticalAlignment="Center" />
+                          <Border Background="#e8e6dc" CornerRadius="10" Padding="8,2"
+                                  VerticalAlignment="Center"
+                                  IsVisible="{Binding VersionText, Converter={StaticResource NotEmpty}}">
+                            <TextBlock Text="{Binding VersionText}" FontSize="11" Foreground="#4d4c48" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding Description}" TextWrapping="Wrap"
+                                   Foreground="#5e5d59" FontSize="12" />
+                        <TextBlock Text="{Binding Author}" Foreground="#87867f" FontSize="11"
+                                   IsVisible="{Binding Author, Converter={StaticResource NotEmpty}}" />
+                      </StackPanel>
+                      <!-- 安装 (terracotta CTA) / 已安装 (Warm Sand 徽标, 暖色体系不用绿) -->
+                      <Button Grid.Column="1" Classes="cta" VerticalAlignment="Center"
+                              Command="{Binding #DlgRoot.((vm:PluginMarketViewModel)DataContext).InstallCommand}"
+                              CommandParameter="{Binding}"
+                              IsVisible="{Binding !IsInstalled}">
+                        <TextBlock Text="{Binding #DlgRoot.((vm:PluginMarketViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2434}" />
+                      </Button>
+                      <Border Grid.Column="1" VerticalAlignment="Center"
+                              IsVisible="{Binding IsInstalled}"
+                              Background="#e8e6dc" CornerRadius="8" Padding="12,6">
+                        <TextBlock FontSize="12" Foreground="#5e5d59" FontWeight="SemiBold"
+                                   Text="{Binding #DlgRoot.((vm:PluginMarketViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2435}" />
+                      </Border>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- 安装回显 -->
+        <TextBlock Grid.Row="2" Text="{Binding StatusText}" FontSize="13" Foreground="#c96442"
+                   FontWeight="SemiBold" Margin="0,10,0,0"
+                   IsVisible="{Binding StatusText, Converter={StaticResource NotEmpty}}" />
+
+      </Grid>
+    </DockPanel>
+  </Border>
+</Window>

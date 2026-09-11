@@ -289,6 +289,20 @@ public sealed class Options
 
     [JsonPropertyName("quickSwitch")]
     public QuickSwitchOption QuickSwitch { get; set; } = new();
+
+    [JsonPropertyName("plugins")]
+    public PluginsOption? Plugins { get; set; } = new();
+}
+
+/// <summary>对应 Go struct PluginsOption。插件注册表 (第三方插件的启用状态)。</summary>
+public sealed class PluginsOption
+{
+    /// <summary>
+    /// 已停用的插件 ID 列表 (缺省 = 启用)。只记「已停用」而非「已启用」:
+    /// 新导入的插件默认启用, 不需要写注册表; 引擎运行时就绪后按此表过滤加载。
+    /// </summary>
+    [JsonPropertyName("disabled")]
+    public List<string> Disabled { get; set; } = [];
 }
 
 /// <summary>对应 Go struct QuickSwitchOption。快速切换 (QuickSwitch) 配置段。</summary>

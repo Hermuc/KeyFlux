@@ -11,11 +11,12 @@ using KeyFlux.Settings.Views;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
-/// 插件页 (左侧导航「插件」) 的运行时冒烟 + View 注册守护。
+/// 插件页 (左侧导航「插件」, Claude 风格统一列表) 的运行时冒烟 + View 注册守护。
 /// 编译期查不出「View 未在 MainWindow 的 ContentControl.DataTemplates 注册」
 /// (症状: 点击「插件」后内容区空白), 故本类:
 ///   ① 实例化真实 <see cref="MainWindow"/> (不 Show), 断言 PluginsPageViewModel 能解析出 PluginsPageView;
-///   ② 把 <see cref="PluginsPageView"/> 挂进窗口渲染, 证明 XAML 运行时可用、文案绑定生效。
+///   ② 把 <see cref="PluginsPageView"/> 挂进窗口渲染, 证明 XAML 运行时可用、文案绑定生效;
+///   ③ 统一插件卡结构守护 (信息区 Button + 开关 + 开关下方状态文字同卡)。
 /// 归入 I18nSerial 集合: 本类与 I18nResourceTests 都读写全局 I18n.Language, 必须串行避免串扰。
 /// </summary>
 [Collection("I18nSerial")]
@@ -31,13 +32,17 @@ public sealed class PluginsPageViewSmokeTests
         return (new PluginsPageViewModel(main), main);
     }
 
-    /// <summary>① View 真能渲染: 标题 + 内置插件行 + 第三方说明 + 启用状态全部出现。</summary>
+    /// <summary>
+    /// ① View 真能渲染: 统一列表 (首卡内置「快速切换」) + 入口按钮 + 运行时说明全部出现。
+    /// 2026-09 Claude 风格重构后不再分区, 2419/2420 (内置/已导入分区标题) 已删, 不应出现。
+    /// </summary>
     [AvaloniaFact]
-    public void PluginsPage_Renders_BuiltIn_And_ThirdParty_Sections()
+    public void PluginsPage_Renders_Unified_List_And_Entries()
     {
         var original = I18n.Language;
         I18n.Language = I18n.Zh;
         var (page, _) = CreateVm(collectEnabled: true);
+        page.Refresh();
         var view = new PluginsPageView { DataContext = page };
         var window = new Window { Width = 1200, Height = 760, Content = view };
         window.Show();
@@ -48,12 +53,20 @@ public sealed class PluginsPageViewSmokeTests
                 .Select(t => t.Text).Where(t => !string.IsNullOrEmpty(t)).ToList();
 
             Assert.Contains(I18n.T("2418"), texts); // 插件 (标题)
-            Assert.Contains(I18n.T("2419"), texts); // 内置插件
-            Assert.Contains(I18n.T("2408"), texts); // 快速切换 (插件名)
-            Assert.Contains(I18n.T("2420"), texts); // 第三方插件
-            Assert.Contains(I18n.T("2421"), texts); // 插件市场尚未开放
-            Assert.Contains(I18n.T("2423"), texts); // 已启用 (collectEnabled=true)
-            Assert.DoesNotContain(I18n.T("2424"), texts); // 不应出现「已停用」
+            Assert.Contains(I18n.T("2408"), texts); // 快速切换 (内置首卡)
+            Assert.Contains(I18n.T("2422"), texts); // 快速切换描述
+            Assert.Contains(I18n.T("2425"), texts); // 运行时说明 (诚实边界)
+            Assert.Contains(I18n.T("2427"), texts); // 导入插件 (入口)
+            Assert.Contains(I18n.T("2428"), texts); // 插件市场 (入口)
+            Assert.Contains(I18n.T("2423"), texts); // 已启用 (开关下方状态文字)
+
+            // 已删除的分区标题不应再出现 (键已从 i18n.json 移除, T() 回显键名本身也不会出现)
+            Assert.DoesNotContain("内置插件", texts);
+            Assert.DoesNotContain("已导入插件", texts);
+
+            // 统一列表: 至少一张插件卡 (内置 QuickSwitch)
+            Assert.NotEmpty(page.Plugins);
+            Assert.Contains(page.Plugins, p => p.IsBuiltin && p.Manifest.Id == "quick_switch");
 
             Assert.Equal("插件", I18n.T("2418")); // sanity: 当前语言确为中文
         }
@@ -64,18 +77,41 @@ public sealed class PluginsPageViewSmokeTests
         }
     }
 
-    /// <summary>② 启用状态由 config.options.quickSwitch.collectEnabled 驱动 (2423 已启用 / 2424 已停用)。</summary>
+    /// <summary>
+    /// ② 内置卡开关由 config.options.quickSwitch.collectEnabled 驱动, 切换即写通配置,
+    /// 状态文字 (2423/2424) 随开关翻转。
+    /// </summary>
     [AvaloniaFact]
-    public void PluginsPage_Status_Reflects_CollectEnabled_Toggle()
+    public void BuiltIn_Card_Toggle_Reflects_And_Writes_Back_CollectEnabled()
     {
         var original = I18n.Language;
         I18n.Language = I18n.Zh;
         try
         {
             var (on, _) = CreateVm(collectEnabled: true);
-            var (off, _) = CreateVm(collectEnabled: false);
-            Assert.Equal(I18n.T("2423"), on.QuickSwitchStatusText);  // 已启用
-            Assert.Equal(I18n.T("2424"), off.QuickSwitchStatusText); // 已停用
+            on.Refresh(); // 外部同步 (BuildNav 路径)
+            var onCard = on.Plugins.Single(p => p.IsBuiltin);
+            Assert.True(onCard.Enabled);
+            Assert.Equal(I18n.T("2423"), onCard.StatusText); // 已启用
+
+            var (off, offMain) = CreateVm(collectEnabled: false);
+            off.Refresh();
+            var offCard = off.Plugins.Single(p => p.IsBuiltin);
+            Assert.False(offCard.Enabled);
+            Assert.Equal(I18n.T("2424"), offCard.StatusText); // 已停用
+
+            // 写通: 切换卡开关 -> 内存 Config 立即同步 + 状态文字翻转
+            // (保存由 SaveAsync 异步链路承载; 测试后端缺失时直接返回, 不影响断言)
+            offCard.Enabled = true;
+            Assert.True(offMain.Config!.Options.QuickSwitch.CollectEnabled);
+            Assert.Equal(I18n.T("2423"), offCard.StatusText);
+            offCard.Enabled = false;
+            Assert.False(offMain.Config!.Options.QuickSwitch.CollectEnabled);
+            Assert.Equal(I18n.T("2424"), offCard.StatusText);
+
+            // 内置卡不可删除
+            Assert.False(offCard.CanDelete);
+            Assert.True(offCard.CanConfigure);
         }
         finally
         {
@@ -116,15 +152,16 @@ public sealed class PluginsPageViewSmokeTests
     }
 
     /// <summary>
-    /// ④ 内置插件卡片为 Button (可点击): 包含 2408 文案的 TextBlock 祖先链中存在 Button。
-    /// ⑤ 第三方插件区域仍为 Border (不可点击): 包含 2420/2421 文案的区域不存在 Button。
+    /// ④ 统一插件卡组件守护: 内置卡信息区为 Button (可点开配置) 且与 ToggleSwitch 同卡;
+    /// 状态文字 (2423) 出现在同一卡的开关列 (开关正下方)。
     /// </summary>
     [AvaloniaFact]
-    public void BuiltIn_Card_Is_Button_And_ThirdParty_Is_Border()
+    public void Unified_Card_Has_Button_Body_Toggle_And_Status_Text()
     {
         var original = I18n.Language;
         I18n.Language = I18n.Zh;
         var (page, _) = CreateVm(collectEnabled: true);
+        page.Refresh();
         var view = new PluginsPageView { DataContext = page };
         var window = new Window { Width = 1200, Height = 760, Content = view };
         window.Show();
@@ -133,26 +170,30 @@ public sealed class PluginsPageViewSmokeTests
         {
             var textBlocks = window.GetVisualDescendants().OfType<TextBlock>().ToList();
 
-            // ④ 内置插件卡片: 找到 2408 (快速切换) 文案, 祖先链应包含 Button
+            // 内置卡信息区: 2408 (快速切换) 文案应位于 Button 内 (点击开配置对话框)
             var quickSwitchText = textBlocks.FirstOrDefault(t => t.Text == I18n.T("2408"));
             Assert.NotNull(quickSwitchText);
-            var hasButtonAncestor = GetVisualAncestorTypes(quickSwitchText!).Contains(typeof(Button));
-            Assert.True(hasButtonAncestor,
-                "内置插件卡片 (2408 快速切换) 应为 Button 包裹, 使其可点击打开配置对话框");
+            Assert.True(GetVisualAncestorTypes(quickSwitchText!).Contains(typeof(Button)),
+                "内置卡信息区 (2408 快速切换) 应为 Button 包裹, 使其可点击打开配置对话框");
 
-            // ⑤ 第三方插件区域: 找到 2420 (第三方插件) 文案, 祖先链不应包含 Button
-            var thirdPartyText = textBlocks.FirstOrDefault(t => t.Text == I18n.T("2420"));
-            Assert.NotNull(thirdPartyText);
-            var thirdPartyHasButton = GetVisualAncestorTypes(thirdPartyText!).Contains(typeof(Button));
-            Assert.False(thirdPartyHasButton,
-                "第三方插件标题 (2420) 不应位于 Button 内, 该区域不可点击");
+            // 统一卡: 2408 所在卡 (pluginCard Border) 内应同时含 ToggleSwitch 与状态文字
+            var cardBorder = GetVisualAncestors(quickSwitchText!)
+                .OfType<Border>()
+                .FirstOrDefault(b => b.Classes.Contains("pluginCard"));
+            Assert.NotNull(cardBorder);
+            var cardDescendants = cardBorder.GetVisualDescendants().ToList();
+            Assert.NotEmpty(cardDescendants.OfType<Avalonia.Controls.ToggleSwitch>());
+            var cardTexts = cardDescendants.OfType<TextBlock>().Select(t => t.Text).ToList();
+            Assert.Contains(I18n.T("2423"), cardTexts); // 状态文字在卡内 (开关下方)
 
-            // 同样验证 2421 (插件市场尚未开放)
-            var marketText = textBlocks.FirstOrDefault(t => t.Text == I18n.T("2421"));
-            Assert.NotNull(marketText);
-            var marketHasButton = GetVisualAncestorTypes(marketText!).Contains(typeof(Button));
-            Assert.False(marketHasButton,
-                "第三方插件说明 (2421) 不应位于 Button 内, 该区域不可点击");
+            // 入口按钮: 2427 (导入插件) / 2428 (插件市场) 应位于 Button 内
+            foreach (var key in new[] { "2427", "2428" })
+            {
+                var entry = textBlocks.FirstOrDefault(t => t.Text == I18n.T(key));
+                Assert.NotNull(entry);
+                Assert.True(GetVisualAncestorTypes(entry!).Contains(typeof(Button)),
+                    $"入口按钮 ({key}) 应为 Button 包裹, 使其可点击");
+            }
         }
         finally
         {
@@ -161,16 +202,18 @@ public sealed class PluginsPageViewSmokeTests
         }
     }
 
-    /// <summary>收集 Visual 的全部祖先类型 (向上遍历直到根)。</summary>
-    private static HashSet<Type> GetVisualAncestorTypes(Avalonia.Visual visual)
+    /// <summary>收集 Visual 的全部祖先 (向上遍历直到根)。</summary>
+    private static IEnumerable<Avalonia.Visual> GetVisualAncestors(Avalonia.Visual visual)
     {
-        var types = new HashSet<Type>();
-        Avalonia.Visual? current = visual;
+        var current = visual.GetVisualParent();
         while (current is not null)
         {
-            types.Add(current.GetType());
+            yield return current;
             current = current.GetVisualParent();
         }
-        return types;
     }
+
+    /// <summary>收集 Visual 的全部祖先类型 (向上遍历直到根)。</summary>
+    private static HashSet<Type> GetVisualAncestorTypes(Avalonia.Visual visual)
+        => GetVisualAncestors(visual).Select(v => v.GetType()).ToHashSet();
 }

@@ -162,10 +162,13 @@ public sealed class ConfigContractTests : ServerTestBase
         {
             "hideMatrix", "keyfluxVersion", "windowGroups", "mouse", "scroll",
             "commandInputSkin", "pathVariables", "startup", "language", "keyMapping", "keyboardLayout",
+            "quickSwitch", "plugins",
         })
         {
             Assert.True(options.TryGetProperty(prop, out _), $"options 缺少字段 {prop}");
         }
+        // plugins.disabled 恒数组 (插件注册表; Go struct 无 omitempty)
+        Assert.Equal(JsonValueKind.Array, options.GetProperty("plugins").GetProperty("disabled").ValueKind);
         // Go ParseConfig 读路径注入: 版本号来自构建期 ldflags, 非空
         Assert.False(string.IsNullOrEmpty(options.GetProperty("keyfluxVersion").GetString()),
             "options.keyfluxVersion 应由 Go 侧注入构建版本号");

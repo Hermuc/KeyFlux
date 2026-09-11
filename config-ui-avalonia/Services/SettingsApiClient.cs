@@ -16,6 +16,9 @@ namespace KeyFlux.Settings.Services;
 //   POST   /server/command/:id          id=2|3|4, 恒 200 {} (会 exec KeyFlux.exe)
 //   POST   /api/selected-action/test    模拟测试 (含页面快照语义; 2026-09 方案 D,
 //                                       旧 /api/action-schemes 6 路由已随多方案模型退役)
+//   GET    /api/plugins                 用户插件目录 (data/plugins)
+//   POST   /api/plugins/import          multipart file=zip -> 安装, 返回 manifest
+//   DELETE /api/plugins/:id             删除用户插件目录
 // ============================================================================
 
 /// <summary>统一响应包装: 强类型结果 + 状态码 + 错误信息 (400/404 时解析 {"message":"..."} 字段)。</summary>
@@ -130,6 +133,11 @@ public interface ISettingsApi
     Task<ApiResponse<BehaviorPack>> UpdateBehaviorAsync(string id, BehaviorPack pack, CancellationToken ct = default);
     Task<ApiResponse<MessageBody>> DeleteBehaviorAsync(string id, CancellationToken ct = default);
     Task<ApiResponse<MessageBody>> ApplyBehaviorsAsync(CancellationToken ct = default);
+
+    // 插件 (插件页: 管理面走专用 API, 启停走 PUT /config)
+    Task<ApiResponse<PluginListResponse>> GetPluginsAsync(CancellationToken ct = default);
+    Task<ApiResponse<PluginManifest>> ImportPluginAsync(byte[] zipBytes, string fileName, CancellationToken ct = default);
+    Task<ApiResponse<MessageBody>> DeletePluginAsync(string id, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -189,6 +197,15 @@ public sealed class SettingsApiClient : ISettingsApi, IDisposable
 
     public Task<ApiResponse<MessageBody>> ApplyBehaviorsAsync(CancellationToken ct = default)
         => SendAsync<MessageBody>(HttpMethod.Post, "api/behaviors/apply", content: null, ct);
+
+    public Task<ApiResponse<PluginListResponse>> GetPluginsAsync(CancellationToken ct = default)
+        => SendAsync<PluginListResponse>(HttpMethod.Get, "api/plugins", content: null, ct);
+
+    public Task<ApiResponse<PluginManifest>> ImportPluginAsync(byte[] zipBytes, string fileName, CancellationToken ct = default)
+        => SendMultipartAsync<PluginManifest>("api/plugins/import", zipBytes, fileName, ct);
+
+    public Task<ApiResponse<MessageBody>> DeletePluginAsync(string id, CancellationToken ct = default)
+        => SendAsync<MessageBody>(HttpMethod.Delete, $"api/plugins/{id}", content: null, ct);
 
     /// <summary>
     /// 非契约端点的便捷原始文本 GET (如 Home 页的 /config_doc.html 静态资源)。
@@ -258,6 +275,46 @@ public sealed class SettingsApiClient : ISettingsApi, IDisposable
                 }
             }
 
+            return new ApiResponse<T>(false, status, default, ExtractErrorMessage(raw), raw);
+        }
+    }
+
+    /// <summary>multipart 上传变体 (POST /api/plugins/import): file 字段携带插件包 zip 字节。</summary>
+    private async Task<ApiResponse<T>> SendMultipartAsync<T>(
+        string path, byte[] zipBytes, string fileName, CancellationToken ct)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            using var form = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(zipBytes);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+            form.Add(fileContent, "file", fileName);
+            response = await _http.PostAsync(path, form, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            return new ApiResponse<T>(false, 0, default, ex.Message);
+        }
+
+        using (response)
+        {
+            var raw = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var status = (int)response.StatusCode;
+            if (response.IsSuccessStatusCode)
+            {
+                try
+                {
+                    var value = string.IsNullOrWhiteSpace(raw)
+                        ? default
+                        : JsonSerializer.Deserialize<T>(raw, SettingsJson.Options);
+                    return new ApiResponse<T>(true, status, value, RawBody: raw);
+                }
+                catch (JsonException ex)
+                {
+                    return new ApiResponse<T>(false, status, default, $"响应体反序列化失败: {ex.Message}", raw);
+                }
+            }
             return new ApiResponse<T>(false, status, default, ExtractErrorMessage(raw), raw);
         }
     }

@@ -159,3 +159,56 @@ func TestSelectedActionRoundTrip(t *testing.T) {
 		t.Errorf("空 selectedAction 的 mappings 应为 [], 实际 %v", sa2["mappings"])
 	}
 }
+
+// TestPluginsRegistryRoundTrip 验证 options.plugins 注册表 (disabled 列表) 的
+// PUT 反序列化 + DTOToConfig → ConfigToDTO 往返, 以及空集合恒数组契约
+// (旧配置缺失该段 -> null -> [], 镜像 mappings 的 wire 契约)。
+func TestPluginsRegistryRoundTrip(t *testing.T) {
+	input := `{"keymaps":[],"options":{"plugins":{"disabled":["a_plugin"]}}}`
+	var dto ConfigDTO
+	if err := json.Unmarshal([]byte(input), &dto); err != nil {
+		t.Fatalf("反序列化 DTO 失败: %v", err)
+	}
+	if len(dto.Options.Plugins.Disabled) != 1 || dto.Options.Plugins.Disabled[0] != "a_plugin" {
+		t.Fatalf("PUT plugins.disabled 往返丢失: %+v", dto.Options.Plugins)
+	}
+	cfg := DTOToConfig(&dto)
+	if len(cfg.Options.Plugins.Disabled) != 1 || cfg.Options.Plugins.Disabled[0] != "a_plugin" {
+		t.Fatalf("DTOToConfig plugins.disabled 往返丢失: %+v", cfg.Options.Plugins)
+	}
+	dto2 := ConfigToDTO(cfg)
+	out, err := json.Marshal(dto2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var check map[string]interface{}
+	if err := json.Unmarshal(out, &check); err != nil {
+		t.Fatal(err)
+	}
+	plugins := check["options"].(map[string]interface{})["plugins"].(map[string]interface{})
+	disabled, ok := plugins["disabled"].([]interface{})
+	if !ok || len(disabled) != 1 || disabled[0] != "a_plugin" {
+		t.Fatalf("wire plugins.disabled 应为数组且值保留, 实际 %v", plugins["disabled"])
+	}
+
+	// 空注册表恒数组
+	var emptyIn ConfigDTO
+	if err := json.Unmarshal([]byte(`{}`), &emptyIn); err != nil {
+		t.Fatal(err)
+	}
+	out2, err := json.Marshal(ConfigToDTO(DTOToConfig(&emptyIn)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var emptyCheck map[string]interface{}
+	if err := json.Unmarshal(out2, &emptyCheck); err != nil {
+		t.Fatal(err)
+	}
+	emptyPlugins, ok := emptyCheck["options"].(map[string]interface{})["plugins"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("wire JSON: options.plugins 恒为对象, 实际 %v", emptyCheck["options"])
+	}
+	if _, ok := emptyPlugins["disabled"].([]interface{}); !ok {
+		t.Fatalf("空 plugins.disabled 应为 [], 实际 %v", emptyPlugins["disabled"])
+	}
+}

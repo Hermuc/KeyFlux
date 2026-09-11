@@ -93,7 +93,7 @@ public sealed class ModelSerializationTests
             {
                 "hideMatrix", "keyfluxVersion", "windowGroups", "mouse", "scroll",
                 "commandInputSkin", "pathVariables", "startup", "language", "keyMapping", "keyboardLayout",
-                "quickSwitch",
+                "quickSwitch", "plugins",
             },
             keys);
 
@@ -105,6 +105,9 @@ public sealed class ModelSerializationTests
                 "pollIntervalMs", "maxHistory", "overlayRows", "overlayRowsCompact", "excludedPrefixes",
             },
             qsKeys);
+
+        var pluginsKeys = doc.RootElement.GetProperty("plugins").EnumerateObject().Select(p => p.Name).ToHashSet();
+        Assert.Equal(new HashSet<string> { "disabled" }, pluginsKeys);
 
         var mouseKeys = doc.RootElement.GetProperty("mouse").EnumerateObject().Select(p => p.Name).ToHashSet();
         Assert.Equal(

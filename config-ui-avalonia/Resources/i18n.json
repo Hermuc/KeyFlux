@@ -1183,17 +1183,9 @@
     "zh": "插件",
     "en": "Plugins"
   },
-  "2419": {
-    "zh": "内置插件",
-    "en": "Built-in plugins"
-  },
-  "2420": {
-    "zh": "第三方插件",
-    "en": "Third-party plugins"
-  },
   "2421": {
-    "zh": "插件市场尚未开放",
-    "en": "Plugin marketplace is not open yet"
+    "zh": "运行时支持开发中",
+    "en": "Runtime in development"
   },
   "2422": {
     "zh": "在文件对话框里一键跳转到最近使用或历史记录中的文件夹。",
@@ -1208,11 +1200,63 @@
     "en": "Disabled"
   },
   "2425": {
-    "zh": "契约层已就绪，但运行时接口尚未完成，暂不支持下装或管理第三方插件。",
-    "en": "The contract layer is ready, but the runtime interface is not yet complete, so installing or managing third-party plugins is not supported yet."
+    "zh": "第三方插件运行时正在开发中：现在可以导入、启停与管理插件，引擎加载将在后续版本生效。",
+    "en": "The third-party plugin runtime is in development: plugins can be imported, toggled and managed now; engine loading arrives in a later release."
   },
   "2426": {
     "zh": "点击卡片即可调整该插件的配置。",
     "en": "Click the card to adjust this plugin's settings."
+  },
+  "2427": {
+    "zh": "导入插件",
+    "en": "Import plugin"
+  },
+  "2428": {
+    "zh": "插件市场",
+    "en": "Plugin marketplace"
+  },
+  "2429": {
+    "zh": "还没有导入插件",
+    "en": "No plugins imported yet"
+  },
+  "2430": {
+    "zh": "从插件市场安装，或导入本地插件包（.zip，内含 plugin.json）。",
+    "en": "Install from the plugin marketplace, or import a local plugin package (.zip containing plugin.json)."
+  },
+  "2431": {
+    "zh": "已导入「{0}」",
+    "en": "\"{0}\" imported"
+  },
+  "2432": {
+    "zh": "导入失败",
+    "en": "Import failed"
+  },
+  "2433": {
+    "zh": "无法加载插件市场目录",
+    "en": "Failed to load the marketplace catalog"
+  },
+  "2434": {
+    "zh": "安装",
+    "en": "Install"
+  },
+  "2435": {
+    "zh": "已安装",
+    "en": "Installed"
+  },
+  "2436": {
+    "zh": "删除插件失败",
+    "en": "Failed to remove the plugin"
+  },
+  "2437": {
+    "zh": "KeyFlux 插件包",
+    "en": "KeyFlux plugin package"
+  },
+  "2438": {
+    "zh": "市场暂无上架插件",
+    "en": "No plugins listed in the marketplace yet"
+  },
+  "2439": {
+    "zh": "加载中…",
+    "en": "Loading…"
   }
 }

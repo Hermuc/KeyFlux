@@ -84,7 +84,8 @@ public static class ConfigReadDefaults
     /// 4. 缺少「📂 文件对话框」窗口组 (value == "ahk_class #32770") 且 id=2 未被占用 -> 追加该组;
     ///    (id=2 已被用户占用时不覆盖用户数据, 保持原样);
     /// 5. 旧配置缺少 quickSwitch 段 (全零签名) -> 补齐设计默认值;
-    /// 6. selectedAction 缺失 -> 空对象 (恒对象契约; 属性默认值已保证, 此处显式兜底)。
+    /// 6. selectedAction 缺失 -> 空对象 (恒对象契约; 属性默认值已保证, 此处显式兜底);
+    /// 7. plugins 段缺失 (旧配置) -> 补空注册表 (disabled = [])。
     /// </summary>
     public static Config Apply(Config config)
     {
@@ -131,6 +132,10 @@ public static class ConfigReadDefaults
         {
             options.QuickSwitch = QuickSwitchDefaults();
         }
+
+        // 读时补齐 plugins 段: 旧配置无该段时 (Go 侧零值序列化为 null disabled), 补空注册表。
+        options.Plugins ??= new();
+        options.Plugins.Disabled ??= [];
 
         config.SelectedAction ??= new SelectedAction();
 

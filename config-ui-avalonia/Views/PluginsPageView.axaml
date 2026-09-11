@@ -2,61 +2,188 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:KeyFlux.Settings.ViewModels"
              x:Class="KeyFlux.Settings.Views.PluginsPageView"
+             x:Name="Root"
              x:DataType="vm:PluginsPageViewModel">
 
-  <!-- 插件页 (左侧导航「插件」): 诚实最小版。
-       阶段 0 实测结论: 插件生态契约层完成度高、运行时约 20-30%, 不足以支撑插件市场,
-       故本页不做「可安装插件列表」的假象 —— 只展示内置插件现状 + 第三方市场的诚实说明。
-       内置插件卡片可点击, 点击后经 QuickSwitchDialogWindow 编辑 Config.Options.QuickSwitch 并落盘。 -->
-  <ScrollViewer>
-    <StackPanel Margin="36,28,36,40" Spacing="16" MaxWidth="820" HorizontalAlignment="Left">
+  <!-- 插件页 (左侧导航「插件」) —— Claude 风格 (羊皮纸/象牙/陶土暖色系, DESIGN.md):
+       统一插件列表 (首卡内置「快速切换」+ 用户插件, 不分区), 每卡 = 插件信息 + 开关一体化:
+       开关在右, 状态文字 (已启用/已停用) 在开关正下方。入口 = 插件市场 (terracotta CTA) + 导入插件。
+       诚实边界: 引擎侧插件运行时为阶段 2, 用户插件卡带「运行时支持开发中」标注。
+       样式全部页面级自包含, 不动 App.axaml (其他页面留待后续统一重构)。 -->
 
-      <!-- 页面标题 (导航标题共用 2418) -->
-      <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2418}"
-                 FontSize="22" FontWeight="Bold" />
+  <UserControl.Resources>
+    <!-- ToggleSwitch 开启态 Fluent 画刷覆盖为 Terracotta (仅本页) -->
+    <SolidColorBrush x:Key="ToggleSwitchFillOn">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOn">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn">#faf9f5</SolidColorBrush>
+  </UserControl.Resources>
 
-      <!-- ① 内置插件: 仅「快速切换」一行 -->
-      <Border Background="White" CornerRadius="12" Padding="16" BorderBrush="#E3E6EC" BorderThickness="1">
-        <StackPanel Spacing="12">
-          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2419}"
-                     FontWeight="SemiBold" FontSize="16" />
-          <Button Background="#F7F8FB" CornerRadius="8" Padding="14" HorizontalContentAlignment="Stretch" Click="OnQuickSwitchCardClick">
-            <Grid ColumnDefinitions="*,Auto">
-              <StackPanel Grid.Column="0" Spacing="5">
-                <!-- 插件名复用 QuickSwitch 文案 2408 (与设置页分区同名) -->
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2408}"
-                           FontWeight="SemiBold" FontSize="14" />
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2422}"
-                           TextWrapping="Wrap" Foreground="#8A8F98" FontSize="13" />
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2426}"
-                           TextWrapping="Wrap" Foreground="#4169E1" FontSize="12" />
-              </StackPanel>
-              <!-- 当前启用状态 (读 config.options.quickSwitch.collectEnabled; 中性配色, 不靠颜色谎报开关) -->
-              <Border Grid.Column="1" VerticalAlignment="Top" Margin="12,0,0,0"
-                      Background="#EEF1F6" CornerRadius="10" Padding="10,4">
-                <TextBlock Text="{Binding QuickSwitchStatusText}" Foreground="#5A6472"
-                           FontSize="12" FontWeight="SemiBold" />
-              </Border>
-            </Grid>
-          </Button>
+  <UserControl.Styles>
+    <!-- 标题 serif: Georgia (中文回退雅黑), DESIGN.md「serif 承载标题」 -->
+    <Style Selector="TextBlock.pageTitle">
+      <Setter Property="FontFamily" Value="Georgia, Microsoft YaHei UI" />
+      <Setter Property="FontSize" Value="24" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="#141413" />
+    </Style>
+    <Style Selector="TextBlock.pluginName">
+      <Setter Property="FontFamily" Value="Georgia, Microsoft YaHei UI" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#141413" />
+    </Style>
+    <!-- 插件卡: Ivory 面 + cream 细边 + 悬停 ring 阴影 (DESIGN.md 深度体系 Level 1/2) -->
+    <Style Selector="Border.pluginCard">
+      <Setter Property="Background" Value="#faf9f5" />
+      <Setter Property="BorderBrush" Value="#f0eee6" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="20,16" />
+      <Setter Property="Margin" Value="0,0,0,10" />
+    </Style>
+    <Style Selector="Border.pluginCard:pointerover">
+      <Setter Property="BoxShadow" Value="0 0 0 1 #d1cfc5" />
+    </Style>
+    <!-- 卡片信息区按钮: 全透明 (视觉与 StackPanel 无异, 仅提供可点性) -->
+    <Style Selector="Button.cardBody">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <!-- 紧凑开关 (无右侧文字, 状态文字由卡内 TextBlock 承载) -->
+    <Style Selector="ToggleSwitch.compact">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="OnContent" Value="{x:Null}" />
+      <Setter Property="OffContent" Value="{x:Null}" />
+    </Style>
+    <!-- 主 CTA: Terracotta -->
+    <Style Selector="Button.cta">
+      <Setter Property="Background" Value="#c96442" />
+      <Setter Property="Foreground" Value="#faf9f5" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="14,7" />
+    </Style>
+    <!-- 次级按钮: Warm Sand -->
+    <Style Selector="Button.sand">
+      <Setter Property="Background" Value="#e8e6dc" />
+      <Setter Property="Foreground" Value="#4d4c48" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="14,7" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer Background="#f5f4ed">
+    <StackPanel Margin="36,32,36,40" Spacing="16" MaxWidth="820" HorizontalAlignment="Left">
+
+      <!-- 标题行: 页面标题 (共用 2418) + 两个入口 (市场 2428 / 导入 2427) -->
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2418}"
+                   Classes="pageTitle" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="cta" Click="OnMarketClick" Margin="12,0,0,0" VerticalAlignment="Center">
+          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2428}" />
+        </Button>
+        <Button Grid.Column="2" Classes="sand" Click="OnImportClick" Margin="8,0,0,0" VerticalAlignment="Center">
+          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2427}" />
+        </Button>
+      </Grid>
+
+      <!-- 一次性操作回显 (导入成功等; Claude 体系内强调反馈用 terracotta) -->
+      <TextBlock Text="{Binding StatusText}" FontSize="13" Foreground="#c96442" FontWeight="SemiBold"
+                 IsVisible="{Binding StatusText, Converter={StaticResource NotEmpty}}" />
+
+      <!-- 统一插件列表: 首卡内置「快速切换」+ 用户插件 (不区分来源) -->
+      <ItemsControl ItemsSource="{Binding Plugins}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:PluginCardVm">
+            <Border Classes="pluginCard">
+              <Grid ColumnDefinitions="*,Auto,Auto">
+
+                <!-- 信息区: 内置卡点击打开配置对话框 (CanConfigure); 用户卡暂无配置 (阶段 2) -->
+                <Button Grid.Column="0" Classes="cardBody" Margin="0,0,16,0"
+                        Click="OnCardConfigureClick" CommandParameter="{Binding}">
+                  <StackPanel Spacing="4">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Classes="pluginName" Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                      <!-- 版本徽标 (Warm Sand) -->
+                      <Border Background="#e8e6dc" CornerRadius="10" Padding="8,2"
+                              VerticalAlignment="Center"
+                              IsVisible="{Binding VersionText, Converter={StaticResource NotEmpty}}">
+                        <TextBlock Text="{Binding VersionText}" FontSize="11" Foreground="#4d4c48" />
+                      </Border>
+                      <!-- 运行时标注 (仅用户插件): 引擎加载为阶段 2, 诚实边界 -->
+                      <Border Background="#e8e6dc" CornerRadius="10" Padding="8,2"
+                              VerticalAlignment="Center" IsVisible="{Binding !IsBuiltin}">
+                        <TextBlock FontSize="11" Foreground="#5e5d59"
+                                   Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2421}" />
+                      </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Description}" TextWrapping="Wrap"
+                               Foreground="#5e5d59" FontSize="13" />
+                    <TextBlock Text="{Binding Author}" Foreground="#87867f" FontSize="11"
+                               IsVisible="{Binding Author, Converter={StaticResource NotEmpty}}" />
+                    <!-- 配置引导 (仅内置卡, terracotta 小字) -->
+                    <TextBlock Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2426}"
+                               TextWrapping="Wrap" Foreground="#c96442" FontSize="11"
+                               IsVisible="{Binding CanConfigure}" />
+                  </StackPanel>
+                </Button>
+
+                <!-- 开关列: 开关 + 正下方状态文字 (启用 Olive SemiBold / 停用 Stone) -->
+                <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2"
+                            VerticalAlignment="Center" HorizontalAlignment="Center">
+                  <ToggleSwitch Classes="compact" IsChecked="{Binding Enabled}" />
+                  <TextBlock FontSize="10" HorizontalAlignment="Center"
+                             Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2423}"
+                             Foreground="#5e5d59" FontWeight="SemiBold"
+                             IsVisible="{Binding Enabled}" />
+                  <TextBlock FontSize="10" HorizontalAlignment="Center"
+                             Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2424}"
+                             Foreground="#87867f"
+                             IsVisible="{Binding !Enabled}" />
+                </StackPanel>
+
+                <!-- 删除 (仅用户插件, tooltip 复用 912) -->
+                <Button Grid.Column="2" Content="✕" Margin="12,0,0,0" VerticalAlignment="Center"
+                        IsVisible="{Binding CanDelete}"
+                        ToolTip.Tip="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=912}"
+                        Command="{Binding #Root.((vm:PluginsPageViewModel)DataContext).DeletePluginCommand}"
+                        CommandParameter="{Binding}"
+                        Background="Transparent" Foreground="#b53333" Padding="6,3" />
+
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- 加载中 -->
+      <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2439}"
+                 Foreground="#87867f" FontSize="13"
+                 IsVisible="{Binding IsLoadingPlugins}" />
+
+      <!-- 目录加载失败 (含逐包告警): Ivory 面 + crimson 文字 -->
+      <Border Background="#faf9f5" BorderBrush="#f0eee6" BorderThickness="1"
+              CornerRadius="8" Padding="14" IsVisible="{Binding ShowLoadError}">
+        <TextBlock Text="{Binding PluginsLoadError}" TextWrapping="Wrap"
+                   Foreground="#b53333" FontSize="12" />
+      </Border>
+
+      <!-- 空态引导 (无用户插件时): Warm Sand 面 -->
+      <Border Background="#e8e6dc" CornerRadius="8" Padding="14"
+              IsVisible="{Binding ShowEmptyState}">
+        <StackPanel Spacing="5">
+          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2429}"
+                     FontWeight="SemiBold" FontSize="13" Foreground="#4d4c48" />
+          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2430}"
+                     TextWrapping="Wrap" Foreground="#5e5d59" FontSize="12" />
         </StackPanel>
       </Border>
 
-      <!-- ② 第三方插件: 明确「尚未开放」+ 原因, 不伪造可安装条目 -->
-      <Border Background="White" CornerRadius="12" Padding="16" BorderBrush="#E3E6EC" BorderThickness="1">
-        <StackPanel Spacing="12">
-          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2420}"
-                     FontWeight="SemiBold" FontSize="16" />
-          <Border Background="#FFF8E1" CornerRadius="8" Padding="14">
-            <StackPanel Spacing="6">
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2421}"
-                         FontWeight="SemiBold" Foreground="#B26A00" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2425}"
-                         TextWrapping="Wrap" Foreground="#8A8F98" FontSize="13" />
-            </StackPanel>
-          </Border>
-        </StackPanel>
-      </Border>
+      <!-- 运行时说明 (诚实边界) -->
+      <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2425}"
+                 TextWrapping="Wrap" Foreground="#87867f" FontSize="12" />
 
     </StackPanel>
   </ScrollViewer>

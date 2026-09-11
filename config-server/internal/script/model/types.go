@@ -134,6 +134,13 @@ type Options struct {
 	KeyMapping       string           `json:"keyMapping"`
 	KeyboardLayout   string           `json:"keyboardLayout"`
 	QuickSwitch      QuickSwitchOption `json:"quickSwitch"`
+	Plugins          PluginsOption    `json:"plugins"`
+}
+
+// PluginsOption 插件注册表 (第三方插件启用状态)。「disabled」= 已停用插件 ID 集,
+// 缺省 (不在列表中) = 启用: 新导入插件默认启用无需写注册表; 引擎运行时就绪后按此表过滤加载。
+type PluginsOption struct {
+	Disabled []string `json:"disabled"`
 }
 
 // QuickSwitchOption 「快速切换 QuickSwitch」阶段 1 配置段 (config.json 的 options.quickSwitch)。
