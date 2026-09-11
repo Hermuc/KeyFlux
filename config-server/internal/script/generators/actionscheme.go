@@ -23,14 +23,15 @@ const selectedActionKeyCap = 9
 // entries 顺序 = 菜单序号 1..n。
 //
 // 数据数组每项字段含义 (稳定可 diff, 供 SelectedAction.ahk 消费):
-//   matchType:  匹配类型 "fileExt" | "textType"
-//   matchValue: 匹配条件值 (fileExt=逗号分隔后缀; textType=url/path/magnet/plain)
-//   key:        菜单序号 1-9 (同一 mapping 内从 1 递增, 用户按数字键选择)
-//   behavior:   行为库 ID (config.json selectedAction 原值, UI 展示用)
-//   action:     ResolveRuleAction 展开后的实际基础动作 (内置 ID 直通, 用户包 entry.action)
-//   actionValue:展开后的动作模板 (entry 非空覆盖包默认, 空补包默认)
-//   workingDir: 展开后的工作目录 (同上)
-//   name:       行为显示名 (包名, 供菜单展示; 目录缺失时回退 behavior ID)
+//
+//	matchType:  匹配类型 "fileExt" | "textType"
+//	matchValue: 匹配条件值 (fileExt=逗号分隔后缀; textType=url/path/magnet/plain)
+//	key:        菜单序号 1-9 (同一 mapping 内从 1 递增, 用户按数字键选择)
+//	behavior:   行为库 ID (config.json selectedAction 原值, UI 展示用)
+//	action:     ResolveRuleAction 展开后的实际基础动作 (内置 ID 直通, 用户包 entry.action)
+//	actionValue:展开后的动作模板 (entry 非空覆盖包默认, 空补包默认)
+//	workingDir: 展开后的工作目录 (同上)
+//	name:       行为显示名 (包名, 供菜单展示; 目录缺失时回退 behavior ID)
 //
 // 注: entry.options (确认/复制/清空) 本版不进数据数组 —— 方案 D 菜单语义下其行为
 // 未定义, 由任务 #30 的 AHK 端决定是否消费。

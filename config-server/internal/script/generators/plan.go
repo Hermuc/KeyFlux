@@ -1,9 +1,9 @@
 package generators
 
 import (
-	"settings/internal/behaviors"
 	"encoding/json"
 	"os"
+	"settings/internal/behaviors"
 	"sort"
 	"strings"
 
@@ -93,11 +93,11 @@ type PlanSelectedEntry struct {
 // 与 GenerateAHK/GenerateScripts 路径保持一致。
 func BuildPlan(cfg *model.Config) *Plan {
 	return &Plan{
-		PlanVersion:   PlanVersion,
-		Keymaps:       planKeymaps(cfg),
+		PlanVersion:    PlanVersion,
+		Keymaps:        planKeymaps(cfg),
 		Abbr:           planAbbr(cfg),
 		SelectedAction: planSelectedAction(cfg),
-		WindowGroups:  cfg.Options.WindowGroups,
+		WindowGroups:   cfg.Options.WindowGroups,
 	}
 }
 

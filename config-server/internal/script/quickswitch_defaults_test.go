@@ -115,8 +115,10 @@ func TestQuickSwitchDefaultsConsistency(t *testing.T) {
 
 // TestQuickSwitchUpgradePathFillsDefaults 是 P1 缺陷的直接回归网:
 // 以「不含 quickSwitch 段」的旧配置为输入 (升级路径), 断言
-//  ① ParseConfig 经全零签名补齐出真默认值;
-//  ② 渲染产物里 InitQuickSwitch({...}) 得到真默认值而非零值。
+//
+//	① ParseConfig 经全零签名补齐出真默认值;
+//	② 渲染产物里 InitQuickSwitch({...}) 得到真默认值而非零值。
+//
 // 修复前: ParseConfig 无 QuickSwitch 分支 -> 全零透传 -> 模板无条件渲染 9 字段 -> 引擎侧功能全失效。
 func TestQuickSwitchUpgradePathFillsDefaults(t *testing.T) {
 	// 基底 = 合成配置 (可完整渲染), 序列化后删除 options.quickSwitch, 模拟"旧配置无该段"。

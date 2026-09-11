@@ -43,9 +43,9 @@ var BuiltinPluginIDs = map[string]bool{
 // Entry 插件入口声明。阶段 1 仅接受 script 形态 (file + func);
 // 运行时加载为阶段 2, 校验通过即视为合法声明。
 type Entry struct {
-	Kind string `json:"kind"`             // "script"
-	File string `json:"file,omitempty"`   // script: 入口脚本文件名 (包内相对路径)
-	Func string `json:"func,omitempty"`   // script: 入口函数名
+	Kind string `json:"kind"`           // "script"
+	File string `json:"file,omitempty"` // script: 入口脚本文件名 (包内相对路径)
+	Func string `json:"func,omitempty"` // script: 入口函数名
 }
 
 // Manifest 插件包 manifest (plugin.json)。

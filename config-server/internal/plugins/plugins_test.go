@@ -98,7 +98,7 @@ func TestInstallFromZip_FlatAndTopDir(t *testing.T) {
 	m2 := validManifest()
 	m2.ID = "top_dir_pack"
 	top := buildZip(t, map[string]string{
-		"top-dir/plugin.json": manifestJSON(t, m2),
+		"top-dir/plugin.json":  manifestJSON(t, m2),
 		"top-dir/lib/util.ahk": "#Requires AutoHotkey v2.0\n",
 	})
 	if _, err := InstallFromZip(bytes.NewReader(top), user); err != nil {
@@ -126,8 +126,8 @@ func TestInstallFromZip_Rejects(t *testing.T) {
 
 	// 路径穿越 (zip-slip)
 	slip := buildZip(t, map[string]string{
-		"plugin.json":               manifestJSON(t, m),
-		"../evil.txt":               "x",
+		"plugin.json": manifestJSON(t, m),
+		"../evil.txt": "x",
 	})
 	if _, err := InstallFromZip(bytes.NewReader(slip), user); err == nil || !strings.Contains(err.Error(), "不安全路径") {
 		t.Fatalf("zip-slip 应拒绝: %v", err)

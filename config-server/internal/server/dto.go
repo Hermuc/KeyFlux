@@ -9,11 +9,11 @@ import "settings/internal/script/model"
 // 旧 ActionSchemeDTO/ActionRuleDTO 已随「单键分发」重构移除 (action-schemes 端点不再存在)。
 
 type ConfigDTO struct {
-	Keymaps        []KeymapDTO        `json:"keymaps"`
-	Options        OptionsDTO         `json:"options,omitempty"`
-	SelectedAction SelectedActionDTO  `json:"selectedAction"`
-	FileGroups     []FileGroupDTO     `json:"fileGroups"`
-	OverviewDocMd  string             `json:"overviewDocMd,omitempty"`
+	Keymaps        []KeymapDTO       `json:"keymaps"`
+	Options        OptionsDTO        `json:"options,omitempty"`
+	SelectedAction SelectedActionDTO `json:"selectedAction"`
+	FileGroups     []FileGroupDTO    `json:"fileGroups"`
+	OverviewDocMd  string            `json:"overviewDocMd,omitempty"`
 }
 
 // 选中动作单键分发 (方案 D): 与 model.SelectedAction 逐字段对应。
@@ -38,13 +38,13 @@ type SelectedEntryDTO struct {
 }
 
 type KeymapDTO struct {
-	ID        int                   `json:"id"`
-	Name      string                `json:"name"`
-	Enable    bool                  `json:"enable"`
-	Hotkey    string                `json:"hotkey"`
-	ParentID  int                   `json:"parentID"`
-	Delay     int                   `json:"delay"`
-	DisableAt string                `json:"disableAt"`
+	ID        int                    `json:"id"`
+	Name      string                 `json:"name"`
+	Enable    bool                   `json:"enable"`
+	Hotkey    string                 `json:"hotkey"`
+	ParentID  int                    `json:"parentID"`
+	Delay     int                    `json:"delay"`
+	DisableAt string                 `json:"disableAt"`
 	Hotkeys   map[string][]ActionDTO `json:"hotkeys"`
 }
 
@@ -81,7 +81,7 @@ type ActionDTO struct {
 
 type OptionsDTO struct {
 	HideMatrix       bool                 `json:"hideMatrix"`
-	KeyfluxVersion  string               `json:"keyfluxVersion"`
+	KeyfluxVersion   string               `json:"keyfluxVersion"`
 	WindowGroups     []WindowGroupDTO     `json:"windowGroups"`
 	Mouse            MouseDTO             `json:"mouse"`
 	Scroll           ScrollDTO            `json:"scroll"`
@@ -285,7 +285,7 @@ func selectedEntryToDTO(e *model.SelectedEntry) SelectedEntryDTO {
 
 func optionsToDTO(o model.Options) OptionsDTO {
 	dto := OptionsDTO{
-		HideMatrix:      o.HideMatrix,
+		HideMatrix:     o.HideMatrix,
 		KeyfluxVersion: o.KeyfluxVersion,
 		Mouse: MouseDTO{
 			KeepMouseMode: o.Mouse.KeepMouseMode,
@@ -479,7 +479,7 @@ func dtoToSelectedEntry(e *SelectedEntryDTO) model.SelectedEntry {
 
 func dtoToOptions(o OptionsDTO) model.Options {
 	m := model.Options{
-		HideMatrix:      o.HideMatrix,
+		HideMatrix:     o.HideMatrix,
 		KeyfluxVersion: o.KeyfluxVersion,
 		Mouse: model.Mouse{
 			KeepMouseMode: o.Mouse.KeepMouseMode,

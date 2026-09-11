@@ -36,18 +36,18 @@ func ActionToHotkey(action model.Action) string {
 }
 
 var TemplateFuncMap = template.FuncMap{
-	"contains":             strings.Contains,
-	"concat":               concat,
-	"join":                 join,
-	"ahkString":            model.AhkString,
-	"escapeAhkHotkey":      escapeAhkHotkey,
-	"actionToHotkey":       ActionToHotkey,
-	"abbrRegistryCode":     AbbrRegistryCode,
-	"sortHotkeys":          sortHotkeys,
-	"divide":               divide,
-	"renderKeymap":         renderKeymap,
+	"contains":            strings.Contains,
+	"concat":              concat,
+	"join":                join,
+	"ahkString":           model.AhkString,
+	"escapeAhkHotkey":     escapeAhkHotkey,
+	"actionToHotkey":      ActionToHotkey,
+	"abbrRegistryCode":    AbbrRegistryCode,
+	"sortHotkeys":         sortHotkeys,
+	"divide":              divide,
+	"renderKeymap":        renderKeymap,
 	"GroupDisableKeyFlux": GroupDisableKeyFlux,
-	"selectedActionCode":   selectedActionCode,
+	"selectedActionCode":  selectedActionCode,
 }
 
 func divide(a, b int) string {
