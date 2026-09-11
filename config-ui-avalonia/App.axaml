@@ -28,6 +28,9 @@
     <FluentTheme />
     <!-- 滚动条交互手感与外观优化 (悬停即时加粗/移开即时变细/Thumb 圆角), 详见 Styles/ScrollBarStyles.axaml -->
     <StyleInclude Source="avares://KeyFlux.Settings/Styles/ScrollBarStyles.axaml" />
+    <!-- Claude / Anthropic 暖色共享主题 (令牌 + 复用类样式); 其 Styles.Resources 随 StyleInclude
+         合并进应用资源字典, 故 {StaticResource} 令牌在全部页面/窗口均可解析。详见 Styles/ClaudeTheme.axaml -->
+    <StyleInclude Source="avares://KeyFlux.Settings/Styles/ClaudeTheme.axaml" />
   </Application.Styles>
 
 </Application>

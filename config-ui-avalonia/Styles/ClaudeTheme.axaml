@@ -1,0 +1,301 @@
+<!--
+  ============================================================================
+  KeyFlux · Claude / Anthropic 暖色共享主题资源字典
+  ============================================================================
+  本文件 = 全部 Claude 风格配色与复用类样式的唯一真源。
+  计划书 (toasty-cascade-darwin-N1t5WwND.md) 第 1.1 / 1.2 节的落地实现。
+
+  >> 令牌 对照 DESIGN.md 表 (值直接照抄 DESIGN.md, 严禁另写一份 hex) <<
+
+    【画刷 18 项 · 浅色(本次接线)】
+      ClaudeParchmentBrush    #f5f4ed  Parchment          页面底
+      ClaudeIvoryBrush        #faf9f5  Ivory              卡片面
+      ClaudeWhiteBrush        #ffffff  Pure White
+      ClaudeSandBrush         #e8e6dc  Warm Sand         次级面/徽标
+      ClaudeNearBlackBrush    #141413  Near Black        正文/标题
+      ClaudeCharcoalWarmBrush #4d4c48  Charcoal Warm     浅暖底上的深字
+      ClaudeOliveGrayBrush    #5e5d59  Olive Gray        次级正文
+      ClaudeStoneGrayBrush    #87867f  Stone Gray        弱化文字
+      ClaudeDarkWarmBrush     #3d3d3a  Dark Warm         文字链接/强调次级
+      ClaudeTerracottaBrush   #c96442  Terracotta        主 CTA
+      ClaudeCoralBrush        #d97757  Coral             焦点环 + 文字强调
+      ClaudeErrorBrush        #b53333  Error Crimson
+      ClaudeMutedGreenBrush   #5e7d5a  低饱和暖绿(正向/已映射)      [代定 见 第4节]
+      ClaudeMutedGreenSoftBrush #e7ebe3 暖绿浅底(已映射按键填充)   [代定 见 第4节]
+      ClaudeBorderCreamBrush  #f0eee6  Border Cream      标准浅底边
+      ClaudeBorderWarmBrush   #e8e6dc  Border Warm      强调分隔/窗口描边
+      ClaudeRingWarmBrush     #d1cfc5  Ring Warm         卡片 hover
+      ClaudeRingDeepBrush     #c2c0b6  Ring Deep         active
+
+    【画刷 4 项 · 暗色桩(定义但不接线, 见文末接线注释)】
+      ClaudeDarkSurfaceBrush  #30302e  Dark Surface   暗色容器/导航边
+      ClaudeDeepDarkBrush     #141413  Deep Dark      暗色页底
+      ClaudeWarmSilverBrush   #b0aea5  Warm Silver    暗底文字
+      ClaudeBorderDarkBrush   #30302e  Border Dark    暗底边
+
+    【阴影 5 项 · BoxShadows】
+      ClaudeShadowHoverRing    0 0 0 1 #d1cfc5               卡片 :pointerover (Ring Warm)
+      ClaudeShadowCtaRing      0 0 0 1 #c96442               主 CTA 静止态环 (DESIGN.md L126)
+      ClaudeShadowPressedInset inset 0 0 0 1 #26262526       按钮 :pressed (Level 4; 0x26=15% 深)
+      ClaudeShadowFocusRing    0 0 0 2 #d97757               键盘焦点环 (Coral, 2px) [焦点环裁定 见 第4节]
+      ClaudeShadowWhisper      0 4 24 0 #0d000000            浮层/对话框/窗口 (Level 3; 0x0d=5% 黑)
+
+    【尺寸 4 项 · x:Double】
+      ClaudeRadiusSm=6  ClaudeRadiusMd=8  ClaudeRadiusLg=12  ClaudeRadiusXl=16
+
+    【字体 1 项 · FontFamily】
+      ClaudeSerifFont = Georgia, Microsoft YaHei UI   (DESIGN.md: serif 承载全部标题)
+
+  >> 焦点环决策 (计划书 第4节) <<
+      DESIGN.md 的 Focus Blue #3898ec 是冷色, 用户指定用暖色系, 故选定 Coral #d97757
+      (2px) 补偿辨识度。ClaudeShadowFocusRing 用 Coral, 而非 Focus Blue。
+
+  >> 暗色主题桩接线方式 (本次只定义令牌 + 此注释, 不接线) <<
+      本文件内每个态样式若需暗色变体, 再补一份 ThemeVariantScope 双份声明
+      (Light 用浅色令牌 / Dark 用 Claude 暗色桩令牌);
+      总开关在 App.axaml 的 RequestedThemeVariant=Light, 改为 Default 跟随系统,
+      改 Dark 强制暗色。本次不改该开关 (计划书 第8节)。
+
+  >> 接入方式 <<
+      App.axaml 通过 StyleInclude 引入本文件 (根节点即 Styles, 其 Styles.Resources
+      随 StyleInclude 合并进应用资源字典, 故 StaticResource 令牌在全部页面/窗口中均可解析)。
+  ============================================================================
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ===================== 令牌 (Styles.Resources) ===================== -->
+  <Styles.Resources>
+
+    <!-- 画刷: 浅色(18) -->
+    <SolidColorBrush x:Key="ClaudeParchmentBrush"    Color="#f5f4ed" />
+    <SolidColorBrush x:Key="ClaudeIvoryBrush"        Color="#faf9f5" />
+    <SolidColorBrush x:Key="ClaudeWhiteBrush"        Color="#ffffff" />
+    <SolidColorBrush x:Key="ClaudeSandBrush"         Color="#e8e6dc" />
+    <SolidColorBrush x:Key="ClaudeNearBlackBrush"    Color="#141413" />
+    <SolidColorBrush x:Key="ClaudeCharcoalWarmBrush"  Color="#4d4c48" />
+    <SolidColorBrush x:Key="ClaudeOliveGrayBrush"    Color="#5e5d59" />
+    <SolidColorBrush x:Key="ClaudeStoneGrayBrush"    Color="#87867f" />
+    <SolidColorBrush x:Key="ClaudeDarkWarmBrush"     Color="#3d3d3a" />
+    <SolidColorBrush x:Key="ClaudeTerracottaBrush"   Color="#c96442" />
+    <SolidColorBrush x:Key="ClaudeCoralBrush"        Color="#d97757" />
+    <SolidColorBrush x:Key="ClaudeErrorBrush"        Color="#b53333" />
+    <SolidColorBrush x:Key="ClaudeMutedGreenBrush"   Color="#5e7d5a" />
+    <SolidColorBrush x:Key="ClaudeMutedGreenSoftBrush" Color="#e7ebe3" />
+    <SolidColorBrush x:Key="ClaudeBorderCreamBrush"  Color="#f0eee6" />
+    <SolidColorBrush x:Key="ClaudeBorderWarmBrush"   Color="#e8e6dc" />
+    <SolidColorBrush x:Key="ClaudeRingWarmBrush"     Color="#d1cfc5" />
+    <SolidColorBrush x:Key="ClaudeRingDeepBrush"     Color="#c2c0b6" />
+
+    <!-- 画刷: 暗色桩(4) · 定义但不接线 -->
+    <SolidColorBrush x:Key="ClaudeDarkSurfaceBrush"  Color="#30302e" />
+    <SolidColorBrush x:Key="ClaudeDeepDarkBrush"     Color="#141413" />
+    <SolidColorBrush x:Key="ClaudeWarmSilverBrush"   Color="#b0aea5" />
+    <SolidColorBrush x:Key="ClaudeBorderDarkBrush"   Color="#30302e" />
+
+    <!-- 阴影 (5) · BoxShadows -->
+    <BoxShadows x:Key="ClaudeShadowHoverRing">0 0 0 1 #d1cfc5</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowCtaRing">0 0 0 1 #c96442</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowPressedInset">inset 0 0 0 1 #26262526</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowFocusRing">0 0 0 2 #d97757</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowWhisper">0 4 24 0 #0d000000</BoxShadows>
+
+    <!-- 尺寸 (4) · CornerRadius 类型
+         注意: 令牌被赋给 CornerRadius 属性, 必须用 CornerRadius 类型。
+         若用 x:Double, 运行时对 CornerRadius 属性赋值会抛 InvalidCastException
+         (构建通过但启动即崩, 见 QA 反馈)。故用四角统一值的 CornerRadius 元素。 -->
+    <CornerRadius x:Key="ClaudeRadiusSm">6,6,6,6</CornerRadius>
+    <CornerRadius x:Key="ClaudeRadiusMd">8,8,8,8</CornerRadius>
+    <CornerRadius x:Key="ClaudeRadiusLg">12,12,12,12</CornerRadius>
+    <CornerRadius x:Key="ClaudeRadiusXl">16,16,16,16</CornerRadius>
+
+    <!-- 字体 (1) · FontFamily -->
+    <FontFamily x:Key="ClaudeSerifFont">Georgia, Microsoft YaHei UI</FontFamily>
+
+  </Styles.Resources>
+
+  <!-- ===================== 复用类样式 (12) ===================== -->
+
+  <!-- 文字层级 -->
+  <Style Selector="TextBlock.claudeTitle">
+    <Setter Property="FontFamily" Value="{StaticResource ClaudeSerifFont}" />
+    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
+  </Style>
+  <Style Selector="TextBlock.claudeSubtitle">
+    <Setter Property="FontFamily" Value="{StaticResource ClaudeSerifFont}" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
+  </Style>
+  <Style Selector="TextBlock.claudeBody">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
+  </Style>
+  <Style Selector="TextBlock.claudeMuted">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
+  </Style>
+  <Style Selector="TextBlock.claudeDim">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeStoneGrayBrush}" />
+  </Style>
+
+  <!-- 卡片: Ivory 面 + Cream 细边 + 悬停 Ring 阴影 -->
+  <Style Selector="Border.claudeCard">
+    <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
+  </Style>
+  <Style Selector="Border.claudeCard:pointerover">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowHoverRing}" />
+  </Style>
+
+  <!-- 主 CTA: Terracotta 底 + Ivory 字。
+       BoxShadow 在 Avalonia 11.3 仅存在于 Border / ContentPresenter (不在 Button),
+       故阴影一律设在模板 ContentPresenter#PART_ContentPresenter 上;
+       Background 亦须同时重设该部件, 否则被 Fluent 模板值压住 (见 1.2 坑 1)。 -->
+  <Style Selector="Button.claudeCta">
+    <Setter Property="Background" Value="{StaticResource ClaudeTerracottaBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    <Setter Property="Padding" Value="14,7" />
+    <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
+  </Style>
+  <Style Selector="Button.claudeCta /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCtaRing}" />
+  </Style>
+  <Style Selector="Button.claudeCta:pointerover">
+    <Setter Property="Background" Value="{StaticResource ClaudeCoralBrush}" />
+  </Style>
+  <Style Selector="Button.claudeCta:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource ClaudeCoralBrush}" />
+  </Style>
+  <!-- 按动: inset 环 + 轻微下沉 (Level 4) -->
+  <Style Selector="Button.claudeCta:pressed">
+    <Setter Property="RenderTransform" Value="translate(0px, 1px)" />
+  </Style>
+  <Style Selector="Button.claudeCta:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource ClaudeCoralBrush}" />
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
+  </Style>
+  <!-- 焦点环 (必须声明在 :pressed 之后, 见 1.2 坑 2; 二者均写 BoxShadow, 靠声明顺序定胜负) -->
+  <Style Selector="Button.claudeCta:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+  </Style>
+
+  <!-- 次级按钮: Warm Sand 底 + Charcoal Warm 字 -->
+  <Style Selector="Button.claudeSand">
+    <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeCharcoalWarmBrush}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    <Setter Property="Padding" Value="14,7" />
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderWarmBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
+  </Style>
+  <Style Selector="Button.claudeSand:pointerover">
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeRingWarmBrush}" />
+  </Style>
+  <Style Selector="Button.claudeSand:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowHoverRing}" />
+  </Style>
+  <Style Selector="Button.claudeSand:pressed">
+    <Setter Property="RenderTransform" Value="translate(0px, 1px)" />
+  </Style>
+  <Style Selector="Button.claudeSand:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
+  </Style>
+  <Style Selector="Button.claudeSand:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+  </Style>
+
+  <!-- 幽灵按钮: 透明底 + Border Warm 描边 + Olive 字 -->
+  <Style Selector="Button.claudeGhost">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    <Setter Property="Padding" Value="14,7" />
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderWarmBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
+  </Style>
+  <Style Selector="Button.claudeGhost:pointerover">
+    <Setter Property="Foreground" Value="{StaticResource ClaudeDarkWarmBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeRingDeepBrush}" />
+  </Style>
+  <Style Selector="Button.claudeGhost:pressed">
+    <Setter Property="RenderTransform" Value="translate(0px, 1px)" />
+  </Style>
+  <Style Selector="Button.claudeGhost:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
+  </Style>
+  <Style Selector="Button.claudeGhost:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+  </Style>
+
+  <!-- 危险按钮: 透明底 + Error Crimson 字 -->
+  <Style Selector="Button.claudeDanger">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeErrorBrush}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    <Setter Property="Padding" Value="14,7" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
+  </Style>
+  <Style Selector="Button.claudeDanger:pointerover">
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeErrorBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Button.claudeDanger:pressed">
+    <Setter Property="RenderTransform" Value="translate(0px, 1px)" />
+  </Style>
+  <Style Selector="Button.claudeDanger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
+  </Style>
+  <Style Selector="Button.claudeDanger:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+  </Style>
+
+  <!-- 紧凑开关: 无右侧文字 (状态文字由卡内 TextBlock 承载)。
+       开启态 Terracotta 画刷由消费页面/窗口通过 Fluent 资源键
+       (ToggleSwitchFillOn / ToggleSwitchStrokeOn / ToggleSwitchKnobFillOn)
+       覆盖, 这些键是资源而非 CLR 属性, 无法在 Style 内设定,
+       参照 PluginsPageView.axaml 已有的同款资源键覆盖。 -->
+  <Style Selector="ToggleSwitch.claudeCompact">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="OnContent" Value="{x:Null}" />
+    <Setter Property="OffContent" Value="{x:Null}" />
+  </Style>
+
+  <!-- 输入框 / 下拉: Ivory 底 + Cream 边 + 焦点 Coral 环。
+       TextBox/ComboBox 均无 BoxShadow 属性:
+       - TextBox 焦点环阴影设在模板 Border#PART_BorderElement 上 (Fluent 实测部件名)。
+       - ComboBox 模板无 PART_Border 部件, 无法挂 BoxShadow 环; 焦点态改用
+         BorderBrush 变 Coral (模板 Border 经 TemplateBinding 继承), 给出可见焦点指示。
+       BorderBrush 均设在控件自身 (经 TemplateBinding 继承到模板 Border)。 -->
+  <Style Selector="TextBox.claudeInput">
+    <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
+  </Style>
+  <Style Selector="TextBox.claudeInput:focus-visible">
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
+  </Style>
+  <Style Selector="TextBox.claudeInput:focus-visible /template/ Border#PART_BorderElement">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+  </Style>
+  <Style Selector="ComboBox.claudeInput">
+    <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
+  </Style>
+  <Style Selector="ComboBox.claudeInput:focus-visible">
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
+  </Style>
+
+</Styles>
