@@ -9,7 +9,19 @@
         Icon="avares://KeyFlux.Settings/Assets/logo.png"
         Width="1200" Height="760"
         MinWidth="960" MinHeight="600"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
+        Background="Transparent">
+
+  <!-- 无边框 + 亚克力 (计划书 §九, A 档零新依赖):
+       · TransparencyLevelHint 是【提示列表】, 从最理想逐级降级; 全不可用时回落 None 不会崩。
+       · 窗口 Background 保持 Transparent, 真正的暖色底由下方根 Border 的
+         ClaudeWindowSurfaceBrush (带 alpha 的 Parchment) 承担, 模糊才能透出来。
+       · 关于"柔和外阴影": BoxShadow 需要窗口边缘留出透明边距才可见, 而一旦该边距存在,
+         在亚克力不可用 (回落 None) 的机器上会显示为黑边 —— 故本期用 1px BorderWarm 细环
+         (DESIGN.md Level 2 ring) 替代外阴影, 等确认目标机器亚克力稳定后再补边距+Whisper。 -->
 
   <!-- Ctrl+S 保存 (复刻 App.vue 的全局 keydown 监听) -->
   <Window.KeyBindings>
@@ -45,9 +57,65 @@
     <Style Selector="ListBoxItem:selected TextBlock.navIcon">
       <Setter Property="Foreground" Value="{StaticResource ClaudeTerracottaBrush}" />
     </Style>
+
+    <!-- 自绘标题栏三键 (无边框窗口的替代品)。底色写样式而非内联 ——
+         内联是本地值, 会压过下面的 :pointerover 态样式。 -->
+    <Style Selector="Button.caption">
+      <Setter Property="Width" Value="42" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusSm}" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.caption:pointerover">
+      <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
+    </Style>
+    <Style Selector="Button.caption:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
+    </Style>
+    <Style Selector="Button.caption:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeRingWarmBrush}" />
+    </Style>
+    <!-- 关闭键: 悬停转 Error Crimson 底 + Ivory 字 -->
+    <Style Selector="Button.caption.captionClose:pointerover">
+      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
+    </Style>
+    <Style Selector="Button.caption.captionClose:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeErrorBrush}" />
+    </Style>
   </Window.Styles>
 
-  <Grid ColumnDefinitions="264,*">
+  <Border Background="{StaticResource ClaudeWindowSurfaceBrush}"
+          BorderBrush="{StaticResource ClaudeBorderWarmBrush}"
+          BorderThickness="1">
+   <DockPanel>
+
+    <!-- 自绘标题栏 (取代被 NoChrome 去掉的系统标题栏):
+         整条为拖动区 (PointerPressed -> BeginMoveDrag), 双击切换最大化; 右侧三键。
+         左侧品牌组 IsHitTestVisible=False, 保证在其上按下也能触发拖动。 -->
+    <Grid DockPanel.Dock="Top" Height="36" Background="Transparent"
+          PointerPressed="OnTitleBarPointerPressed">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Spacing="8"
+                  Margin="14,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False">
+        <Image Source="avares://KeyFlux.Settings/Assets/logo.png" Width="16" Height="16" />
+        <TextBlock Text="KeyFlux" FontFamily="{StaticResource ClaudeSerifFont}" FontSize="12"
+                   Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2"
+                  Margin="0,0,6,0" VerticalAlignment="Center">
+        <Button Classes="caption" Content="─" Click="OnMinimizeClick" />
+        <Button Classes="caption" Content="□" Click="OnMaximizeClick" />
+        <Button Classes="caption captionClose" Content="✕" Click="OnCloseClick" />
+      </StackPanel>
+    </Grid>
+
+    <Grid ColumnDefinitions="264,*">
 
     <!-- ===================== 左侧导航 (复刻 NavigationDrawer.vue) ===================== -->
     <Border Grid.Column="0" Background="{StaticResource ClaudeIvoryBrush}"
@@ -154,6 +222,8 @@
         </StackPanel>
       </Border>
     </Grid>
-  </Grid>
+    </Grid>
+   </DockPanel>
+  </Border>
 
 </Window>

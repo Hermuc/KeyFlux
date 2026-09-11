@@ -112,6 +112,14 @@
     <!-- 字体 (1) · FontFamily -->
     <FontFamily x:Key="ClaudeSerifFont">Georgia, Microsoft YaHei UI</FontFamily>
 
+    <!-- ── 窗口面 (亚克力用) ──
+         Parchment 带 alpha, 供无边框窗口的根 Border 作底色, 让底层模糊透出。
+         alpha 取 0xE6 (≈90%) 是刻意保守: TransparencyLevelHint 只是"提示",
+         平台不支持时 Avalonia 会回落到 None —— 此时若 alpha 过低, 暖底会明显发灰发脏。
+         90% 在 None 下与实心 Parchment 肉眼几乎无差, 在有模糊时能透出材质感。
+         若要更明显的磨砂效果, 只需下调这一个 alpha 值 (越小越透)。 -->
+    <SolidColorBrush x:Key="ClaudeWindowSurfaceBrush" Color="#E6f5f4ed" />
+
   </Styles.Resources>
 
   <!-- ===================== 复用类样式 (12) ===================== -->
