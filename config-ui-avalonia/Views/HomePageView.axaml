@@ -19,9 +19,9 @@
     <!-- 加载中 -->
     <StackPanel IsVisible="{Binding IsLoading}"
                 HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-      <ProgressBar IsIndeterminate="True" Width="200" Foreground="#4169E1" />
+      <ProgressBar IsIndeterminate="True" Width="200" Foreground="{StaticResource ClaudeTerracottaBrush}" />
       <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=918}"
-                 Foreground="#8A8F98" HorizontalAlignment="Center" />
+                 Foreground="{StaticResource ClaudeStoneGrayBrush}" HorizontalAlignment="Center" />
     </StackPanel>
 
     <!-- config_doc.md 渲染 (标题层级/图片/链接, 复刻 Vue 版 iframe 效果) -->
@@ -31,7 +31,7 @@
                              FontSize="22" FontWeight="Bold" Margin="0,0,0,10" />
         <ItemsControl ItemsSource="{Binding DocBlocks}" />
         <SelectableTextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=931}"
-                             Foreground="#B0B4BC" FontSize="12" Margin="0,24,0,0" />
+                             Foreground="{StaticResource ClaudeWarmSilverBrush}" FontSize="12" Margin="0,24,0,0" />
         <!-- 底部编辑区: 虚线分割线 + 可点击说明 (替代原右上角「编辑总览」按钮) -->
         <controls:EditZoneHint Margin="0,26,0,0"
                                Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2407}"
@@ -44,8 +44,8 @@
       <StackPanel IsVisible="{Binding !IsLoading}" Margin="36,28" Spacing="14" MaxWidth="720">
         <SelectableTextBlock Text="KeyFlux" FontSize="22" FontWeight="Bold" />
         <SelectableTextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=932}"
-                             Foreground="#C77700" FontSize="13" />
-        <Border Height="1" Background="#E3E6EC" Margin="0,4" />
+                             Foreground="{StaticResource ClaudeTerracottaBrush}" FontSize="13" />
+        <Border Height="1" Background="{StaticResource ClaudeBorderCreamBrush}" Margin="0,4" />
         <SelectableTextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=934}"
                              TextWrapping="Wrap" FontSize="14" />
         <SelectableTextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=935}"

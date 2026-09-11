@@ -9,7 +9,7 @@
   <!-- 键位图页 (复刻 views/Keymap.vue): 物理键盘网格 + 动作编辑面板 + 右侧备注汇总
        布局: 外层 Grid 只承载页面背景 (铺满内容区, 避免 Margin 露白),
        内层 Grid 带边距与裁剪; 左列 (页头/键盘/编辑面板) 固定不滚动, 右列备注汇总独立滚动 -->
-  <Grid Background="#F0F2F7">
+  <Grid Background="{StaticResource ClaudeParchmentBrush}">
     <!-- 右边距 4 (原 24): 右列备注滚动区向右扩 20, 滚动条右移远离文字;
          文字宽度由 CommentSummaryPanel 内容右 Margin 20 保持不变 -->
     <Grid ColumnDefinitions="Auto,*" Margin="24,20,4,28" ClipToBounds="True">
@@ -22,7 +22,7 @@
         <!-- 页头: 模式名称 + 子模式上层信息 (label:503) -->
         <StackPanel Orientation="Horizontal" Spacing="14" Margin="2,0,0,12">
           <TextBlock Text="{Binding HeaderTitle}" FontSize="18" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding ParentInfo}" FontSize="13" Foreground="#8A8F98"
+          <TextBlock Text="{Binding ParentInfo}" FontSize="13" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                      VerticalAlignment="Center" />
         </StackPanel>
 
@@ -47,10 +47,10 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:KeyCellVm">
                     <Button Height="43" Width="{Binding CellWidth}" MinWidth="{Binding CellMinWidth}"
-                            Padding="{Binding CellPadding}" CornerRadius="6"
+                            Padding="{Binding CellPadding}" CornerRadius="{StaticResource ClaudeRadiusSm}"
                             Background="{Binding Background}"
                             IsEnabled="{Binding IsEnabled}"
-                            Foreground="#20242B" BorderBrush="#D5D9E2" BorderThickness="1"
+                            Foreground="{StaticResource ClaudeNearBlackBrush}" BorderBrush="{StaticResource ClaudeRingWarmBrush}" BorderThickness="1"
                             Command="{Binding #Root.((vm:KeymapPageViewModel)DataContext).SelectKeyCommand}"
                             CommandParameter="{Binding}">
                       <TextBlock Text="{Binding Label}"

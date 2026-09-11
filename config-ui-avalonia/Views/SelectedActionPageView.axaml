@@ -21,8 +21,8 @@
     <DataTemplate x:Key="MappingRowCard" x:DataType="vm:MappingRowVm">
 
       <Border Classes="row-card" Classes.matched="{Binding IsMatched}"
-              Background="White" BorderBrush="#E3E6EC" BorderThickness="1"
-              CornerRadius="10" Padding="12" Margin="0,0,0,8"
+              Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
+              CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="12" Margin="0,0,0,8"
               Tapped="OnRowHeaderTapped">
         <StackPanel Spacing="8">
           <!-- 行头: 分区标题 (仅分区首行, 沿用原徽章色) + 条件值编辑 + 行操作 -->
@@ -34,19 +34,19 @@
             <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
               <!-- textType: 文本特征四选一 Toggle (所见即所选; 点亮与标题同色) -->
               <StackPanel IsVisible="{Binding IsTextType}" Orientation="Horizontal" Spacing="6">
-                <ToggleButton Classes="type-toggle tone-blue"
+                <ToggleButton Classes="type-toggle tone-terracotta"
                               IsChecked="{Binding IsUrl, Mode=TwoWay}"
                               Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                               Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1059}" />
-                <ToggleButton Classes="type-toggle tone-blue"
+                <ToggleButton Classes="type-toggle tone-terracotta"
                               IsChecked="{Binding IsPath, Mode=TwoWay}"
                               Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                               Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1060}" />
-                <ToggleButton Classes="type-toggle tone-blue"
+                <ToggleButton Classes="type-toggle tone-terracotta"
                               IsChecked="{Binding IsMagnet, Mode=TwoWay}"
                               Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                               Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1061}" />
-                <ToggleButton Classes="type-toggle tone-blue"
+                <ToggleButton Classes="type-toggle tone-terracotta"
                               IsChecked="{Binding IsPlain, Mode=TwoWay}"
                               Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
                               Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1062}" />
@@ -56,7 +56,7 @@
                 <TextBox Text="{Binding MatchValueDisplay}"
                          Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1034}" />
                 <StackPanel IsVisible="{Binding ShowFileGroupFill}" Orientation="Horizontal" Spacing="6">
-                  <TextBlock FontSize="12" Foreground="#8A8F98" VerticalAlignment="Center"
+                  <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1006}" />
                   <ItemsControl ItemsSource="{Binding GroupToggles}">
                     <ItemsControl.ItemsPanel>
@@ -66,7 +66,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:FileGroupToggleVm">
-                        <ToggleButton Classes="type-toggle tone-orange"
+                        <ToggleButton Classes="type-toggle tone-coral"
                                       IsChecked="{Binding IsChecked, Mode=TwoWay}"
                                       Content="{Binding Label}" />
                       </DataTemplate>
@@ -74,7 +74,7 @@
                   </ItemsControl>
                 </StackPanel>
               </StackPanel>
-              <TextBlock Text="{Binding MatchHint}" FontSize="11" Foreground="#8A8F98"
+              <TextBlock Text="{Binding MatchHint}" FontSize="11" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                          TextWrapping="Wrap" />
             </StackPanel>
 
@@ -110,13 +110,13 @@
             <ItemsControl ItemsSource="{Binding Editors}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:EntryRowVm">
-                  <Border Background="#FAFBFC" BorderBrush="#ECEFF3" BorderThickness="1"
-                          CornerRadius="8" Padding="10" Margin="0,0,0,6">
+                  <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
+                          CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="10" Margin="0,0,0,6">
                     <StackPanel Spacing="8">
                       <Grid ColumnDefinitions="Auto,*,Auto">
-                        <Border Background="#E8F0FE" CornerRadius="6" Padding="7,2"
+                        <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="7,2"
                                 VerticalAlignment="Center">
-                          <TextBlock Text="{Binding Index}" Foreground="#4169E1"
+                          <TextBlock Text="{Binding Index}" Foreground="{StaticResource ClaudeTerracottaBrush}"
                                      FontWeight="SemiBold" FontSize="13" />
                         </Border>
                         <ComboBox Grid.Column="1" Margin="10,0" HorizontalAlignment="Stretch"
@@ -132,15 +132,15 @@
                                   ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1108}" />
                         </StackPanel>
                       </Grid>
-                      <TextBlock Text="{Binding BehaviorHint}" FontSize="11" Foreground="#8A8F98"
+                      <TextBlock Text="{Binding BehaviorHint}" FontSize="11" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                                  TextWrapping="Wrap" />
                       <!-- 命令模板 -->
                       <StackPanel IsVisible="{Binding ShowTemplate}" Spacing="4">
-                        <TextBlock FontSize="11" Foreground="#8A8F98"
+                        <TextBlock FontSize="11" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                                    Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1012}" />
                         <TextBox Text="{Binding ActionValue}" TextWrapping="Wrap" AcceptsReturn="False" />
                       </StackPanel>
-                      <TextBlock IsVisible="{Binding IsNoValue}" FontSize="11" Foreground="#2E7D32"
+                      <TextBlock IsVisible="{Binding IsNoValue}" FontSize="11" Foreground="{StaticResource ClaudeMutedGreenBrush}"
                                  TextWrapping="Wrap" Text="{Binding TemplateHint}" />
                       <!-- 工作目录 -->
                       <TextBox Text="{Binding WorkingDir}"
@@ -155,10 +155,10 @@
             <!-- 添加行为 (达 9 禁用 + 提示) -->
             <StackPanel Orientation="Horizontal" Spacing="8">
               <Button Command="{Binding AddEntryCommand}" IsEnabled="{Binding CanAddEntry}"
-                      Background="Transparent" BorderThickness="1" BorderBrush="#4169E1"
-                      Foreground="#4169E1" CornerRadius="8" Padding="12,5" FontSize="12"
+                      Background="Transparent" BorderThickness="1" BorderBrush="{StaticResource ClaudeTerracottaBrush}"
+                      Foreground="{StaticResource ClaudeTerracottaBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,5" FontSize="12"
                       Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1106}" />
-              <TextBlock IsVisible="{Binding !CanAddEntry}" FontSize="12" Foreground="#B26A00"
+              <TextBlock IsVisible="{Binding !CanAddEntry}" FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}"
                          VerticalAlignment="Center"
                          Text="{Binding AddEntryHint}" />
             </StackPanel>
@@ -185,49 +185,49 @@
       <Setter Property="Padding" Value="14,5"/>
       <Setter Property="CornerRadius" Value="999"/>
       <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="BorderBrush" Value="#DADCE0"/>
-      <Setter Property="Background" Value="White"/>
-      <Setter Property="Foreground" Value="#5F6368"/>
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeRingWarmBrush}"/>
+      <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}"/>
+      <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}"/>
       <Setter Property="FontSize" Value="13"/>
       <Setter Property="MinHeight" Value="30"/>
     </Style>
     <!-- 点亮态必须打在模板 PART_ContentPresenter 上, 只改控件属性会被 Fluent 主题覆盖 -->
-    <Style Selector="ToggleButton.tone-blue:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#4169E1"/>
-      <Setter Property="Foreground" Value="White"/>
+    <Style Selector="ToggleButton.tone-terracotta:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeTerracottaBrush}"/>
+      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}"/>
     </Style>
-    <Style Selector="ToggleButton.tone-blue:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#4169E1"/>
-      <Setter Property="Foreground" Value="White"/>
+    <Style Selector="ToggleButton.tone-terracotta:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeTerracottaBrush}"/>
+      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}"/>
     </Style>
-    <Style Selector="ToggleButton.tone-blue:checked">
-      <Setter Property="BorderBrush" Value="#2F55C0"/>
+    <Style Selector="ToggleButton.tone-terracotta:checked">
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
-    <Style Selector="ToggleButton.tone-orange:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#E65100"/>
-      <Setter Property="Foreground" Value="White"/>
+    <Style Selector="ToggleButton.tone-coral:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeCoralBrush}"/>
+      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}"/>
     </Style>
-    <Style Selector="ToggleButton.tone-orange:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#E65100"/>
-      <Setter Property="Foreground" Value="White"/>
+    <Style Selector="ToggleButton.tone-coral:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeCoralBrush}"/>
+      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}"/>
     </Style>
-    <Style Selector="ToggleButton.tone-orange:checked">
-      <Setter Property="BorderBrush" Value="#BF3F00"/>
+    <Style Selector="ToggleButton.tone-coral:checked">
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
-    <!-- 映射行卡: 悬停提亮边框 / 测试命中高亮 (蓝底) -->
+    <!-- 映射行卡: 悬停提亮边框 / 测试命中高亮 (暖陶土底 + 陶土边) -->
     <Style Selector="Border.row-card:pointerover">
-      <Setter Property="BorderBrush" Value="#9DB8EC" />
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeRingWarmBrush}" />
     </Style>
     <Style Selector="Border.row-card.matched">
-      <Setter Property="Background" Value="#E8F0FE" />
-      <Setter Property="BorderBrush" Value="#4169E1" />
+      <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
     </Style>
     <!-- 行为胶囊 (chip): 彩色描边 + 同色文字, 徽章色由 VM 按 BaseActionOf 推导 -->
     <Style Selector="Border.chip">
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
       <Setter Property="Padding" Value="8,2" />
       <Setter Property="Margin" Value="0,0,6,6" />
       <Setter Property="VerticalAlignment" Value="Center" />
@@ -240,40 +240,40 @@
       <Setter Property="Padding" Value="6,2" />
       <Setter Property="MinWidth" Value="28" />
       <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="#3C4043" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeDarkWarmBrush}" />
     </Style>
     <Style Selector="Button.icon-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#3C4043" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeDarkWarmBrush}" />
     </Style>
     <Style Selector="Button.icon-btn:pressed /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#3C4043" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeDarkWarmBrush}" />
     </Style>
     <!-- 禁用 (首行↑/末行↓): 仅箭头变灰, 无底框 -->
     <Style Selector="Button.icon-btn:disabled">
-      <Setter Property="Foreground" Value="#B8BCC4" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeWarmSilverBrush}" />
     </Style>
     <Style Selector="Button.icon-btn:disabled /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#B8BCC4" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeWarmSilverBrush}" />
     </Style>
     <!-- 删除按钮: 红色, 悬停/按下仍保持红 -->
     <Style Selector="Button.icon-btn.danger">
-      <Setter Property="Foreground" Value="#D32F2F" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeErrorBrush}" />
     </Style>
     <Style Selector="Button.icon-btn.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#D32F2F" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeErrorBrush}" />
     </Style>
     <Style Selector="Button.icon-btn.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#D32F2F" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeErrorBrush}" />
     </Style>
     <!-- 黄色提示条 (StatusText / 热键卡提示): 统一底色与内距 -->
     <Style Selector="Border.hint">
-      <Setter Property="Background" Value="#FFF8E1" />
-      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
       <Setter Property="Padding" Value="12,8" />
     </Style>
   </UserControl.Styles>
@@ -292,10 +292,10 @@
     <DockPanel Grid.Row="0" Margin="0,0,0,12">
       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <Button Click="OnManageBehaviors" Background="Transparent" BorderThickness="1"
-                BorderBrush="#E3E6EC" CornerRadius="8" Padding="12,7" FontSize="13"
+                BorderBrush="{StaticResource ClaudeBorderCreamBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,7" FontSize="13"
                 Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1083}" />
         <Button Command="{Binding OpenAddPanelCommand}"
-                Background="#4169E1" Foreground="White" CornerRadius="8" Padding="14,7">
+                Background="{StaticResource ClaudeTerracottaBrush}" Foreground="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="14,7">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="＋" />
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1105}" />
@@ -310,19 +310,19 @@
       <StackPanel x:Name="PageRoot" MaxWidth="860" HorizontalAlignment="Left" Spacing="14">
 
         <!-- 说明条 (单键分发语义, 复用 960) -->
-        <Border Background="#E8F0FE" CornerRadius="8" Padding="12,9">
-          <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#37474F"
+        <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,9">
+          <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource ClaudeDarkWarmBrush}"
                      Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=960}" />
         </Border>
 
         <!-- 页内提示条 (重复映射等非阻断反馈) -->
         <Border Classes="hint" IsVisible="{Binding StatusText, Converter={StaticResource NotEmpty}}">
-          <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#B26A00" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" TextWrapping="Wrap" />
         </Border>
 
         <!-- 主快捷键 + 启用开关 -->
-        <Border Background="White" BorderBrush="#E3E6EC" BorderThickness="1"
-                CornerRadius="10" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
+                CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
           <StackPanel Spacing="10">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock FontWeight="SemiBold" VerticalAlignment="Center"
@@ -335,13 +335,13 @@
                                     UsedHotkeys="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).UsedHotkeys}" />
             <!-- 热键提示条 (互斥合并: 未保存 1077 优先于空热键警示 976, 文案见 VM.HotkeyHintText) -->
             <Border Classes="hint" IsVisible="{Binding HotkeyHintText, Converter={StaticResource NotEmpty}}">
-              <TextBlock Text="{Binding HotkeyHintText}" FontSize="12" Foreground="#B26A00" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding HotkeyHintText}" FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" TextWrapping="Wrap" />
             </Border>
           </StackPanel>
         </Border>
 
         <!-- 匹配优先级说明 (组内行序 = 优先级) -->
-        <TextBlock FontSize="12" Foreground="#8A8F98" TextWrapping="Wrap"
+        <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" TextWrapping="Wrap"
                    Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=978}" />
 
         <!-- 空状态 -->
@@ -349,7 +349,7 @@
           <TextBlock Text="👆" FontSize="40" HorizontalAlignment="Center" />
           <TextBlock FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"
                      Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1112}" />
-          <TextBlock FontSize="12" Foreground="#8A8F98" HorizontalAlignment="Center"
+          <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" HorizontalAlignment="Center"
                      Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1113}" />
         </StackPanel>
 
@@ -366,8 +366,8 @@
         </StackPanel>
 
         <!-- ===================== 底部紧凑模拟测试条 ===================== -->
-        <Border Background="White" BorderBrush="#E3E6EC" BorderThickness="1"
-                CornerRadius="10" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
+                CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
           <StackPanel Spacing="8">
             <TextBlock FontWeight="SemiBold"
                        Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=987}" />
@@ -376,28 +376,28 @@
                        Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=988}" />
               <CheckBox Grid.Column="1" IsChecked="{Binding TestIsFile}" VerticalAlignment="Center"
                         Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=989}" />
-              <Button Grid.Column="2" Command="{Binding RunTestCommand}" Background="#4169E1"
-                      Foreground="White" CornerRadius="8" Padding="16,7" VerticalAlignment="Center"
+              <Button Grid.Column="2" Command="{Binding RunTestCommand}" Background="{StaticResource ClaudeTerracottaBrush}"
+                      Foreground="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="16,7" VerticalAlignment="Center"
                       IsEnabled="{Binding !Testing}"
                       Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
             </Grid>
-            <TextBlock IsVisible="{Binding TestError}" Foreground="#D32F2F" FontSize="12"
+            <TextBlock IsVisible="{Binding TestError}" Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12"
                        TextWrapping="Wrap" Text="{Binding TestError}" />
             <StackPanel IsVisible="{Binding HasResult}" Spacing="6">
               <!-- 未命中 -->
-              <TextBlock IsVisible="{Binding !ResultMatched}" FontSize="12" Foreground="#8A8F98"
+              <TextBlock IsVisible="{Binding !ResultMatched}" FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                          Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=993}" />
               <!-- 命中: 类型 + 值 + 菜单键位 + 预览 -->
               <StackPanel IsVisible="{Binding ResultMatched}" Spacing="6">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Border Background="#E8F0FE" CornerRadius="6" Padding="8,3">
-                    <TextBlock Text="{Binding MatchedTypeText}" Foreground="#4169E1" FontSize="12" />
+                  <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="8,3">
+                    <TextBlock Text="{Binding MatchedTypeText}" Foreground="{StaticResource ClaudeTerracottaBrush}" FontSize="12" />
                   </Border>
                   <TextBlock Text="{Binding MatchedValueText}" FontSize="13" FontWeight="SemiBold"
                              VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock FontSize="12" Foreground="#8A8F98" VerticalAlignment="Center"
+                  <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1110}" />
                   <ItemsControl ItemsSource="{Binding MenuKeys}">
                     <ItemsControl.ItemsPanel>
@@ -419,7 +419,7 @@
                   </ItemsControl>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock FontSize="12" Foreground="#8A8F98" VerticalAlignment="Center"
+                  <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=996}" />
                   <TextBlock Text="{Binding PreviewText}" FontSize="12" TextWrapping="Wrap"
                              VerticalAlignment="Center" />
@@ -433,22 +433,22 @@
     </ScrollViewer>
 
     <!-- ===================== 添加映射弹窗 (页内 overlay, 非独立窗口) ===================== -->
-    <Border Grid.RowSpan="2" IsVisible="{Binding IsAddPanelOpen}" Background="#88000000">
+    <Border Grid.RowSpan="2" IsVisible="{Binding IsAddPanelOpen}" Background="{StaticResource ClaudeErrorBrush}00">
       <ContentControl Content="{Binding AddPanel}" HorizontalAlignment="Center" VerticalAlignment="Center">
         <ContentControl.DataTemplates>
           <DataTemplate x:DataType="vm:AddMappingVm">
             <Border MaxWidth="560" MinWidth="440" HorizontalAlignment="Left"
-                    Background="White" CornerRadius="12" Padding="20" Margin="20"
+                    Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="20" Margin="20"
                     BoxShadow="0 8 24 rgba(0,0,0,0.25)">
               <StackPanel Spacing="12">
                 <!-- 标题 + 说明 -->
                 <TextBlock FontSize="17" FontWeight="SemiBold"
                            Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1105}" />
-                <TextBlock FontSize="12" Foreground="#5F6368" TextWrapping="Wrap" Text="{Binding Hint}" />
+                <TextBlock FontSize="12" Foreground="{StaticResource ClaudeOliveGrayBrush}" TextWrapping="Wrap" Text="{Binding Hint}" />
 
                 <!-- 步骤 1: 类型 (文件后缀 + 文本特征四选一) -->
                 <StackPanel Spacing="4">
-                  <TextBlock FontSize="12" Foreground="#8A8F98"
+                  <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1004}" />
                   <ComboBox MinWidth="220" ItemsSource="{Binding TypeOptions}"
                             SelectedItem="{Binding TypeSelected}"
@@ -459,7 +459,7 @@
                               Background="{Binding IsSeparator, Converter={StaticResource PopupBg}}">
                           <TextBlock Text="{Binding Label}" IsVisible="{Binding !IsSeparator}"
                                      Margin="10,0" VerticalAlignment="Center" />
-                          <Rectangle IsVisible="{Binding IsSeparator}" Height="1" Fill="#1F000000"
+                          <Rectangle IsVisible="{Binding IsSeparator}" Height="1" Fill="{StaticResource ClaudeErrorBrush}00"
                                      Margin="10,0" VerticalAlignment="Center" />
                         </Grid>
                       </DataTemplate>
@@ -469,16 +469,16 @@
 
                 <!-- 步骤 2: 条件值 (仅文件后缀) -->
                 <StackPanel Spacing="4" IsVisible="{Binding IsFileExt}">
-                  <TextBlock FontSize="12" Foreground="#8A8F98"
+                  <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1005}" />
                   <TextBox Text="{Binding MatchValue}" IsReadOnly="True" Focusable="False"
-                           Background="#F8F9FA" />
-                  <TextBlock FontSize="11" Foreground="#8A8F98" TextWrapping="Wrap" Text="{Binding MatchHint}" />
+                           Background="{StaticResource ClaudeIvoryBrush}" />
+                  <TextBlock FontSize="11" Foreground="{StaticResource ClaudeStoneGrayBrush}" TextWrapping="Wrap" Text="{Binding MatchHint}" />
                 </StackPanel>
 
                 <!-- 步骤 3: 行为勾选 (勾选顺序 = 菜单键位; 最多 9) -->
                 <StackPanel Spacing="4">
-                  <TextBlock FontSize="12" Foreground="#8A8F98"
+                  <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1011}" />
                   <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding BehaviorPicks}">
@@ -487,9 +487,9 @@
                           <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding IsEnabled}"
                                     Padding="4,3" Margin="0,0,0,2">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                              <Border Background="#E8F0FE" CornerRadius="5" Padding="5,1"
+                              <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="5,1"
                                       IsVisible="{Binding IsChecked}">
-                                <TextBlock Text="{Binding Order}" Foreground="#4169E1" FontSize="11"
+                                <TextBlock Text="{Binding Order}" Foreground="{StaticResource ClaudeTerracottaBrush}" FontSize="11"
                                            FontWeight="SemiBold" />
                               </Border>
                               <TextBlock Text="{Binding Label}" FontSize="13" />
@@ -502,7 +502,7 @@
                   <!-- 评审 D2: 链接式「管理行为…」入口, 复用视图 OnManageBehaviors
                        (打开 BehaviorLibraryWindow, 关闭后 vm.ReloadBehaviorCatalogAsync 刷新勾选列表) -->
                   <Button Background="Transparent" BorderThickness="0" Padding="0" Margin="0,2,0,0"
-                          FontSize="12" Foreground="#4169E1" HorizontalAlignment="Left"
+                          FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" HorizontalAlignment="Left"
                           Click="OnManageBehaviors"
                           Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1083}" />
                 </StackPanel>
@@ -510,11 +510,11 @@
                 <!-- 底部按钮 -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,4,0,0">
                   <Button Command="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).CloseAddPanelCommand}"
-                          Background="White" BorderThickness="1" BorderBrush="#E3E6EC"
-                          CornerRadius="8" Padding="18,7"
+                          Background="{StaticResource ClaudeIvoryBrush}" BorderThickness="1" BorderBrush="{StaticResource ClaudeBorderCreamBrush}"
+                          CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="18,7"
                           Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=970}" />
                   <Button Command="{Binding ConfirmCommand}" IsEnabled="{Binding CanConfirm}"
-                          Background="#4169E1" Foreground="White" CornerRadius="8" Padding="18,7"
+                          Background="{StaticResource ClaudeTerracottaBrush}" Foreground="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="18,7"
                           Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1114}" />
                 </StackPanel>
               </StackPanel>
