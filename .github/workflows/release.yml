@@ -103,12 +103,12 @@ jobs:
           rm -rf bin/templates
           cp -r config-server/templates bin/templates
 
-      # 2026-09-12 关闭 ReadyToRun (与 Makefile 同步): R2R 镜像使 bin/ui 体积接近翻倍、
-      # 运行内存更高; 关闭后磁盘/内存显著下降, 代价仅为面板冷启动多一轮 JIT
-      - name: Publish Avalonia UI (self-contained win-x64, no ReadyToRun)
+      # 2026-09-12 裁剪+R2R: 发布调优统一收进 KeyFlux.Settings.csproj (Trimmed/TrimMode/
+      # R2R/TrimmerRoots/STJ 反射开关), 此处不传 -p: 覆盖项 (命令行 -p 会压过 csproj)
+      - name: Publish Avalonia UI (self-contained win-x64, trim+R2R per csproj)
         shell: pwsh
         run: |
-          $out = dotnet publish config-ui-avalonia/KeyFlux.Settings.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=false -o bin/ui --nologo -v q 2>&1 | Out-String
+          $out = dotnet publish config-ui-avalonia/KeyFlux.Settings.csproj -c Release -r win-x64 --self-contained true -o bin/ui --nologo -v q 2>&1 | Out-String
           if ($LASTEXITCODE -ne 0) {
             $tail = ($out -split "`r?`n" | Where-Object { $_ -ne '' } | Select-Object -Last 20) -join "`n"
             Write-Output ("::error::publish failed%0A" + ($tail -replace "%", "%25" -replace "`n", "%0A"))

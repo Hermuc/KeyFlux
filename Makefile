@@ -9,14 +9,14 @@ buildServer:
 	cp -r config-server/templates bin/templates
 
 # 发布 Avalonia 原生设置界面到 bin/ui/ (自包含, 免装 .NET 运行时)
-# 2026-09-12 关闭 ReadyToRun: R2R 预编译镜像使 bin/ui 体积接近翻倍、运行时常驻内存更高;
-#   关闭后磁盘显著缩小、面板内存占用降低, 代价仅为面板冷启动多一轮 JIT
-#   (AHK 唤起侧本就有 3s WinWait + 约 10s 兜底轮询, 可容忍; 实测数据见对应提交)
+# 2026-09-12 裁剪+R2R: 发布调优 (PublishTrimmed/TrimMode/R2R/TrimmerRoots/STJ 反射开关)
+#   统一收进 KeyFlux.Settings.csproj 单一真源 —— 命令行 -p: 会覆盖 csproj, 本文件勿再传。
+#   实测: bin/ui 118M→65M (deploy 140M→87M), 冷启动 598ms (R2R 保 <1s), 面板稳态内存 <200MB。
 # 注意 PATH 陷阱: C:\Program Files\dotnet 可能只有运行时没有 SDK, 须显式探测
 buildClientAvalonia:
 	@dotnet --list-sdks | grep -q . || (echo "[错误] dotnet --list-sdks 为空: 未找到 .NET SDK (PATH 陷阱: C:\\Program Files\\dotnet 可能只有运行时无 SDK), 请安装 SDK 或将 PATH 指向含 SDK 的 dotnet.exe"; exit 1)
 	rm -f -r bin/ui
-	cd config-ui-avalonia; dotnet publish -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=false -o ../bin/ui
+	cd config-ui-avalonia; dotnet publish -c Release -r win-x64 --self-contained true -o ../bin/ui
 	@pwsh -NoProfile -Command "$$src='config-ui-avalonia/Resources/i18n.json'; $$dst='bin/ui/Resources/i18n.json'; if(!(Test-Path $$dst)){Write-Error '[断言失败] publish 后缺少散资源: '$$dst; exit 1}; $$h1=(Get-FileHash $$src -Algorithm SHA256).Hash; $$h2=(Get-FileHash $$dst -Algorithm SHA256).Hash; if($$h1 -ne $$h2){Write-Error ('[断言失败] i18n.json SHA256 不一致: 源=' + $$h1 + ' 产出=' + $$h2); exit 1}; Write-Host '[OK] i18n.json SHA256 一致: '$$h1"
 
 copyFiles: CopyAHK

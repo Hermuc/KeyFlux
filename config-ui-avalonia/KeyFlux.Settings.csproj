@@ -22,7 +22,25 @@
          avares 资源是两条路径；下方 <AvaloniaResource Include="Assets\**" /> 会顺带把它也
          打进资源包(+44KB)，不影响运行。 -->
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
+
+    <!-- ── 2026-09-12 体积/内存优化：IL 裁剪 + R2R（发布配置单一真源, Makefile/CI 不再传 -p:）──
+         PublishTrimmed: 砍掉未用到的框架 IL (磁盘 -xxMB 级, 实测见提交)。
+         JsonSerializerIsReflectionEnabledByDefault: 本工程 7 处 System.Text.Json 反射序列化
+           (ConfigSaver/SettingsApiClient/I18n/PluginMarket/SelectedActionPage) 未迁移
+           source-gen, 裁剪下默认会被禁用 → 显式开启反射模式。
+         TrimmerRoots.xml: 根植本程序集全部类型, 保住上述序列化依赖的模型元数据。
+         PublishReadyToRun: 裁剪后代码量小, R2R 预编译换取 <1s 冷启动 (AHK 唤起体验)。
+         ⚠ 裁剪的破坏面只在「发布产物」上, dotnet test 跑的是未裁剪程序集, 拦不住；
+           因此裁剪相关改动必须实机跑一遍页面+保存路径 (契约: TrimmerRoots 勿删)。 -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
+
+  <ItemGroup>
+    <TrimmerRootDescriptor Include="TrimmerRoots.xml" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Avalonia 核心、桌面平台、Fluent 主题、MVVM 工具包 -->
