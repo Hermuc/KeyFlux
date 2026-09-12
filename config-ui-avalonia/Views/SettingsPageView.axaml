@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:KeyFlux.Settings.ViewModels"
+             xmlns:controls="using:KeyFlux.Settings.Controls"
              xmlns:models="using:KeyFlux.Settings.Models"
              x:Class="KeyFlux.Settings.Views.SettingsPageView"
              x:Name="Root"
@@ -119,7 +120,7 @@
                    FontSize="16" FontWeight="SemiBold" />
 
         <!-- 开机自启 + 隐藏矩阵 (顶部常驻开关行) -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True">
           <StackPanel Spacing="6">
             <StackPanel Orientation="Horizontal" Spacing="14">
               <ToggleSwitch IsChecked="{Binding Startup}" />
@@ -136,7 +137,7 @@
         </Border>
 
         <!-- 🌐 切换语言 (label:781) -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="language">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=781}"
@@ -155,7 +156,7 @@
         </Border>
 
         <!-- 😺 编辑程序分组 (label:601, 复刻 WindowGroupDialog.vue 入口按钮) -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True">
           <Button Classes="sectionHeader" Click="OnEditWindowGroups">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=601}"
                        FontWeight="SemiBold" />
@@ -165,7 +166,7 @@
         <!-- ⌨️ 自定义热键 (label:1116, 原 Custom Hotkeys 页迁入 2026-09-08):
              展开 = 热键/功能 两列同行列表; 热键列点击聚焦即编辑 (失焦提交复刻 @change),
              功能列 (原「备注」) 点击弹 ActionEditorWindow 编辑动作; 底部新建 (label:1118) -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16"
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True"
                 IsVisible="{Binding CustomHotkeys, Converter={StaticResource NotNull}}">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}"
@@ -217,7 +218,7 @@
         </Border>
 
         <!-- 🖱️ 修改鼠标参数 (label:701, 含滚轮参数) -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="mouse">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=701}"
@@ -279,7 +280,7 @@
         </Border>
 
         <!-- ⌨️ 修改键盘布局 (label:721) -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="layout">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=721}"
@@ -309,7 +310,7 @@
         </Border>
 
         <!-- 🕗 设置触发延时 (label:761, 默认展开) -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="delay">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=761}"
@@ -334,7 +335,7 @@
         </Border>
 
         <!-- ✨ 命令框皮肤 (label:741, 18 字段数据驱动) -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="skin">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=741}"
@@ -356,7 +357,7 @@
         <!-- 🪟 窗口毛玻璃 (亚克力): 开关 + 透明度滑杆
              透明度 = 0 时窗口底色为【实心】Parchment (不带 alpha), 避免叠在背后未知像素上发灰/花屏。
              改动即时生效 (窗口底色走 DynamicResource), 按 Ctrl+S 才会写入 config.json。 -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="acrylic">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2500}"
@@ -383,7 +384,7 @@
         </Border>
 
         <!-- 🧩 编辑路径变量 (label:907, Vue 中被注释, 按任务规格补齐) -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16" controls:LiquidEdge.IsEnabled="True">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="pathvars">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=907}"
