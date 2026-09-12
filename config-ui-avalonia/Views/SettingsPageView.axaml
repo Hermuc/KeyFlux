@@ -22,17 +22,12 @@
     </Style>
   </UserControl.Styles>
 
-  <!-- 整页内容包 Viewbox Uniform 等比缩放 (背景留在 ScrollViewer 上, 左右两列均属内容区一同缩放):
-       缩放由可用尺寸驱动 (默认内容区 936 / 测量宽 1024 -> 约 0.91, 窗口宽到 1288 时回到 1);
-       ScrollViewer 横向 Disabled -> Viewbox Uniform 随内容区宽动态缩放, 但 MaxWidth=988 封顶:
-       窗口缩窄时组件等比缩小; 加宽超过内容基准 (916 = 左列 500 + 右列 368 + 左右边距 48) 后继续放大,
-       最大约 988/916 ≈ 1.08 倍 (2026-09-08 应用户反馈从 1200/1.19 倍下调: 最大化后组件嫌大,
-       1.08 = 用户当前窗口 1351 宽时的实际倍率, 当前窗口观感不变、最大化不再继续放大; 同日右列收窄 20%
-       460->368 后 MaxWidth 同步 1088->988, 否则基准变窄会推高整体倍率使左列连带变大); 要调上限改 MaxWidth;
-       HorizontalAlignment=Left 使封顶后内容左对齐 (同自定义热键页), 避免居中在两侧留大白;
-       纵向默认 Auto -> Viewbox 纵向不放大, 放大溢出由 ScrollViewer 滚动承接 -->
-  <ScrollViewer Background="Transparent">
-    <Viewbox Stretch="Uniform" MaxWidth="988" HorizontalAlignment="Left">
+  <!-- 整页内容包 Viewbox Uniform 等比缩放 (2026-09-12 重构: 移除外层 ScrollViewer):
+       Viewbox 直接以页面真实尺寸为可用空间 (宽高均有界), Uniform 等比缩放适配 ——
+       页面永不滚动, 顶缘边界固定 (修复: 上限随滚轮变化/两列未真正独立);
+       缩放仍由可用宽度驱动 (默认内容区 936 / 测量宽 932 -> ≈1.0; MaxWidth=988 封顶 ≈1.06);
+       更矮的窗口: 整页等比缩小 (纵向也参与适配), 两列各自内部滚动, 互不影响 -->
+  <Viewbox Stretch="Uniform" MaxWidth="988" HorizontalAlignment="Left" VerticalAlignment="Top">
     <Grid ColumnDefinitions="500,*" Margin="24,20,24,28">
 
       <!-- ===================== 左列: 快捷键方案 (label:915, 复刻 Settings.vue 表格) ===================== -->
@@ -436,6 +431,4 @@
       </ScrollViewer>
     </Grid>
     </Viewbox>
-  </ScrollViewer>
-
 </UserControl>

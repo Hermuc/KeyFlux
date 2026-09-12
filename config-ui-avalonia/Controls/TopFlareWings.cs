@@ -12,12 +12,13 @@ public sealed class TopFlareWingsMarker
 }
 
 /// <summary>
-/// TopFlareWings —— 顶缘吸附翼: 卡片顶部穿越视口上缘期间, 在视口顶部两角
-/// 绘制向外扩散的圆角翼 (水滴吸附天花板的摊开轮廓), 卡片完全移出视野后隐藏。
+/// TopFlareWings —— 顶缘吸附翼: 右列一旦滚动 (Offset &gt; 0), 视口顶部左右两角
+/// 持续显示向外扩散的圆角翼 (水滴吸附天花板的摊开轮廓), 滚回顶部后隐藏。
+/// 「持续显示」是刻意设计: 卡片间存在间隙, 若仅在卡片跨越上缘时显示,
+/// 翼会在卡片间隙处消失再出现 (用户报: 翼存在时间太短)。
 ///
 /// 挂在滚动容器上 (FlareOverlay = 翼形画布, 置于滚动容器之上的固定覆盖层,
-/// 不随内容滚动 —— 效果钉在视口顶部); 事件驱动 (ScrollChanged), 仅遍历直接子卡片
-/// (~10), 值不变不写。
+/// 不随内容滚动 —— 效果钉在视口顶部); 事件驱动 (ScrollChanged), 值不变不写。
 /// </summary>
 public static class TopFlareWings
 {
@@ -60,33 +61,16 @@ public static class TopFlareWings
     private static void Update(ScrollViewer sv)
     {
         var overlay = sv.GetValue(FlareOverlayProperty);
-        if (overlay is null || sv.Content is not Panel panel)
+        if (overlay is null)
         {
             return;
         }
-
-        // 任一卡片跨越视口上缘 (top < 0 < bottom) → 显示吸附翼, 否则隐藏
-        var straddling = false;
-        foreach (var child in panel.Children)
+        // 翼显隐 = 右列是否处于滚动状态 ( Offset > 1px 视为滚动 );
+        // 持续显示直到滚回顶部 —— 卡片间隙处不断裂 (用户规格: 翼持续到下一张卡)
+        var scrolled = sv.Offset.Y > 1;
+        if (overlay.IsVisible != scrolled)
         {
-            if (child is not Border card)
-            {
-                continue;
-            }
-            if (card.TranslatePoint(new Point(0, 0), sv) is not { } top)
-            {
-                continue;
-            }
-            var bottom = top.Y + card.Bounds.Height;
-            if (top.Y < 0 && bottom > 0)
-            {
-                straddling = true;
-                break;
-            }
-        }
-        if (overlay.IsVisible != straddling)
-        {
-            overlay.IsVisible = straddling;
+            overlay.IsVisible = scrolled;
         }
     }
 }
