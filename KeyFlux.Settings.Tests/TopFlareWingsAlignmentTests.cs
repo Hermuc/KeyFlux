@@ -43,7 +43,7 @@ public sealed class TopFlareWingsAlignmentTests
         var host = canvas.GetVisualRoot() as Visual ?? throw new InvalidOperationException("no root");
         // 卡片列 = Width=368 锁宽的 StackPanel (卡 Border 靠拉伸铺满, 自身无显式宽)
         var panel = host.GetVisualDescendants().OfType<StackPanel>()
-            .First(p => p.Width == 368);
+            .First(p => p.Width == 460);
         var card = panel.GetVisualDescendants().OfType<Border>().First();
         var sv = host.GetVisualDescendants().OfType<ScrollViewer>()
             .First(s => TopFlareWings.GetIsEnabled(s));
