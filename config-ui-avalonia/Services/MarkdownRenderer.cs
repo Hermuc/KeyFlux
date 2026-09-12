@@ -312,7 +312,10 @@ public static class MarkdownRenderer
     }
 
     /// <summary>
-    /// 链接控件: 蓝色下划线 + 手型光标, 点击回调 openLink。
+    /// 链接控件: 手型光标 + 点击回调 openLink; 下划线用外层 Border 的 1px 底边框绘制。
+    /// ⚠ 不用 TextDecorations.Underline: 文本整形按脚本拆段后装饰只画在部分段上
+    /// (实测 "项目 GitHub" 下划线在 CJK "项目" 段整段缺失, 仅拉丁段连续 —— 用户报
+    /// "部分文字的下划线显示不完整"), 底边框与文字脚本无关, 恒为完整一条。
     /// 与所在行同字体同字号, 文字度量 (Ascent/基线) 一致, 避免内嵌控件位置偏移。
     /// 指针交互: SelectableTextBlock 的 OnPointerPressed 无条件捕获指针 (e.Pointer.Capture(this))
     /// 且类处理器注册为 handledEventsToo=false —— 内嵌链接收不到 PointerReleased, Tapped 手势
@@ -320,7 +323,7 @@ public static class MarkdownRenderer
     /// 「原地释放 = 点击跳转; 移出链接 = 拖动/误触, 不跳转」; 按下时 Handled=true 阻止
     /// SelectableTextBlock 接管文本选择 (仅限链接区域, 链接外选词不受影响)。
     /// </summary>
-    private static TextBlock BuildLink(string text, string url, int fontSize, FontFamily fontFamily, double? baselineOffset, Action<string> openLink)
+    private static Border BuildLink(string text, string url, int fontSize, FontFamily fontFamily, double? baselineOffset, Action<string> openLink)
     {
         var link = new TextBlock
         {
@@ -332,7 +335,6 @@ public static class MarkdownRenderer
             // 取消继承, 让控件按自身文字行高布局, 由 BaselineOffset 精确对齐。
             LineHeight = double.NaN,
             Foreground = new SolidColorBrush(Color.Parse(LinkColor)),
-            TextDecorations = TextDecorations.Underline,
             Cursor = new Cursor(StandardCursorType.Hand),
         };
         // 关键: BaselineAlignment=Baseline 时 EmbeddedControlRun 按控件 BaselineOffset
@@ -340,7 +342,17 @@ public static class MarkdownRenderer
         // 直接使用会偏低; 段落/列表的补偿值已按 14px 字号肉眼校准 (见上方常量),
         // 其余字号 (标题) 按字体度量等比折算。
         using var layout = new TextLayout(text, new Typeface(fontFamily), fontSize, null);
-        link.BaselineOffset = baselineOffset ?? layout.Baseline + 1.5;
+
+        // 下划线 = Border 1px 底边框 (画在控件底缘, 与文字脚本无关恒完整);
+        // BaselineOffset 挂在 wrapper 上: Border 无实例属性, 用 TextBlock.SetBaselineOffset
+        // 静态访问器 (EmbeddedControlRun 正是从这里读任意 Control 的基线), 值复用链接文字基线
+        var wrapper = new Border
+        {
+            Child = link,
+            BorderBrush = new SolidColorBrush(Color.Parse(LinkColor)),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+        };
+        TextBlock.SetBaselineOffset(wrapper, baselineOffset ?? layout.Baseline + 1.5);
 
         // 指针交互: SelectableTextBlock 的 OnPointerPressed 无条件捕获指针 (e.Pointer.Capture(this))
         // 且类处理器注册为 handledEventsToo=false —— 内嵌链接收不到 PointerReleased, Tapped 手势
@@ -354,6 +366,6 @@ public static class MarkdownRenderer
             e.Handled = true; // 阻止 SelectableTextBlock 的指针捕获与文本选择接管 (仅链接区域)
         };
         link.Tapped += (_, _) => openLink(url);
-        return link;
+        return wrapper;
     }
 }
