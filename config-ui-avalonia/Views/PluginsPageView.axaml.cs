@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using KeyFlux.Settings.Services;
 using KeyFlux.Settings.ViewModels;
 
@@ -28,6 +30,23 @@ public partial class PluginsPageView : UserControl
             try { await vm.ReloadAsync(); }
             catch { /* 目录加载失败已由 VM 状态呈现 */ }
         }
+    }
+
+    /// <summary>
+    /// 卡内任意区域点击 = 选中该卡 (用户报: 只有点文字部分才有橙环): 非交互区域 (内衬/空隙/纯文字)
+    /// 按下时把焦点转移到信息区按钮, 由 Border.pluginCard:focus-within 点亮橙色焦点环。
+    /// 交互子项 (开关/删除按钮) 自己处理焦点与语义, 不抢 —— Avalonia 无 ButtonBase,
+    /// ToggleSwitch/ToggleButton/普通按钮全是 Button 派生, is Button 一网打尽。
+    /// </summary>
+    private void OnCardPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border card) return;
+        for (var v = (Avalonia.Visual?)e.Source; v is not null && !ReferenceEquals(v, card); v = v.GetVisualParent())
+        {
+            if (v is Button) return;
+        }
+        card.GetVisualDescendants().OfType<Button>()
+            .FirstOrDefault(b => b.Classes.Contains("cardBody"))?.Focus();
     }
 
     /// <summary>卡信息区点击: 内置卡 (CanConfigure) 弹 QuickSwitchDialogWindow; 用户卡暂无配置。</summary>

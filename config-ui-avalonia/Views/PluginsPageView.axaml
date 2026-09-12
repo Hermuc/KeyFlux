@@ -155,7 +155,7 @@
       <ItemsControl ItemsSource="{Binding Plugins}" ClipToBounds="False">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:PluginCardVm">
-            <Border Classes="pluginCard">
+            <Border Classes="pluginCard" PointerPressed="OnCardPointerPressed">
               <Grid ColumnDefinitions="*,Auto,Auto">
 
                 <!-- 信息区: 内置卡点击打开配置对话框 (CanConfigure); 用户卡暂无配置 (阶段 2)

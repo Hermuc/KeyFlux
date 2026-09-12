@@ -1,5 +1,7 @@
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -199,6 +201,52 @@ public sealed class PluginsPageViewSmokeTests
         {
             window.Close();
             I18n.Language = original;
+        }
+    }
+
+
+    /// <summary>
+    /// ④ 卡内任意区域点击 = 选中 (用户报: 只有点文字部分才有橙环): 点卡片边缘内衬
+    /// (Border Padding 内、信息区按钮覆盖不到的角落) 应把焦点转移到 cardBody,
+    /// 由 Border.pluginCard:focus-within 点亮橙色焦点环。
+    /// </summary>
+    [AvaloniaFact]
+    public void PluginsPage_Click_Card_Padding_Focuses_CardBody()
+    {
+        var (page, _) = CreateVm(collectEnabled: true);
+        page.Refresh();
+        var view = new PluginsPageView { DataContext = page };
+        var window = new Window { Width = 1200, Height = 760, Content = view };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        try
+        {
+            var card = window.GetVisualDescendants().OfType<Border>()
+                .First(b => b.Classes.Contains("pluginCard"));
+            var body = window.GetVisualDescendants().OfType<Button>()
+                .First(b => b.Classes.Contains("cardBody"));
+
+            // 点卡片左上角内衬 (Border Padding 20,16 内; 按钮 Margin -10,-6 外扩后仍覆盖不到)
+            var pt = Avalonia.VisualExtensions.TranslatePoint(card, new Avalonia.Point(8, 8), window)!.Value;
+            window.MouseDown(pt, Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.None);
+            window.MouseUp(pt, Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.None);
+            Dispatcher.UIThread.RunJobs();
+
+            // 预热: headless 输入管线的首个事件可能被吞, 先在窗口角落 (页面根, 无任何 handler) 点一下;
+            // 避免直接点按钮 —— 内置卡点击会弹配置对话框, headless 下无谓且不稳
+            window.MouseDown(new Avalonia.Point(2, 2), Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.None);
+            window.MouseUp(new Avalonia.Point(2, 2), Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.None);
+            Dispatcher.UIThread.RunJobs();
+
+            // 点卡片边缘内衬 (非交互区) → cardBody 获焦 → :focus-within 橙环
+            window.MouseDown(pt, Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.None);
+            window.MouseUp(pt, Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.None);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(body.IsFocused, $"点卡片内衬未获焦 (pt={pt} focused={body.IsFocused})");
+        }
+        finally
+        {
+            window.Close();
         }
     }
 
