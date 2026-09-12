@@ -466,13 +466,15 @@ public sealed class BackendSession : IAsyncDisposable
 
     private static async Task<bool> WaitForReadyAsync(SettingsApiClient client, TimeSpan timeout, CancellationToken ct)
     {
+        // 探测 GET /health (零 IO, 后端立即 200): 原用 GET /config 作探测, 首次请求即
+        // 同步 schtasks (~1s) —— 是"连接后端"耗时的大头。失败 (连接拒绝/超时) 立即重试,
+        // 不整段等待 (服务器 accept 前的重试窗口本就 <100ms)。
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
             ct.ThrowIfCancellationRequested();
-            var probe = await client.GetConfigAsync(ct);
-            if (probe.Success) return true;
-            await Task.Delay(100, ct);
+            if (await client.HealthCheckAsync(ct)) return true;
+            await Task.Delay(25, ct);
         }
         return false;
     }

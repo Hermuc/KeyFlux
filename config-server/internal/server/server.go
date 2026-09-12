@@ -37,6 +37,7 @@ func Run(hasError chan<- struct{}, rainDone <-chan struct{}, debug bool, headles
 	router.NoRoute(static.Serve("/", static.LocalFile("./site", false)), indexHandler)
 
 	router.GET("/", indexHandler)
+	router.GET("/health", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
 	router.GET("/config", GetConfigHandler)
 	router.PUT("/config", SaveConfigHandler(debug))
 	router.POST("/server/command/:id", ServerCommandHandler)

@@ -171,6 +171,23 @@ public sealed class SettingsApiClient : ISettingsApi, IDisposable
     public Task<ApiResponse<Config>> GetConfigAsync(CancellationToken ct = default)
         => SendAsync<Config>(HttpMethod.Get, "config", content: null, ct);
 
+    /// <summary>
+    /// 健康探测 (GET /health, 后端零 IO 立即 200)。连接基础设施专用, 不进 ISettingsApi
+    /// 契约 —— 健康语义 = "HTTP 活着", 读配置能力由连接后的主加载兜底。
+    /// </summary>
+    public async Task<bool> HealthCheckAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            using var resp = await _http.GetAsync("health", ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public Task<ApiResponse<MessageBody>> SaveConfigAsync(Config config, CancellationToken ct = default)
         => SendAsync<MessageBody>(HttpMethod.Put, "config", config, ct);
 

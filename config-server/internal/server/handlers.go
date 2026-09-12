@@ -11,7 +11,9 @@ import (
 
 	"settings/internal/proc"
 	"settings/internal/script"
-)
+
+	"sync"
+	"time")
 
 func GetConfigHandler(c *gin.Context) {
 	config, err := script.ParseConfig("../data/config.json")
@@ -19,10 +21,55 @@ func GetConfigHandler(c *gin.Context) {
 		panic(err)
 	}
 	// 以计划任务真实生效态回填开机自启显示态 (详见 syncStartupFromTask)
-	syncStartupFromTask(&config.Options.Startup)
+	config.Options.Startup = getCachedStartupState()
 	// DTO 转换在 syncStartupFromTask 之后, 确保任务回填值体现在响应中
 	dto := ConfigToDTO(config)
 	c.JSON(http.StatusOK, dto)
+}
+
+// ---- 开机自启显示态缓存 ----
+// syncStartupFromTask 每次 GET /config 都同步 spawn schtasks.exe (冷启动 ~1s,
+// 是设置面板"连接后端"耗时的大头)。改为进程启动时异步预热 + 结果缓存 (TTL 2s)
+// + 保存路径写时失效: GET 命中缓存零 IO, 显示态滞后至多 2s (显示态本就无同步机制)。
+
+var (
+	startupMu       sync.Mutex
+	startupCacheVal bool
+	startupCacheAt  time.Time
+)
+
+func queryStartupFromTask() bool {
+	out, err := exec.Command("schtasks", "/query", "/tn", "KeyFlux").Output()
+	return err == nil && bytes.Contains(out, []byte("KeyFlux"))
+}
+
+// PreloadStartup 后台预热开机自启缓存: settings.exe 启动即发起, 与 GUI 冷启动
+// (Avalonia 初始化 ~0.5s) 并行, GUI 首次 GET /config 时缓存大概率已就绪。
+func PreloadStartup() {
+	v := queryStartupFromTask()
+	startupMu.Lock()
+	startupCacheVal = v
+	startupCacheAt = time.Now()
+	startupMu.Unlock()
+}
+
+func invalidateStartupCache() {
+	startupMu.Lock()
+	startupCacheAt = time.Time{} // 归零 = 失效, 下次 GET 同步重查
+	startupMu.Unlock()
+}
+
+// getCachedStartupState 读缓存; 未预热/过期时同步查一次并回填 (只此一处同步)。
+func getCachedStartupState() bool {
+	startupMu.Lock()
+	defer startupMu.Unlock()
+	if time.Since(startupCacheAt) < 2*time.Second {
+		return startupCacheVal
+	}
+	v := queryStartupFromTask()
+	startupCacheVal = v
+	startupCacheAt = time.Now()
+	return v
 }
 
 // syncStartupFromTask 用计划任务 KeyFlux 的真实状态回填 options.startup。
@@ -113,6 +160,7 @@ func SaveConfigHandler(debug bool) gin.HandlerFunc {
 		}
 
 		script.SaveConfigFile(config) // 保存配置文件
+		invalidateStartupCache()      // 配置已变 (含开机自启), 显示态缓存失效待重查
 
 		if debug {
 			script.GenerateScripts(config) // 生成脚本文件

@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using KeyFlux.Settings.ViewModels;
 
 namespace KeyFlux.Settings.Views;
@@ -12,6 +13,33 @@ namespace KeyFlux.Settings.Views;
 public partial class SettingsPageView : UserControl
 {
     public SettingsPageView() => InitializeComponent();
+
+    /// <summary>
+    /// 组件框任意处点击 = 展开/收起 (用户报: 只有点文字部分才能展开)。
+    /// 实现转交给卡内的分区标题按钮 (ToggleSectionCommand / 编辑程序分组的 Click),
+    /// 逻辑单源; 交互控件 (TextBox/Slider/ToggleSwitch/ComboBox 等) 自行处理指针 ——
+    /// 判定用 Focusable (可聚焦控件默认 true, 纯文本/Border 默认 false, 前向兼容)。
+    /// </summary>
+    private void OnCardPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border card) return;
+        for (var v = (Avalonia.Visual?)e.Source; v is not null && !ReferenceEquals(v, card); v = v.GetVisualParent())
+        {
+            if (v is InputElement { Focusable: true }) return;
+        }
+        var header = card.GetVisualDescendants().OfType<Button>()
+            .FirstOrDefault(b => b.Classes.Contains("sectionHeader"));
+        if (header is null) return;
+        if (header.Command?.CanExecute(header.CommandParameter) == true)
+        {
+            header.Command.Execute(header.CommandParameter);
+        }
+        else
+        {
+            // 无 Command 的标题按钮 (编辑程序分组 = Click 事件): 派发路由 Click
+            header.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }
+    }
 
     /// <summary>名称/触发键失焦 -> 复刻 Vue 的 checkKeymapData (blur 事件)。</summary>
     private void OnRowFieldLostFocus(object? sender, RoutedEventArgs e)

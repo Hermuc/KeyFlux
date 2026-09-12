@@ -95,30 +95,16 @@
   <Border Background="{DynamicResource ClaudeWindowSurfaceBrush}"
           BorderBrush="{StaticResource ClaudeBorderWarmBrush}"
           BorderThickness="1">
-   <DockPanel>
-
-    <!-- 自绘标题栏 (取代被 NoChrome 去掉的系统标题栏):
-         整条为拖动区 (PointerPressed -> BeginMoveDrag), 双击切换最大化; 右侧三键。
-         左侧不放品牌组 (与侧栏大 Logo 重复, 用户要求删除): 整条均为空白拖动区。 -->
-    <Grid DockPanel.Dock="Top" Height="36" Background="Transparent"
-          PointerPressed="OnTitleBarPointerPressed">
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2"
-                  Margin="0,0,6,0" VerticalAlignment="Center">
-        <Button Classes="caption" Content="─" Click="OnMinimizeClick" />
-        <Button Classes="caption" Content="□" Click="OnMaximizeClick" />
-        <Button Classes="caption captionClose" Content="✕" Click="OnCloseClick" />
-      </StackPanel>
-    </Grid>
-
-    <Grid ColumnDefinitions="264,*">
+   <Grid RowDefinitions="36,*" ColumnDefinitions="264,*">
 
     <!-- ===================== 左侧导航 (复刻 NavigationDrawer.vue) ===================== -->
-    <Border Grid.Column="0" Background="{StaticResource ClaudeSidebarSurfaceBrush}"
+    <!-- RowSpan=2: 侧栏背景顶到窗口顶 (用户报: 上部有 36px 空隙); 头部 Margin 顶避让标题条 -->
+    <Border Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" Background="{StaticResource ClaudeSidebarSurfaceBrush}"
             BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="0,0,1,0">
       <DockPanel>
 
         <!-- 头部: Logo + 名称 + 版本号 -->
-        <StackPanel DockPanel.Dock="Top" Margin="20,18,20,14" Spacing="10">
+        <StackPanel DockPanel.Dock="Top" Margin="20,54,20,14" Spacing="10">
           <StackPanel Orientation="Horizontal" Spacing="10">
             <!-- 品牌 logo (tb.png 裁剪透明边距后降采样 256x256, 内容占画布 ~93%):
                  尺寸取 52: 52*0.93≈48px 实际图形, 头部 StackPanel 高度从旧 42→52(+10px),
@@ -167,7 +153,7 @@
     </Border>
 
     <!-- ===================== 右侧内容区 ===================== -->
-    <Grid Grid.Column="1" Background="Transparent" controls:ModalBlur.IsHost="True">
+    <Grid Grid.Column="1" Grid.Row="1" Background="Transparent" controls:ModalBlur.IsHost="True">
       <ContentControl Content="{Binding CurrentPage}">
         <ContentControl.DataTemplates>
           <DataTemplate DataType="vm:HomePageViewModel">
@@ -217,8 +203,21 @@
         </StackPanel>
       </Border>
     </Grid>
+
+    <!-- 自绘标题栏 (取代被 NoChrome 去掉的系统标题栏): Row0 全宽, 最后声明 = 顶层。
+         整条为拖动区 (PointerPressed -> BeginMoveDrag), 双击切换最大化; 右侧三键。
+         左侧不放品牌组 (与侧栏大 Logo 重复, 用户要求删除): 整条均为空白拖动区,
+         侧栏顶部 36px 亦被本条覆盖 —— 侧栏背景透出、可拖动。 -->
+    <Grid Grid.Row="0" Grid.ColumnSpan="2" Height="36" Background="Transparent"
+          PointerPressed="OnTitleBarPointerPressed">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2"
+                  Margin="0,0,6,0" VerticalAlignment="Center">
+        <Button Classes="caption" Content="─" Click="OnMinimizeClick" />
+        <Button Classes="caption" Content="□" Click="OnMaximizeClick" />
+        <Button Classes="caption captionClose" Content="✕" Click="OnCloseClick" />
+      </StackPanel>
     </Grid>
-   </DockPanel>
+   </Grid>
   </Border>
 
 </Window>
