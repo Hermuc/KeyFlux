@@ -7,15 +7,6 @@
              x:Name="Root"
              x:DataType="vm:SettingsPageViewModel">
 
-  <UserControl.Resources>
-    <!-- 卡片阴影走效果管线 (DropShadowEffect, 四边均匀): Border 的 BoxShadow 在
-         Viewbox 渲染变换下左右竖段会丢失 (两轮实证), 效果管线无此问题 -->
-    <DropShadowDirectionEffect x:Key="CardShadowRest" BlurRadius="18" Direction="270" ShadowDepth="6"
-                               Opacity="0.16" Color="#000000" />
-    <DropShadowDirectionEffect x:Key="CardShadowStrong" BlurRadius="26" Direction="270" ShadowDepth="6"
-                               Opacity="0.28" Color="#000000" />
-  </UserControl.Resources>
-
   <UserControl.Styles>
     <!-- 分区标题按钮: 无底色、整行可点 -->
     <Style Selector="Button.sectionHeader">
@@ -28,17 +19,15 @@
          BoxShadow 环落在亚像素位置时左右竖边被拆成两列半透明而发虚 (用户报"侧边缺失"),
          而卡片自带的 1px Border 在同缩放下已验证清晰 —— 换色鲁棒 -->
     <Style Selector="Border.settingsCard">
-      <!-- 阴影 = DropShadowEffect (四边均匀); BorderThickness=2 提供三态换色的实体描边 -->
-      <Setter Property="Effect" Value="{StaticResource CardShadowRest}" />
-      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
     <Style Selector="Border.settingsCard:pointerover">
-      <Setter Property="Effect" Value="{StaticResource CardShadowStrong}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHover}" />
       <Setter Property="BorderBrush" Value="#d1cfc5" />
     </Style>
     <Style Selector="Border.settingsCard:focus-within">
-      <Setter Property="Effect" Value="{StaticResource CardShadowStrong}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
     </Style>
     <!-- 分区标题按钮: 压制 Fluent 模板部件在基态/悬停/按下的自带灰底 (坑13/18) ——
