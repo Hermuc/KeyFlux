@@ -24,7 +24,7 @@
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
 
     <!-- ── 2026-09-12 体积/内存优化：IL 裁剪 + R2R（发布配置单一真源, Makefile/CI 不再传 -p:）──
-         PublishTrimmed: 砍掉未用到的框架 IL (磁盘 -xxMB 级, 实测见提交)。
+         PublishTrimmed: 砍掉未用到的框架 IL (实测 bin/ui 116.7→65MB, 221→85 文件)。
          JsonSerializerIsReflectionEnabledByDefault: 本工程 7 处 System.Text.Json 反射序列化
            (ConfigSaver/SettingsApiClient/I18n/PluginMarket/SelectedActionPage) 未迁移
            source-gen, 裁剪下默认会被禁用 → 显式开启反射模式。
@@ -36,6 +36,16 @@
     <TrimMode>full</TrimMode>
     <PublishReadyToRun>true</PublishReadyToRun>
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+
+    <!-- ── 2026-09-12 启动内存尖峰治理 (用户报: 冷启动瞬峰 500-600MB 后回落 ~200MB) ──
+         TieredPGO=false / MetadataUpdaterSupport=false: 减少插桩与热重载元数据, 无副作用保留。
+         ⚠ 已实测否决: GC 堆硬上限 (System.GC.HeapHardLimit, 经 RuntimeHostConfigurationOption
+           注入) —— 瞬峰由冷启动 JIT 突发+GC 时序主导, 运行间方差即达 414~657MB, 硬顶
+           无稳定收益反添 OOM 风险面, 已移除勿再试;
+           瞬峰属 .NET GUI 冷启动固有行为, 约 15-20s 自行回落至 ~160MB, 稳态优秀。
+           彻底压平瞬峰需代码级启动优化 (延迟初始化/分阶段渲染), 属独立任务。 -->
+    <TieredPGO>false</TieredPGO>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
   </PropertyGroup>
 
   <ItemGroup>
