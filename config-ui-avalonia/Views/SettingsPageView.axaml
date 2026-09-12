@@ -10,9 +10,9 @@
   <UserControl.Resources>
     <!-- 右列卡片阴影走效果管线 (DropShadowDirectionEffect, 四边均匀):
          Border 的 BoxShadow 在 Viewbox 渲染变换下左右竖段不可靠 (两轮实证) -->
-    <DropShadowDirectionEffect x:Key="CardShadowRest" BlurRadius="12" Direction="270" ShadowDepth="4"
+    <DropShadowDirectionEffect x:Key="CardShadowRest" BlurRadius="12" Direction="0" ShadowDepth="4"
                                Opacity="0.10" Color="#000000" />
-    <DropShadowDirectionEffect x:Key="CardShadowStrong" BlurRadius="16" Direction="270" ShadowDepth="5"
+    <DropShadowDirectionEffect x:Key="CardShadowStrong" BlurRadius="16" Direction="0" ShadowDepth="4"
                                Opacity="0.18" Color="#000000" />
   </UserControl.Resources>
 
