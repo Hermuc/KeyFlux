@@ -105,23 +105,30 @@
            渲染时卡片仍按 368 槽宽正常分配 * 列 -->
       <!-- 右列滚动分离 (2026-09-12 用户报: 滚轮滚右列会带动整页): 右列包进固定高 ScrollViewer,
            滚轮只滚本列; 滚动条 Hidden —— 滚轮滚动不受影响, 且不占测量宽度 (Width=368 锁定保持,
-           若显示滚动条会把卡内容挤窄并推高缩放比)。外层 ScrollViewer/Viewbox 架构不动。
-           高度 800 (2026-09-12 用户报: 不必与左列 560 等高, 显示范围太小): Viewbox 纵向不放大
-           (缩放由宽度主导), 800 设计像素在默认 1500x950 窗口渲染 ≈ 850 < 可视区, 尽用竖向空间;
-           更矮的窗口由外层 ScrollViewer 兜底整页滚动 -->
-      <!-- 顶缘吸附翼 (TopFlareWings): 任一卡片顶部穿越视口上缘期间, 在视口顶部左右两角
-           各显示一片向外扩散的圆角翼 (水滴吸附天花板的摊开轮廓), 卡片完全移出后隐藏;
-           置于滚动容器之后的固定覆盖层 (不随内容滚动, 效果钉在视口顶部), 仅在极矮窗口下
-           会随外层滚动偏移 (可接受的边缘情况) -->
-      <Canvas x:Name="PART_TopFlareWings" Grid.Column="1" VerticalAlignment="Top" Height="18"
-              Margin="-18,0,-18,0" IsHitTestVisible="False" IsVisible="False">
-        <!-- 两翼与卡片同色 (Ivory 实色): 吸附带+两翼+卡片读作一整块连续材质 -->
-        <Path Fill="{StaticResource ClaudeIvoryBrush}" Data="M 18,0 L 18,18 A 18,18 0 0 0 0,0 Z" />
-        <Path Fill="{StaticResource ClaudeIvoryBrush}" Data="M 386,0 L 386,18 A 18,18 0 0 1 404,0 Z" />
-      </Canvas>
-      <ScrollViewer Grid.Column="1" Height="800" VerticalScrollBarVisibility="Hidden"
-                    controls:TopFlareWings.IsEnabled="True" controls:TopFlareWings.FlareOverlay="{Binding #PART_TopFlareWings}">
-      <StackPanel Spacing="12" Width="368">
+           若显示滚动条会把卡内容挤窄并推高缩放比)。
+           高度 800 (用户报 560 显示范围太小)。外层整页 ScrollViewer 已移除 (晚些时候用户报
+           "上限随滚轮变化"): 页面永不滚动, 本列是右列唯一滚动来源, Viewbox 宽高双向等比适配 -->
+      <!-- 顶缘吸附翼 (TopFlareWings): 右列滚动期间 (Offset>1), 视口顶部左右两角各显示一片
+           向外扩散的圆角翼 (水滴吸附天花板的摊开轮廓), 滚回顶部隐藏; 固定覆盖层, 不随内容滚动。
+           翼与卡缘的贴合靠行为类动态定位 (用户两报间隙 + 右翼错位的根因): Viewbox 排布下
+           * 列实际宽随窗口变化、内容对齐随 presenter 浮动、滚动条还让左右各差半宽 ——
+           任何静态对齐必有残余误差, 只有按卡片实际渲染边界 TranslatePoint 才能稳贴。
+           ★ 画布 Width=0 是零测量足迹铁律: Viewbox 以 ∞ 测量子内容, 画布任何正宽度
+           (含子元素撑出的期望宽) 都会撑大 * 列自然宽 → 翼显隐翻转时缩放比跳动 =
+           用户报的「滚轮滑动时右侧一整列移动」。子元素溢出 0 宽画布渲染 (Canvas 默认不裁剪),
+           定位全靠行为类 Canvas.SetLeft -->
+      <Grid Grid.Column="1" Height="800">
+        <Canvas x:Name="PART_TopFlareWings" VerticalAlignment="Top" Height="18"
+                Width="0" HorizontalAlignment="Left" IsHitTestVisible="False" IsVisible="False">
+          <!-- 两翼与卡片同色 (Ivory 实色): 吸附带+两翼+卡片读作一整块连续材质。
+               几何与定位解耦: 左翼竖直边在局部 x=18 (翼体向左铺开), 右翼竖直边在局部 x=0
+               (翼体向右铺开), 竖直边必须落在卡片左右缘 —— 由行为类按卡缘精确定位 -->
+          <Path Fill="{StaticResource ClaudeIvoryBrush}" Data="M 18,0 L 18,18 A 18,18 0 0 0 0,0 Z" />
+          <Path Fill="{StaticResource ClaudeIvoryBrush}" Data="M 0,0 L 0,18 A 18,18 0 0 1 18,0 Z" />
+        </Canvas>
+        <ScrollViewer VerticalScrollBarVisibility="Hidden"
+                      controls:TopFlareWings.IsEnabled="True" controls:TopFlareWings.FlareOverlay="{Binding #PART_TopFlareWings}">
+          <StackPanel Spacing="12" Width="368">
         <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=505}"
                    FontSize="16" FontWeight="SemiBold" />
 
@@ -429,6 +436,7 @@
 
       </StackPanel>
       </ScrollViewer>
+    </Grid>
     </Grid>
     </Viewbox>
 </UserControl>
