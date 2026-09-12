@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"settings/internal/script"
 	"settings/internal/script/generators"
 )
@@ -36,6 +37,8 @@ func GenerateAHK(args ...string) {
 	// 与运行时路径(GenerateScripts)保持一致: 先预处理(注入 !f17 免疫热键等)再生成,
 	// 否则验证产物与真实运行产物不一致, 无法用于零行为变更验证/Oracle diff
 	generators.BehaviorCatalog = script.LoadBehaviorCatalog(configFile)
+	// 插件注入目录 (config.json 同级 plugins/), 见 generators/plugins.go
+	generators.SetPluginsDir(filepath.Join(filepath.Dir(configFile), "plugins"))
 	script.Preprocess(config)
 
 	if err := script.SaveAHK(config, templateFile, outputFile); err != nil {

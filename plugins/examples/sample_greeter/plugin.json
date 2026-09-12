@@ -1,0 +1,11 @@
+{
+  "id": "sample_greeter",
+  "name": "示例问候",
+  "nameEn": "Sample Greeter",
+  "version": "1.0.0",
+  "specVersion": 1,
+  "description": "首个官方示例插件：引擎启动时显示一条问候提示，演示插件接入链路 (入口函数 + API 视图)。",
+  "author": "KeyFlux",
+  "entry": {"kind": "script", "file": "main.ahk", "func": "SampleGreeterMain"},
+  "permissions": []
+}

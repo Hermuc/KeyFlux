@@ -13,6 +13,8 @@ func GenerateScripts(config *Config) {
 	// 行为目录: 渲染期据此把规则引用的用户行为 ID 展开为基础动作 (内置 ID 直通);
 	// 运行时 cwd=bin, 用户包随配置在 ../data/behaviors
 	generators.BehaviorCatalog = LoadBehaviorCatalog("../data/config.json")
+	// 插件注入目录: 用户插件包在 ../data/plugins (生成端 #Include + 引导, 见 generators/plugins.go)
+	generators.SetPluginsDir("../data/plugins")
 
 	Preprocess(config)
 

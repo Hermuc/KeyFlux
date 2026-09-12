@@ -48,6 +48,9 @@ var TemplateFuncMap = template.FuncMap{
 	"renderKeymap":        renderKeymap,
 	"GroupDisableKeyFlux": GroupDisableKeyFlux,
 	"selectedActionCode":  selectedActionCode,
+	// 插件注入块 (plugins.go): 零插件时均为空串, 模板行尾拼接约定下产物字节不变
+	"PLUGIN_INCLUDES":  func() string { return PluginIncludes() },
+	"PLUGIN_BOOTSTRAP": func() string { return PluginBootstrap() },
 }
 
 func divide(a, b int) string {

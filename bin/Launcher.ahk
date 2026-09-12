@@ -68,5 +68,27 @@ NeedsRegenerate(config, template, genScript) {
       return true
     }
   }
+  ; 插件新鲜度 (2026-09-12 插件接入): data/plugins 目录、任一插件目录或其中的
+  ; plugin.json / *.ahk 晚于产物 → 重生成 (插件安装/卸载/入口改动即刻生效)
+  pluginsDir := "./data/plugins"
+  if DirExist(pluginsDir) {
+    if FileGetTime(pluginsDir) > genTime {
+      return true
+    }
+    Loop Files pluginsDir "\*", "D" {
+      pluginDir := A_LoopFilePath
+      if FileGetTime(pluginDir) > genTime {
+        return true
+      }
+      Loop Files pluginDir "\*.ahk"
+        if FileGetTime(A_LoopFilePath) > genTime {
+          return true
+        }
+      Loop Files pluginDir "\*.json"
+        if FileGetTime(A_LoopFilePath) > genTime {
+          return true
+        }
+    }
+  }
   return false
 }

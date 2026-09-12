@@ -1,7 +1,6 @@
 /**
  * APIBridge —— 插件 API 视图工厂 (docs/CONTRACTS.md §3.7 暴露面清单)。
- * 阶段 5 落地权限门控骨架: Create(permissions) 返回按权限裁剪的 APIView;
- * 未授权命名空间调用 → 记日志 + 返回空值, 不抛出 (错误隔离, 约束 4)。
+ * 阶段 5 权限门控骨架; 2026-09-12 生成端接入真实插件, L1 委托实现补全。
  *
  * 权限 → 命名空间映射 (契约 §4 词表 6 项 -> §3.7 命名空间 7 组):
  *   selection -> selection.*          (GetSelectedText / GetSelectedFiles)
@@ -12,7 +11,10 @@
  *   events    -> events.*
  *   ui.* (Tip / ConfirmBox) 为基础反馈, 不门控, 所有插件可用。
  *
- * 委托实现留待生成端接入真实插件时补全 (阶段 5 用户裁定: 框架先行)。
+ * 委托来源: selection -> context/SelectionContext; window -> actions/builtins/type3_window
+ * (零参函数, 作用于当前活动窗口); run -> ScriptHost / actions type1 ActivateOrRun;
+ * ui -> core/Utils Tip + 原生 MsgBox; config -> plugins/ConfigProvider (§3.8)。
+ * 未授权命名空间调用 → 记日志 + 返回空值, 不抛出 (错误隔离, 约束 4)。
  */
 class APIBridge {
   ; 权限 -> 命名空间列表
@@ -26,19 +28,21 @@ class APIBridge {
   )
 
   /**
-   * 给定权限数组, 返回按权限裁剪的 APIView 实例。
+   * 给定权限数组与插件 ID (config.* 命名空间按插件作用域隔离), 返回 APIView。
    */
-  static Create(permissions) {
-    return APIView(permissions)
+  static Create(permissions, pluginId := "") {
+    return APIView(permissions, pluginId)
   }
 }
 
 class APIView {
   permissions := []
   _granted := Map()              ; namespace -> true
+  _pluginId := ""                ; config.* 设置隔离的作用域
 
-  __New(permissions) {
+  __New(permissions, pluginId := "") {
     this.permissions := permissions
+    this._pluginId := pluginId
     if (IsObject(permissions)) {
       for p in permissions {
         if (APIBridge.PermNamespace.Has(p)) {
@@ -54,56 +58,158 @@ class APIView {
   }
 
   _deny(ns) {
-    try {
-      FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " APIBridge denied namespace '" ns "'`n", "logs\plugin_manager.log")
-    }
+    PluginManager._log("APIBridge denied namespace '" ns "' (plugin: " this._pluginId ")")
     return ""
   }
 
-  ; ---- selection.* (接入时委托 SelectionContext) ----
+  ; ---- selection.* (委托 context/SelectionContext, 契约 §3.5) ----
   GetSelectedText() {
     if (!this._has("selection"))
       return this._deny("selection")
-    return "" ; TODO 接入: SelectionContext.Get()
+    sel := SelectionContext.Get(false)
+    return (sel.type != "") ? sel.content : ""
   }
 
   GetSelectedFiles() {
     if (!this._has("selection"))
       return this._deny("selection")
-    return "" ; TODO 接入: SelectionContext.Get(&isFile), 仅返回文件情形
+    sel := SelectionContext.Get(false)
+    return (sel.type = "file") ? sel.content : ""
   }
 
-  ; ---- window.* (接入时委托 Actions.ahk / Functions.ahk) ----
-  ; TODO 接入: ActivateWindow / SmartCloseWindow / LoopRelatedWindows /
-  ;            GoToLastWindow / MinimizeWindow / MaximizeWindow /
-  ;            CenterAndResizeWindow / ToggleWindowTopMost / MoveWindowToNextMonitor
+  ; ---- window.* (委托 actions/builtins/type3_window; 零参函数作用于当前活动窗口) ----
+  ActivateWindow(winTitle) {
+    if (!this._has("window"))
+      return this._deny("window")
+    try {
+      WinActivate(winTitle)
+      return true
+    } catch {
+      return false
+    }
+  }
 
-  ; ---- send.* (接入时委托原生 Send 封装) ----
-  ; TODO 接入: SendText / SendKeys
+  SmartCloseWindow() {
+    if (!this._has("window"))
+      return this._deny("window")
+    SmartCloseWindow()
+    return true
+  }
 
-  ; ---- run.* (接入时委托 Actions.ahk; ActivateOrRun 默认子进程化) ----
-  ; TODO 接入: RunProgram / RunScript / ActivateOrRun
+  LoopRelatedWindows() {
+    if (!this._has("window"))
+      return this._deny("window")
+    LoopRelatedWindows()
+    return true
+  }
+
+  GoToLastWindow() {
+    if (!this._has("window"))
+      return this._deny("window")
+    GoToLastWindow()
+    return true
+  }
+
+  MinimizeWindow() {
+    if (!this._has("window"))
+      return this._deny("window")
+    MinimizeWindow()
+    return true
+  }
+
+  MaximizeWindow() {
+    if (!this._has("window"))
+      return this._deny("window")
+    MaximizeWindow()
+    return true
+  }
+
+  CenterAndResizeWindow(width, height) {
+    if (!this._has("window"))
+      return this._deny("window")
+    CenterAndResizeWindow(width, height)
+    return true
+  }
+
+  ToggleWindowTopMost() {
+    if (!this._has("window"))
+      return this._deny("window")
+    ToggleWindowTopMost()
+    return true
+  }
+
+  MoveWindowToNextMonitor() {
+    if (!this._has("window"))
+      return this._deny("window")
+    MoveWindowToNextMonitor()
+    return true
+  }
+
+  ; ---- send.* (委托 AHK v2 原生 SendText / Send) ----
+  SendText(text) {
+    if (!this._has("send"))
+      return this._deny("send")
+    SendText(text)
+    return true
+  }
+
+  SendKeys(keys) {
+    if (!this._has("send"))
+      return this._deny("send")
+    Send(keys)
+    return true
+  }
+
+  ; ---- run.* (委托 ScriptHost / actions type1 ActivateOrRun) ----
+  RunProgram(target, args := "", workingDir := "") {
+    if (!this._has("run"))
+      return this._deny("run")
+    try {
+      Run('"' target '"' (args != "" ? " " args : ""), workingDir)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  RunScript(scriptPath, args := "") {
+    if (!this._has("run"))
+      return this._deny("run")
+    return ScriptHost.Run(scriptPath, args, true)
+  }
+
+  ActivateOrRun(winTitle := "", target := "", args := "", workingDir := "") {
+    if (!this._has("run"))
+      return this._deny("run")
+    try {
+      ActivateOrRun(winTitle, target, args, workingDir)
+      return true
+    } catch {
+      return false
+    }
+  }
 
   ; ---- ui.* (基础反馈, 不门控) ----
   Tip(msg) {
-    return true ; TODO 接入: Tip(msg)
+    Tip(msg)
+    return true
   }
 
   ConfirmBox(msg) {
-    return false ; TODO 接入: ConfirmBox(msg)
+    return MsgBox(msg, "KeyFlux 插件", "OKCancel Icon?") = "OK"
   }
 
-  ; ---- config.* (接入时委托 ConfigProvider, 随首个真实插件落地) ----
+  ; ---- config.* (委托 ConfigProvider, 契约 §3.8; 按插件 ID 作用域隔离) ----
   GetSetting(key) {
     if (!this._has("config"))
       return this._deny("config")
-    return "" ; TODO 接入: ConfigProvider.GetPluginSetting
+    return (this._pluginId != "") ? ConfigProvider.Get(this._pluginId, key) : ""
   }
 
   SetSetting(key, value) {
     if (!this._has("config"))
       return this._deny("config")
-    return false ; TODO 接入: ConfigProvider.SetPluginSetting
+    return (this._pluginId != "") ? ConfigProvider.Set(this._pluginId, key, value) : false
   }
 
   ; ---- events.* (阶段 6 已桥接 EventBus) ----

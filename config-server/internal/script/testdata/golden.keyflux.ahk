@@ -22,6 +22,7 @@
 #Include lib/quickswitch/DialogInspector.ahk
 #Include lib/quickswitch/QuickSwitchUI.ahk
 #Include lib/quickswitch/QuickSwitch.ahk
+#Include lib/plugins/Plugins.ahk
 
 ; #WinActivateForce   ; 先关了遇到相关问题再打开试试
 ; InstallKeybdHook    ; 这个可以重装 keyboard hook, 提高自己的 hook 优先级, 以后可能会用到

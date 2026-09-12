@@ -1,12 +1,10 @@
 /**
  * PluginManager —— L1 插件生命周期管理 (docs/CONTRACTS.md §3.7)。
- * 模块化重构阶段 5 落地框架: 元数据管理 / permissions 词表校验 / 错误隔离 / 卸载。
+ * 阶段 5 落地框架: 元数据管理 / permissions 词表校验 / 错误隔离 / 卸载。
  *
- * 范围说明 (阶段 5 用户裁定):
- *  - AHK v2 无运行时动态加载代码能力, L1 插件 main.ahk 须经编译期 #Include;
- *    生成端接入 (扫描 data/plugins 生成 Include 行 + 调用 Register(api)) 留待后续。
- *  - 首个官方插件 everything-search 推迟到全部阶段完成后。
- *  - 本阶段仅定义不接入运行路径, 模板与生成产物不变 (零行为变更)。
+ * 2026-09-12 生成端接入完成: 生成器扫描 data/plugins 渲染 #Include 行与
+ * Register(<manifest 字面量>) / LoadEntry("<id>") 引导 (见 generators/plugins.go),
+ * 本类新增 LoadEntry 按清单入口函数拉起插件并注入按权限裁剪的 API 视图。
  */
 class PluginManager {
   static Plugins := Map()        ; pluginId -> Map{manifest, enabled}
@@ -15,7 +13,7 @@ class PluginManager {
   static PERMISSIONS := ["selection", "run", "clipboard", "window", "settings", "events"]
 
   /**
-   * 注册插件。manifest 为已解析的 Map (阶段 5 不引入 JSON 库, 文件解析留待接入)。
+   * 注册插件。manifest 为生成端渲染的 AHK Map (无需 AHK 侧 JSON 解析)。
    * 必需字段: id, entry。permissions 须在词表内。
    * 重复 id: 记日志, 不覆盖先到者 (约束 4)。
    * @return true = 注册成功; false = 拒绝
@@ -45,8 +43,39 @@ class PluginManager {
       return false
     }
     this.Plugins[id] := Map("manifest", manifest, "enabled", true)
+    this._log("plugin registered: " id)
     ; 阶段 6: 插件生命周期事件 (隔离兜底, 不影响注册结果)
     try EventBus.Publish("plugin_loaded", Map("pluginId", id))
+    return true
+  }
+
+  /**
+   * 按清单入口拉起插件 (生成端在引擎引导期对每个插件各调一次)。
+   * 入口函数签名: <func>(api), api 为按权限裁剪的 APIView。
+   * 入口异常: plugin_error + 不影响其他插件 (约束 4)。
+   * @return true = 入口执行成功; false = 未注册/执行失败
+   */
+  static LoadEntry(id) {
+    plugin := this.Get(id)
+    if (plugin == "") {
+      this._recordError(id, "LoadEntry rejected: plugin not registered")
+      return false
+    }
+    m := plugin["manifest"]
+    e := m.Has("entry") ? m["entry"] : ""
+    fnName := (IsObject(e) && e.Has("func") && e["func"] != "") ? e["func"] : "Register"
+    api := this.GetAPI(id)
+    if (api == "") {
+      this._recordError(id, "LoadEntry rejected: api view unavailable")
+      return false
+    }
+    try {
+      %fnName%(api)
+    } catch as err {
+      this._recordError(id, "entry '" fnName "' failed: " err.Message)
+      return false
+    }
+    this._log("plugin entry loaded: " id " (" fnName ")")
     return true
   }
 
@@ -64,14 +93,14 @@ class PluginManager {
 
   /**
    * 按 manifest.permissions 裁剪的 API 视图 (契约 §3.7)。
-   * 未知插件返回空串。
+   * 未知插件返回空串。config.* 命名空间按插件 ID 作用域隔离。
    */
   static GetAPI(id) {
     plugin := this.Get(id)
     if (plugin == "")
       return ""
     perms := plugin["manifest"].Has("permissions") ? plugin["manifest"]["permissions"] : []
-    return APIBridge.Create(perms)
+    return APIBridge.Create(perms, id)
   }
 
   static _validatePermissions(perms) {
@@ -98,9 +127,10 @@ class PluginManager {
     try EventBus.Publish("plugin_error", Map("pluginId", pluginId, "message", msg))
   }
 
-  ; 错误日志 (与 ActionRegistry._log 同策略: 追加写, 失败静默)
+  ; 日志 (与 ActionRegistry._log 同策略: 追加写, 失败静默; 目录自建, cwd=部署根)
   static _log(msg) {
     try {
+      DirCreate("logs")
       FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " msg "`n", "logs\plugin_manager.log")
     }
   }

@@ -263,6 +263,22 @@ class ScriptHost {
 ③ `ConfigProvider` 的 JSON 解析(`plugin-settings.json` 读写)随首个真实插件落地。
 本阶段仅定义不接入运行路径, 模板与生成产物不变(零行为变更)。
 
+**已完成(2026-09-12, 生成端接入 + L1 API 实现, 即"插件市场可用"里程碑)**:
+`generators/plugins.go` 扫描 `<config.json 同级>/plugins` 渲染 `#Include` 行与
+`PluginManager.Register(<manifest Map 字面量>)` + `LoadEntry("<id>")` 引导
+(模板拼接约定 `{{ PLUGIN_INCLUDES }}` / `{{ PLUGIN_BOOTSTRAP }}` 行尾注入;
+零插件时生成产物与历史字节一致)。入口文件存在性与路径逃逸(../、盘符)在
+**生成期**拦截 —— AHK `#Include` 指向缺失文件会拖垮整个脚本加载。
+APIBridge 七命名空间 L1 委托全部实现(selection→SelectionContext; window→type3_window
+零参函数; run→ScriptHost/ActivateOrRun; send→原生 SendText/Send; ui→Tip/MsgBox;
+config→ConfigProvider; events→EventBus 既有), config.* 按插件 ID 作用域隔离。
+`PluginManager.LoadEntry(id)` 以动态调用拉起 `<entry.func>(api)`, 异常隔离为 plugin_error。
+实机验证: `plugins/examples/sample_greeter` 经导入落盘 → 引擎重启 →
+`plugin registered` / `plugin entry loaded` 全链 (logs/plugin_manager.log)。
+**遗留**: 插件启用/停用的持久化(当前 UI 开关未落盘)与声明式 contributes(§3.9 行为包
+形态) 属后续阶段; 插件注册的自定义动作(IAction, Type="plugin:<id>:<name>")契约已定、
+接线待做 —— Oracle/DumpPlan 不建模插件动作。
+
 ### 3.8 ConfigProvider — 配置读取收口
 
 ```ahk
@@ -274,6 +290,9 @@ class ConfigProvider {
 }
 ```
 
+**已落地(2026-09-12, v1 最小实现)**:`plugins/ConfigProvider.ahk`, 扁平字符串键值
+`{"<pluginId>:<key>": "<value>"}`(写入端 JSON 转义, 值仅字符串; 结构化值由插件自行
+编码)。Load/SchemaVersion 及 JSON.ahk 全量解析器仍随首个需要结构化设置的插件落地。
 
 ### 3.9 行为包 (Behavior Pack) —— 选中动作「行为库」契约 (2026-09-05 冻结)
 
