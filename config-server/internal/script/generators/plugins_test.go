@@ -3,6 +3,7 @@ package generators
 import (
 	"os"
 	"path/filepath"
+	"settings/internal/script/model"
 	"strings"
 	"testing"
 )
@@ -93,7 +94,7 @@ func TestRenderPluginBlocks_PathEscape(t *testing.T) {
 		os.MkdirAll(pdir, 0o755)
 		os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
 			"id": "evil", "name": "evil", "specVersion": 1,
-			"entry": {"kind": "script", "file": "` + evil + `", "func": "Register"}
+			"entry": {"kind": "script", "file": "`+evil+`", "func": "Register"}
 		}`), 0o644)
 
 		SetPluginsDir(dir)
@@ -104,6 +105,42 @@ func TestRenderPluginBlocks_PathEscape(t *testing.T) {
 		if !strings.Contains(boot, "entry.file 非法") && !strings.Contains(boot, "[插件错误] evil") {
 			t.Fatalf("路径逃逸 %q 缺拦截:\n%q", evil, boot)
 		}
+	}
+}
+
+// 停用持久化 (config.options.plugins.disabled): 停用插件不注入不注册 (落注释),
+// 启用插件不受影响 —— 与设置面板开关写配置链路 (OnCardEnabledChanged→SaveAsync) 闭环。
+func TestRenderPluginBlocks_Disabled(t *testing.T) {
+	dir := t.TempDir()
+	for _, id := range []string{"on", "off"} {
+		pdir := filepath.Join(dir, id)
+		os.MkdirAll(pdir, 0o755)
+		os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
+			"id": "`+id+`", "name": "`+id+`", "specVersion": 1,
+			"entry": {"kind": "script", "file": "main.ahk", "func": "Register"}
+		}`), 0o644)
+		os.WriteFile(filepath.Join(pdir, "main.ahk"), []byte("Register(api) {}"), 0o644)
+	}
+
+	Cfg = &model.Config{Options: model.Options{Plugins: model.PluginsOption{Disabled: []string{"off"}}}}
+	defer func() { Cfg = nil }()
+	SetPluginsDir(dir)
+	inc, boot := pluginBlocks()
+
+	if strings.Contains(inc, "/off/") {
+		t.Fatalf("停用插件不得产出 Include:\n%q", inc)
+	}
+	if !strings.Contains(inc, "/on/main.ahk") {
+		t.Fatalf("启用插件应正常注入:\n%q", inc)
+	}
+	if !strings.Contains(boot, "[插件] off 已在配置中停用") {
+		t.Fatalf("缺停用注释:\n%q", boot)
+	}
+	if strings.Contains(boot, "PluginManager.Register(Map(\"id\", \"off\"") {
+		t.Fatalf("停用插件不得注册:\n%q", boot)
+	}
+	if !strings.Contains(boot, "PluginManager.Register(Map(\"id\", \"on\"") {
+		t.Fatalf("启用插件应注册:\n%q", boot)
 	}
 }
 

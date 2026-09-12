@@ -469,6 +469,16 @@ class SelectedAction {
         RunScriptWithSelected(entry.actionValue, content)
       case "copy":
         A_Clipboard := SelectionContext.Normalize(entry.actionValue, content)
+      default:
+        ; 插件/未内置动作 (IAction, 契约 §3.2/§3.4): 兜底委托 ActionRegistry 统一执行。
+        ; 插件启动期经 ActionRegistry.Register 注册 Type="plugin:<id>:<name>" 后即达;
+        ; 未注册的未知动作由 Execute 内部拒绝 (日志), 静默返回。
+        if (ActionRegistry.Get(entry.action) != "") {
+          ctx := {selected: selected.content, isFile: (selected.type = "file"), winTitle: "", params: Map(), source: "plugin"}
+          ActionRegistry.Execute(entry.action, ctx)
+        } else {
+          Tip("未知动作: " entry.action, -1200)
+        }
     }
   }
 }

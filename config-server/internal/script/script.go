@@ -27,15 +27,29 @@ func GenerateScripts(config *Config) {
 }
 
 // LoadBehaviorCatalog 加载行为目录: 内置包在 settings.exe 同级 behaviors/, 用户包在
-// config.json 同级 behaviors/。CLI 与运行时的 cwd 不同, 故以可执行文件与配置文件路径
-// 推导目录位置, 不依赖当前工作目录。
+// config.json 同级 behaviors/, 插件贡献包在各插件目录 behaviors/ 子目录 (§3.9 同格式)。
+// CLI 与运行时的 cwd 不同, 故以可执行文件与配置文件路径推导目录位置, 不依赖当前工作目录。
 func LoadBehaviorCatalog(configPath string) *behaviors.Catalog {
 	builtinDir := "behaviors"
 	if exePath, err := os.Executable(); err == nil {
 		builtinDir = filepath.Join(filepath.Dir(exePath), "behaviors")
 	}
 	userDir := filepath.Join(filepath.Dir(configPath), "behaviors")
-	return behaviors.LoadCatalog(builtinDir, userDir)
+	// 插件贡献的行为包: plugins/<id>/behaviors/<packId>/ (声明式 contributes, §3.9 同格式)
+	var extra []string
+	pluginsDir := filepath.Join(filepath.Dir(configPath), "plugins")
+	if entries, err := os.ReadDir(pluginsDir); err == nil {
+		for _, de := range entries {
+			if !de.IsDir() {
+				continue
+			}
+			bp := filepath.Join(pluginsDir, de.Name(), "behaviors")
+			if fi, err := os.Stat(bp); err == nil && fi.IsDir() {
+				extra = append(extra, bp)
+			}
+		}
+	}
+	return behaviors.LoadCatalog(builtinDir, userDir, extra...)
 }
 
 // Preprocess 对配置做生成前的预处理。

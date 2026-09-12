@@ -1,0 +1,9 @@
+{
+  "id": "sample_timestamp",
+  "name": "示例: 复制时间戳",
+  "nameEn": "Sample: Copy Timestamp",
+  "specVersion": 1,
+  "description": "选中任意文本后一键复制当前时间戳 (演示插件贡献行为 + IAction 运行时动作)。",
+  "appliesTo": [{"type": "textType", "value": "plain"}],
+  "entry": {"kind": "builtin", "action": "plugin:sample_greeter:timestamp"}
+}

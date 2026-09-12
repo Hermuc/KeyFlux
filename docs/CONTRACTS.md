@@ -275,9 +275,23 @@ config→ConfigProvider; events→EventBus 既有), config.* 按插件 ID 作用
 `PluginManager.LoadEntry(id)` 以动态调用拉起 `<entry.func>(api)`, 异常隔离为 plugin_error。
 实机验证: `plugins/examples/sample_greeter` 经导入落盘 → 引擎重启 →
 `plugin registered` / `plugin entry loaded` 全链 (logs/plugin_manager.log)。
-**遗留**: 插件启用/停用的持久化(当前 UI 开关未落盘)与声明式 contributes(§3.9 行为包
-形态) 属后续阶段; 插件注册的自定义动作(IAction, Type="plugin:<id>:<name>")契约已定、
-接线待做 —— Oracle/DumpPlan 不建模插件动作。
+**已完成(2026-09-12 下午, 三项遗留收口)**:
+① 启停持久化闭环 —— 生成端消费 `config.options.plugins.disabled`
+(generators/plugins.go: 停用插件不注入不注册, 落注释; UI 开关→SaveAsync→PUT /config
+既有链路承接持久化, 配置 mtime 变化经 NeedsRegenerate 自动触发重生成);
+② 声明式 contributes —— 插件目录 `behaviors/` 子目录可贡献 §3.9 同格式行为包
+(behaviors.LoadCatalog 增 extraDirs 变参来源, Source 标记 plugin<N>, 排在 builtin/user
+之后且同 ID 先到者胜/冲突注记去重; 插件贡献包非 user 来源 → 行为库不可编辑删除,
+随插件装删);
+③ IAction 动作接线 —— ValidateManifest 放行 `plugin:<pluginId>:<actionName>` 形态的
+entry.action 引用 (pluginActionPattern); 运行时 SelectedAction._Execute 增 default 分发:
+未内置动作委托 ActionRegistry.Execute (插件启动期注册的 IAction 由此可达; 未注册动作
+日志+静默)。Oracle/DumpPlan 仍不建模插件动作 (plan 侧 plugin: 前缀原样透传, 已测试)。
+实机验证: sample_greeter 升级版 (IAction 注册 + behaviors/sample_timestamp 贡献包) →
+重启自动重生成 → GET /api/behaviors 可见贡献包 → 临时配置规则引用生成
+`action: "plugin:sample_greeter:timestamp"` 分发行。
+**仍遗留**: 插件启用/停用状态在行为库 UI 的展示细化 (插件贡献包当前显示为内置标签)、
+声明式 contributes 的 UI 创作辅助。
 
 ### 3.8 ConfigProvider — 配置读取收口
 

@@ -56,6 +56,53 @@ func TestLoadCatalogOrderAndErrors(t *testing.T) {
 	}
 }
 
+// 插件贡献包 (extraDirs, 声明式 contributes): 排在 builtin/user 之后, Source 标记 plugin*;
+// 与用户包同 ID 冲突时先到者胜 (Get 取首个, 插件贡献不可遮蔽用户包);
+// 插件贡献包非 user 来源 → 不可经行为库删除 (随插件装删);
+// 未注册进目录的 plugin: 前缀动作类型经 ResolveRuleAction 原样透传 (IAction 运行时接线的前提)。
+func TestLoadCatalog_PluginExtraDirs(t *testing.T) {
+	builtin := t.TempDir()
+	user := t.TempDir()
+	plugA := t.TempDir()
+	plugB := t.TempDir()
+	writePack(t, builtin, "open_url", `{"id":"open_url","name":"打开网址","specVersion":1,"appliesTo":[{"type":"textType","value":"url"}],"entry":{"kind":"builtin","action":"open_url"}}`)
+	writePack(t, user, "ps_edit", psEditManifest)
+	// 插件 A 贡献两个包; 插件 B 贡献一个与用户包同 ID 的遮蔽测试包
+	writePack(t, plugA, "everything_search", `{"id":"everything_search","name":"Everything 搜索","specVersion":1,"appliesTo":[{"type":"textType","value":"plain"}],"entry":{"kind":"builtin","action":"run","params":{"actionValue":"everything.exe -s \"%selected%\""}}}`)
+	writePack(t, plugA, "open_with_notepad", `{"id":"open_with_notepad","name":"记事本打开","specVersion":1,"appliesTo":[{"type":"fileExt","exts":["txt"]},{"type":"textType","value":"plain"}],"entry":{"kind":"builtin","action":"open"}}`)
+	writePack(t, plugB, "ps_edit", `{"id":"ps_edit","name":"冒名 PS","specVersion":1,"appliesTo":[{"type":"textType","value":"plain"}],"entry":{"kind":"builtin","action":"copy"}}`)
+
+	c := LoadCatalog(builtin, user, plugA, plugB)
+	if len(c.Errors) != 1 || !strings.Contains(c.Errors[0], "贡献包 ID \"ps_edit\" 与既有行为冲突") {
+		t.Fatalf("期望 1 条贡献包冲突注记, got %v", c.Errors)
+	}
+	var ids []string
+	for _, p := range c.Packs {
+		ids = append(ids, p.ID)
+	}
+	want := []string{"open_url", "ps_edit", "everything_search", "open_with_notepad"}
+	if strings.Join(ids, ",") != strings.Join(want, ",") {
+		t.Fatalf("顺序不符 (builtin→user→各插件字典序, 冲突包去重): got %v", ids)
+	}
+	// Source 标记: 插件 A 的包 = plugin1
+	if got := c.Get("everything_search").Source; got != "plugin1" {
+		t.Fatalf("插件贡献包 Source = %q, want plugin1", got)
+	}
+	// 同 ID 遮蔽: ps_edit 解析到用户包 (先到者胜)
+	if got := c.Get("ps_edit"); got.Source != "user" || got.Name != "PS 编辑图片" {
+		t.Fatalf("ps_edit 应解析到用户包, got Source=%s Name=%s", got.Source, got.Name)
+	}
+	// 插件贡献包不可经行为库删除 (非 user 来源)
+	if err := ValidateDelete(c, "everything_search", nil); err == nil || !strings.Contains(err.Error(), "不可删除") {
+		t.Fatalf("插件贡献包应不可删除, got %v", err)
+	}
+	// 未入目录的 plugin: 前缀动作类型原样透传 (IAction 运行时接线前提)
+	a, av, wd := ResolveRuleAction(c, "plugin:sample_greeter:timestamp", "tpl", "wd")
+	if a != "plugin:sample_greeter:timestamp" || av != "tpl" || wd != "wd" {
+		t.Fatalf("plugin: 前缀应透传, got %q/%q/%q", a, av, wd)
+	}
+}
+
 func TestCovers(t *testing.T) {
 	c := LoadCatalog(t.TempDir(), t.TempDir())
 	c.Packs = append(c.Packs, &Pack{ID: "ps_edit", AppliesTo: []AppliesToEntry{{Type: "fileExt", Exts: []string{"jpg", "png"}}}, Entry: Entry{Kind: "builtin", Action: "run"}})

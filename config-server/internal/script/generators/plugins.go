@@ -57,6 +57,18 @@ func pluginBlocks() (string, string) {
 	return pluginIncludeBlock, pluginBootstrapBlock
 }
 
+// disabledPluginSet 读取 config.options.plugins.disabled (启停持久化, 契约 §1 数据进配置)。
+// generators.Cfg 由 SaveAHK 在模板执行前注入 (本函数仅在模板执行期被调用)。
+func disabledPluginSet() map[string]bool {
+	out := map[string]bool{}
+	if Cfg != nil && Cfg.Options.Plugins.Disabled != nil {
+		for _, id := range Cfg.Options.Plugins.Disabled {
+			out[id] = true
+		}
+	}
+	return out
+}
+
 // renderPluginBlocks 单插件失败只产注释行, 不影响其他插件 (契约约束 4 错误隔离)。
 // 入口文件在生成期做存在性与路径安全校验: AHK 的 #Include 指向缺失文件会让整个
 // 脚本加载失败 (拖垮引擎), 必须在生成期拦下。
@@ -65,8 +77,15 @@ func renderPluginBlocks(dir string) (includes, bootstrap string) {
 		return "", ""
 	}
 	cat := plugins.LoadCatalog(dir)
+	disabled := disabledPluginSet()
 	var inc, boot strings.Builder
 	for _, m := range cat.Plugins {
+		if disabled[m.ID] {
+			// 启停持久化 (config.options.plugins.disabled): 停用插件不注入不注册,
+			// 落一行注释便于用户在生成产物里看到过滤结果
+			boot.WriteString(fmt.Sprintf("\n; [插件] %s 已在配置中停用, 跳过加载", m.ID))
+			continue
+		}
 		if m.Entry.Kind != "script" || m.Entry.File == "" {
 			boot.WriteString(fmt.Sprintf("\n; [插件警告] %s: 仅支持 script 入口 (entry.file), 已跳过", m.ID))
 			continue

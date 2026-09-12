@@ -72,7 +72,7 @@ class PluginManager {
     try {
       %fnName%(api)
     } catch as err {
-      this._recordError(id, "entry '" fnName "' failed: " err.Message)
+      this._recordError(id, "entry '" fnName "' failed: " err.Message " @ " err.What " line " err.Line)
       return false
     }
     this._log("plugin entry loaded: " id " (" fnName ")")

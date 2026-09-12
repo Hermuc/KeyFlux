@@ -29,6 +29,11 @@ const SpecVersion = 1
 
 var idPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 
+// pluginActionPattern 插件运行时动作引用 (IAction, 契约 §3.2):
+// 行为包 entry.action 可引用 "plugin:<pluginId>:<actionName>" 形态 —— 此类动作不在
+// 生成端展开, 由运行时 SelectedAction 分发兜底派发到 ActionRegistry (插件启动期注册)。
+var pluginActionPattern = regexp.MustCompile(`^plugin:[a-z][a-z0-9_]{0,31}:[A-Za-z0-9_\-]{1,64}$`)
+
 // BuiltinActionIDs 内置基础动作保留 ID 集 (= AHK ExecuteActionRule 的 case 集 / 前端
 // 基础动作词表)。行为包 entry.kind=builtin 的 action 必须取值于此; 用户包 ID 不得占用。
 var BuiltinActionIDs = map[string]bool{
@@ -141,8 +146,10 @@ func readPack(dir string) (*Pack, error) {
 	return &p, nil
 }
 
-// LoadCatalog 加载内置包目录与用户包目录, 构建稳定排序的目录。
-func LoadCatalog(builtinDir, userDir string) *Catalog {
+// LoadCatalog 加载内置包目录、用户包目录与额外来源目录, 构建稳定排序的目录。
+// extraDirs = 插件贡献的行为包目录 (plugins/<id>/behaviors, §3.9 同格式),
+// 排在最后: 同 ID 冲突时 Catalog.Get 先到者胜 (优先级 builtin > user > 插件贡献)。
+func LoadCatalog(builtinDir, userDir string, extraDirs ...string) *Catalog {
 	c := &Catalog{}
 	builtin, errs, err := loadDir(builtinDir, "builtin")
 	if err != nil {
@@ -158,6 +165,23 @@ func LoadCatalog(builtinDir, userDir string) *Catalog {
 	sortPacks(user)
 	c.Packs = append(c.Packs, builtin...)
 	c.Packs = append(c.Packs, user...)
+	for i, dir := range extraDirs {
+		packs, errs, err := loadDir(dir, fmt.Sprintf("plugin%d", i+1))
+		if err != nil {
+			c.Errors = append(c.Errors, fmt.Sprintf("plugin%d: %v", i+1, err))
+		}
+		c.Errors = append(c.Errors, errs...)
+		sortPacks(packs)
+		// 同 ID 先到者胜 (builtin > user > 插件贡献): 冲突包跳过并注记,
+		// 避免行为库 UI 出现同 ID 重复条目
+		for _, p := range packs {
+			if c.Get(p.ID) != nil {
+				c.Errors = append(c.Errors, fmt.Sprintf("plugin%d: 贡献包 ID %q 与既有行为冲突, 已跳过", i+1, p.ID))
+				continue
+			}
+			c.Packs = append(c.Packs, p)
+		}
+	}
 	return c
 }
 
@@ -332,8 +356,10 @@ func ValidateManifest(p *Pack) error {
 	}
 	switch p.Entry.Kind {
 	case "builtin":
-		if !BuiltinActionIDs[p.Entry.Action] {
-			return fmt.Errorf("行为「%s」的 entry.action %q 不是内置基础动作", p.ID, p.Entry.Action)
+		// 内置基础动作白名单, 或插件运行时动作引用 (plugin:<id>:<name>, 运行时经
+		// ActionRegistry 兜底派发; 插件未注册时运行时静默忽略并提示)
+		if !BuiltinActionIDs[p.Entry.Action] && !pluginActionPattern.MatchString(p.Entry.Action) {
+			return fmt.Errorf("行为「%s」的 entry.action %q 不是内置基础动作或插件动作引用", p.ID, p.Entry.Action)
 		}
 	case "script":
 		if strings.TrimSpace(p.Entry.File) == "" || strings.TrimSpace(p.Entry.Func) == "" {
