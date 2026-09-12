@@ -107,11 +107,13 @@
            锁宽后测量全程有界、比例稳定。368 = 460 等比收窄 20% (2026-09-08 应用户要求),
            卡内固定列宽同步 220->176 / 140,240->112,192, 路径行 112+192+✕按钮≈32 = 336 + 卡 Padding 32 = 368 正好;
            渲染时卡片仍按 368 槽宽正常分配 * 列 -->
-      <!-- 右列滚动分离 (2026-09-12 用户报: 滚轮滚右列会带动整页): 右列包进固定高 ScrollViewer
-           (Height=560 与左列 Border 等高), 滚轮只滚本列; 滚动条 Hidden —— 滚轮滚动不受影响,
-           且不占测量宽度 (Width=368 锁定保持, 若显示滚动条会把卡内容挤窄并推高缩放比)。
-           外层 ScrollViewer/Viewbox 架构不动, 仅在极端矮窗时兜底整页滚动 -->
-      <ScrollViewer Grid.Column="1" Height="560" VerticalScrollBarVisibility="Hidden">
+      <!-- 右列滚动分离 (2026-09-12 用户报: 滚轮滚右列会带动整页): 右列包进固定高 ScrollViewer,
+           滚轮只滚本列; 滚动条 Hidden —— 滚轮滚动不受影响, 且不占测量宽度 (Width=368 锁定保持,
+           若显示滚动条会把卡内容挤窄并推高缩放比)。外层 ScrollViewer/Viewbox 架构不动。
+           高度 800 (2026-09-12 用户报: 不必与左列 560 等高, 显示范围太小): Viewbox 纵向不放大
+           (缩放由宽度主导), 800 设计像素在默认 1500x950 窗口渲染 ≈ 850 < 可视区, 尽用竖向空间;
+           更矮的窗口由外层 ScrollViewer 兜底整页滚动 -->
+      <ScrollViewer Grid.Column="1" Height="800" VerticalScrollBarVisibility="Hidden">
       <StackPanel Spacing="12" Width="368">
         <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=505}"
                    FontSize="16" FontWeight="SemiBold" />
