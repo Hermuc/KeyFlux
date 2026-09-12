@@ -12,6 +12,7 @@ public partial class ActionEditorWindow : Window
     public ActionEditorWindow()
     {
         InitializeComponent();
+        Services.Win32.DialogChrome.Apply(this);
         // 标题栏小图标透明化 (与主窗口/其他对话框同一助手)
         TitleBarIconSuppressor.Attach(this);
     }

@@ -21,6 +21,7 @@ public partial class OverviewEditWindow : Window
     public OverviewEditWindow(MainViewModel main, string initialMd)
     {
         InitializeComponent();
+        Services.Win32.DialogChrome.Apply(this);
         _main = main;
 
         // 标题栏小图标透明化 (与主窗口同一助手, 行为一致)

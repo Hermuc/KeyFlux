@@ -14,6 +14,7 @@ public partial class PluginMarketWindow : Window
     public PluginMarketWindow()
     {
         InitializeComponent();
+        Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => UnsubscribeLanguage();
         I18n.Changed += OnLanguageChanged;
     }

@@ -225,6 +225,14 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll")]
     public static extern int DwmGetWindowAttribute(IntPtr hWnd, uint dwAttribute, out RECT pvAttribute, uint cbAttribute);
 
+    // ================================================================== 组3.1: DWM 标题栏着色 (Win11 22000+; 见 DialogChrome)
+    public const uint DWMWA_BORDER_COLOR = 34;
+    public const uint DWMWA_CAPTION_COLOR = 35;
+    public const uint DWMWA_TEXT_COLOR = 36;
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(IntPtr hWnd, uint dwAttribute, ref uint pvAttribute, int cbAttribute);
+
     // ================================================================== 组4: 高亮框窗口 (类注册 / 创建 / 区域 / 分层)
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern ushort RegisterClass(ref WNDCLASS lpWndClass);

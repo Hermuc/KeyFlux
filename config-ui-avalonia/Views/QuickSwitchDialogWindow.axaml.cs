@@ -19,6 +19,7 @@ public partial class QuickSwitchDialogWindow : Window
     public QuickSwitchDialogWindow()
     {
         InitializeComponent();
+        Services.Win32.DialogChrome.Apply(this);
         TitleBarIconSuppressor.Attach(this);
         Title = I18n.T("2408");
         I18n.Changed += OnLanguageChanged;

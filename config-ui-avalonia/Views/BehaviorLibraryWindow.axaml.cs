@@ -18,6 +18,7 @@ public partial class BehaviorLibraryWindow : Window
     public BehaviorLibraryWindow()
     {
         InitializeComponent();
+        Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => (DataContext as BehaviorLibraryViewModel)?.UnsubscribeLanguage();
     }
 

@@ -18,6 +18,7 @@ public partial class BehaviorEditWindow : Window
     public BehaviorEditWindow()
     {
         InitializeComponent();
+        Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => (DataContext as BehaviorEditViewModel)?.UnsubscribeLanguage();
     }
 
