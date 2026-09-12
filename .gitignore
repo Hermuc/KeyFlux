@@ -22,3 +22,5 @@ shortcuts/
 lanzou_cookie.txt
 CommandInputSkin.txt
 /go-tmp/
+# 测试运行输出 (dotnet test 生成)
+KeyFlux.Settings.Tests/TestResults/
