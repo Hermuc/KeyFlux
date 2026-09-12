@@ -5,6 +5,7 @@ using System.Threading;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Fonts;
+using Avalonia.Win32;
 using KeyFlux.Settings.Services;
 
 namespace KeyFlux.Settings;
@@ -63,6 +64,17 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .With(new Win32PlatformOptions
+            {
+                // 2026-09-12 启动瞬峰治理 (dotnet-counters 剖析: GC 托管堆仅 ~15MB、分配速率
+                // ~1.2MB/s, 私有提交却冲 400-650MB —— 大头是 GPU 渲染管线在进程内的
+                // ANGLE/D3D11/WinUIComposition 交换链与驱动分配)。设置面板为静态内容, 软件渲染
+                // 视觉无差, 换取瞬峰压平与更低常驻内存; RedirectionSurface = 渲染进缓冲后经
+                // GDI 重定向呈现, 全程不建 D3D 设备。
+                // ⚠ 渲染契约: 换回 GPU 渲染需回归瞬峰/内存实测; 勿删此配置。
+                RenderingMode = new[] { Win32RenderingMode.Software },
+                CompositionMode = new[] { Win32CompositionMode.RedirectionSurface },
+            })
             .With(new FontManagerOptions
             {
                 FontFallbacks = new[]
