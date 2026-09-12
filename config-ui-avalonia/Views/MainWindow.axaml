@@ -99,15 +99,9 @@
 
     <!-- 自绘标题栏 (取代被 NoChrome 去掉的系统标题栏):
          整条为拖动区 (PointerPressed -> BeginMoveDrag), 双击切换最大化; 右侧三键。
-         左侧品牌组 IsHitTestVisible=False, 保证在其上按下也能触发拖动。 -->
+         左侧不放品牌组 (与侧栏大 Logo 重复, 用户要求删除): 整条均为空白拖动区。 -->
     <Grid DockPanel.Dock="Top" Height="36" Background="Transparent"
           PointerPressed="OnTitleBarPointerPressed">
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Spacing="8"
-                  Margin="14,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False">
-        <Image Source="avares://KeyFlux.Settings/Assets/logo.png" Width="16" Height="16" />
-        <TextBlock Text="KeyFlux" FontFamily="{StaticResource ClaudeSerifFont}" FontSize="12"
-                   Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center" />
-      </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2"
                   Margin="0,0,6,0" VerticalAlignment="Center">
         <Button Classes="caption" Content="─" Click="OnMinimizeClick" />
