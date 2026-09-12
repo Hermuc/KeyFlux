@@ -52,6 +52,40 @@ public sealed class SelectedActionPageViewSmokeTests
         return (page, view, window);
     }
 
+    /// <summary>
+    /// 添加规则面板打开时背景模糊 (ModalBlur) 守护: 曾因遮罩 Background 写成
+    /// "{StaticResource ...}00" 解析为不透明红 (用户报红色背景)。
+    /// 打开 → 页头/列表 Effect 为 BlurEffect; 关闭 → 撤销。
+    /// </summary>
+    [AvaloniaFact]
+    public void AddPanel_Open_Blurs_Page_Background()
+    {
+        var (page, view, window) = CreateHost();
+        try
+        {
+            Assert.Null(BackgroundEffect(view));
+            page.OpenAddPanelCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.IsType<BlurEffect>(BackgroundEffect(view));
+
+            page.CloseAddPanelCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(BackgroundEffect(view));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>页内挂了 ModalBlur.IsActive 的元素 (页头 DockPanel / 列表 ScrollViewer) 的当前 Effect。</summary>
+    private static Avalonia.Media.IEffect? BackgroundEffect(Avalonia.Visual root)
+        => root.GetVisualDescendants()
+            .OfType<Avalonia.Visual>()
+            .Where(v => KeyFlux.Settings.Controls.ModalBlur.GetIsActive(v))
+            .Select(v => v.Effect)
+            .FirstOrDefault();
+
     [AvaloniaFact]
     public void Page_Instantiates_And_Renders_Both_Partitions()
     {

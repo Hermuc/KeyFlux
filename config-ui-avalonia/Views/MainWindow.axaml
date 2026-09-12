@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:KeyFlux.Settings.ViewModels"
         xmlns:views="using:KeyFlux.Settings.Views"
+        xmlns:controls="using:KeyFlux.Settings.Controls"
         x:Class="KeyFlux.Settings.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         FontFamily="Microsoft YaHei UI, Segoe UI, Segoe UI Emoji"
@@ -172,7 +173,7 @@
     </Border>
 
     <!-- ===================== 右侧内容区 ===================== -->
-    <Grid Grid.Column="1" Background="Transparent">
+    <Grid Grid.Column="1" Background="Transparent" controls:ModalBlur.IsHost="True">
       <ContentControl Content="{Binding CurrentPage}">
         <ContentControl.DataTemplates>
           <DataTemplate DataType="vm:HomePageViewModel">

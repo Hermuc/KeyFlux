@@ -44,6 +44,19 @@ internal static class DialogChrome
             SetColor(hwnd, NativeMethods.DWMWA_CAPTION_COLOR, caption);
             SetColor(hwnd, NativeMethods.DWMWA_TEXT_COLOR, text);
             SetColor(hwnd, NativeMethods.DWMWA_BORDER_COLOR, caption);
+            // 弹窗打开期间 owner 背后的模糊宿主 +1 (Closed 撤销) —— 背景高斯模糊
+            // 替代颜色遮罩 (ModalBlur 统一管理叠窗计数); 无 owner (无主窗) 时跳过
+            if (window.Owner is not null)
+            {
+                Controls.ModalBlur.SetActive(window.Owner, active: true);
+            }
+        };
+        window.Closed += (_, _) =>
+        {
+            if (window.Owner is not null)
+            {
+                Controls.ModalBlur.SetActive(window.Owner, active: false);
+            }
         };
     }
 

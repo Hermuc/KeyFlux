@@ -301,7 +301,7 @@
   <Grid Margin="20" RowDefinitions="Auto,*">
 
     <!-- ===================== 顶部: 标题 + 管理行为… + 添加映射 ===================== -->
-    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+    <DockPanel Grid.Row="0" Margin="0,0,0,12" controls:ModalBlur.IsActive="{Binding IsAddPanelOpen}">
       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <Button Click="OnManageBehaviors" Background="Transparent" BorderThickness="1"
                 BorderBrush="{StaticResource ClaudeBorderCreamBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,7" FontSize="13"
@@ -318,7 +318,7 @@
                  Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=914}" />
     </DockPanel>
 
-    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" controls:ModalBlur.IsActive="{Binding IsAddPanelOpen}">
       <StackPanel x:Name="PageRoot" MaxWidth="860" HorizontalAlignment="Left" Spacing="14">
 
         <!-- 说明条 (单键分发语义, 复用 960) -->
@@ -446,7 +446,7 @@
     </ScrollViewer>
 
     <!-- ===================== 添加映射弹窗 (页内 overlay, 非独立窗口) ===================== -->
-    <Border Grid.RowSpan="2" IsVisible="{Binding IsAddPanelOpen}" Background="{StaticResource ClaudeErrorBrush}00">
+    <Border Grid.RowSpan="2" IsVisible="{Binding IsAddPanelOpen}" Background="Transparent">
       <ContentControl Content="{Binding AddPanel}" HorizontalAlignment="Center" VerticalAlignment="Center">
         <ContentControl.DataTemplates>
           <DataTemplate x:DataType="vm:AddMappingVm">
@@ -472,7 +472,7 @@
                               Background="{Binding IsSeparator, Converter={StaticResource PopupBg}}">
                           <TextBlock Text="{Binding Label}" IsVisible="{Binding !IsSeparator}"
                                      Margin="10,0" VerticalAlignment="Center" />
-                          <Rectangle IsVisible="{Binding IsSeparator}" Height="1" Fill="{StaticResource ClaudeErrorBrush}00"
+                          <Rectangle IsVisible="{Binding IsSeparator}" Height="1"
                                      Margin="10,0" VerticalAlignment="Center" />
                         </Grid>
                       </DataTemplate>
