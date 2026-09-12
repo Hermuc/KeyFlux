@@ -1139,6 +1139,10 @@
     "zh": "该匹配类型的可用行为都已添加，无法重复添加",
     "en": "All available behaviors for this match type have been added"
   },
+  "1120": {
+    "zh": "删除当前选中的类型（确认后立即保存）",
+    "en": "Delete the selected type (asks first, saves immediately)"
+  },
   "2408": {
     "zh": "快速切换",
     "en": "Quick Switch"

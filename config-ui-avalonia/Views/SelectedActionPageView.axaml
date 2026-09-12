@@ -85,7 +85,7 @@
                       ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
               <Button Classes="icon-btn danger" Command="{Binding AskRemoveCommand}" Content="✕"
                       ToolTip.ShowDelay="200"
-                      ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1108}" />
+                      ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1120}" />
             </StackPanel>
           </Grid>
 
