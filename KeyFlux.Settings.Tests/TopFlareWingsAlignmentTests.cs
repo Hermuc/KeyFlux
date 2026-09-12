@@ -71,9 +71,11 @@ public sealed class TopFlareWingsAlignmentTests
         var diag = $"cardT={cardT} cardW={card.Bounds.Width} leftEdge={leftEdge} rightEdge={rightEdge} canvasT={canvasT} "
                  + $"getL={Canvas.GetLeft(canvas.Children[0])} getR={Canvas.GetLeft(canvas.Children[1])} "
                  + $"rB={canvas.Children[1].Bounds} cB={canvas.Bounds} pB={panel.Bounds}";
-        // ② 左翼竖直边 == 卡左缘; 右翼竖直边 == 卡右缘 (按实际渲染边界, 容差半像素)
-        Assert.True(Math.Abs(leftEdge.X - cardT.Value.X) < 0.5, $"left wing {diag}");
-        Assert.True(Math.Abs(rightEdge.X - cardR.X) < 0.5, $"right wing {diag}");
+        // ② 两翼竖直边压进卡缘 1.5 设计像素 (同色重叠消抗锯齿缝; 完美相切会留暗线)
+        var scale = canvas.Bounds.Height / 18;
+        var overlap = 1.5 * scale;
+        Assert.True(Math.Abs((leftEdge.X - cardT.Value.X) - overlap) < 0.5, $"left wing {diag}");
+        Assert.True(Math.Abs((cardR.X - rightEdge.X) - overlap) < 0.5, $"right wing {diag}");
         // ③ 画布顶 == 视口顶 (翼钉在视口上缘, 不随视口在格内垂直居中而漂移)
         Assert.True(Math.Abs(svT!.Value.Y - canvasT!.Value.Y) < 0.5, $"top {diag}");
     }

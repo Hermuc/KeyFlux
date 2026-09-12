@@ -30,6 +30,14 @@ public static class TopFlareWings
 {
     private const double WingWidth = 18;
 
+    /// <summary>
+    /// 翼竖直边压进卡内的深度 (设计像素)。完美对齐时两形状边缘相切, 各自的抗锯齿
+    /// 边像素都与背景混色 → 拼缝处出现一条暗线 (用户报"还是没有完全贴合")。
+    /// 同色实体重叠不可见, 抗锯齿边落在卡片色块内部混成纯色, 缝消失;
+    /// 翼弧线与卡缘的交点处轮廓自然过渡, 无台阶。
+    /// </summary>
+    private const double EdgeOverlap = 1.5;
+
     public static readonly AttachedProperty<bool> IsEnabledProperty =
         AvaloniaProperty.RegisterAttached<TopFlareWingsMarker, ScrollViewer, bool>("IsEnabled");
 
@@ -97,7 +105,7 @@ public static class TopFlareWings
     }
 
     /// <summary>
-    /// 两翼 Path 竖直边精确压在卡片左右缘: 左翼竖直边在自身局部 x=18 (翼体向左铺开),
+    /// 两翼竖直边压进卡缘 EdgeOverlap 深度: 左翼竖直边在自身局部 x=18 (翼体向左铺开),
     /// 右翼竖直边在自身局部 x=0 (翼体向右铺开) —— 几何与定位解耦, Path 只管形状。
     /// </summary>
     private static void PositionWings(ScrollViewer sv, Control overlay)
@@ -122,8 +130,8 @@ public static class TopFlareWings
         }
         var left = canvas.Children[0];
         var right = canvas.Children[1];
-        var lx = p.X - WingWidth;
-        var rx = p.X + card.Bounds.Width;
+        var lx = p.X - WingWidth + EdgeOverlap;
+        var rx = p.X + card.Bounds.Width - EdgeOverlap;
         if (Canvas.GetLeft(left) != lx)
         {
             Canvas.SetLeft(left, lx);
