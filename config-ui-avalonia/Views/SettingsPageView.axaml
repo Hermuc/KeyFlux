@@ -162,8 +162,9 @@
           <Path Fill="{StaticResource ClaudeIvoryBrush}" Data="M 18,0 L 18,18 A 18,18 0 0 0 0,0 Z" />
           <Path Fill="{StaticResource ClaudeIvoryBrush}" Data="M 0,0 L 0,18 A 18,18 0 0 1 18,0 Z" />
         </Canvas>
-        <!-- Padding 12,0: 卡片边缘离裁剪边界 12px 呼吸距离 (描边/阴影不被裁) -->
-        <ScrollViewer VerticalScrollBarVisibility="Hidden" Padding="12,0"
+        <!-- Padding: 水平 24 必须大于阴影模糊半径 16 —— 不足时阴影超出部分被滚动视口
+             裁掉, 左右呈"被切断"状 (用户报); 底部 16 给最后一张卡的下阴影留衰减空间 -->
+        <ScrollViewer VerticalScrollBarVisibility="Hidden" Padding="24,0,24,16"
                       controls:TopFlareWings.IsEnabled="True" controls:TopFlareWings.FlareOverlay="{Binding #PART_TopFlareWings}">
           <StackPanel Spacing="12" Width="460">
         <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=505}"
