@@ -170,6 +170,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     [ObservableProperty] private bool _showSkin;
     [ObservableProperty] private bool _showPathVariables;
     [ObservableProperty] private bool _showCustomHotkeys;
+    [ObservableProperty] private bool _showAcrylic;
 
     [RelayCommand]
     private void ToggleSection(string? which)
@@ -183,10 +184,12 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             "skin" => ShowSkin,
             "pathvars" => ShowPathVariables,
             "customhotkeys" => ShowCustomHotkeys,
+            "acrylic" => ShowAcrylic,
             _ => false,
         };
         ShowMouseOption = ShowLanguageOption = ShowKeyboardLayout = false;
         ShowKeymapDelay = ShowSkin = ShowPathVariables = ShowCustomHotkeys = false;
+        ShowAcrylic = false;
         if (wasOpen) return;
         switch (which)
         {
@@ -197,6 +200,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             case "skin": ShowSkin = true; break;
             case "pathvars": ShowPathVariables = true; break;
             case "customhotkeys": ShowCustomHotkeys = true; break;
+            case "acrylic": ShowAcrylic = true; break;
         }
     }
 
