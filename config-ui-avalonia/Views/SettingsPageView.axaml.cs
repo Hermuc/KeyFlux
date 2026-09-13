@@ -30,6 +30,9 @@ public partial class SettingsPageView : UserControl
         var header = card.GetVisualDescendants().OfType<Button>()
             .FirstOrDefault(b => b.Classes.Contains("sectionHeader"));
         if (header is null) return;
+        // 先聚焦标题按钮: 橙色线圈挂 :focus-within (卡内控件获焦即亮),
+        // 点空白处不聚焦的话展开生效但橙圈不出现 (用户报)
+        header.Focus();
         if (header.Command?.CanExecute(header.CommandParameter) == true)
         {
             header.Command.Execute(header.CommandParameter);
