@@ -153,7 +153,10 @@ public sealed class SettingsApiClient : ISettingsApi, IDisposable
     /// <summary>按端口构造基址: http://localhost:{port}</summary>
     public SettingsApiClient(int port, TimeSpan? timeout = null)
     {
-        _http = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
+        // 127.0.0.1 而非 localhost (关键性能): Go net.Listen("tcp","localhost:..") 只绑 IPv4,
+        // .NET 把 localhost 解析为 ::1 优先 → 每个 HTTP 请求先在 IPv6 connect 挂起 ~2s
+        // 再 Happy Eyeballs 回退 —— 实测"连接后端"被拖到 2.1s (探针: /health 2156→90ms)
+        _http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
         _ownsHttpClient = true;
         // 保存配置会触发 Go 侧写盘 + 生成逻辑, 预留充足超时
         _http.Timeout = timeout ?? TimeSpan.FromSeconds(10);
