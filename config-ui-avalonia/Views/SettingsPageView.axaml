@@ -71,7 +71,13 @@
 
       <!-- ===================== 左列: 快捷键方案 (label:915, 复刻 Settings.vue 表格) ===================== -->
       <Border Grid.Column="0" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16"
-              Height="620" VerticalAlignment="Top" Margin="0,0,16,0">
+              Height="624" VerticalAlignment="Top" Margin="0,0,16,0">
+        <!-- LayoutTransform 等比放大卡内全部内容 (字号/输入框/开关随框一起变大):
+             1.12 = 加宽后内容区 528 / 原内容区 468; 卡高 624 = 528x1.12 + Padding 32 -->
+        <LayoutTransformControl>
+          <LayoutTransformControl.LayoutTransform>
+            <ScaleTransform ScaleX="1.12" ScaleY="1.12" />
+          </LayoutTransformControl.LayoutTransform>
         <DockPanel>
           <TextBlock DockPanel.Dock="Top"
                      Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=915}"
@@ -87,10 +93,10 @@
 
           <!-- 表头 -->
           <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,6">
-            <TextBlock Width="130" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=501}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-            <TextBlock Width="124" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=502}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-            <TextBlock Width="132" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=503}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-            <TextBlock Width="60" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=504}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+            <TextBlock Width="124" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=501}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+            <TextBlock Width="120" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=502}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+            <TextBlock Width="128" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=503}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+            <TextBlock Width="52" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=504}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
           </StackPanel>
 
           <!-- 表行 -->
@@ -98,7 +104,7 @@
             <ItemsControl ItemsSource="{Binding KeymapRows}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:KeymapRowViewModel">
-                  <Grid ColumnDefinitions="130,124,132,60,*" Margin="0,2">
+                  <Grid ColumnDefinitions="124,120,128,52,*" Margin="0,2">
                     <!-- 名称 (失焦复刻 checkKeymapData) -->
                     <TextBox Text="{Binding Name}" LostFocus="OnRowFieldLostFocus"
                              Margin="0,0,6,0" Padding="6,4" FontSize="13" />
@@ -133,6 +139,7 @@
             </ItemsControl>
           </ScrollViewer>
         </DockPanel>
+        </LayoutTransformControl>
       </Border>
 
       <!-- ===================== 右列: 其他设置 (label:505) ===================== -->
