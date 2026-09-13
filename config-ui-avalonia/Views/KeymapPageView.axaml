@@ -6,6 +6,22 @@
              x:Name="Root"
              x:DataType="vm:KeymapPageViewModel">
 
+  <UserControl.Styles>
+    <!-- 选中键格悬停: 整键陶土底 + 白字 (2026-09-13 用户指定; 原悬停与普通键格同为
+         Fluent 默认灰, 选中辨识度不足)。普通键格悬停保持 Fluent 默认灰不变。
+         必须打在模板 PART_ContentPresenter 上 (Fluent :pointerover 在部件上设底色,
+         只改控件属性压不住); IsSelected 经 Classes.selected 驱动伪类 -->
+    <Style Selector="Button.keyCell.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeTerracottaBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeWhiteBrush}" />
+    </Style>
+    <!-- 选中键格按下: Coral 亮一档, 与悬停区分按压反馈 -->
+    <Style Selector="Button.keyCell.selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource ClaudeCoralBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource ClaudeWhiteBrush}" />
+    </Style>
+  </UserControl.Styles>
+
   <!-- 键位图页 (复刻 views/Keymap.vue): 物理键盘网格 + 动作编辑面板 + 右侧备注汇总
        布局: 外层 Grid 只承载页面背景 (铺满内容区, 避免 Margin 露白),
        内层 Grid 带边距与裁剪; 左列 (页头/键盘/编辑面板) 固定不滚动, 右列备注汇总独立滚动 -->
@@ -46,7 +62,8 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:KeyCellVm">
-                    <Button Height="43" Width="{Binding CellWidth}" MinWidth="{Binding CellMinWidth}"
+                    <Button Classes="keyCell" Classes.selected="{Binding IsSelected}"
+                            Height="43" Width="{Binding CellWidth}" MinWidth="{Binding CellMinWidth}"
                             Padding="{Binding CellPadding}" CornerRadius="{StaticResource ClaudeRadiusSm}"
                             Background="{Binding Background}"
                             IsEnabled="{Binding IsEnabled}"

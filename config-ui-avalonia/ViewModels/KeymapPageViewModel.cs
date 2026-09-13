@@ -29,6 +29,10 @@ public sealed partial class KeyCellVm : ObservableObject
     [ObservableProperty]
     private string _borderBrush = ClaudePalette.RingWarm;
 
+    /// <summary>选中标记 (驱动 XAML Classes.selected → 悬停时整键变陶土底白字)。</summary>
+    [ObservableProperty]
+    private bool _isSelected;
+
     /// <summary>禁用键不可点 (触发键自身, 复刻 v-card :disabled)。</summary>
     [ObservableProperty]
     private bool _isEnabled = true;
@@ -159,6 +163,7 @@ public sealed partial class KeymapPageViewModel : ObservableObject, ILanguageRef
                 var disabled = Core.IsDisabledKey(cell.Hotkey);
                 var selected = cell.Hotkey == Core.SelectedHotkey;
                 cell.IsEnabled = !disabled;
+                cell.IsSelected = selected;
                 // 选中态 = 陶土描边 + 陶土字 + 白底 (2026-09-13 用户指定, 原 Sand 底与 Ivory 难区分);
                 // 其余状态文字/描边复位默认
                 cell.Background = selected ? ClaudePalette.White
