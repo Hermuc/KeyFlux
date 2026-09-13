@@ -22,11 +22,11 @@ public static class ActionSchemeCatalog
 {
     // 匹配条件类型 (复刻 MATCH_TYPES; 「文本正则」与「文件分组」已按 2026-08 改造移除,
     // 「默认 (兜底)」已按 2026-09 移除, 现仅剩 fileExt / textType 两类)
-    // (Value, LabelKey, HintKey)
-    public static readonly (string Value, string LabelKey, string HintKey)[] MatchTypes =
+    // (Value, LabelKey) —— 原提示键 (1034/1035) 随 2026-09-13 冗余副标题清理退役
+    public static readonly (string Value, string LabelKey)[] MatchTypes =
     [
-        ("fileExt", "1031", "1034"),
-        ("textType", "1032", "1035"),
+        ("fileExt", "1031"),
+        ("textType", "1032"),
     ];
 
     // 行为类型词表已于 2026-09 迁移至 BehaviorCatalog: 由后端 GET /api/behaviors 下发的
@@ -101,11 +101,4 @@ public static class ActionSchemeCatalog
     public static string TextTypeLabel(string value)
         => TextTypes.FirstOrDefault(x => x.Value == value) is var t && t.Value is not null
             ? I18n.T(t.LabelKey) : value;
-
-    public static string MatchTypeHint(string value)
-        => MatchTypes.FirstOrDefault(x => x.Value == value) is var t && t.Value is not null
-            ? I18n.T(t.HintKey) : "";
-
-    /// <summary>行为提示: 由 BehaviorCatalog 按包 description 推导 (未知 ID 回退空串)。</summary>
-    public static string ActionTypeHint(string value) => BehaviorCatalog.HintFor(value);
 }
