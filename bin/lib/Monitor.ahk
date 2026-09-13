@@ -32,6 +32,7 @@
 ;   restore factory / capabilities 系列) 是为保持与上游 tigerlily-dev v2.4.1 可 diff 而刻意保留,
 ;   勿当死代码删除。上游拼写 (retreive/currentRefue)、GetMonitorBrightness 内的调试 MsgBox "Failed"、
 ;   SaveCurrentMonitorSettings 内实际调用的 RestoreMonitorFactoryDefaults DllCall 均为 vendored 原样特征, 勿"修正"。
+;   唯一例外: GetMonitorBlueDrive 内同款调试 MsgBox 已于 2026-09-13 经用户批准清理 (throw 保留, 见 B1 批次)。
 ; 更正: 此前"只用到 GetMethod/GetMonitorInfo 两个入口"的表述不准确 —— GetMethod 是 AHK v2 内建
 ;   Any.GetMethod (用于 EnumDisplayMonitors 内 CallbackCreate(Monitor.GetMethod("MonitorEnumProc")…)),
 ;   GetMonitorInfo 是内部私有静态方法 (由 MonitorEnumProc 调用),
@@ -509,7 +510,6 @@ class Monitor {
 		
 		if (DllCall("dxva2\GetMonitorRedGreenOrBlueDrive", "ptr", hMonitor, "ptr", 0x00000002, "uint*", &Minimum, "uint*", &Current, "uint*", &Maximum))
 			return Map("Minimum", Minimum, "Current", Current, "Maximum", Maximum)
-		MsgBox "Failed"
 		throw Error("Unable to retreive values.`n`nError code: " Format("0x{:X}", A_LastError))
 	}
 	

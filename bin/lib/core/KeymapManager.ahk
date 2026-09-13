@@ -240,8 +240,8 @@ class Keymap {
     }
 
     Enable() {
+      ; 不应到达: 已启用时重复 Enable (守卫仅文档化此约定; 原调试 MsgBox 已清理, 继续语义不变)
       if this.enabled {
-        MsgBox "bug"
       }
       this.hotifContext(this.winTitle, this.conditionType, true)
       ; 无效热键(如反引号)注册失败时跳过, 避免单个热键拖垮整个脚本
@@ -363,8 +363,8 @@ class Keymap {
   }
   ; 启用 keymap
   Enable(parent := false) {
+    ; 不应到达: 子键已挂父键时再次以 parent 启用 (守卫仅文档化此约定; 原调试 MsgBox 已清理)
     if this.parent && parent {
-      MsgBox "bug"
     }
     this.parent := parent
 
