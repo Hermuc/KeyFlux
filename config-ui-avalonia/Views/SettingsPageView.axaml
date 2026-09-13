@@ -222,6 +222,8 @@
            半透明细线, 用户报「第一列方框右边缘被切割」。像素对齐后描边落在整数设备像素上恒清晰。
            只挂本卡不挂整页: 右列 TopFlareWings 几何守护断言容差 0.5px, 页级取整有破坏风险 -->
       <Border Grid.Column="0" Classes="leftPanel" UseLayoutRounding="True" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16"
+              BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
+              BoxShadow="{StaticResource ClaudeShadowCard}"
               Height="624" VerticalAlignment="Top" Margin="0,0,16,0">
         <!-- LayoutTransform 等比放大卡内全部内容 (字号/输入框/开关随框一起变大):
              1.12 = 加宽后内容区 528 / 原内容区 468; 卡高 624 = 528x1.12 + Padding 32 -->
