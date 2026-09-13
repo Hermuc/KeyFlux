@@ -90,7 +90,12 @@ DlgClassify(hwnd) {
       return {kind: DialogKind.FileOpen, isFileDialog: true}
     if (hasEdit1001)
       return {kind: DialogKind.FileSave, isFileDialog: true}
-    return {kind: DialogKind.FileDialogGeneric, isFileDialog: true}
+    ; 2026-09-13 修复 (用户报: 非保存/另存为的系统窗口也弹插件):
+    ; 有 shell 视图类 (SHELLDLL_DefView/SysListView32/DirectUIHWND) 但缺文件名框等
+    ; 签名控件的 #32770 (属性页/确认框/系统提示弹窗等) 一律非文件对话框 ——
+    ; 原 FileDialogGeneric 兜底是误判源。签名判断宁严勿宽: 真实打开/保存框
+    ; 必有文件名 Edit (1148/1001), 文件夹选择器必有 1152。
+    return {kind: DialogKind.Other, isFileDialog: false}
   }
 
   if (edits = 0 && statics > 0 && cs.Length <= 8)
