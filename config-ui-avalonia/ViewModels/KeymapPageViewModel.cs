@@ -17,9 +17,17 @@ public sealed partial class KeyCellVm : ObservableObject
     public required string Hotkey { get; init; }
     public required string Label { get; init; }
 
-    /// <summary>格子底色 (选中 Sand / 禁用 BorderCream / 已绑定 MutedGreenSoft / 空键 Ivory), 全部取自 ClaudePalette。</summary>
+    /// <summary>格子底色 (选中 White / 禁用 BorderCream / 已绑定 MutedGreenSoft / 空键 Ivory), 全部取自 ClaudePalette。</summary>
     [ObservableProperty]
     private string _background = ClaudePalette.Ivory;
+
+    /// <summary>文字色 (选中 Terracotta / 其余 NearBlack)。</summary>
+    [ObservableProperty]
+    private string _foreground = ClaudePalette.NearBlack;
+
+    /// <summary>描边色 (选中 Terracotta / 其余 RingWarm)。</summary>
+    [ObservableProperty]
+    private string _borderBrush = ClaudePalette.RingWarm;
 
     /// <summary>禁用键不可点 (触发键自身, 复刻 v-card :disabled)。</summary>
     [ObservableProperty]
@@ -151,10 +159,14 @@ public sealed partial class KeymapPageViewModel : ObservableObject, ILanguageRef
                 var disabled = Core.IsDisabledKey(cell.Hotkey);
                 var selected = cell.Hotkey == Core.SelectedHotkey;
                 cell.IsEnabled = !disabled;
-                cell.Background = selected ? ClaudePalette.Sand
+                // 选中态 = 陶土描边 + 陶土字 + 白底 (2026-09-13 用户指定, 原 Sand 底与 Ivory 难区分);
+                // 其余状态文字/描边复位默认
+                cell.Background = selected ? ClaudePalette.White
                     : disabled ? ClaudePalette.BorderCream
                     : !abbr && IsBound(cell.Hotkey) ? ClaudePalette.MutedGreenSoft
                     : ClaudePalette.Ivory;
+                cell.Foreground = selected ? ClaudePalette.Terracotta : ClaudePalette.NearBlack;
+                cell.BorderBrush = selected ? ClaudePalette.Terracotta : ClaudePalette.RingWarm;
             }
         }
     }

@@ -182,10 +182,6 @@
                                Foreground="{StaticResource ClaudeOliveGrayBrush}" FontSize="13" />
                     <TextBlock Text="{Binding Author}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="11"
                                IsVisible="{Binding Author, Converter={StaticResource NotEmpty}}" />
-                    <!-- 配置引导 (仅内置卡, terracotta 小字) -->
-                    <TextBlock Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2426}"
-                               TextWrapping="Wrap" Foreground="{StaticResource ClaudeTerracottaBrush}" FontSize="11"
-                               IsVisible="{Binding CanConfigure}" />
                   </StackPanel>
                 </Button>
 
@@ -243,6 +239,10 @@
       <!-- 运行时说明 (诚实边界) -->
       <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2425}"
                  TextWrapping="Wrap" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+
+      <!-- 配置引导 (terracotta 小字, 2026-09-13 自内置卡移至页尾; 内置 QuickSwitch 卡恒存在, 常显) -->
+      <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2426}"
+                 TextWrapping="Wrap" Foreground="{StaticResource ClaudeTerracottaBrush}" FontSize="11" />
 
     </StackPanel>
   </ScrollViewer>

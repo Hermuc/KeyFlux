@@ -50,7 +50,7 @@
                             Padding="{Binding CellPadding}" CornerRadius="{StaticResource ClaudeRadiusSm}"
                             Background="{Binding Background}"
                             IsEnabled="{Binding IsEnabled}"
-                            Foreground="{StaticResource ClaudeNearBlackBrush}" BorderBrush="{StaticResource ClaudeRingWarmBrush}" BorderThickness="1"
+                            Foreground="{Binding Foreground}" BorderBrush="{Binding BorderBrush}" BorderThickness="1"
                             Command="{Binding #Root.((vm:KeymapPageViewModel)DataContext).SelectKeyCommand}"
                             CommandParameter="{Binding}">
                       <TextBlock Text="{Binding Label}"
