@@ -66,6 +66,16 @@
     <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPressed">#d97757</SolidColorBrush>
     <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver">#f0eee6</SolidColorBrush>
     <SolidColorBrush x:Key="ComboBoxItemBackgroundPressed">#e8e2d4</SolidColorBrush>
+
+    <!-- ===================== TextBox 聚焦边框/选中文本高亮 (2026-09-13 用户报蓝色) =====================
+         弹窗 (WindowGroupDialogWindow 等) 的 TextBox 未挂 claudeInput class, 聚焦边框与
+         选中文本高亮走 Fluent 硬编码蓝 (TextControlBorderBrushFocused /
+         TextControlSelectionHighlightColor)。全局覆盖后页面 claudeInput (自身样式 Coral)
+         与弹窗 TextBox 统一暖色。选择高亮用半透明 Coral: 选中文字需保持可读。
+         >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 << -->
+    <SolidColorBrush x:Key="TextControlBorderBrushFocused">#d97757</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver">#c9c7bd</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlSelectionHighlightColor">#8cd97757</SolidColorBrush>
   </Application.Resources>
 
   <!-- 应用级样式：使用 Fluent 主题 (变体由 Application.RequestedThemeVariant 决定) -->
