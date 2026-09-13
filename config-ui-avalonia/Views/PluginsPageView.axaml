@@ -204,7 +204,7 @@
                 </StackPanel>
 
                 <!-- 删除 (仅用户插件, tooltip 复用 912) -->
-                <Button Grid.Column="2" Content="✕" Margin="12,0,0,0" VerticalAlignment="Center"
+                <Button Grid.Column="2" Content="✕" FontWeight="Bold" Margin="12,0,0,0" VerticalAlignment="Center"
                         IsVisible="{Binding CanDelete}"
                         ToolTip.Tip="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=912}"
                         Command="{Binding #Root.((vm:PluginsPageViewModel)DataContext).DeletePluginCommand}"

@@ -83,7 +83,7 @@
                       Background="Transparent"
                       ToolTip.ShowDelay="200"
                       ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
-              <Button Classes="icon-btn danger" Command="{Binding AskRemoveCommand}" Content="✕"
+              <Button Classes="icon-btn danger" Command="{Binding AskRemoveCommand}" Content="✕" FontWeight="Bold"
                       ToolTip.ShowDelay="200"
                       ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1120}" />
             </StackPanel>
@@ -132,7 +132,7 @@
                           <Button Classes="icon-btn" Command="{Binding MoveDownCommand}"
                                   IsEnabled="{Binding CanMoveDown}" Content="↓" />
                           <Button Classes="icon-btn danger" Command="{Binding RemoveCommand}"
-                                  IsEnabled="{Binding CanRemove}" Content="✕"
+                                  IsEnabled="{Binding CanRemove}" Content="✕" FontWeight="Bold"
                                   ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1108}" />
                         </StackPanel>
                       </Grid>
@@ -345,10 +345,10 @@
                           OnContent="" OffContent="" />
             <TextBlock Grid.Column="2" Text="On" FontSize="10" FontWeight="SemiBold"
                        Foreground="{StaticResource ClaudeOliveGrayBrush}" VerticalAlignment="Center"
-                       Margin="8,0,0,0" IsVisible="{Binding Enable}" />
+                       Margin="4,0,0,0" IsVisible="{Binding Enable}" />
             <TextBlock Grid.Column="2" Text="Off" FontSize="10" FontWeight="SemiBold"
                        Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
-                       Margin="8,0,0,0" IsVisible="{Binding !Enable}" />
+                       Margin="4,0,0,0" IsVisible="{Binding !Enable}" />
             </Grid>
             <controls:HotkeyCapture Hotkey="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).Hotkey, Mode=TwoWay}"
                                     UsedHotkeys="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).UsedHotkeys}" />

@@ -127,7 +127,7 @@
                     <ToggleSwitch Grid.Column="3" Classes="rowSwitch" IsChecked="{Binding Enable}"
                                   VerticalAlignment="Center" />
                     <!-- 删除 (启用中/被依赖时禁用, 复刻 disabledKeymapOption) -->
-                    <Button Grid.Column="4" Content="✕"
+                    <Button Grid.Column="4" Content="✕" FontWeight="Bold"
                             IsEnabled="{Binding CanDelete}"
                             ToolTip.Tip="{Binding DeleteTip}"
                             Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).RemoveKeymapRowCommand}"
@@ -261,7 +261,7 @@
                                    FontSize="13" />
                       </Button>
                       <!-- 删除 -->
-                      <Button Grid.Column="2" Content="✕"
+                      <Button Grid.Column="2" Content="✕" FontWeight="Bold"
                               Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).CustomHotkeys.RemoveRowCommand}"
                               CommandParameter="{Binding}"
                               Background="Transparent" Foreground="{StaticResource ClaudeErrorBrush}" Padding="6,3" />
@@ -465,7 +465,7 @@
                     <Grid ColumnDefinitions="112,192,*" Margin="0,2">
                       <TextBox Text="{Binding Name}" Margin="0,0,6,0" Padding="6,4" />
                       <TextBox Grid.Column="1" Text="{Binding Value}" Padding="6,4" />
-                      <Button Grid.Column="2" Content="✕"
+                      <Button Grid.Column="2" Content="✕" FontWeight="Bold"
                               Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).RemovePathVariableCommand}"
                               CommandParameter="{Binding}"
                               ToolTip.Tip="{Binding #Root.((vm:SettingsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=912}"
