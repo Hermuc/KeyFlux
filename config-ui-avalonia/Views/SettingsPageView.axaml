@@ -63,12 +63,15 @@
        页面永不滚动, 顶缘边界固定 (修复: 上限随滚轮变化/两列未真正独立);
        缩放仍由可用宽度驱动 (默认内容区 936 / 测量宽 932 -> ≈1.0; MaxWidth=988 封顶 ≈1.06);
        更矮的窗口: 整页等比缩小 (纵向也参与适配), 两列各自内部滚动, 互不影响 -->
-  <Viewbox Stretch="Uniform" MaxWidth="1060" HorizontalAlignment="Left" VerticalAlignment="Top">
-    <Grid ColumnDefinitions="500,*" Margin="24,20,24,28">
+  <!-- MinWidth = 最小缩放下限 (测量宽 1116 x 0.8): 窗口缩到主窗 MinWidth (1210) 后整页
+         停止缩小, 快捷键方案卡保持 ≥0.8 缩放可读 —— 双下限闭合 (窗口 MinWidth 1210
+         的可用宽 898 ≥ 本 MinWidth 893) -->
+  <Viewbox Stretch="Uniform" MaxWidth="1120" MinWidth="893" HorizontalAlignment="Left" VerticalAlignment="Top">
+    <Grid ColumnDefinitions="560,*" Margin="24,20,24,28">
 
       <!-- ===================== 左列: 快捷键方案 (label:915, 复刻 Settings.vue 表格) ===================== -->
       <Border Grid.Column="0" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16"
-              Height="560" VerticalAlignment="Top" Margin="0,0,16,0">
+              Height="620" VerticalAlignment="Top" Margin="0,0,16,0">
         <DockPanel>
           <TextBlock DockPanel.Dock="Top"
                      Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=915}"
@@ -84,9 +87,9 @@
 
           <!-- 表头 -->
           <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,6">
-            <TextBlock Width="112" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=501}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-            <TextBlock Width="112" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=502}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-            <TextBlock Width="118" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=503}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+            <TextBlock Width="130" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=501}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+            <TextBlock Width="124" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=502}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+            <TextBlock Width="132" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=503}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
             <TextBlock Width="60" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=504}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
           </StackPanel>
 
@@ -95,7 +98,7 @@
             <ItemsControl ItemsSource="{Binding KeymapRows}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:KeymapRowViewModel">
-                  <Grid ColumnDefinitions="112,112,118,60,*" Margin="0,2">
+                  <Grid ColumnDefinitions="130,124,132,60,*" Margin="0,2">
                     <!-- 名称 (失焦复刻 checkKeymapData) -->
                     <TextBox Text="{Binding Name}" LostFocus="OnRowFieldLostFocus"
                              Margin="0,0,6,0" Padding="6,4" FontSize="13" />

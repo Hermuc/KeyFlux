@@ -9,7 +9,7 @@
         Title="Setting"
         Icon="avares://KeyFlux.Settings/Assets/logo.png"
         Width="1200" Height="760"
-        MinWidth="960" MinHeight="600"
+        MinWidth="1210" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="NoChrome"
