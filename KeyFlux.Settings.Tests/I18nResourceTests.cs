@@ -47,7 +47,8 @@ public sealed class I18nResourceTests
     /// 2026-09 插件页 Claude 风格重构: 统一插件列表 (不分区), 删 2 键 (2419 内置插件 /
     /// 2420 已导入插件, 分区标题零引用) -> 315。
     /// 2026-09 选中动作规则行 ✕ 提示改类型语义 (原误用行为条目的 1108): 新增 1120 -> 319。
-    private const int ExpectedKeyCount = 319;
+    /// 2026-09-13 快捷键方案行可删除态 ✕ 提示 (原空串弹空白框): 新增 1121 -> 320。
+    private const int ExpectedKeyCount = 320;
 
     private const string LabelPrefix = "label:";
 

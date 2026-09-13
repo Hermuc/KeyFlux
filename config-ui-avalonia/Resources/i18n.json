@@ -1143,6 +1143,10 @@
     "zh": "删除当前选中的类型（确认后立即保存）",
     "en": "Delete the selected type (asks first, saves immediately)"
   },
+  "1121": {
+    "zh": "删除该方案",
+    "en": "Delete this keymap"
+  },
   "2408": {
     "zh": "快速切换",
     "en": "Quick Switch"

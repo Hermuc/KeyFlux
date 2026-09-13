@@ -101,9 +101,9 @@ public sealed partial class KeymapRowViewModel : ObservableObject
     /// <summary>复刻 disabledKeymapOption: 启用中或被依赖时禁止删除。</summary>
     public bool CanDelete => !Model.Enable && !HasSubKeymap;
 
-    /// <summary>复刻 deleteBtnTip。</summary>
+    /// <summary>复刻 deleteBtnTip; 可删除时给正向动作提示 (原空串会弹空白 tooltip 框, 用户报)。</summary>
     public string DeleteTip =>
-        Model.Enable ? I18n.T("950") : HasSubKeymap ? I18n.T("951") : "";
+        Model.Enable ? I18n.T("950") : HasSubKeymap ? I18n.T("951") : I18n.T("1121");
 
     /// <summary>模型侧变更后刷新行上的计算属性。</summary>
     public void RefreshComputed()
