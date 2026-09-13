@@ -336,11 +336,19 @@
         <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
                 CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
           <StackPanel Spacing="10">
-            <Grid ColumnDefinitions="*,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto">
               <TextBlock FontWeight="SemiBold" VerticalAlignment="Center"
                          Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1063}" />
-              <!-- OnContent/OffContent 不设 = Fluent 默认 On/Off (与设置页统一, 用户要求; 原 964/965 启用/停用已弃) -->
-            <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enable}" MinWidth="10" />
+              <!-- On/Off 文字样式对齐插件页 (10px SemiBold + 状态色, 用户反馈默认 OnContent 字体不好看);
+                 ToggleSwitch 自身 OnContent/OffContent 置空抑制默认文字 -->
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enable}" MinWidth="10"
+                          OnContent="" OffContent="" />
+            <TextBlock Grid.Column="2" Text="On" FontSize="10" FontWeight="SemiBold"
+                       Foreground="{StaticResource ClaudeOliveGrayBrush}" VerticalAlignment="Center"
+                       Margin="8,0,0,0" IsVisible="{Binding Enable}" />
+            <TextBlock Grid.Column="2" Text="Off" FontSize="10" FontWeight="SemiBold"
+                       Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
+                       Margin="8,0,0,0" IsVisible="{Binding !Enable}" />
             </Grid>
             <controls:HotkeyCapture Hotkey="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).Hotkey, Mode=TwoWay}"
                                     UsedHotkeys="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).UsedHotkeys}" />
