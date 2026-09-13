@@ -26,7 +26,20 @@
             Width="30" Height="30" Cursor="Hand"
             HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
             ToolTip.Tip="{Binding $parent[controls:WindowPickButton].LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1080}">
-      <TextBlock Text="🎯" FontSize="15" />
+      <!-- 准星图标 (2026-09-13 用户指定: 参考示意图 1:1 复刻, 矢量重绘):
+           橙色四臂圆头准星 (臂长/臂宽/圆心点按原图 2048 画布实测等比) +
+           两层淡奶油色同心环 (r≈75/54, 环宽 10)。矢量绘制替代 🎯 emoji, 随缩放清晰 -->
+      <Viewbox Width="20" Height="20">
+        <Canvas Width="200" Height="200">
+          <Ellipse Canvas.Left="25" Canvas.Top="25" Width="150" Height="150"
+                   Stroke="#FFE9C2" StrokeThickness="10" />
+          <Ellipse Canvas.Left="46" Canvas.Top="46" Width="108" Height="108"
+                   Stroke="#FFE9C2" StrokeThickness="10" />
+          <Path Data="M 100,8.4 L 100,79 M 100,121 L 100,192 M 8.4,100 L 79,100 M 121,100 L 192,100"
+                Stroke="#F76D12" StrokeThickness="17" StrokeLineCap="Round" />
+          <Ellipse Canvas.Left="91.65" Canvas.Top="91.65" Width="16.7" Height="16.7" Fill="#F76D12" />
+        </Canvas>
+      </Viewbox>
     </Button>
 
     <!-- 失败/异常提示浮层: Popup 渲染在 overlay 层, 自身测量为零 -> 不影响宿主 Auto 列宽/行高, 不受 Viewbox 缩放布局测量影响;
