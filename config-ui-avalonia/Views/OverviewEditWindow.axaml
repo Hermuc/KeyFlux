@@ -9,7 +9,7 @@
         WindowStartupLocation="CenterOwner"
         CanResize="True"
         ShowInTaskbar="False"
-        FontFamily="Microsoft YaHei UI, Segoe UI, Segoe UI Emoji">
+        FontFamily="{StaticResource AppUiFont}">
 
   <!-- 总览页编辑窗口: 编辑 markdown 原文 (纯文本, 支持 # 标题 / 列表 / [链接] / ![图片] / `代码`) -->
   <DockPanel Margin="20">

@@ -47,8 +47,9 @@
     【尺寸 4 项 · x:Double】
       ClaudeRadiusSm=6  ClaudeRadiusMd=8  ClaudeRadiusLg=12  ClaudeRadiusXl=16
 
-    【字体 1 项 · FontFamily】
-      ClaudeSerifFont = Georgia, Microsoft YaHei UI   (DESIGN.md: serif 承载全部标题)
+    【字体 2 项 · FontFamily】
+      AppUiFont       = MiSans 全局 UI 字体 (2026-09-13 换, 随应用打包, 见定义处注释)
+      ClaudeSerifFont = MiSans (原 Georgia 衬线弃用, 键名契约保留)
 
   >> 焦点环决策 (计划书 第4节) <<
       DESIGN.md 的 Focus Blue #3898ec 是冷色, 用户指定用暖色系, 故选定 Coral #d97757
@@ -111,7 +112,7 @@
     尺寸 (4):  ClaudeRadiusSm / ClaudeRadiusMd / ClaudeRadiusLg / ClaudeRadiusXl
               ⚠ 类型必须是 CornerRadius (不是 x:Double) —— 历史事故: 曾定义成 Double,
                 构建 0 错误但所有窗口加载即抛 InvalidCastException。
-    字体 (1):  ClaudeSerifFont
+    字体 (2):  AppUiFont + ClaudeSerifFont (均 MiSans, 见定义处注释)
     动效 (4):  C# 真源 ViewModels/ClaudeMotion.cs (Press/Micro/Standard/Enter, TimeSpan)
               ⚠ XAML 引用一律 {x:Static vm:ClaudeMotion.*}, 勿写散落字面量
     类样式:    TextBlock.claude{Title,Subtitle,Body,Muted,Dim} /
@@ -197,8 +198,16 @@
     <CornerRadius x:Key="ClaudeRadiusLg">12,12,12,12</CornerRadius>
     <CornerRadius x:Key="ClaudeRadiusXl">16,16,16,16</CornerRadius>
 
-    <!-- 字体 (1) · FontFamily -->
-    <FontFamily x:Key="ClaudeSerifFont">Georgia, Microsoft YaHei UI</FontFamily>
+    <!-- 字体 (2) · FontFamily -->
+    <!-- AppUiFont: 全局 UI 字体单源 (2026-09-13 用户指定 MiSans, 随应用打包,
+         4 字重入 Assets/Fonts, 族名均 "MiSans")。放皮肤而非 App.axaml ——
+         测试宿主不加载 App.axaml (坑 40), StaticResource 会炸; 各 XAML 经
+         {StaticResource AppUiFont} 引用。链尾 YaHei 兜缺字, Emoji 垫尾。
+         例外 (刻意保留): 等宽 Consolas (代码/键盘布局), MDI 图标, Twemoji 表情 -->
+    <FontFamily x:Key="AppUiFont">avares://KeyFlux.Settings/Assets/Fonts/#MiSans, Microsoft YaHei UI, Segoe UI Emoji</FontFamily>
+    <!-- ClaudeSerifFont: 原 Georgia 衬线, 2026-09-13 全局换 MiSans (用户指定)。
+         键名为皮肤契约锁定保留 (历史语义"衬线"已不存在, 勿据名猜测用途) -->
+    <FontFamily x:Key="ClaudeSerifFont">avares://KeyFlux.Settings/Assets/Fonts/#MiSans, Microsoft YaHei UI</FontFamily>
 
     <!-- ── 动效时长令牌 (4) ── C# 强类型真源 = ViewModels/ClaudeMotion.cs (与色值真源
          ClaudePalette.cs 同一先例; TimeSpan 无法作 XAML 资源元素实例化, AVLN2000 实测),

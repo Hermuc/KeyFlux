@@ -16,13 +16,13 @@
   <UserControl.Styles>
     <!-- 标题 serif: Georgia (中文回退雅黑), DESIGN.md「serif 承载标题」 -->
     <Style Selector="TextBlock.pageTitle">
-      <Setter Property="FontFamily" Value="Georgia, Microsoft YaHei UI" />
+      <Setter Property="FontFamily" Value="{StaticResource AppUiFont}" />
       <Setter Property="FontSize" Value="24" />
       <Setter Property="FontWeight" Value="Medium" />
       <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
     </Style>
     <Style Selector="TextBlock.pluginName">
-      <Setter Property="FontFamily" Value="Georgia, Microsoft YaHei UI" />
+      <Setter Property="FontFamily" Value="{StaticResource AppUiFont}" />
       <Setter Property="FontSize" Value="15" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />

@@ -29,11 +29,13 @@ public static class MarkdownRenderer
     private const string CodeFont = "Consolas";
 
     /// <summary>
-    /// 文档字体链: 保持 YaHei UI 首位 (行高/基线度量与历史渲染一致)。
+    /// 文档字体链: MiSans (AppUiFont 同源, 随应用打包) + YaHei 兜底。
+    /// 显式锁定不继承主窗链: 主窗链尾含 Segoe UI Emoji,
+    /// 标题继承后 Bold 变体解析失败会走合成字形路径 (坑 31 开机崩溃), 故链尾必不带 Emoji。
     /// emoji 由 AppendTextRuns 拆成独立段经 Skia 位图内嵌 (见 GetEmojiImage)。
     /// </summary>
     private static readonly FontFamily DocFontFamily =
-        new FontFamily("Microsoft YaHei UI, Segoe UI");
+        new FontFamily("avares://KeyFlux.Settings/Assets/Fonts/#MiSans, Microsoft YaHei UI");
 
     /// <summary>链接文字基线补偿 (14px 字号实测校准): 段落行高 24 用 15.4, 列表行高 23 用 15.2。</summary>
     private const double ParagraphLinkOffset = 15.4;

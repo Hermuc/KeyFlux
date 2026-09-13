@@ -15,6 +15,15 @@
     <services:NotNullConverter x:Key="NotNull" />
     <!-- MDI 图标字体 (导航图标, 复刻 Vue 版 mdi 图标) -->
     <FontFamily x:Key="MdiFont">avares://KeyFlux.Settings/Assets/Fonts/materialdesignicons.ttf#Material Design Icons</FontFamily>
+
+    <!-- ===================== 全局 UI 字体 = MiSans (2026-09-13 用户指定, 随应用打包) =====================
+         单源 = 皮肤资源 AppUiFont (Styles/Skins/Claude.axaml, 4 字重入 Assets/Fonts);
+         此处 ContentControlThemeFontFamily = Fluent 模板内部 DynamicResource 的主题资源键,
+         覆盖后模板化控件文本同样走 MiSans (值须与皮肤 AppUiFont 镜像, 勿单改一处)。
+         例外 (刻意保留): 等宽场景 Consolas (代码/键盘布局), MDI 图标字体, Twemoji 表情。
+         >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 <<
+         (全窗口默认字体经 App.Styles 的 Window 样式引用皮肤 AppUiFont) -->
+    <FontFamily x:Key="ContentControlThemeFontFamily">avares://KeyFlux.Settings/Assets/Fonts/#MiSans, Microsoft YaHei UI, Segoe UI Emoji</FontFamily>
     <!-- 滚动条整体宽度: Fluent 主题模板中 ScrollBar 的 MinWidth 与 Thumb 宽度均绑定 ScrollBarSize 资源
          (默认值下实测展开约 14px, 细条约 3px; 注意窗口为 125% DPI, 物理像素 = 逻辑值 x 1.25),
          此处覆盖为 10, 展开宽度收窄至约 12-13px, 细条同步变细.
@@ -120,6 +129,14 @@
          StyleInclude 合并进应用资源字典, 故 {StaticResource} 令牌在全部页面/窗口均可解析。
          校验皮肤是否完整: KeyFlux.Settings.Tests/SkinContractTests.cs (漏键即红)。 -->
     <StyleInclude Source="avares://KeyFlux.Settings/Styles/Skins/Claude.axaml" />
+
+    <!-- 全窗口默认字体 = MiSans: 单源 = 皮肤资源 AppUiFont。
+         ★ 必须放在皮肤 StyleInclude 之后, 且用 DynamicResource —— StaticResource 会在
+           App.axaml 解析期前向查找皮肤资源而失败 → 应用启动即崩 (2026-09-13 实测,
+           测试宿主不加载 App.axaml 故测试全绿也拦不住, 见坑 40/43) -->
+    <Style Selector="Window">
+      <Setter Property="FontFamily" Value="{DynamicResource AppUiFont}" />
+    </Style>
   </Application.Styles>
 
 </Application>
