@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -13,6 +14,38 @@ namespace KeyFlux.Settings.Views;
 public partial class SettingsPageView : UserControl
 {
     public SettingsPageView() => InitializeComponent();
+
+    /// <summary>
+    /// Viewbox 占宽钳制 (最小缩放限制): 下限 893 = 测量宽 1132 x 0.8 (快捷键方案卡
+    /// 保持 ≥0.8 可读), 上限 1120 = 默认窗口缩放 1.0。Viewbox 自身 MinWidth 不参与
+    /// 其缩放计算 (实测恒跟随窗口宽), 故命令式钳制。窗口最小宽 1210 (主窗 MinWidth)
+    /// 时可用 898 ≥ 893, 下限闭合无裁剪。
+    /// </summary>
+    /// <summary>布局落定后钳制 (LayoutUpdated 每布局 pass 触发, 值不变不写防循环);
+    /// SizeChanged 方案无效: attach 时 Bounds=0 → 钳到下限后不再更新 (实测)。</summary>
+    private void OnLayoutUpdated(object? sender, EventArgs e) => ClampViewboxWidth();
+
+    private void ClampViewboxWidth()
+    {
+        var viewbox = this.GetVisualDescendants().OfType<Viewbox>().FirstOrDefault();
+        if (viewbox is null) return;
+        var available = Bounds.Width - 48; // 页面左右 margin 24x2
+        var target = Math.Clamp(available, 893, 1120);
+        if (Math.Abs(viewbox.Width - target) < 0.5) return; // 值不变不写 (防布局循环)
+        viewbox.Width = target;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        LayoutUpdated += OnLayoutUpdated;
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        LayoutUpdated -= OnLayoutUpdated;
+    }
 
     /// <summary>
     /// 组件框任意处点击 = 展开/收起 (用户报: 只有点文字部分才能展开)。

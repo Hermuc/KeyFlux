@@ -63,10 +63,10 @@
        页面永不滚动, 顶缘边界固定 (修复: 上限随滚轮变化/两列未真正独立);
        缩放仍由可用宽度驱动 (默认内容区 936 / 测量宽 932 -> ≈1.0; MaxWidth=988 封顶 ≈1.06);
        更矮的窗口: 整页等比缩小 (纵向也参与适配), 两列各自内部滚动, 互不影响 -->
-  <!-- MinWidth = 最小缩放下限 (测量宽 1116 x 0.8): 窗口缩到主窗 MinWidth (1210) 后整页
-         停止缩小, 快捷键方案卡保持 ≥0.8 缩放可读 —— 双下限闭合 (窗口 MinWidth 1210
-         的可用宽 898 ≥ 本 MinWidth 893) -->
-  <Viewbox Stretch="Uniform" MaxWidth="1120" MinWidth="893" HorizontalAlignment="Left" VerticalAlignment="Top">
+  <!-- Width 由 code-behind 钳制 (ClampViewboxWidth): 下限 893 = 最小缩放 0.8 (窗口缩到
+         主窗 MinWidth 1210 后恒 893, 快捷键方案卡不再缩小); 上限 1120 = 默认窗口缩放 1.0。
+         Viewbox 自身的 MinWidth 不参与其缩放计算 (实测无效), 勿改回 -->
+  <Viewbox Stretch="Uniform" MaxWidth="1120" HorizontalAlignment="Left" VerticalAlignment="Top">
     <Grid ColumnDefinitions="560,*" Margin="24,20,24,28">
 
       <!-- ===================== 左列: 快捷键方案 (label:915, 复刻 Settings.vue 表格) ===================== -->
