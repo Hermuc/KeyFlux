@@ -352,8 +352,8 @@
     "en": "🏠 Window"
   },
   "204": {
-    "zh": "🖱️  鼠标操作",
-    "en": "🖱️  Mouse"
+    "zh": " 鼠标操作",
+    "en": " Mouse"
   },
   "205": {
     "zh": "🅰️ 重映射按键",
@@ -472,8 +472,8 @@
     "en": "Save（CTRL+S）"
   },
   "601": {
-    "zh": "😺 编辑程序分组",
-    "en": "😺 Window Groups"
+    "zh": "编辑程序分组",
+    "en": "Window Groups"
   },
   "602": {
     "zh": "组名",
@@ -520,8 +520,8 @@
     "en": "Note: KeyFlux will be disabled in the \"Exclude\" group."
   },
   "701": {
-    "zh": "🖱️ 修改鼠标参数",
-    "en": "🖱️ Mouse Options"
+    "zh": "修改鼠标参数",
+    "en": "Mouse Options"
   },
   "702": {
     "zh": "鼠标移动相关参数",
@@ -580,8 +580,8 @@
     "en": "Lines to scroll at a time"
   },
   "721": {
-    "zh": "⌨️ 修改键盘布局",
-    "en": "⌨️ Keyboard Layout"
+    "zh": "修改键盘布局",
+    "en": "Keyboard Layout"
   },
   "722": {
     "zh": "键盘布局",
@@ -604,8 +604,8 @@
     "en": "Add Mouse Buttons"
   },
   "741": {
-    "zh": "✨ 命令框皮肤",
-    "en": "✨ Command Window"
+    "zh": "命令框皮肤",
+    "en": "Command Window"
   },
   "743": {
     "zh": "窗口宽度",
@@ -660,8 +660,8 @@
     "en": "Drop shadow color"
   },
   "761": {
-    "zh": "🕗 设置触发延时",
-    "en": "🕗 Modifer Delay"
+    "zh": "设置触发延时",
+    "en": "Modifer Delay"
   },
   "762": {
     "zh": "触发延时 (毫秒)",
@@ -672,8 +672,8 @@
     "en": "If delay > 0, you need long press to use the keymap."
   },
   "781": {
-    "zh": "🌐 切换语言",
-    "en": "🌐 Change Language"
+    "zh": "切换语言",
+    "en": "Change Language"
   },
   "901": {
     "zh": "隐藏按键矩阵",
@@ -684,8 +684,8 @@
     "en": "Hide the floating key-matrix window"
   },
   "907": {
-    "zh": "🧩 编辑路径变量",
-    "en": "🧩 Path Variables"
+    "zh": "编辑路径变量",
+    "en": "Path Variables"
   },
   "909": {
     "zh": "变量名",
@@ -1124,8 +1124,8 @@
     "en": "This match condition already exists"
   },
   "1116": {
-    "zh": "⌨️ 自定义热键",
-    "en": "⌨️ Custom Hotkeys"
+    "zh": "自定义热键",
+    "en": "Custom Hotkeys"
   },
   "1117": {
     "zh": "功能",

@@ -23,6 +23,8 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <!-- 卡片标题字号 15 (2026-09-13 用户要求再大 1 号: 12→14→15); 毛玻璃卡标题自带 15 同尺寸, 已同步提升至 16 保持层级 -->
+      <Setter Property="FontSize" Value="15" />
     </Style>
     <!-- 右列组件框: 插件卡同款三态 (静态双层下坠影 / 悬停灰描边+强影 / 单击聚焦橙描边+强影)。
          描边 = 实体 BorderThickness 2 换色 (用户确认过此机制侧边可见);
@@ -587,7 +589,7 @@
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="acrylic">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2500}"
-                         FontFamily="{StaticResource ClaudeSerifFont}" FontSize="15" FontWeight="Medium" />
+                         FontWeight="SemiBold" />
             </Button>
             <StackPanel Classes="sectionBody" Classes.open="{Binding ShowAcrylic}"
                         IsVisible="{Binding ShowAcrylic}" Spacing="10">
