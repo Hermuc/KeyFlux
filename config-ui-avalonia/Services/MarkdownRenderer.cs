@@ -70,6 +70,9 @@ public static class MarkdownRenderer
         var tb = new SelectableTextBlock
         {
             FontSize = size,
+            FontFamily = DocFontFamily, // 显式锁定与正文一致: 不显式时继承主窗链尾含 Segoe UI Emoji,
+                                        // Bold 变体解析失败走合成路径, 字体缓存异常时在
+                                        // SKStream.Read 踩访问违例 (0xc0000005 崩溃, 用户报)
             FontWeight = FontWeight.Bold,
             Margin = new Thickness(0, heading.Level == 1 ? 16 : 14, 0, 6),
             TextWrapping = TextWrapping.Wrap,
