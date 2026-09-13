@@ -54,6 +54,18 @@
     <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver">#87867f</SolidColorBrush>
     <SolidColorBrush x:Key="ToggleSwitchFillOffPressed">Transparent</SolidColorBrush>
     <SolidColorBrush x:Key="ToggleSwitchStrokeOffPressed">#5e5d59</SolidColorBrush>
+
+    <!-- ===================== ComboBox 下拉项选中态 (2026-09-13 用户报蓝色遗漏) =====================
+         Fluent ComboBox 下拉弹层的选中项/悬停/按下背景走 ComboBoxItemBackgroundSelected* 系列
+         DynamicResource, 默认硬编码蓝 —— 与 ToggleSwitch 同族遗漏, 不覆盖则展开下拉时
+         选中项整行变蓝。必须放 Application.Resources (模板 DynamicResource 沿逻辑树查找,
+         同上方 ToggleSwitch 系列的原因)。
+         >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 << -->
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected">#e1957a</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver">#e1957a</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPressed">#d97757</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver">#f0eee6</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundPressed">#e8e2d4</SolidColorBrush>
   </Application.Resources>
 
   <!-- 应用级样式：使用 Fluent 主题 (变体由 Application.RequestedThemeVariant 决定) -->
