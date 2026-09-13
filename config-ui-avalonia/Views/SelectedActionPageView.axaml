@@ -339,9 +339,8 @@
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock FontWeight="SemiBold" VerticalAlignment="Center"
                          Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1063}" />
-              <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enable}"
-                            OnContent="{Binding EnableLabel}" OffContent="{Binding EnableLabel}"
-                            MinWidth="10" />
+              <!-- OnContent/OffContent 不设 = Fluent 默认 On/Off (与设置页统一, 用户要求; 原 964/965 启用/停用已弃) -->
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enable}" MinWidth="10" />
             </Grid>
             <controls:HotkeyCapture Hotkey="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).Hotkey, Mode=TwoWay}"
                                     UsedHotkeys="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).UsedHotkeys}" />

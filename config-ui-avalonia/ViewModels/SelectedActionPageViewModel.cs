@@ -121,7 +121,6 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
             var original = Sa.Enable;
             Sa.Enable = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(EnableLabel));
             _ = SaveEnableAsync(original, value);
         }
     }
@@ -140,10 +139,8 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         if (Sa.Enable != attempted) return;
         Sa.Enable = original;
         OnPropertyChanged(nameof(Enable));
-        OnPropertyChanged(nameof(EnableLabel));
     }
 
-    public string EnableLabel => Sa.Enable ? I18n.T("964") : I18n.T("965");
 
     // ------------------------------------------------------------- 两分区映射列表
 
@@ -470,7 +467,6 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     public void OnLanguageChanged()
     {
         LanguageTick++;
-        OnPropertyChanged(nameof(EnableLabel));
         OnPropertyChanged(nameof(HotkeyHintText)); // 条件拼接文案, 语言切换需重算
         foreach (var row in TextMappings) row.RefreshLanguage();
         foreach (var row in FileMappings) row.RefreshLanguage();

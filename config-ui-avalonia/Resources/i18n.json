@@ -1200,12 +1200,12 @@
     "en": "Jump to a recently used or historical folder in one keystroke inside a file dialog."
   },
   "2423": {
-    "zh": "已启用",
-    "en": "Enabled"
+    "zh": "On",
+    "en": "On"
   },
   "2424": {
-    "zh": "已停用",
-    "en": "Disabled"
+    "zh": "Off",
+    "en": "Off"
   },
   "2425": {
     "zh": "第三方插件运行时正在开发中：现在可以导入、启停与管理插件，引擎加载将在后续版本生效。",
