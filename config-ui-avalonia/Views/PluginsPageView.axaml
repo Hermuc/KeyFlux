@@ -193,11 +193,12 @@
                 <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2"
                             VerticalAlignment="Center" HorizontalAlignment="Center">
                   <ToggleSwitch Classes="compact" IsChecked="{Binding Enabled}" />
-                  <TextBlock FontSize="10" HorizontalAlignment="Center"
+                  <!-- Margin 右 12: 文字可用宽缩到 40 = 轨道宽 (控件 52, 轨道 x=0 起) —— 中心对齐轨道中心 -->
+                  <TextBlock FontSize="10" HorizontalAlignment="Center" Margin="0,0,12,0"
                              Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2423}"
                              Foreground="{StaticResource ClaudeOliveGrayBrush}" FontWeight="SemiBold"
                              IsVisible="{Binding Enabled}" />
-                  <TextBlock FontSize="10" HorizontalAlignment="Center"
+                  <TextBlock FontSize="10" HorizontalAlignment="Center" Margin="0,0,12,0"
                              Text="{Binding #Root.((vm:PluginsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2424}"
                              Foreground="{StaticResource ClaudeStoneGrayBrush}"
                              IsVisible="{Binding !Enabled}" />
