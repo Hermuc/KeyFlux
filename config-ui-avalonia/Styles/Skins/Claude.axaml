@@ -200,7 +200,43 @@
     <SolidColorBrush x:Key="ClaudeWindowSurfaceBrush"   Color="#B3f5f4ed" />
     <SolidColorBrush x:Key="ClaudeSidebarSurfaceBrush"  Color="#C4faf9f5" />
 
-  </Styles.Resources>
+  
+  <!-- ToolTip 无动画直显 (2026-09-13 用户报: 淡入动画结束才显示完整文字)。覆盖 Fluent
+       ControlTheme: 原版 Opacity 0 + 0.15s DoubleTransition + :open 才变 1; 本版恒 Opacity=1
+       无 Transitions —— 悬浮即完整显示。模板/配色资源与 Fluent 原版逐项一致, 仅去动画。
+       注意: ControlTheme 必须放 Styles.Resources, 作 Styles 直接子项会 AVLN3000 (实测) -->
+  <!-- ToolTip 无动画直显 (2026-09-13 用户报: 先淡入动画结束才显示完整文字)。
+       覆盖 Fluent 的 ToolTip ControlTheme: 原版 Opacity 0 + 0.15s DoubleTransition +
+       :open 才变 1 (淡入); 本版恒 Opacity=1 无 Transitions —— 悬浮即完整显示。
+       模板/配色资源与 Fluent 原版逐项一致 (DynamicResource 主题键), 仅去动画。 -->
+  <ControlTheme x:Key="{x:Type ToolTip}" TargetType="ToolTip">
+    <Setter Property="Foreground" Value="{DynamicResource ToolTipForeground}" />
+    <Setter Property="Background" Value="{DynamicResource ToolTipBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ToolTipBorderBrush}" />
+    <Setter Property="BorderThickness" Value="{DynamicResource ToolTipBorderThemeThickness}" />
+    <Setter Property="FontSize" Value="{DynamicResource ToolTipContentThemeFontSize}" />
+    <Setter Property="Padding" Value="{DynamicResource ToolTipBorderThemePadding}" />
+    <Setter Property="MaxWidth" Value="320" />
+    <Setter Property="CornerRadius" Value="{DynamicResource OverlayCornerRadius}" />
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_LayoutRoot"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                Padding="{TemplateBinding Padding}"
+                CornerRadius="{TemplateBinding CornerRadius}">
+          <ContentPresenter Name="PART_ContentPresenter"
+                            MaxWidth="{TemplateBinding MaxWidth}"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            TextBlock.TextWrapping="Wrap"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+</Styles.Resources>
 
   <!-- ===================== 复用类样式 (12) ===================== -->
 
@@ -385,5 +421,6 @@
   <Style Selector="ComboBox.claudeInput:focus-visible">
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
   </Style>
+
 
 </Styles>
