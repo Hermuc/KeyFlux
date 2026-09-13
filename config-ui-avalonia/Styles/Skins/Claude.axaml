@@ -422,5 +422,12 @@
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
   </Style>
 
+  <!-- 全局开关状态文字 ON/OFF (2026-09-13 用户要求全大写统一): 未显式设置 OnContent/OffContent
+       的 ToggleSwitch (设置页毛玻璃卡等) 由此生效; 行内 rowSwitch (x:Null) 与
+       插件页 compact (x:Null+独立 TextBlock) 局部样式优先级更高, 不受影响 -->
+  <Style Selector="ToggleSwitch">
+    <Setter Property="OnContent" Value="ON" />
+    <Setter Property="OffContent" Value="OFF" />
+  </Style>
 
 </Styles>

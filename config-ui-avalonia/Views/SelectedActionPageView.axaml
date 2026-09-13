@@ -343,10 +343,10 @@
                  ToggleSwitch 自身 OnContent/OffContent 置空抑制默认文字 -->
             <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enable}" MinWidth="10"
                           OnContent="" OffContent="" />
-            <TextBlock Grid.Column="2" Text="On" FontSize="10" FontWeight="SemiBold"
+            <TextBlock Grid.Column="2" Text="ON" FontSize="10" FontWeight="SemiBold"
                        Foreground="{StaticResource ClaudeOliveGrayBrush}" VerticalAlignment="Center"
                        Margin="4,0,0,0" IsVisible="{Binding Enable}" />
-            <TextBlock Grid.Column="2" Text="Off" FontSize="10" FontWeight="SemiBold"
+            <TextBlock Grid.Column="2" Text="OFF" FontSize="10" FontWeight="SemiBold"
                        Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
                        Margin="4,0,0,0" IsVisible="{Binding !Enable}" />
             </Grid>
