@@ -75,9 +75,18 @@ public sealed partial class MainViewModel : ObservableObject
     private object? _currentPage;
 
     /// <summary>导航选中变化 (ListBox.SelectedItem 双向绑定驱动): 切换内容页。</summary>
+    /// <remarks>
+    /// **null 必须忽略 (2026-09-15 修「切换输入框时整窗闪白」)**:
+    /// <see cref="BuildNav"/> 重建导航时执行 `NavItems.Clear()`, 双向绑定到 SelectedItem 的
+    /// 导航 ListBox 会**瞬间把选中项置空**并把 null 推回本属性; 若照单全收, `CurrentPage`
+    /// 会被置为 null ⇒ 内容区空白一帧, 用户看到整窗闪白 (实测变化序列 `null -> page`)。
+    /// 导航恒有至少一个可选项 (总览/选中动作/插件), "空选中"在本应用无业务含义 ⇒ 忽略 null,
+    /// 内容区保持当前页不变。此修复对 BuildNav 的所有触发者生效 (失焦提交/开关联动/换上层/删行)。
+    /// </remarks>
     partial void OnCurrentNavItemChanged(NavItem? value)
     {
-        CurrentPage = value?.Page;
+        if (value is null) return;
+        CurrentPage = value.Page;
     }
 
     // ------------------------------------------------------------- 初始化

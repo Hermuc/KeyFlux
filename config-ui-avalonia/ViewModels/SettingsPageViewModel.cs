@@ -458,15 +458,32 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     /// 复刻 checkKeymapData (名称/触发键失焦时):
     /// 触发键与同上层键重复时删除当前行; 规范化非标准键名 (bs->Backspace 等)。
     /// </summary>
+    /// <remarks>
+    /// **无实际变化时不得重建 (2026-09-15 修用户报「切换输入框整窗闪白」)**:
+    /// 从一个输入框点到另一个输入框时, 前一个框失焦即走本方法, 而此时**什么都没变**。
+    /// 原实现无条件 `RefreshKeymapSection()` —— 它会 `KeymapRows.Clear()` + 逐行重建 +
+    /// `OnNavInvalidated()` (⇒ 导航重建), 每次切焦点都把整张表拆了重搭, 视觉上就是闪一下。
+    /// 故: ① 有变化才继续; ② 即使需要重建, 导航侧也已由 MainViewModel.OnCurrentNavItemChanged
+    /// 的 null 防护兜住内容区不被清空。
+    /// </remarks>
     public void CommitKeymapEdit(KeymapRowViewModel row)
     {
         var km = row.Model;
         var f = Config.Keymaps.FirstOrDefault(k => k.Hotkey == km.Hotkey && k.ParentId == km.ParentId) ?? km;
         if (f.Id != km.Id && !string.IsNullOrEmpty(km.Hotkey))
         {
+            // 触发键重复 ⇒ 本行被删除: 行集合真的少了一项, 必须重建
             RemoveKeymapById(km.Id);
+            RefreshKeymapSection();
+            return;
         }
-        km.Hotkey = ConfigActions.NormalizeKeyName(km.Hotkey);
+
+        // 仅切换焦点 (未改动任何内容) ⇒ 直接返回, 不触碰 KeymapRows / 导航
+        var normalized = ConfigActions.NormalizeKeyName(km.Hotkey);
+        if (normalized == km.Hotkey) return;
+
+        // 触发键文本被规范化 (bs -> Backspace 等): 需要重建以刷新显示与导航徽标
+        km.Hotkey = normalized;
         RefreshKeymapSection();
     }
 
