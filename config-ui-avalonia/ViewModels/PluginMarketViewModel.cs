@@ -10,7 +10,7 @@ namespace KeyFlux.Settings.ViewModels;
 
 /// <summary>
 /// 插件市场窗口 VM: 拉取市场目录 (JSON) 并支持一键安装。
-///   - 目录与下载走独立 HttpClient (外部网络; .NET 默认遵循系统代理);
+///   - 目录与下载走**共享** HttpClient (外部网络; .NET 默认遵循系统代理);
 ///   - 安装 = 客户端下载插件包 zip -> POST /api/plugins/import (与本地导入同链路,
 ///     后端不做出网请求);
 ///   - 已安装判定 = 本地用户插件目录 (打开窗口时快照 + 安装后即时更新)。
@@ -31,7 +31,20 @@ public sealed partial class PluginMarketViewModel : ObservableObject
     private static readonly HashSet<string> BuiltinPluginIds = ["quick_switch"];
 
     private readonly MainViewModel _main;
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+    /// <summary>
+    /// 共享 HttpClient (2026-09-15 修资源泄漏): 原为**实例字段**, 而插件市场窗口每次打开
+    /// 都由 PluginsPageView 新建一个 VM (见 PluginsPageView.axaml.cs), 故每次打开都会新建一个
+    /// 持有连接池/Handler 且**从不 Dispose** 的 HttpClient，socket 随打开次数累积。
+    /// 改为静态单例后全应用复用同一连接池，与 MainWindow 同生命期, 无需 Dispose。
+    /// 配 PooledConnectionLifetime 是为了避免静态客户端常见的"连接长期复用导致 DNS 变更
+    /// 不生效"问题 (市场目录指向 GitHub raw, 走 CDN)。
+    /// </summary>
+    private static readonly HttpClient Http = new(new SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+    })
+    { Timeout = TimeSpan.FromSeconds(15) };
 
     public PluginMarketViewModel(MainViewModel main) => _main = main;
 
@@ -64,7 +77,7 @@ public sealed partial class PluginMarketViewModel : ObservableObject
         LoadError = null;
         try
         {
-            using var resp = await _http.GetAsync(CatalogUrl);
+            using var resp = await Http.GetAsync(CatalogUrl);
             if (!resp.IsSuccessStatusCode)
             {
                 throw new HttpRequestException($"HTTP {(int)resp.StatusCode}");
@@ -118,7 +131,7 @@ public sealed partial class PluginMarketViewModel : ObservableObject
         entry.IsInstalling = true;
         try
         {
-            var zip = await _http.GetByteArrayAsync(entry.Entry.Url);
+            var zip = await Http.GetByteArrayAsync(entry.Entry.Url);
             var resp = await api.ImportPluginAsync(zip, $"{entry.Entry.Id}.zip");
             if (!resp.Success || resp.Value is null)
             {
