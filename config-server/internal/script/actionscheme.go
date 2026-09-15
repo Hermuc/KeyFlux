@@ -9,14 +9,6 @@ import (
 	"settings/internal/behaviors"
 )
 
-// 特征中文显示名 (保存校验的错误提示用, 与前端 i18n 保持一致)
-var textTypeLabels = map[string]string{
-	"url":    "链接",
-	"path":   "路径",
-	"magnet": "磁力链接",
-	"plain":  "纯文本",
-}
-
 // matchTypeName 匹配类型中文显示名 (错误提示用)
 func matchTypeName(matchType string) string {
 	if matchType == "textType" {
