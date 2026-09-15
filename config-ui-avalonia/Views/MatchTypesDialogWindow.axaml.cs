@@ -1,13 +1,13 @@
 using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Interactivity;
 using KeyFlux.Settings.Services;
 
 namespace KeyFlux.Settings.Views;
 
 /// <summary>
-/// 匹配类型弹窗外壳: 窗口属性与自绘标题栏同 MainWindow, 内容为 <see cref="MatchTypesPageView"/>。
-/// 无边框 + 亚克力窗口 (ExtendClientAreaChromeHints=NoChrome) 需自带拖动区与最小化/最大化/关闭三键, 见 axaml。
+/// 匹配类型弹窗外壳 (内容为 <see cref="MatchTypesPageView"/>)。
+/// 与其余弹窗一致: 保留系统标题栏与原生三键, 但经
+/// <see cref="KeyFlux.Settings.Services.Win32.DialogChrome"/> 把标题栏染成暖色表面色,
+/// 并在弹窗打开期间开启 owner 的背景模糊 (ModalBlur)。
 /// 调用方在关闭后读 <c>MatchTypesPageViewModel.LastCreatedTypeId</c> 决定是否自动选中新类型。
 /// </summary>
 public partial class MatchTypesDialogWindow : Window
@@ -15,32 +15,10 @@ public partial class MatchTypesDialogWindow : Window
     public MatchTypesDialogWindow()
     {
         InitializeComponent();
-        // 无边框模式系统不绘制标题, 窗口标题仅用于任务栏与无障碍朗读
+        // 标题栏文案 (系统绘制; DialogChrome 只负责着色, 不改文字)
         Title = I18n.T("2519");
+        // 弹窗必备: DWM 标题栏着色 + owner 背景模糊 (ModalBlur) 的统一入口。
+        // 漏调会让本窗口标题栏保持冷白、且打开时没有背景模糊 (2026-09-15 实测缺陷)。
+        KeyFlux.Settings.Services.Win32.DialogChrome.Apply(this);
     }
-
-    /// <summary>标题栏拖动区: 左键拖拽移动窗口, 双击在最大化/还原之间切换。</summary>
-    private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
-        if (e.ClickCount == 2)
-        {
-            ToggleMaximize();
-            return;
-        }
-        // 最大化状态下拖拽交给系统还原语义, 避免出现"拖不动的最大化窗口"
-        if (WindowState == WindowState.Normal)
-        {
-            BeginMoveDrag(e);
-        }
-    }
-
-    private void OnMinimizeClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
-
-    private void OnMaximizeClick(object? sender, RoutedEventArgs e) => ToggleMaximize();
-
-    private void OnCaptionCloseClick(object? sender, RoutedEventArgs e) => Close();
-
-    private void ToggleMaximize()
-        => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 }

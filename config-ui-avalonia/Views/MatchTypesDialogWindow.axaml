@@ -5,72 +5,21 @@
         x:Class="KeyFlux.Settings.Views.MatchTypesDialogWindow"
         x:DataType="vm:MatchTypesPageViewModel"
         Title="Setting"
-        Icon="avares://KeyFlux.Settings/Assets/logo.png"
         Width="900" Height="620" MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="Transparent">
+        Background="{DynamicResource ClaudeWindowSurfaceBrush}">
 
   <!--
-    匹配类型弹窗外壳 —— 顶部与主窗口 (MainWindow.axaml) 同一套做法, 不再是系统白色标题栏:
-      · 无边框 + 亚克力: ExtendClientArea/NoChrome + 窗口 Background=Transparent,
-        暖色底由根 Border 的 ClaudeWindowSurfaceBrush 承担 (与主窗口逐字一致);
-      · 自绘标题栏: 36px 透明拖动区 (双击切最大化) + 右侧三键 (─ □ ✕, 样式同主窗口 Button.caption);
-      · 内容 = MatchTypesPageView (顶部说明 / 主从布局 / 底部按钮栏, 与行为库同构)。
-    入口: 选中动作页顶部「匹配类型」按钮, 以及「添加映射」弹窗里的「＋ 新建匹配类型」链接。
+    匹配类型弹窗外壳 —— 与行为库等其余 7 个弹窗**同一套弹窗约定**:
+      · 窗口: TransparencyLevelHint + 半透明画布 ClaudeWindowSurfaceBrush (亚克力透出);
+      · 构造期必须调 Services.Win32.DialogChrome.Apply(this) —— 它做两件事:
+        ① 用 DWM 把系统标题栏染成暖色表面色 (否则冷白标题栏与暖色 UI 割裂);
+        ② 在 Opened/Closed 上开关 owner 的 ModalBlur (即"弹窗背后的背景模糊")。
+        漏调 = 标题栏冷白 + 背景不模糊 (2026-09-15 实测即此因)。
+      · 系统标题栏与原生 ─ □ ✕ 保留, 不做无边框自绘 (项目既有设计决策)。
+    内容 = MatchTypesPageView (顶部说明 / 主从布局 / 底部按钮栏, 与行为库同构)。
   -->
 
-  <Window.Styles>
-    <!-- 自绘标题栏三键 (与 MainWindow.axaml 同款; 底色写样式而非内联 —— 内联是本地值, 会压过 :pointerover) -->
-    <Style Selector="Button.caption">
-      <Setter Property="Width" Value="42" />
-      <Setter Property="Height" Value="28" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="Margin" Value="0" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusSm}" />
-      <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Button.caption:pointerover">
-      <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
-    </Style>
-    <Style Selector="Button.caption:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
-    </Style>
-    <Style Selector="Button.caption:pressed /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource ClaudeRingWarmBrush}" />
-    </Style>
-    <!-- 关闭键: 悬停转 Error Crimson 底 + Ivory 字 -->
-    <Style Selector="Button.caption.captionClose:pointerover">
-      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
-    </Style>
-    <Style Selector="Button.caption.captionClose:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource ClaudeErrorBrush}" />
-    </Style>
-  </Window.Styles>
-
-  <Border Background="{DynamicResource ClaudeWindowSurfaceBrush}"
-          BorderBrush="{StaticResource ClaudeBorderWarmBrush}"
-          BorderThickness="1">
-    <Grid RowDefinitions="36,*">
-
-      <!-- 标题栏: 整条为拖动区 (无标题文本, 与主窗口一致), 右侧三键 -->
-      <Grid Grid.Row="0" Height="36" Background="Transparent" PointerPressed="OnTitleBarPointerPressed">
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2"
-                    Margin="0,0,6,0" VerticalAlignment="Center">
-          <Button Classes="caption" Content="─" Click="OnMinimizeClick" />
-          <Button Classes="caption" Content="□" Click="OnMaximizeClick" />
-          <Button Classes="caption captionClose" Content="✕" Click="OnCaptionCloseClick" />
-        </StackPanel>
-      </Grid>
-
-      <views:MatchTypesPageView Grid.Row="1" />
-    </Grid>
-  </Border>
+  <views:MatchTypesPageView />
 </Window>
