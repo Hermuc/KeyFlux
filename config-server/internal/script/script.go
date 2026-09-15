@@ -93,7 +93,6 @@ func SaveAHK(data *Config, templateFile, outputFile string) error {
 	defer f.Close()
 
 	// 因为模板文件就是 UTF-8 with BOM,  所以输出文件也是 UTF-8 with BOM
-	// _, _ = f.Write([]byte{0xef, 0xbb, 0xbf}) // 写入 utf-8 的 BOM (0xefbbbf)
 	_, err = f.Write([]byte(res))
 	return err
 }

@@ -45,7 +45,6 @@ class KeymapManager {
 
   static _handleDelay(keymap) {
     if keymap.delay {
-      ; Tip(keymap.Name " " keymap.delay)
       ih := InputHook("T" keymap.delay)
       ih.KeyOpt("{All}", "E")
       ih.Start()

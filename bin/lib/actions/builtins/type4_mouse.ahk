@@ -17,7 +17,7 @@ MouseToActiveWindowCenter() {
 MoveMouseToCaret() {
   GetCaretPos(&x, &y)
   if (StrLen(x) | StrLen(y)) {
-    ; Tip(A_SendMode "|" A_CoordModeMouse) ; 每次执行热键, 这两个都会重置为默认值
+    ; SendMode / CoordMode 每次执行热键都会重置为默认值, 故此处每次重设
     SendMode("Event")
     CoordMode("Mouse", "Screen")
     MouseMove(x, y, 100)
