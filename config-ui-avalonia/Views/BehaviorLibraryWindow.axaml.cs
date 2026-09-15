@@ -89,6 +89,4 @@ public partial class BehaviorLibraryWindow : Window
             vm.StatusText = ex.Message;
         }
     }
-
-    private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();
 }

@@ -20,6 +20,7 @@
       · 圆角层级: 容器 claudeCard = Lg(12) / 行·按钮·输入 = Md(8)
       · 配色: Ivory 面 · Sand 悬停 · Parchment 选中 + 陶土指示条 · Terracotta 唯一主 CTA
       · 快捷: 列表行双击 = 编辑行为 (仅自定义包)
+      · 关闭: 由窗口标题栏 ✕ 承担 (底部不再放「取消/关闭」按钮, 与匹配类型弹窗一致)
   -->
 
   <Window.Styles>
@@ -188,9 +189,6 @@
           </Button>
           <Button Classes="claudeSand" Click="OnApplyClick" IsEnabled="{Binding CanApply, Mode=OneWay}">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1094}" />
-          </Button>
-          <Button Classes="claudeGhost" Click="OnCloseClick">
-            <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=611}" />
           </Button>
         </StackPanel>
       </StackPanel>
