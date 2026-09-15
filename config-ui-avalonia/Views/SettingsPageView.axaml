@@ -42,6 +42,23 @@
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
     </Style>
+    <!-- 左列「快捷键方案」大卡: 与右列组件框**同一套三态机制** (2026-09-15 用户要求统一悬停反馈)。
+         ⚠️ 原实现把 BorderBrush / BorderThickness / BoxShadow **内联**写在 Border 元素上 ——
+         Avalonia 中内联值的优先级**高于样式 Setter**, 会压掉 :pointerover 的设置, 悬停永远不变色。
+         故必须改由样式承载这三项, 悬停才可能生效。
+         取值与 Border.settingsCard 逐项一致 (奶油描边 + 双层下坠影 → 悬停灰描边 + 强影);
+         BorderThickness 同为 2, 悬停时的描边粗细才与右列一致 (原左卡为 1)。
+         注意: 不改本卡外框尺寸 (Width 由 560 列 - 16 右边距决定 / Height 624),
+         故整页 Viewbox 缩放比不变, TopFlareWings 的 0.5px 几何守护不受影响 -->
+    <Style Selector="Border.leftPanel">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+    </Style>
+    <Style Selector="Border.leftPanel:pointerover">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
+      <Setter Property="BorderBrush" Value="#c9c7bd" />
+    </Style>
     <!-- 分区标题按钮: 压制 Fluent 模板部件基态/悬停/按下的自带灰底 (坑13/18) ——
          悬停反馈交给所在 settingsCard, 按钮自身零视觉 -->
     <Style Selector="Button.sectionHeader /template/ ContentPresenter#PART_ContentPresenter">
@@ -224,8 +241,6 @@
            半透明细线, 用户报「第一列方框右边缘被切割」。像素对齐后描边落在整数设备像素上恒清晰。
            只挂本卡不挂整页: 右列 TopFlareWings 几何守护断言容差 0.5px, 页级取整有破坏风险 -->
       <Border Grid.Column="0" Classes="leftPanel" UseLayoutRounding="True" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16"
-              BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
-              BoxShadow="{StaticResource ClaudeShadowCard}"
               Height="624" VerticalAlignment="Top" Margin="0,0,16,0">
         <!-- LayoutTransform 等比放大卡内全部内容 (字号/输入框/开关随框一起变大):
              1.12 = 加宽后内容区 528 / 原内容区 468; 卡高 624 = 528x1.12 + Padding 32 -->
