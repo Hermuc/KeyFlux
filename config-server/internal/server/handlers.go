@@ -13,7 +13,8 @@ import (
 	"settings/internal/script"
 
 	"sync"
-	"time")
+	"time"
+)
 
 func GetConfigHandler(c *gin.Context) {
 	config, err := script.ParseConfig("../data/config.json")

@@ -11,10 +11,10 @@ func TestAsciiFold(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"ABC", "abc"},
 		{"Hello, World!", "hello, world!"},
-		{"a-b.c", "a-b.c"},          // 非字母不变
-		{"ＡＢＣ", "ＡＢＣ"},        // 全角非 ASCII, 不折叠
-		{"网盘LINK", "网盘link"},    // 仅 ASCII 大写被折, CJK 原样
-		{"🔥FOO", "🔥foo"},          // emoji 原样, 仅 FOO 被折
+		{"a-b.c", "a-b.c"},   // 非字母不变
+		{"ＡＢＣ", "ＡＢＣ"},       // 全角非 ASCII, 不折叠
+		{"网盘LINK", "网盘link"}, // 仅 ASCII 大写被折, CJK 原样
+		{"🔥FOO", "🔥foo"},     // emoji 原样, 仅 FOO 被折
 	}
 	for _, c := range cases {
 		if got := asciiFold(c.in); got != c.want {
@@ -132,8 +132,8 @@ func TestCustomMatchTypesEmpty(t *testing.T) {
 func TestCustomMatchTypesRendersEscaped(t *testing.T) {
 	cfg := &Config{MatchTypes: []MatchType{
 		{ID: "netdisk", Label: "网盘", Kind: "text", Rules: []MatchRule{
-			{Op: "contains", Value: `he"llo`},  // 含双引号
-			{Op: "contains", Value: `x ;y`},    // 含 "空格;"(须转义为 `;)
+			{Op: "contains", Value: `he"llo`}, // 含双引号
+			{Op: "contains", Value: `x ;y`},   // 含 "空格;"(须转义为 `;)
 		}},
 		{ID: "design", Label: "设计", Kind: "fileExt", Exts: []string{"psd", "ai"}},
 	}}
@@ -163,7 +163,7 @@ func TestCustomMatchTypesRendersEscaped(t *testing.T) {
 }
 
 // unescapedQuoteCount 统计未被反引号转义的双引号个数 (AHK v2 转义符为 `)。
-// 反引号自身可被反引号转义 (`` 表示一个反引号), 故按连续反引号数的奇偶判定。
+// 反引号自身可被反引号转义 (连续两个反引号表示一个反引号), 故按连续反引号数的奇偶判定。
 func unescapedQuoteCount(s string) int {
 	n, backticks := 0, 0
 	for _, r := range s {
