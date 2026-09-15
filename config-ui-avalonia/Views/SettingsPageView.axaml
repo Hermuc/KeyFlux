@@ -8,13 +8,15 @@
              x:DataType="vm:SettingsPageViewModel">
 
   <UserControl.Resources>
-    <!-- 阴影说明 (2026-09-13 与插件页统一): 卡片阴影由 DropShadowDirectionEffect 四周均匀环境影
-         改为插件卡同款 BoxShadow 令牌 (ClaudeShadowCard / 悬停聚焦强影 ClaudeShadowCardDeep)。
+    <!-- 阴影说明 (2026-09-13 与插件页统一; 2026-09-15 进一步对齐插件页机制): 卡片阴影由
+         DropShadowDirectionEffect 四周均匀环境影改为插件卡同款 BoxShadow 令牌。
          历史改用 Effect 管线的理由是「Viewbox 渲染变换下 BoxShadow 环竖段不可靠」——
          2026-09-13 在设置页真实条件 (Viewbox ≈0.9 缩小档, 软件 Skia) 下 headless 探针实证:
-         偏移影与环影均渲染完整 (左 216/右 216), 当年现象应为坑 15 的列表裁剪而非 Viewbox;
-         故回归 BoxShadow 令牌与插件页观感一致。描边仍走实体 BorderThickness 2 换色机制
-         (用户已验收), 故悬停强影用去环版 ClaudeShadowCardDeep 而非 ClaudeShadowCardHover -->
+         偏移影与环影均渲染完整 (左 216/右 216), 当年现象应为坑 15 的列表裁剪而非 Viewbox。
+         2026-09-15: 描边由「实体 BorderThickness 2 换色」改回插件页同款「环」机制
+         (悬停 ClaudeShadowCardHover / 聚焦 ClaudeShadowFocusRing), 用户要求两页视觉一致;
+         遗留: 去环版 ClaudeShadowCardDeep 因此暂无消费方, 令牌保留在皮肤清单
+         (SkinContractTests 有列名守护), 后续若确认不再需要可整体移除 -->
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -26,38 +28,42 @@
       <!-- 卡片标题字号 15 (2026-09-13 用户要求再大 1 号: 12→14→15); 毛玻璃卡标题自带 15 同尺寸, 已同步提升至 16 保持层级 -->
       <Setter Property="FontSize" Value="15" />
     </Style>
-    <!-- 右列组件框: 插件卡同款三态 (静态双层下坠影 / 悬停灰描边+强影 / 单击聚焦橙描边+强影)。
-         描边 = 实体 BorderThickness 2 换色 (用户确认过此机制侧边可见);
-         阴影 = 插件页同款 BoxShadow 令牌 (2026-09-13 统一, 见 Resources 注释) -->
+    <!-- 右列组件框: **以插件页 Border.pluginCard 为基准**统一描边 (2026-09-15 用户要求两页视觉一致)。
+         原实现走「实体描边换色」机制 (BorderThickness 2 + 悬停换 #c9c7bd / 聚焦换 Coral),
+         与插件页的「环」机制存在实测差异:
+           静止  2px  vs 插件页 1px               → 粗细差一倍
+           悬停  2px #c9c7bd vs 插件页 1px #d1cfc5 → 更深且更粗
+           聚焦  实体橙边    vs 插件页 Coral 2px 环
+         现逐项对齐 Border.pluginCard: 静止 1px 奶油边; 悬停/聚焦**只换 BoxShadow 环**,
+         不再改 BorderBrush (故 ClaudeCoralBrush/#c9c7bd 两处硬编码色随之移除)。
+         注: 卡片虽在 ScrollViewer 内, 但右列 StackPanel 留有 24px 外边距
+         (2026-09-12 由 Padding 改 Margin 修好"阴影被切断"), 环不被裁 -->
     <Style Selector="Border.settingsCard">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
-      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
     <Style Selector="Border.settingsCard:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
-      <Setter Property="BorderBrush" Value="#c9c7bd" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHover}" />
     </Style>
     <Style Selector="Border.settingsCard:focus-within">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
-      <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
-    <!-- 左列「快捷键方案」大卡: 与右列组件框**同一套三态机制** (2026-09-15 用户要求统一悬停反馈)。
-         ⚠️ 原实现把 BorderBrush / BorderThickness / BoxShadow **内联**写在 Border 元素上 ——
-         Avalonia 中内联值的优先级**高于样式 Setter**, 会压掉 :pointerover 的设置, 悬停永远不变色。
-         故必须改由样式承载这三项, 悬停才可能生效。
-         取值与 Border.settingsCard 逐项一致 (奶油描边 + 双层下坠影 → 悬停灰描边 + 强影);
-         BorderThickness 同为 2, 悬停时的描边粗细才与右列一致 (原左卡为 1)。
-         注意: 不改本卡外框尺寸 (Width 由 560 列 - 16 右边距决定 / Height 624),
+    <!-- 左列「快捷键方案」大卡: 同样以插件页为基准, 与右列逐项一致 (同静止/悬停/聚焦三态)。
+         ⚠️ 这三项原先是**内联**写在 Border 元素上的 —— Avalonia 内联值优先级高于样式 Setter,
+         会压掉 :pointerover / :focus-within, 故必须由样式承载才可能生效。
+         注意: 未改本卡外框尺寸 (Width 由 560 列 - 16 右边距决定 / Height 624),
          故整页 Viewbox 缩放比不变, TopFlareWings 的 0.5px 几何守护不受影响 -->
     <Style Selector="Border.leftPanel">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
-      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
     <Style Selector="Border.leftPanel:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
-      <Setter Property="BorderBrush" Value="#c9c7bd" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHover}" />
+    </Style>
+    <Style Selector="Border.leftPanel:focus-within">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
     <!-- 分区标题按钮: 压制 Fluent 模板部件基态/悬停/按下的自带灰底 (坑13/18) ——
          悬停反馈交给所在 settingsCard, 按钮自身零视觉 -->
