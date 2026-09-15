@@ -91,12 +91,14 @@
 
             <!-- ② 内联新建/编辑表单 (就地展开, 不弹窗); 操作栏常驻底部, 不随表单滚动 -->
             <Grid IsVisible="{Binding IsEditorOpen}" RowDefinitions="*,Auto">
-              <!-- 滚动条右移 (2026-09-15 用户要求: 滚动条与文字过近):
-                   视口向右扩 10 (负右 Margin 侵入卡片 20 的内边距), 滚动条随之右移 10;
-                   内容右 Margin 12 -> 22 恰好抵消扩量 ⇒ 文字换行边界与位置和改动前完全一致。
-                   (同一手法见 AbbrPageView:13-14 与 CommentSummaryPanel:19-23) -->
-              <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Margin="0,0,-10,0" x:Name="FormScroll">
-                <StackPanel Spacing="16" Margin="0,0,22,0" DataContext="{Binding Editor}">
+              <!-- 滚动条贴紧右侧边框 (2026-09-15 用户二次要求: 再靠近右侧边框一些):
+                   视口负右 Margin 由 -10 加大到 -16 —— 侵入卡片 20 内边距 16px,
+                   滚动条右沿 = 卡片外沿 - 5 (留 1px 描边 + 圆角/呼吸余量);
+                   内容右 Margin 同步 22 -> 28 抵消扩量 ⇒ 文字换行边界与位置仍与最初完全一致。
+                   定位参数: DetailCard Padding=20 / 描边 1 / ScrollBarSize=10 (可见条宽 16)。
+                   (同一手法见 AbbrPageView:13-15 与 CommentSummaryPanel:19-26) -->
+              <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Margin="0,0,-16,0" x:Name="FormScroll">
+                <StackPanel Spacing="16" Margin="0,0,28,0" DataContext="{Binding Editor}">
                   <TextBlock Classes="claudeSubtitle" Text="{Binding Title}" />
 
                 <!-- 名称 -->
