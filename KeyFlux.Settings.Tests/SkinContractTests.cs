@@ -112,6 +112,36 @@ public sealed class SkinContractTests
         }
     }
 
+    /// <summary>
+    /// 管理类弹窗共享类 (2026-09-15): <c>Border.claudeHint</c> = Sand 面 + Md(8) 圆角;
+    /// <c>ListBox.claudeList</c> = 透明无边框 + 6 内边距 (行样式由该类的后代选择器接管)。
+    /// 「匹配类型」与「行为库」两窗共用这组类, 此断言防止后续换肤时单边漂移。
+    /// </summary>
+    [AvaloniaFact]
+    public void Management_Dialog_Shared_Classes_Are_Wired()
+    {
+        var hint = new Border();
+        hint.Classes.Add("claudeHint");
+        var list = new ListBox();
+        list.Classes.Add("claudeList");
+        var window = new Window { Content = new Grid { Children = { hint, list } } };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        try
+        {
+            // Sand 面 (#e8e6dc) + 尺寸令牌 ClaudeRadiusMd(8) —— 与皮肤顶部契约清单一致
+            Assert.Equal(Color.Parse("#e8e6dc"), ((ISolidColorBrush)hint.Background!).Color);
+            Assert.Equal(new CornerRadius(8), hint.CornerRadius);
+            // 列表本体不带边线/底色, 容器面由外层 Border.claudeCard 提供
+            Assert.Equal(0, list.BorderThickness.Left);
+            Assert.Equal(new Thickness(6), list.Padding);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     // ===================== 皮肤契约强制校验 =====================
 
     /// <summary>画刷键 (含 4 个暗色桩与窗口亚克力面) —— 与 Styles/Skins/*.axaml 顶部契约清单一致。</summary>

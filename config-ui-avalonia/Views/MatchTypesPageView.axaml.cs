@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -61,6 +62,21 @@ public partial class MatchTypesPageView : UserControl
         if (TopLevel.GetTopLevel(this) is Window win) win.Close();
     }
 
+    /// <summary>
+    /// 列表行双击 = 主操作 (与底部按钮同义, 提升便捷性):
+    /// 自定义类型 → 编辑; 未配置行为的类型 → 配置行为; 内置类型无操作。
+    /// </summary>
+    private async void OnRowDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is not MatchTypesPageViewModel vm) return;
+        if (vm.CanEditSelected)
+        {
+            vm.OpenEditCommand.Execute(vm.SelectedRow);
+            return;
+        }
+        if (vm.CanSetAction) await OpenBehaviorLibraryAsync();
+    }
+
     /// <summary>「常用类型」胶囊: 一键填好名称 / 匹配条件 / 条件或扩展名 / 默认动作。</summary>
     private void OnApplyPreset(object? sender, RoutedEventArgs e)
     {
@@ -71,11 +87,14 @@ public partial class MatchTypesPageView : UserControl
         }
     }
 
+    /// <summary>底部「配置行为」(2569): 打开行为库窗口为该类型建专属行为 (仅"尚未配置行为"的自定义类型可点)。</summary>
+    private async void OnSetAction(object? sender, RoutedEventArgs e) => await OpenBehaviorLibraryAsync();
+
     /// <summary>
-    /// 底部「配置行为」(2569): 打开行为库窗口为该类型建专属行为 (仅"尚未配置行为"的自定义类型可点)。
-    /// 关窗后重拉行为目录 —— 列表的「已配置行为 N / 未配置行为」随之刷新。
+    /// 打开行为库窗口 (底部「配置行为」与列表行双击共用); 关窗后重拉行为目录 ——
+    /// 列表的「已配置行为 N / 未配置行为」随之刷新。
     /// </summary>
-    private async void OnSetAction(object? sender, RoutedEventArgs e)
+    private async Task OpenBehaviorLibraryAsync()
     {
         if (TopLevel.GetTopLevel(this) is not Window owner || DataContext is not MatchTypesPageViewModel vm)
         {

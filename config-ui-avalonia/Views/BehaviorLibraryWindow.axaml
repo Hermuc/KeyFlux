@@ -6,75 +6,79 @@
         Background="{DynamicResource ClaudeWindowSurfaceBrush}"
         x:DataType="vm:BehaviorLibraryViewModel"
         Title="Setting"
-        Width="860" Height="560"
+        Width="880" Height="580"
         WindowStartupLocation="CenterOwner">
 
-  <!-- 行为库 (CONTRACTS §3.9): 内置包只读 + 用户包增删; 变更经「立即生效」显式重启 -->
+  <!--
+    行为库 (CONTRACTS §3.9): 内置包只读 + 用户包增删; 变更经「立即生效」显式重启。
+    视觉与「匹配类型」弹窗**同构** (2026-09-15 统一):
+      · 圆角层级: 容器 claudeCard = Lg(12) / 行·按钮 = Md(8) / 徽标 = Sm(6)
+      · 配色: Ivory 面 · Sand 悬停 · Parchment 选中 + 陶土指示条 · Terracotta 主 CTA
+      · 布局: 顶部一句话说明 → 左列表(卡) + 右详情(卡) → 底部状态栏 + 按钮栏
+      · 快捷: 列表行双击 = 编辑行为 (仅自定义包), 与底部按钮同义
+  -->
+
   <Border Padding="20">
     <Grid RowDefinitions="Auto,*,Auto">
 
       <!-- 顶部: 提示行 -->
-      <TextBlock Grid.Row="0" FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" Margin="0,0,0,10" TextWrapping="Wrap"
+      <TextBlock Grid.Row="0" Classes="claudeMuted" Margin="0,0,0,10" TextWrapping="Wrap"
                  Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1095}" />
 
-      <!-- 中部: 主从布局 -->
+      <!-- 中部: 主从布局 (左 340 + 右详情), 两侧均为 claudeCard 容器 -->
       <Grid Grid.Row="1" ColumnDefinitions="340,*">
-        <ListBox Grid.Column="0" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
-                 Margin="0,0,12,0">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:BehaviorRowVm">
-              <StackPanel Margin="4,6">
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Grid.Column="1" Text="{Binding SourceLabel}" FontSize="11"
-                             Foreground="{StaticResource ClaudeStoneGrayBrush}" Margin="8,0,0,0" />
+        <Border Grid.Column="0" Classes="claudeCard" Margin="0,0,12,0">
+          <ListBox Grid.Column="0" Classes="claudeList" ItemsSource="{Binding Rows}"
+                   SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                   DoubleTapped="OnRowDoubleTapped">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:BehaviorRowVm">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                  <TextBlock Classes="claudeBody" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                             Text="{Binding Name}" />
+                  <TextBlock Grid.Column="1" Classes="claudeDim" Margin="8,0,0,0" Text="{Binding SourceLabel}" />
+                  <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="claudeDim" Margin="0,3,0,0"
+                             TextWrapping="Wrap" Text="{Binding PremiseSummary}" />
                 </Grid>
-                <TextBlock Text="{Binding PremiseSummary}" FontSize="11" Foreground="{StaticResource ClaudeStoneGrayBrush}"
-                           TextWrapping="Wrap" Margin="0,2,0,0" />
-              </StackPanel>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
 
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-          <StackPanel Spacing="8" Margin="4,0,0,0">
-            <TextBlock Text="{Binding SelectedRow.Name}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding SelectedRow.Id}" FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" />
-            <TextBlock Text="{Binding SelectedRow.PremiseSummary}" FontSize="12" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding SelectedRow.Description}" FontSize="12" Foreground="{StaticResource ClaudeOliveGrayBrush}"
-                       TextWrapping="Wrap" />
-          </StackPanel>
-        </ScrollViewer>
+        <Border Grid.Column="1" Classes="claudeCard" Padding="16">
+          <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="claudeSubtitle" FontSize="18" TextWrapping="Wrap"
+                         Text="{Binding SelectedRow.Name}" />
+              <TextBlock Classes="claudeDim" Text="{Binding SelectedRow.Id}" />
+              <TextBlock Classes="claudeBody" TextWrapping="Wrap" Text="{Binding SelectedRow.PremiseSummary}" />
+              <TextBlock Classes="claudeMuted" TextWrapping="Wrap" Text="{Binding SelectedRow.Description}" />
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
       </Grid>
 
-      <!-- 底部: 状态栏 + 操作按钮 -->
+      <!-- 底部: 状态栏 + 操作按钮 (主 CTA 唯一: 新建行为) -->
       <StackPanel Grid.Row="2" Margin="0,14,0,0">
-        <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource ClaudeDarkWarmBrush}" TextWrapping="Wrap" />
+        <TextBlock Classes="claudeMuted" TextWrapping="Wrap" Text="{Binding StatusText}" />
         <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
-          <Button Click="OnNewClick" Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}" BorderThickness="1"
-                  Foreground="{StaticResource ClaudeTerracottaBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
+          <Button Classes="claudeCta" Click="OnNewClick" MinWidth="112">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1085}" />
           </Button>
-          <Button Click="OnEditClick" IsEnabled="{Binding SelectedRow.IsUser, Mode=OneWay}"
-                  Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}" BorderThickness="1"
-                  Foreground="{StaticResource ClaudeTerracottaBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
+          <Button Classes="claudeGhost" Click="OnEditClick" IsEnabled="{Binding SelectedRow.IsUser, Mode=OneWay}">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1086}" />
           </Button>
-          <Button Click="OnDeleteClick" IsEnabled="{Binding SelectedRow.IsUser, Mode=OneWay}"
-                  Background="Transparent" BorderBrush="{StaticResource ClaudeErrorBrush}" BorderThickness="1"
-                  Foreground="{StaticResource ClaudeErrorBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
+          <Button Classes="claudeDanger" Click="OnDeleteClick" IsEnabled="{Binding SelectedRow.IsUser, Mode=OneWay}">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1096}" />
           </Button>
-          <Button Click="OnApplyClick" IsEnabled="{Binding IsDirty}"
-                  Background="{StaticResource ClaudeTerracottaBrush}" Foreground="{StaticResource ClaudeIvoryBrush}" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
+          <Button Classes="claudeSand" Click="OnApplyClick" IsEnabled="{Binding IsDirty}">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1094}" />
           </Button>
-          <Button Click="OnCloseClick" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
+          <Button Classes="claudeGhost" Click="OnCloseClick">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=611}" />
           </Button>
         </StackPanel>
       </StackPanel>
-
     </Grid>
   </Border>
 </Window>

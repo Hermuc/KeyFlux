@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using KeyFlux.Settings.Models;
 using KeyFlux.Settings.ViewModels;
@@ -48,6 +49,13 @@ public partial class BehaviorLibraryWindow : Window
     {
         if (DataContext is not BehaviorLibraryViewModel vm) return;
         if (vm.SelectedRow is { } row) await OpenEditAsync(row.Pack);
+    }
+
+    /// <summary>列表行双击 = 编辑行为 (仅自定义包; 内置包只读 ⇒ 无操作)。</summary>
+    private async void OnRowDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is not BehaviorLibraryViewModel vm) return;
+        if (vm.SelectedRow is { IsUser: true } row) await OpenEditAsync(row.Pack);
     }
 
     private async Task OpenEditAsync(BehaviorPack? existing)
