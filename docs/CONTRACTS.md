@@ -38,9 +38,11 @@ bin/lib/
 ├── actions/     ActionRegistry.ahk / IAction.ahk / IRegistration.ahk —— **已完成(阶段 3)**:
 │                  三件套按 §3.2-3.4 冻结接口落地(含 ActionContext), 冒烟测试 8 项全过;
 │                  仅定义不接入运行路径, 模板与生成产物不变 (快路径仍编译期直连)
-│   └── builtins/  9 类内置动作各一文件 —— **已完成(阶段 3)**:`Actions.ahk` 的 42 个函数已按
+│   └── builtins/  8 类内置动作各一文件 —— **已完成(阶段 3)**:`Actions.ahk` 的 42 个函数已按
 │                  TypeID 拆入 `builtins/type{1,2,3,4,6,7,8,9}_*.ahk`(函数体逐行搬运,
 │                  行多重集校验通过);`Actions.ahk` 保留为聚合 include 入口,模板与生成产物不变
+│                  (TypeID5 remapKey 由 `KeymapManager` 直接重映射, 不是 "内置动作" 文件,
+│                   故 `builtins/` 无 type5_*.ahk; 生成侧覆盖见 `golden_test.go` 覆盖矩阵)
 ├── rules/       SelectionEngine.ahk(只匹配,不执行)
 ├── commands/    CommandResolver.ahk / FuzzyStrategy.ahk —— **CommandResolver 已完成(阶段 4)**:
 │                  缩写 switch 换为运行时注册表 (闭包即待执行数据), FuzzyStrategy 留桩
@@ -53,15 +55,18 @@ data/
 ├── config.json / plugins/<id>/ / plugin-settings.json
 config-server/internal/script/generators/   (actionMap 按类型拆分)
 config-server/internal/server/              (HTTP handler + 路由注册 + DTO 层)
-├── server.go      gin 引擎装配、11 条路由注册、端口监听回退、headless 端口通告、openBrowser、PanicHandler
+├── server.go      gin 引擎装配、15 条路由注册、端口监听回退、headless 端口通告、openBrowser、PanicHandler
 ├── handlers.go    GetConfigHandler / SaveConfigHandler / GetShortcutsHandler / ServerCommandHandler / syncStartupFromRegistry
-├── actionscheme.go  选中动作方案 REST API (6 handler + loadActionSchemes / saveActionSchemes / parseSchemeID)
+├── selectedaction.go 选中动作单键分发 API (TestSelectedActionHandler; 旧 action-schemes CRUD 六路由随
+│                  方案 D 重构移除, 存量配置经 ParseConfig 读时一次性迁移)
+├── behaviors.go   行为包 REST API (列表 / 新建 / 更新 / 删除 / 应用, 5 handler)
+├── plugins.go     插件 REST API (列表 / 导入 zip / 删除, 3 handler)
 └── dto.go         Config 及全部嵌套结构的 DTO 类型 + 双向映射 (model→dto 供 GET, dto→model 供 PUT)
 config-server/internal/proc/                (共享子进程启动工具)
 └── proc.go        ExecCmd / FallbackExecCmd (CREATE_BREAKAWAY_FROM_JOB + explorer 中转降级)
 config-server/cmd/settings/                 (仅保留入口与模式判断)
 └── main.go        main() CLI 分发 + debug/headless 判断 + 代码雨编排 + hideMatrix + server.Run() 调用
-config-ui-avalonia/Resources/i18n.json      (双语文案真源, 308 键, UTF-8 无 BOM; 构建产物请勿手改)
+config-ui-avalonia/Resources/i18n.json      (双语文案真源, 385 键, UTF-8 无 BOM; 构建产物请勿手改)
 bin/ui/Resources/i18n.json                  (松散部署物, 由 csproj Content 项产出, 随 robocopy /MIR 同步到部署目录)
 scripts/                                    (维护者脚本, 不随发布包出货, 与出货的 tools/ 区分)
 ├── build_tools.go     发布前 AHK 版本闸 (checkForAHKUpdate) + 回写分享链接 (updateShareLink)
