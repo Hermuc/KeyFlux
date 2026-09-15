@@ -56,7 +56,7 @@ public sealed class I18nResourceTests
     ///    2530-2533 行为表单四字段 / 2534 保存 / 2535 取消 / 2536 删除 / 2537 待补行为 /
     ///    2538 专属行为 / 2539 内置 / 2540-2544 校验提示 / 2545 删除确认 / 2546 编辑 /
     ///    2547-2548 空态 / 2550 值 / 2551 类别) -> 353。
-    private const int ExpectedKeyCount = 383;
+    private const int ExpectedKeyCount = 385;
 
     private const string LabelPrefix = "label:";
 

@@ -64,22 +64,30 @@ public sealed partial class MatchTypeRowVm : ObservableObject
     public bool IsBuiltin { get; init; }
     public MatchType? Model { get; init; }        // 自定义类型才有
 
+    /// <summary>
+    /// 草稿行 (2026-09-15): 新建期间追加在列表末尾的占位项, 代表"正在创建、尚未填写"的类型。
+    /// 仅存在于 UI 集合中 (不写入 Config.MatchTypes), 保存/取消后即移除。
+    /// </summary>
+    public bool IsDraft { get; init; }
+
     [ObservableProperty] private string _label = "";
     [ObservableProperty] private string _summary = "";
     [ObservableProperty] private int _dedicatedCount;
 
-    /// <summary>还没设置动作 (自定义类型且专属行为数为 0) —— 列表上给"现在设置"入口。</summary>
-    public bool NeedsBehavior => !IsBuiltin && DedicatedCount == 0;
+    /// <summary>还没设置动作 (自定义类型且专属行为数为 0); 草稿行不参与该判定。</summary>
+    public bool NeedsBehavior => !IsBuiltin && !IsDraft && DedicatedCount == 0;
 
-    /// <summary>状态文案: 内置 / 已设置动作 N / 还没设置动作。</summary>
-    public string StatusText => IsBuiltin
-        ? I18n.T("2539")
-        : NeedsBehavior
-            ? I18n.T("2537")
-            : I18n.T("2538") + " " + DedicatedCount;
+    /// <summary>状态文案: 新建中(草稿) / 内置 / 已设置动作 N / 还没设置动作。</summary>
+    public string StatusText => IsDraft
+        ? I18n.T("2578")
+        : IsBuiltin
+            ? I18n.T("2539")
+            : NeedsBehavior
+                ? I18n.T("2537")
+                : I18n.T("2538") + " " + DedicatedCount;
 
-    /// <summary>自定义行才可编辑/删除。</summary>
-    public bool IsCustom => !IsBuiltin;
+    /// <summary>自定义行才可编辑/删除 (草稿行不算)。</summary>
+    public bool IsCustom => !IsBuiltin && !IsDraft;
 
     /// <summary>「现在设置」按钮可见性 (留桩行专有)。</summary>
     public bool ShowSetAction => NeedsBehavior;
@@ -561,12 +569,33 @@ public sealed partial class MatchTypesPageViewModel : ObservableObject, ILanguag
     public string? LastCreatedTypeId { get; private set; }
 
     /// <summary>编辑器新建成功后回调 (由编辑面板调用)。</summary>
-    public void NoteCreated(string id) => LastCreatedTypeId = id;
+    /// <summary>
+    /// 保存成功回调: 记录新建 id 并把选中指向新建出的真实行 (草稿行随后由 CloseEditor 移除)。
+    /// 先清 <c>_draftRow</c> 以解除"选择钉住", 否则新选中会被弹回草稿。
+    /// </summary>
+    public void NoteCreated(string id)
+    {
+        LastCreatedTypeId = id;
+        _draftRow = null;
+        SelectedRow = Rows.FirstOrDefault(r => r.Id == id) ?? SelectedRow;
+    }
 
     // ------------------------------------------------------------- 列表 (主从布局: 左列表 + 右详情)
 
     /// <summary>列表行 (单一扁平列表): 4 个内置文本特征在前, 自定义类型按 文本类 → 文件类 追加。</summary>
     public ObservableCollection<MatchTypeRowVm> Rows { get; } = [];
+
+    /// <summary>草稿行的内部 id: 不符合类型 id 正则, 因此不可能与真实类型冲突。</summary>
+    private const string DraftRowId = "__draft__";
+
+    /// <summary>新建期间的草稿行 (null = 未在新建); 只存在于 Rows, 不写入 Config.MatchTypes。</summary>
+    private MatchTypeRowVm? _draftRow;
+
+    /// <summary>进入新建前的选中项 (取消时恢复)。</summary>
+    private MatchTypeRowVm? _selectionBeforeCreate;
+
+    /// <summary>选择钉住期间的重入保护。</summary>
+    private bool _isPinningSelection;
 
     /// <summary>当前选中行 (右侧详情与底部按钮的作用对象)。</summary>
     [ObservableProperty]
@@ -578,14 +607,17 @@ public sealed partial class MatchTypesPageViewModel : ObservableObject, ILanguag
 
     public bool HasSelection => SelectedRow is not null;
 
-    /// <summary>仅自定义类型可编辑。</summary>
-    public bool CanEditSelected => SelectedRow?.IsCustom == true;
+    /// <summary>列表操作按钮可用性: 内联表单打开时一律禁用 (交给表单自身的两条保存路径)。</summary>
+    public bool CanUseActions => Editor is null;
 
-    /// <summary>仅自定义类型可删除。</summary>
-    public bool CanRemoveSelected => SelectedRow?.IsCustom == true;
+    /// <summary>仅自定义类型可编辑 (且不在编辑态)。</summary>
+    public bool CanEditSelected => CanUseActions && SelectedRow?.IsCustom == true;
 
-    /// <summary>「配置行为」仅对"尚未配置行为"的自定义类型可用。</summary>
-    public bool CanSetAction => SelectedRow is { IsCustom: true, NeedsBehavior: true };
+    /// <summary>仅自定义类型可删除 (且不在编辑态)。</summary>
+    public bool CanRemoveSelected => CanUseActions && SelectedRow?.IsCustom == true;
+
+    /// <summary>「配置行为」仅对"尚未配置行为"的自定义类型可用 (且不在编辑态)。</summary>
+    public bool CanSetAction => CanUseActions && SelectedRow is { IsCustom: true, NeedsBehavior: true };
 
     /// <summary>尚无任何自定义类型。</summary>
     public bool HasNoCustomTypes => Config.MatchTypes.Count == 0;
@@ -616,8 +648,45 @@ public sealed partial class MatchTypesPageViewModel : ObservableObject, ILanguag
         foreach (var mt in Config.MatchTypes.Where(t => t.Kind == "fileExt")) Rows.Add(BuildRow(mt));
 
         foreach (var r in Rows) r.NotifyDerived();
-        SelectedRow = keep is null ? null : Rows.FirstOrDefault(r => r.Id == keep);
+        if (_draftRow is not null)
+        {
+            // 新建期间列表被重建 (语言切换 / 保存回调): 重新追加草稿行并保持选中
+            _draftRow = CreateDraftRow();
+            Rows.Add(_draftRow);
+            SelectedRow = _draftRow;
+        }
+        else
+        {
+            SelectedRow = keep is null ? null : Rows.FirstOrDefault(r => r.Id == keep);
+        }
         OnPropertyChanged(nameof(HasNoCustomTypes));
+    }
+
+    /// <summary>
+    /// 构造草稿行: 列表最末的"正在创建、尚未填写"占位项。
+    /// 文案 = 标题「新建匹配类型」/ 状态「新建中」/ 副标题「尚未填写」; 文字用弱化色 (见视图 IsDraft 样式)。
+    /// </summary>
+    private MatchTypeRowVm CreateDraftRow() => new()
+    {
+        Id = DraftRowId,
+        Kind = "text",
+        IsBuiltin = false,
+        IsDraft = true,
+        Label = I18n.T("2522"),
+        Summary = I18n.T("2579"),
+    };
+
+    /// <summary>
+    /// 新建期间把选择钉在草稿行上 —— 避免出现"选中行 ≠ 正在编辑的对象"的错位
+    /// (右窗在编辑草稿, 左列表却高亮别的行)。保存/取消时草稿行移除后即解除。
+    /// </summary>
+    partial void OnSelectedRowChanged(MatchTypeRowVm? value)
+    {
+        if (_isPinningSelection || _draftRow is null) return;
+        if (ReferenceEquals(value, _draftRow)) return;
+        _isPinningSelection = true;
+        SelectedRow = _draftRow;
+        _isPinningSelection = false;
     }
 
     /// <summary>构造自定义类型的列表行。</summary>
@@ -685,6 +754,10 @@ public sealed partial class MatchTypesPageViewModel : ObservableObject, ILanguag
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEditorOpen))]
+    [NotifyPropertyChangedFor(nameof(CanUseActions))]
+    [NotifyPropertyChangedFor(nameof(CanEditSelected))]
+    [NotifyPropertyChangedFor(nameof(CanRemoveSelected))]
+    [NotifyPropertyChangedFor(nameof(CanSetAction))]
     private MatchTypeEditorVm? _editor;
 
     public bool IsEditorOpen => Editor is not null;
@@ -701,6 +774,10 @@ public sealed partial class MatchTypesPageViewModel : ObservableObject, ILanguag
     private async Task OpenCreateAsync()
     {
         if (Api is not null && !BehaviorCatalog.Loaded) await BehaviorCatalog.LoadAsync(Api);
+        _selectionBeforeCreate = SelectedRow;   // 取消时恢复
+        _draftRow = CreateDraftRow();
+        Rows.Add(_draftRow);                    // 列表最末: 正在创建、尚未填写
+        SelectedRow = _draftRow;
         Editor = new MatchTypeEditorVm(this, null);
     }
 
@@ -713,7 +790,17 @@ public sealed partial class MatchTypesPageViewModel : ObservableObject, ILanguag
     }
 
     /// <summary>关闭面板 (取消)。</summary>
-    public void CloseEditor() => Editor = null;
+    /// <summary>
+    /// 关闭内联表单: 移除草稿行; 若当前选中行已不在列表 (取消路径) 则恢复进入新建前的选中项。
+    /// 保存路径下 NoteCreated 已把选中指向新建出的真实项, 故不会被覆盖。
+    /// </summary>
+    public void CloseEditor()
+    {
+        foreach (var draft in Rows.Where(r => r.IsDraft).ToList()) Rows.Remove(draft);
+        _draftRow = null;
+        if (SelectedRow is null || !Rows.Contains(SelectedRow)) SelectedRow = _selectionBeforeCreate;
+        Editor = null;
+    }
 
     // ------------------------------------------------------------- 删除
 

@@ -1,14 +1,14 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using KeyFlux.Settings.Models;
 using KeyFlux.Settings.ViewModels;
 
 namespace KeyFlux.Settings.Views;
 
 /// <summary>
-/// 行为库窗口 (CONTRACTS §3.9): 浏览/新建/编辑/删除行为包; 新建与编辑打开
-/// <see cref="BehaviorEditWindow"/> 模态表单; 变更标记 IsDirty, 「立即生效」显式重启引擎。
+/// 行为库窗口 (CONTRACTS §3.9): 浏览/新建/编辑/删除行为包; 变更标记 IsDirty, 「立即生效」显式重启引擎。
+/// 新建与编辑**在本窗右侧详情区就地展开表单** (不再弹 <c>BehaviorEditWindow</c>, 避免三层弹窗);
+/// 表单的保存/取消直接绑定 VM 命令 (<c>SaveEditorCommand</c> / <c>CancelEditorCommand</c>), 此处只转发列表操作。
 /// </summary>
 public partial class BehaviorLibraryWindow : Window
 {
@@ -42,36 +42,24 @@ public partial class BehaviorLibraryWindow : Window
         }
     }
 
-    private async void OnNewClick(object? sender, RoutedEventArgs e)
-        => await OpenEditAsync(null);
+    /// <summary>「新建行为」: 就地展开空白表单 (不弹窗)。</summary>
+    private void OnNewClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is BehaviorLibraryViewModel vm) vm.OpenCreate();
+    }
 
-    private async void OnEditClick(object? sender, RoutedEventArgs e)
+    /// <summary>「编辑行为」: 就地展开填充表单 (仅自定义包)。</summary>
+    private void OnEditClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not BehaviorLibraryViewModel vm) return;
-        if (vm.SelectedRow is { } row) await OpenEditAsync(row.Pack);
+        if (vm.SelectedRow is { IsUser: true } row) vm.OpenEdit(row.Pack);
     }
 
     /// <summary>列表行双击 = 编辑行为 (仅自定义包; 内置包只读 ⇒ 无操作)。</summary>
-    private async void OnRowDoubleTapped(object? sender, TappedEventArgs e)
+    private void OnRowDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is not BehaviorLibraryViewModel vm) return;
-        if (vm.SelectedRow is { IsUser: true } row) await OpenEditAsync(row.Pack);
-    }
-
-    private async Task OpenEditAsync(BehaviorPack? existing)
-    {
-        if (DataContext is not BehaviorLibraryViewModel vm) return;
-        var dialog = new BehaviorEditWindow { DataContext = new BehaviorEditViewModel(vm.Main, existing) };
-        await dialog.ShowDialog(this);
-        if (dialog.Saved)
-        {
-            vm.IsDirty = true;
-            ReloadSilently(dialog.DataContext is BehaviorEditViewModel form ? form.SavedId : null);
-        }
-        else
-        {
-            ReloadSilently();
-        }
+        if (vm.SelectedRow is { IsUser: true } row) vm.OpenEdit(row.Pack);
     }
 
     private async void OnDeleteClick(object? sender, RoutedEventArgs e)

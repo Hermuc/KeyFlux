@@ -56,12 +56,6 @@ public partial class MatchTypesPageView : UserControl
         }
     }
 
-    /// <summary>底部「关闭」(键 1): 关掉宿主窗口 (弹窗内容与外壳 1:1, 故直接关窗口)。</summary>
-    private void OnClose(object? sender, RoutedEventArgs e)
-    {
-        if (TopLevel.GetTopLevel(this) is Window win) win.Close();
-    }
-
     /// <summary>
     /// 列表行双击 = 主操作 (与底部按钮同义, 提升便捷性):
     /// 自定义类型 → 编辑; 未配置行为的类型 → 配置行为; 内置类型无操作。

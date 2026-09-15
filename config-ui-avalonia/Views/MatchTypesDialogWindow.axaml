@@ -5,7 +5,7 @@
         x:Class="KeyFlux.Settings.Views.MatchTypesDialogWindow"
         x:DataType="vm:MatchTypesPageViewModel"
         Title="Setting"
-        Width="900" Height="620" MinWidth="760" MinHeight="520"
+        Width="1000" Height="680" MinWidth="840" MinHeight="560"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
         Background="{DynamicResource ClaudeWindowSurfaceBrush}">

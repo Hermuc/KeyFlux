@@ -1530,5 +1530,13 @@
   "2577": {
     "zh": "仅自定义类型可编辑或删除",
     "en": "Only custom types can be edited or deleted."
+  },
+  "2578": {
+    "zh": "新建中",
+    "en": "Creating…"
+  },
+  "2579": {
+    "zh": "尚未填写",
+    "en": "Not filled in yet"
   }
 }
