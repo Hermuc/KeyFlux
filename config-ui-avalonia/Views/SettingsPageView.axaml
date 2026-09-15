@@ -246,12 +246,24 @@
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=405}" />
           </Button>
 
-          <!-- 表头 -->
-          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,6">
-            <TextBlock Width="124" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=501}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-            <TextBlock Width="120" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=502}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-            <TextBlock Width="128" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=503}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-            <TextBlock Width="52" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=504}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+          <!-- 表头 (2026-09-15 布局重构): 原为 StackPanel+Spacing=6 加在标签【之后】,
+               而数据行把同值 6px 当作【列内右边距】—— 两者不等价, 导致每列递增错位 6px
+               (实测 触发键 6 / 上层 12 / 开关 18)。改为与数据行**同一套列定义 + ColumnSpacing**,
+               对齐成为结构保证。此处只需前 4 列: 列 4 不影响更前列的位置。
+               列宽须与下方行 Grid 逐字保持同步 -->
+          <StackPanel DockPanel.Dock="Top">
+            <!-- 列定义字符串必须与下方数据行 Grid **逐字相同** (含尾部 * 列):
+                 两 Grid 可宽相同 (456) 时, 只有定义全等才能保证列宽逐个相等 ——
+                 实测表头若省掉 * 列, 余量 14px 的分配方式不同, 会使列宽变成 119/105/117/45
+                 (数据行 118/104/116/44), 仍残留 1px/列的累积错位 -->
+            <Grid ColumnDefinitions="118,104,116,44,20,*" ColumnSpacing="10">
+              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=501}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+              <TextBlock Grid.Column="1" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=502}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+              <TextBlock Grid.Column="2" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=503}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+              <TextBlock Grid.Column="3" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=504}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+            </Grid>
+            <!-- 表头分隔发丝线: 让「表头 / 数据」读作两个层次, 替代原先仅靠 6px 空白区分 -->
+            <Border Height="1" Margin="0,7,0,3" Background="{StaticResource ClaudeBorderCreamBrush}" />
           </StackPanel>
 
           <!-- 表行 -->
@@ -259,20 +271,25 @@
             <ItemsControl ItemsSource="{Binding KeymapRows}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:KeymapRowViewModel">
-                  <!-- 行体包 Border: 悬停 Sand 底 (keymapRow 样式), 行距 Margin 从 Grid 移到 Border -->
-                  <Border Classes="keymapRow" Margin="0,2">
-                    <Grid ColumnDefinitions="124,120,128,52,*">
+                  <!-- 行体包 Border: 悬停 Sand 底 (keymapRow 样式);
+                       垂直 Margin 2 -> 4 (2026-09-15「清爽透气」): 相邻行净空 4 -> 8px -->
+                  <Border Classes="keymapRow" Margin="0,4">
+                    <!-- 列定义 + ColumnSpacing 必须与上方表头 Grid 的前 4 列**逐字一致** (对齐靠此保证);
+                         列间距 6 -> 10 (经 ColumnSpacing 统一, 不再用逐列 Margin 制造不等价间距);
+                         末列固定 20 放删除键 + 尾随 * 吸收余量: 按钮右缘 442, 让开浮层滚动条 (446 起),
+                         修复原先按钮被滚动条压住 4px 的问题 -->
+                    <Grid ColumnDefinitions="118,104,116,44,20,*" ColumnSpacing="10">
                     <!-- 名称 (失焦复刻 checkKeymapData) -->
                     <TextBox Text="{Binding Name}" LostFocus="OnRowFieldLostFocus"
-                             Margin="0,0,6,0" Padding="6,4" FontSize="13" />
+                             Padding="9,4" FontSize="13" />
                     <!-- 触发键 -->
                     <TextBox Grid.Column="1" Text="{Binding Hotkey}" LostFocus="OnRowFieldLostFocus"
-                             Margin="0,0,6,0" Padding="6,4" FontSize="13" />
+                             Padding="9,4" FontSize="13" />
                     <!-- 上层 (被依赖时禁用, 复刻 hasSubKeymap) -->
                     <ComboBox Grid.Column="2" ItemsSource="{Binding ParentOptions}"
                               SelectedItem="{Binding ParentSelection}"
                               IsEnabled="{Binding !HasSubKeymap}"
-                              Margin="0,0,6,0" Padding="6,3" FontSize="13"
+                              Padding="9,3" FontSize="13"
                               HorizontalAlignment="Stretch" MinWidth="0">
                       <ComboBox.ItemTemplate>
                         <DataTemplate x:DataType="models:Keymap">
@@ -285,6 +302,7 @@
                                   VerticalAlignment="Center" />
                     <!-- 删除 (启用中/被依赖时禁用, 复刻 disabledKeymapOption): 背退格键形按钮 -->
                     <Button Grid.Column="4" Theme="{StaticResource DeleteKey}"
+                              HorizontalAlignment="Left"
                               IsEnabled="{Binding CanDelete}"
                               ToolTip.Tip="{Binding DeleteTip}"
                               Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).RemoveKeymapRowCommand}"
