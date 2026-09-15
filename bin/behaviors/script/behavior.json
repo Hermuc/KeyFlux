@@ -1,7 +1,7 @@
 {
   "id": "script",
   "name": "AHK 脚本",
-  "nameEn": "AHK Script",
+  "nameEn": "Run AHK script",
   "version": "1.0.0",
   "specVersion": 1,
   "description": "执行一段 AutoHotkey 脚本片段, %selected% 会替换为字符串字面量",

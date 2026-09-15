@@ -13,6 +13,7 @@ type ConfigDTO struct {
 	Options        OptionsDTO        `json:"options,omitempty"`
 	SelectedAction SelectedActionDTO `json:"selectedAction"`
 	FileGroups     []FileGroupDTO    `json:"fileGroups"`
+	MatchTypes     []MatchTypeDTO    `json:"matchTypes"`
 	OverviewDocMd  string            `json:"overviewDocMd,omitempty"`
 }
 
@@ -52,6 +53,24 @@ type FileGroupDTO struct {
 	Name  string   `json:"name"`
 	Label string   `json:"label"`
 	Exts  []string `json:"exts"`
+}
+
+// MatchTypeDTO / MatchRuleDTO 与 model.MatchType / model.MatchRule 逐字段对应,
+// JSON tag 完全一致 (无 omitempty, 与 FileGroups 同口径的空集合恒数组契约)。
+// 漏加会导致 PUT /config 保存时静默丢光全部自定义匹配类型 (方案 T5/G1)。
+type MatchTypeDTO struct {
+	ID      string         `json:"id"`
+	Label   string         `json:"label"`
+	LabelEn string         `json:"labelEn,omitempty"`
+	Kind    string         `json:"kind"`
+	Rules   []MatchRuleDTO `json:"rules,omitempty"`
+	Exts    []string       `json:"exts,omitempty"`
+	Order   int            `json:"order,omitempty"`
+}
+
+type MatchRuleDTO struct {
+	Op    string `json:"op"`
+	Value string `json:"value"`
 }
 
 type RuleOptionsDTO struct {
@@ -189,8 +208,38 @@ func ConfigToDTO(cfg *model.Config) *ConfigDTO {
 	} else {
 		dto.FileGroups = []FileGroupDTO{}
 	}
+	// 空集合恒输出 [] 而非缺键/null (与 FileGroups 同口径的 wire 契约);
+	// 漏此分支会让 GET /config 缺 matchTypes 键, 旧 UI 回退时 PUT 丢数据 (G1)。
+	if cfg.MatchTypes != nil {
+		dto.MatchTypes = make([]MatchTypeDTO, len(cfg.MatchTypes))
+		for i, mt := range cfg.MatchTypes {
+			dto.MatchTypes[i] = MatchTypeDTO{
+				ID:      mt.ID,
+				Label:   mt.Label,
+				LabelEn: mt.LabelEn,
+				Kind:    mt.Kind,
+				Rules:   matchRulesToDTO(mt.Rules),
+				Exts:    mt.Exts,
+				Order:   mt.Order,
+			}
+		}
+	} else {
+		dto.MatchTypes = []MatchTypeDTO{}
+	}
 	dto.SelectedAction = selectedActionToDTO(cfg.SelectedAction)
 	return dto
+}
+
+// matchRulesToDTO 把 model.MatchRule 切片投影为 DTO (nil → 空切片, 维持恒数组契约)。
+func matchRulesToDTO(rules []model.MatchRule) []MatchRuleDTO {
+	if rules == nil {
+		return []MatchRuleDTO{}
+	}
+	out := make([]MatchRuleDTO, len(rules))
+	for i, r := range rules {
+		out[i] = MatchRuleDTO{Op: r.Op, Value: r.Value}
+	}
+	return out
 }
 
 func keymapToDTO(km model.Keymap) KeymapDTO {
@@ -388,7 +437,34 @@ func DTOToConfig(dto *ConfigDTO) *model.Config {
 			cfg.FileGroups[i] = model.FileGroup{Name: fg.Name, Label: fg.Label, Exts: fg.Exts}
 		}
 	}
+	// 反向映射: 漏此分支 PUT /config 会把全部自定义匹配类型抹掉 (G1)。
+	if dto.MatchTypes != nil {
+		cfg.MatchTypes = make([]model.MatchType, len(dto.MatchTypes))
+		for i, mt := range dto.MatchTypes {
+			cfg.MatchTypes[i] = model.MatchType{
+				ID:      mt.ID,
+				Label:   mt.Label,
+				LabelEn: mt.LabelEn,
+				Kind:    mt.Kind,
+				Rules:   matchRulesFromDTO(mt.Rules),
+				Exts:    mt.Exts,
+				Order:   mt.Order,
+			}
+		}
+	}
 	return cfg
+}
+
+// matchRulesFromDTO 把 MatchRuleDTO 切片投影回 model (nil → 空切片)。
+func matchRulesFromDTO(rules []MatchRuleDTO) []model.MatchRule {
+	if rules == nil {
+		return []model.MatchRule{}
+	}
+	out := make([]model.MatchRule, len(rules))
+	for i, r := range rules {
+		out[i] = model.MatchRule{Op: r.Op, Value: r.Value}
+	}
+	return out
 }
 
 func dtoToKeymap(km KeymapDTO) model.Keymap {

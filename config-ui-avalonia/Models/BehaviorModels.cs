@@ -35,6 +35,13 @@ public sealed class BehaviorPack
     [JsonPropertyName("permissions")]
     public List<string>? Permissions { get; set; }
 
+    /// <summary>
+    /// 强绑定的自定义匹配类型 id (方案 C7 路径①: 建类型时同时建专属行为)。
+    /// <b>仅供 UI 展示</b> —— 覆盖判定仍由 appliesTo 唯一裁决 (与 Go behaviors.Pack.BoundTypeID 一致)。
+    /// </summary>
+    [JsonPropertyName("boundTypeId")]
+    public string? BoundTypeId { get; set; }
+
     /// <summary>来源标记 (builtin/user), 后端加载期附加, 不属于包文件本身。</summary>
     [JsonPropertyName("source")]
     public string? Source { get; set; }

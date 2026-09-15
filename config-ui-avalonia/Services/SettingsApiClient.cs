@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using KeyFlux.Settings.Models;
+using MatchType = KeyFlux.Settings.Models.MatchType;
 
 namespace KeyFlux.Settings.Services;
 
@@ -73,6 +74,11 @@ public sealed class SelectedActionTestRequest
     /// <summary>页面编辑中的 selectedAction 快照 (未保存的修改也能测试); null 时后端回退读取磁盘配置。</summary>
     [JsonPropertyName("selectedAction")]
     public SelectedAction? SelectedAction { get; set; }
+
+    /// <summary>页面编辑中的自定义匹配类型 (方案 C7; 未保存的新类型也能参与模拟测试);
+    /// null 时后端回退读取磁盘配置 (与 §D.3.10 同步)。</summary>
+    [JsonPropertyName("matchTypes")]
+    public List<MatchType>? MatchTypes { get; set; }
 }
 
 /// <summary>POST /api/selected-action/test 响应菜单项 (key 从 1 起, 顺序即映射 entries 顺序)。</summary>

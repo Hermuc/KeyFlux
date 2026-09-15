@@ -54,8 +54,13 @@ public static class BehaviorCatalog
         if (!string.Equals(e.Type, matchType, StringComparison.OrdinalIgnoreCase)) return false;
         if (string.Equals(e.Type, "textType", StringComparison.OrdinalIgnoreCase))
         {
-            return values.Count == 1 &&
-                   string.Equals(e.Value?.Trim(), values[0], StringComparison.OrdinalIgnoreCase);
+            if (values.Count != 1) return false;
+            var v = values[0];
+            // 精确匹配 (专属前提), 或 plain 通配前提覆盖任意自定义文本类型引用 (两段式覆盖,
+            // 留桩不死胡同 —— 对齐 Go behaviors.entryCovers 的 plain && IsCustomRef 规则)。
+            return string.Equals(e.Value?.Trim(), v, StringComparison.OrdinalIgnoreCase)
+                   || (string.Equals(e.Value?.Trim(), "plain", StringComparison.OrdinalIgnoreCase)
+                       && IsCustomRef(v));
         }
         var packWildcard = e.Exts?.Any(x => x.Trim() == "*") == true;
         foreach (var v in values)
@@ -75,6 +80,40 @@ public static class BehaviorCatalog
     }
 
     /// <summary>
+    /// 精确覆盖 (不含 plain 继承 / * 通配): 用于"专属 / 继承"分段。
+    /// 自定义文本类型 (type: 引用) 若无包显式声明 appliesTo = 该引用, 则其覆盖集结构上式为零专属,
+    /// 由 plain 继承段兜底 —— 留桩列表恒非空, 不死胡同。
+    /// </summary>
+    private static bool CoversDedicated(BehaviorPack p, string matchType, List<string> values)
+        => p.AppliesTo.Any(e => EntryCoversExact(e, matchType, values));
+
+    private static bool EntryCoversExact(BehaviorAppliesTo e, string matchType, List<string> values)
+    {
+        if (!string.Equals(e.Type, matchType, StringComparison.OrdinalIgnoreCase)) return false;
+        if (string.Equals(e.Type, "textType", StringComparison.OrdinalIgnoreCase))
+        {
+            return values.Count == 1 &&
+                   string.Equals(e.Value?.Trim(), values[0], StringComparison.OrdinalIgnoreCase);
+        }
+        // fileExt: 精确覆盖要求前提非 * 通配且逐值命中
+        if (e.Exts?.Any(x => x.Trim() == "*") == true) return false;
+        foreach (var v in values)
+        {
+            if (v == "*") return false;
+            if (!(e.Exts?.Any(x => string.Equals(
+                    x.Trim().Trim('.'), v, StringComparison.OrdinalIgnoreCase)) == true))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>是否 "type:" 自定义引用 (与 Go behaviors.IsCustomRef 同约定; 仅纯前缀判断, 不依赖类型定义)。</summary>
+    private static bool IsCustomRef(string v)
+        => v.StartsWith("type:", StringComparison.Ordinal);
+
+    /// <summary>
     /// 覆盖某前提的行为列表, 展示序: 专属前提 (非通配) 在前、通配在后, 各自保持目录序。
     /// 语义与旧静态词表的关键差异: 通配行为 (run/script 等) 对任意后缀规则恒适用 ——
     /// 旧「图片分组隐藏 run」属展示层过度收窄, 由 default 推荐引导替代硬过滤。
@@ -87,12 +126,18 @@ public static class BehaviorCatalog
         foreach (var p in Packs)
         {
             if (!Covers(p, matchType, values)) continue;
-            var isGeneric = p.AppliesTo.Any(e => string.Equals(e.Type, matchType, StringComparison.OrdinalIgnoreCase)
-                                                 && e.Exts?.Contains("*") == true);
-            (isGeneric ? generic : specific).Add(p);
+            // 专属 (精确 appliesTo 命中) 在前, 继承 (plain 通配 / * 通配) 在后
+            (CoversDedicated(p, matchType, values) ? specific : generic).Add(p);
         }
         return [.. specific, .. generic];
     }
+
+    /// <summary>
+    /// 某前提是否拥有"专属"行为 (精确 appliesTo 命中, 不含 plain 继承 / * 通配)。
+    /// 留桩判定: 自定义文本类型引用若无任何专属包, 即"待补行为" (继承 plain 的 5 个内置包恒可见)。
+    /// </summary>
+    public static bool HasDedicatedBehaviorFor(string matchType, string matchValue)
+        => Packs.Any(p => CoversDedicated(p, matchType, RuleValues(matchType, matchValue)));
 
     /// <summary>前提桶默认行为: default 标记优先 (目录序), 回退第一条覆盖包。</summary>
     public static string? DefaultFor(string matchType, string matchValue)

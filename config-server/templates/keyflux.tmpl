@@ -71,7 +71,7 @@ InitKeymap()
 {{ .PathVariables }}
 {{ if .CapslockAbbrEnabled }}  ; 缩写命令注册表 (阶段 4: 取代 ExecCapslockAbbr 内的 switch)
 {{ abbrRegistryCode .CapslockAbbr "capslock" "  " }}{{ end }}{{ if .SemicolonAbbrEnabled }}{{ abbrRegistryCode .SemicolonAbbr "semicolon" "  " }}{{ end }}  ; 窗口组
-{{ .WindowGroups }}
+{{ .WindowGroups }}{{ .CustomMatchTypes }}
   KeymapManager.GlobalKeymap.DisabledAt := {{ GroupDisableKeyFlux .Options.WindowGroups }}
 {{range .EnabledKeymaps}}{{renderKeymap .}}{{end}}
 {{ selectedActionCode .SelectedAction }}

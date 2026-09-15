@@ -291,6 +291,9 @@
     <!-- ===================== 顶部: 标题 + 管理行为… + 添加映射 ===================== -->
     <DockPanel Grid.Row="0" Margin="0,0,0,12" controls:ModalBlur.IsActive="{Binding IsAddPanelOpen}">
       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Button Command="{Binding ManageMatchTypesCommand}" Background="Transparent" BorderThickness="1"
+                BorderBrush="{StaticResource ClaudeBorderCreamBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,7" FontSize="13"
+                Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2519}" />
         <Button Click="OnManageBehaviors" Background="Transparent" BorderThickness="1"
                 BorderBrush="{StaticResource ClaudeBorderCreamBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,7" FontSize="13"
                 Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1083}" />
@@ -473,7 +476,26 @@
                       </DataTemplate>
                     </ComboBox.ItemTemplate>
                   </ComboBox>
+                  <!-- 内联新建入口: 打开匹配类型弹窗, 新建成功后自动选中该类型 (少一步来回) -->
+                  <Button Command="{Binding CreateTypeCommand}"
+                          Background="Transparent" BorderThickness="0" Padding="0" Margin="0,2,0,0"
+                          FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" HorizontalAlignment="Left"
+                          Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2553}" />
                 </StackPanel>
+
+                <!-- 留桩提示条 (自定义文本类型暂无专属行为; 2517 文案 + 2518 跳转, §D.2.4) -->
+                <Border IsVisible="{Binding ShowStubHint}"
+                        Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="10,8">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2517}"
+                               FontSize="12" Foreground="{StaticResource ClaudeDarkWarmBrush}" TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                    <Button Click="OnCreateDedicatedBehavior"
+                            Background="Transparent" BorderThickness="0" Padding="0" Margin="0"
+                            FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" VerticalAlignment="Center"
+                            Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2518}" />
+                  </StackPanel>
+                </Border>
 
                 <!-- 步骤 2: 条件值 (仅文件后缀) -->
                 <StackPanel Spacing="4" IsVisible="{Binding IsFileExt}">

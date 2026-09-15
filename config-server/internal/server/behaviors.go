@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"settings/internal/behaviors"
 	"settings/internal/proc"
+	"settings/internal/script"
 	"settings/internal/script/model"
 )
 
@@ -17,6 +18,25 @@ import (
 // 增删多个行为时的重启风暴 (与「保存设置即重启」的方案 CRUD 语义刻意区分)。
 
 const userBehaviorsDir = "../data/behaviors"
+
+// matchTypeResolver 构造"自定义匹配类型存在性"钩子 (方案 C7 §D.3.5): 行为包的前提值
+// (appliesTo.value) 与 boundTypeId 可以引用 type:<id>, 保存期要求该 id 已定义。
+// textType 引用查 config.json 的 matchTypes[], fileExt 引用查 fileGroups[] ——
+// 两者共用同一 "type:" 命名空间, 故任一命中即视为存在。
+// 配置读取失败时返回 nil: 退化为"不校验存在性"(容忍口径), 不因读不到配置而阻塞保存。
+func matchTypeResolver() func(string) bool {
+	cfg, err := script.ParseConfig("../data/config.json")
+	if err != nil {
+		return nil
+	}
+	return func(id string) bool {
+		if cfg.FindMatchType(id) != nil {
+			return true
+		}
+		_, ok := cfg.FileGroupExts(id)
+		return ok
+	}
+}
 
 func loadBehaviorCatalog() *behaviors.Catalog {
 	builtinDir := "behaviors"
@@ -74,7 +94,7 @@ func CreateBehaviorHandler(c *gin.Context) {
 	if rejectIfScriptEntry(c, &p) {
 		return
 	}
-	if err := behaviors.WriteUserPack(userBehaviorsDir, &p); err != nil {
+	if err := behaviors.WriteUserPack(userBehaviorsDir, &p, matchTypeResolver()); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
@@ -98,7 +118,7 @@ func UpdateBehaviorHandler(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "仅可编辑用户自定义行为"})
 		return
 	}
-	if err := behaviors.WriteUserPack(userBehaviorsDir, &p); err != nil {
+	if err := behaviors.WriteUserPack(userBehaviorsDir, &p, matchTypeResolver()); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}

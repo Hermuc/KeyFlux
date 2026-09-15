@@ -29,6 +29,8 @@ type selectedActionTestRequest struct {
 	// 前端编辑中的 selectedAction 快照 (未保存的修改也能测试, 不落盘);
 	// 为空时回退读取磁盘配置 (镜像旧 TestActionSchemeHandler 的快照优先模式)
 	SelectedAction *model.SelectedAction `json:"selectedAction"`
+	// 编辑中未保存的自定义匹配类型 (未保存的新类型也要能测); 缺省时回退读取磁盘运行配置。
+	MatchTypes []model.MatchType `json:"matchTypes"`
 }
 
 // TestSelectedActionHandler 模拟测试: 输入选中内容, 返回第一个命中的 mapping、
@@ -42,16 +44,25 @@ func TestSelectedActionHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		panic(err)
 	}
+	// 注册表: 优先用请求体携带的未保存类型, 否则回退磁盘运行配置 (容忍缺失, 不 panic),
+	// 保证"编辑中自定义类型"与"已保存运行配置"两种场景都能解析 type: 引用。
+	cfg := &model.Config{}
+	if diskCfg, err := script.ParseConfig("../data/config.json"); err == nil {
+		cfg = diskCfg
+	}
+	if req.MatchTypes != nil {
+		cfg.MatchTypes = req.MatchTypes
+	}
 	sa := req.SelectedAction
 	if sa == nil {
-		sa = loadSelectedAction()
+		sa = cfg.SelectedAction
 	}
 	// 校验组合合法性 (cat 为 nil 时校验内部容忍, 见 script.ValidateSelectedAction)
-	if err := script.ValidateSelectedAction(sa, loadBehaviorCatalog()); err != nil {
+	if err := script.ValidateSelectedAction(sa, loadBehaviorCatalog(), cfg); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
-	m := script.MatchSelectedAction(sa, req.IsFile, req.Content)
+	m := script.MatchSelectedAction(sa, req.IsFile, req.Content, cfg)
 	if m == nil {
 		c.JSON(http.StatusOK, gin.H{"matched": false})
 		return

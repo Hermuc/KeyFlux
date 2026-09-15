@@ -147,8 +147,9 @@ func SaveConfigHandler(debug bool) gin.HandlerFunc {
 		// DTO→model 映射在校验与落盘之前
 		config := DTOToConfig(&dto)
 
-		// 校验选中动作单键分发组合合法性 (entry 引用的行为必须存在且覆盖匹配前提), 非法组合拒绝保存
-		if err := script.ValidateSelectedAction(config.SelectedAction, loadBehaviorCatalog()); err != nil {
+		// 校验选中动作单键分发组合合法性 (entry 引用的行为必须存在且覆盖匹配前提), 非法组合拒绝保存。
+		// 传入 config 作为自定义类型注册表, 否则含 type: 引用的映射会在保存校验被误拒 (G1 同源)。
+		if err := script.ValidateSelectedAction(config.SelectedAction, loadBehaviorCatalog(), config); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "保存失败: " + err.Error()})
 			return
 		}

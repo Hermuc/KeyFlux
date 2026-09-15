@@ -28,6 +28,11 @@ type Plan struct {
 	Abbr           PlanAbbr            `json:"abbr"`
 	SelectedAction PlanSelectedAction  `json:"selectedAction"` // 旧 actionSchemes 段已随「单键分发」重构改造
 	WindowGroups   []model.WindowGroup `json:"windowGroups"`
+	// MatchTypes 自定义匹配类型表 (方案 C7), 与 CustomMatchTypes() 渲染的 AHK 表同源 ——
+	// 供 oracle 比对"运行时解析表"与"生成端意图"。
+	// PlanVersion 不递增的理由: 计划是"消费者按段取用"的加法契约 (tools/oracle.ps1 只读
+	// .abbr), 新增段不改动任何既有段的语义与字段; 递增反而会让未来加载器误判为不兼容格式。
+	MatchTypes []model.MatchType `json:"matchTypes"`
 }
 
 type PlanKeymap struct {
@@ -98,6 +103,7 @@ func BuildPlan(cfg *model.Config) *Plan {
 		Abbr:           planAbbr(cfg),
 		SelectedAction: planSelectedAction(cfg),
 		WindowGroups:   cfg.Options.WindowGroups,
+		MatchTypes:     cfg.MatchTypes,
 	}
 }
 

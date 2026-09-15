@@ -1,7 +1,7 @@
 {
   "id": "search",
   "name": "搜索",
-  "nameEn": "Search",
+  "nameEn": "Search the web",
   "version": "1.0.0",
   "specVersion": 1,
   "description": "把 %selected% 作为关键词搜索, 如 https://bing.com/search?q=%selected%",

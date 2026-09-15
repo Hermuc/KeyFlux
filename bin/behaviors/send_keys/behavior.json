@@ -1,7 +1,7 @@
 {
   "id": "send_keys",
   "name": "发送按键",
-  "nameEn": "Send Keys",
+  "nameEn": "Send keys",
   "version": "1.0.0",
   "specVersion": 1,
   "description": "向当前窗口发送按键序列, 如 ^c; 含选中内容时建议用 {text}%selected% 包裹, 否则内容中的 {Enter} 等会被解析为按键",

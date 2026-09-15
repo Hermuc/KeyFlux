@@ -73,6 +73,23 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     /// <summary>确认对话框委托 (视图注入; 删除映射确认)。</summary>
     public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
 
+    /// <summary>
+    /// 匹配类型弹窗委托 (视图注入): 打开「匹配类型」窗口, 返回**本次新建的类型 id** (取消/无新建为 null)。
+    /// 弹窗关闭时视图内部已完成行为目录重拉, 故此处只需回灌"新建了什么"给调用方 (如添加映射弹窗自动选中)。
+    /// </summary>
+    public Func<Task<string?>>? MatchTypesDialogAsync { get; set; }
+
+    /// <summary>「匹配类型」: 打开弹窗管理自定义匹配类型 (文本特征 / 文件后缀), 关闭后刷新依赖方。</summary>
+    [RelayCommand]
+    private async Task ManageMatchTypesAsync()
+    {
+        if (MatchTypesDialogAsync is null) return;
+        var created = await MatchTypesDialogAsync();
+        // 类型可能增删: 行为勾选列表 (覆盖集) 与添加映射弹窗的类型下拉都要重算
+        RefreshBehaviorOptions();
+        AddPanel?.RefreshTypeOptions(created is null ? null : "type:" + created);
+    }
+
     // ------------------------------------------------------------- 主快捷键 + 启用
 
     /// <summary>主快捷键 (AHK 格式; HotkeyCapture 捕获)。变更后展示未保存提示 (1077)。</summary>
@@ -332,6 +349,7 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
             Content = TestContent,
             IsFile = TestIsFile,
             SelectedAction = snapshot,
+            MatchTypes = Config.MatchTypes, // 未保存的新类型也参与模拟测试 (§D.3.10)
         });
 
         Testing = false;

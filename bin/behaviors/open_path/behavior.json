@@ -1,7 +1,7 @@
 {
   "id": "open_path",
   "name": "打开文件/程序 (系统关联)",
-  "nameEn": "Open File (System Association)",
+  "nameEn": "Open file",
   "version": "1.0.0",
   "specVersion": 1,
   "description": "按系统关联程序打开选中的路径, 等同资源管理器双击",

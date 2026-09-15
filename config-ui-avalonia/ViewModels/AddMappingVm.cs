@@ -17,18 +17,8 @@ public sealed partial class AddMappingVm : ObservableObject
     public AddMappingVm(SelectedActionPageViewModel page)
     {
         _page = page;
-        // 类型下拉: 分组在前, 分隔项居中, 文本特征在后; 分组项即定条件值
-        _typeOptions = [];
-        foreach (var g in page.FileGroups)
-        {
-            _typeOptions.Add(new ComboOption("group:" + g.Name, g.Label));
-        }
-        // 分隔线始终跟随最后一组 (用户要求); 容器压制在 View 层 DropDownOpened 后处理
-        _typeOptions.Add(new("", "", IsSeparator: true));
-        _typeOptions.Add(new("url", I18n.T("1059")));
-        _typeOptions.Add(new("path", I18n.T("1060")));
-        _typeOptions.Add(new("magnet", I18n.T("1061")));
-        _typeOptions.Add(new("plain", I18n.T("1062")));
+        // 类型下拉 (动态源, 方案 C7): 文件分组 + 分隔项 + 内置 4 文本特征 + 配置派生文本类型
+        _typeOptions = ActionSchemeCatalog.BuildTypeOptions(page.Config);
         _typeSelected = _typeOptions.FirstOrDefault(o => !o.IsSeparator);
         if (_typeSelected is not null && IsFileExt)
         {
@@ -71,14 +61,54 @@ public sealed partial class AddMappingVm : ObservableObject
         }
         if (IsFileExt)
         {
-            MatchValue = GroupMatchValue ?? ""; // 分组项: 条件值 = 该组后缀集
+            // 分组项: 条件值 = 展开后缀集; type: 文件引用: 条件值 = 引用本身 (不展开)
+            MatchValue = TypeSelected?.Value?.StartsWith("group:") == true
+                ? GroupMatchValue ?? ""
+                : TypeSelected?.Value ?? "";
+        }
+        else
+        {
+            // 文本特征 (内置 url/path/magnet/plain 或自定义 type:<id> 引用): 条件值即选中值本身
+            MatchValue = TypeSelected?.Value ?? "";
         }
         OnPropertyChanged(nameof(IsFileExt));
+        OnPropertyChanged(nameof(ShowStubHint)); // 留桩提示随选中类型切换
         RebuildPicks(); // 无条件重建: 各类型覆盖集不同 (fileExt 按条件值 / 文本特征按特征词)
     }
 
-    /// <summary>当前类型是否文件后缀分组项 (分组自带后缀集, 条件值输入框不出现)。</summary>
-    public bool IsFileExt => TypeSelected?.Value?.StartsWith("group:") == true;
+    /// <summary>当前类型是否文件后缀类 (分组自带后缀集, 或 type: 文件引用); 二者条件值输入框均不出现。</summary>
+    public bool IsFileExt
+    {
+        get
+        {
+            var v = TypeSelected?.Value;
+            if (v?.StartsWith("group:") == true) return true;
+            if (v?.StartsWith("type:") == true)
+            {
+                // type: 引用: 按配置判定 kind —— text 走文本特征语义, fileExt 走文件后缀语义
+                var id = v["type:".Length..];
+                return _page.Config.MatchTypes.FirstOrDefault(t => t.Id == id)?.Kind == "fileExt";
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 留桩提示可见性: 选中自定义文本类型 (type:&lt;id&gt;, kind=text) 且它"没有任何专属行为"时为真。
+    /// 此时继承段 (plain 覆盖的 5 个内置包) 仍非空, CanConfirm 可用 —— 不死胡同 (§D.2.4)。
+    /// </summary>
+    public bool ShowStubHint
+    {
+        get
+        {
+            var v = TypeSelected?.Value;
+            if (v is null || !v.StartsWith("type:")) return false;
+            var id = v["type:".Length..];
+            var mt = _page.Config.MatchTypes.FirstOrDefault(t => t.Id == id);
+            if (mt is null || mt.Kind != "text") return false;
+            return !BehaviorCatalog.HasDedicatedBehaviorFor("textType", v);
+        }
+    }
 
     /// <summary>分组项对应的后缀集 (matchValue), 非分组项为 null。</summary>
     public string? GroupMatchValue
@@ -88,6 +118,34 @@ public sealed partial class AddMappingVm : ObservableObject
                 ? string.Join(",", exts)
                 : null
             : null;
+
+    /// <summary>
+    /// 「＋ 新建匹配类型」: 打开匹配类型弹窗 (视图经页面 VM 注入), 新建成功后自动选中该类型。
+    /// 弹窗内取消或无新建时返回 null ⇒ 保持当前选择不动。
+    /// </summary>
+    [RelayCommand]
+    private async Task CreateTypeAsync()
+    {
+        if (_page.MatchTypesDialogAsync is null) return;
+        var created = await _page.MatchTypesDialogAsync();
+        if (string.IsNullOrEmpty(created)) return;
+        RefreshTypeOptions("type:" + created);
+    }
+
+    /// <summary>
+    /// 类型下拉重建 (匹配类型弹窗可能增删了自定义类型; 原地清空+重填, 保持实例引用)。
+    /// selectValue 非空时选中它 (并触发 OnTypeSelectedChanged 同步条件值与勾选列表)。
+    /// </summary>
+    public void RefreshTypeOptions(string? selectValue = null)
+    {
+        _typeOptions.Clear();
+        _typeOptions.AddRange(ActionSchemeCatalog.BuildTypeOptions(_page.Config));
+        OnPropertyChanged(nameof(TypeOptions));
+        if (selectValue is null) return;
+        var target = _typeOptions.FirstOrDefault(o => o.Value == selectValue);
+        if (target is not null) TypeSelected = target;
+        else OnPropertyChanged(nameof(IsFileExt));
+    }
 
     // ---- 步骤 2: 条件值 (仅 fileExt) ----
 
@@ -176,13 +234,14 @@ public sealed partial class AddMappingVm : ObservableObject
         foreach (var t in _typeOptions)
         {
             var idx = _typeOptions.IndexOf(t);
+            // 内置 4 文本特征重新翻译 (走 i18n); 分组 / 自定义 type: 标签为用户数据, 不重译
             _typeOptions[idx] = t.Value switch
             {
-                "fileExt" => t with { Label = I18n.T("1031") },
                 "url" => t with { Label = I18n.T("1059") },
                 "path" => t with { Label = I18n.T("1060") },
                 "magnet" => t with { Label = I18n.T("1061") },
-                _ => t with { Label = I18n.T("1062") },
+                "plain" => t with { Label = I18n.T("1062") },
+                _ => t,
             };
         }
         OnPropertyChanged(nameof(TypeOptions));

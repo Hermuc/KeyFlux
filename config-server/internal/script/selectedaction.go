@@ -78,7 +78,7 @@ const maxEntriesPerMapping = 9
 //  5. 条件值合法性: textType 须在词表内, fileExt 归一化后非空 (评审 L1);
 //  6. hotkey 非空 —— 仅启用态要求 (沿用现有渲染口径: 禁用/空热键方案不注册热键,
 //     空方案/出厂默认态 enable=false 可保存, 不把存量空配置锁死在 PUT /config)。
-func ValidateSelectedAction(sa *SelectedAction, cat *behaviors.Catalog) error {
+func ValidateSelectedAction(sa *SelectedAction, cat *behaviors.Catalog, cfg *Config) error {
 	if sa == nil {
 		return nil
 	}
@@ -101,25 +101,23 @@ func ValidateSelectedAction(sa *SelectedAction, cat *behaviors.Catalog) error {
 		if len(m.Entries) > maxEntriesPerMapping {
 			return fmt.Errorf("%s「%s」的行为超过 %d 个 (菜单序号仅支持 1-%d)", matchTypeName(m.MatchType), m.MatchValue, maxEntriesPerMapping, maxEntriesPerMapping)
 		}
-		var values []string
-		switch m.MatchType {
-		case "fileExt":
-			values = behaviors.RefValues(m.MatchType, m.MatchValue)
-			// L1: 归一化后为空 (空串/纯点/纯逗号) 的条件值拒绝, 镜像 textType 词表拒绝风格 ——
-			// 此前 cat==nil (纯 CLI) 时空后缀直接滑过, 生成出不命中任何文件的死映射
-			if len(values) == 0 {
-				return fmt.Errorf("%s「%s」的文件后缀条件值为空或无效, 请填写如 jpg,png (或 * 匹配任意文件)", matchTypeName(m.MatchType), m.MatchValue)
+		// 解析匹配前提值集 (含 type: 引用): 引用悬空或条件非法即拒绝;
+		// 非 type: 值原样透传 (内置 4 文本特征走 KnownTextTypes, 文件后缀走 RefValues)。
+		matchType, values, ok := ResolveMappingValues(cfg, m)
+		if !ok {
+			// 失败原因分两类, 分别给出可执行的提示 (合并成一句会让两种场景都失去指向性);
+			// 文案口径: 面向非专业用户, 用词与设置界面「匹配类型」弹窗一致 (术语表见实施计划 §8.1)。
+			if isCustomRef(m.MatchValue) {
+				return fmt.Errorf("未找到引用的匹配类型「%s」，请先在「匹配类型」中创建", strings.TrimPrefix(m.MatchValue, "type:"))
 			}
-		case "textType":
-			v := strings.ToLower(strings.TrimSpace(m.MatchValue))
-			if !behaviors.KnownTextTypes[v] {
-				return fmt.Errorf("未知的文本特征「%s」, 可选: 链接 / 路径 / 磁力链接 / 纯文本", m.MatchValue)
+			if m.MatchType == "textType" {
+				return fmt.Errorf("未知的文本特征「%s」，可选：链接 / 路径 / 磁力链接 / 纯文本（或在「匹配类型」中自定义）", m.MatchValue)
 			}
-			values = []string{v}
-		default:
-			// 未知匹配类型不在保存时拒绝 (沿用 textRegex/fileGroup 移除任务的口径:
-			// 不把含遗留数据的旧配置锁死在 PUT /config), 该 mapping 运行时不命中
-			continue
+			return fmt.Errorf("文件扩展名「%s」无效，请填写如 jpg,png（或 * 表示任意文件）", m.MatchValue)
+		}
+		// L1: 文件扩展名归一化后为空拒绝 (空串/纯点/纯逗号), 镜像 textType 词表拒绝风格
+		if len(values) == 0 {
+			return fmt.Errorf("文件扩展名「%s」无效，请填写如 jpg,png（或 * 表示任意文件）", m.MatchValue)
 		}
 		for j := range m.Entries {
 			e := &m.Entries[j]
@@ -127,8 +125,8 @@ func ValidateSelectedAction(sa *SelectedAction, cat *behaviors.Catalog) error {
 			if cat == nil || (behaviors.BuiltinActionIDs[e.Behavior] && cat.Get(e.Behavior) == nil) {
 				continue
 			}
-			if !cat.Covers(e.Behavior, m.MatchType, values) {
-				return fmt.Errorf("%s「%s」第 %d 项: 行为「%s」与该前提不匹配",
+			if !cat.Covers(e.Behavior, matchType, values) {
+				return fmt.Errorf("%s「%s」第 %d 项: 动作「%s」与该匹配条件不匹配",
 					matchTypeName(m.MatchType), m.MatchValue, j+1, behaviorDisplayName(cat, e.Behavior))
 			}
 		}
@@ -136,16 +134,57 @@ func ValidateSelectedAction(sa *SelectedAction, cat *behaviors.Catalog) error {
 	return nil
 }
 
+// ResolveMappingValues 解析映射的匹配前提为 (matchType, values, ok), 是引用解析的唯一入口,
+// 供生成端/校验/模拟测试共用, 禁止三处各写一份。
+//   - type: 引用: 文本侧查 FindMatchType(kind=text) 返回 values=[matchValue] (供 two-segment 覆盖判定;
+//     值形如 type:<id>, 既支持"专属包 value=type:<id>"也支持"plain 继承覆盖");
+//     文件侧查 FileGroupExts 返回该组后缀集。任一找不到或为空即 ok=false。
+//   - 非引用: fileExt 经 RefValues 展开后缀集, textType 经 KnownTextTypes 校验后单值返回。
+func ResolveMappingValues(cfg *Config, m *SelectedMapping) (string, []string, bool) {
+	if isCustomRef(m.MatchValue) {
+		id := strings.TrimPrefix(m.MatchValue, "type:")
+		switch m.MatchType {
+		case "textType":
+			if cfg != nil {
+				if mt := cfg.FindMatchType(id); mt != nil && mt.Kind == "text" {
+					return "textType", []string{m.MatchValue}, true
+				}
+			}
+			return "", nil, false
+		case "fileExt":
+			if cfg != nil {
+				if exts, ok := cfg.FileGroupExts(id); ok && len(exts) > 0 {
+					return "fileExt", exts, true
+				}
+			}
+			return "", nil, false
+		}
+		return "", nil, false
+	}
+	switch m.MatchType {
+	case "fileExt":
+		v := behaviors.RefValues("fileExt", m.MatchValue)
+		return "fileExt", v, len(v) > 0
+	case "textType":
+		v := strings.ToLower(strings.TrimSpace(m.MatchValue))
+		if behaviors.KnownTextTypes[v] {
+			return "textType", []string{v}, true
+		}
+		return "", nil, false
+	}
+	return "", nil, false
+}
+
 // MatchSelectedAction 按 mappings 顺序匹配第一个命中的 mapping, 供模拟测试 API 使用。
 // 匹配语义与旧 ActionRule 完全一致 (matchActionRule): fileExt 要求选中为文件,
-// textType 要求选中为文本。
-func MatchSelectedAction(sa *SelectedAction, isFile bool, content string) *SelectedMapping {
+// textType 要求选中为文本; type: 引用由 matchActionRule 内部解析 (cfg 为注册表, 可空)。
+func MatchSelectedAction(sa *SelectedAction, isFile bool, content string, cfg *Config) *SelectedMapping {
 	if sa == nil {
 		return nil
 	}
 	for i := range sa.Mappings {
 		m := &sa.Mappings[i]
-		if matchActionRule(&ActionRule{MatchType: m.MatchType, MatchValue: m.MatchValue}, isFile, content) {
+		if matchActionRule(cfg, &ActionRule{MatchType: m.MatchType, MatchValue: m.MatchValue}, isFile, content) {
 			return m
 		}
 	}

@@ -159,14 +159,30 @@ class SelectedAction {
 
   /**
    * 匹配类型判定, 语义同旧 MatchActionRule:
-   * fileExt 只认文件选中, textType 只认文本选中 (多选文件匹配语义在 MatchFileExt 内)
+   * fileExt 只认文件选中, textType 只认文本选中 (多选文件匹配语义在 MatchFileExt 内)。
+   * matchValue 为 "type:<id>" 引用时改走自定义类型表 (方案 C7): 未命中 / kind 不符一律不命中
+   * (与 Go 端 matchActionRule 的引用分支同口径); 非引用值走原分支, 一行不改。
    */
   static _MatchCondition(matchType, matchValue, selected) {
     switch matchType {
       case "fileExt":
-        return selected.type == "file" && MatchFileExt(matchValue, selected.content)
+        if (selected.type != "file") {
+          return false
+        }
+        if (IsCustomMatchRef(matchValue)) {
+          mt := ResolveMatchValue(matchValue)
+          return IsObject(mt) && mt.kind == "fileExt" && MatchFileExtList(mt.exts, selected.content)
+        }
+        return MatchFileExt(matchValue, selected.content)
       case "textType":
-        return selected.type == "text" && MatchTextType(matchValue, selected.content)
+        if (selected.type != "text") {
+          return false
+        }
+        if (IsCustomMatchRef(matchValue)) {
+          mt := ResolveMatchValue(matchValue)
+          return IsObject(mt) && mt.kind == "text" && MatchCustomRules(mt.rules, selected.content)
+        }
+        return MatchTextType(matchValue, selected.content)
     }
     return false
   }
@@ -491,6 +507,147 @@ class SelectedAction {
  */
 GetSelectedContent() {
   return SelectionContext.Get()
+}
+
+; ============================================================
+; 自定义匹配类型 (方案 C7): 用户可在设置界面新增"文本特征"(如 网盘链接) 与"文件后缀分组",
+; 映射的条件值写 "type:<id>" 引用它们, 生成端把"可用匹配类型"渲染为全局表 CustomMatchTypes
+; (config-server/internal/script/model/methods.go 的 CustomMatchTypes(); 挂载点
+;  config-server/templates/keyflux.tmpl:74)。表结构:
+;   {id: {kind: "text", rules: [{op, value}, ...]} | {kind: "fileExt", exts: [...]}}
+;   - kind=text    -> 4 个封闭算子 OR 求值 (MatchCustomRules)
+;   - kind=fileExt -> 后缀集匹配 (MatchFileExtList) —— 自定义文件类型与文件分组共用该形态
+; 无自定义类型且无文件分组时生成端不输出该表 (下方 IsSet 守卫兜底)。
+;
+; 挂载点位于 InitKeymap() 函数体内, 故生成片段自带 global 前缀; 真机实测该 global 赋值对本类
+; 的 static 方法可见 (2026-09-15 spike)。契约: 数据数组仍 8 列, 仅 matchValue 值域新增
+; "type:<id>" 一类形态 (加法扩展)。
+;
+; 与 Go 端一致性: 算子语义由双端一致性向量
+; (config-server/internal/script/testdata/match_ops.json) 守护; 大小写折叠一律走 AsciiLower
+; (仅折 A-Z), 禁止 StrLower —— 后者对非 ASCII 做区域相关变换, 会造成两端语义分歧。
+; ============================================================
+
+/**
+ * 是否为自定义匹配类型引用 ("type:<id>")。
+ * `:` 是 Windows 文件名非法字符, 故该前缀不可能与任何真实文件后缀或内置特征值碰撞。
+ */
+IsCustomMatchRef(matchValue) {
+  return SubStr(matchValue, 1, 5) == "type:"
+}
+
+/**
+ * 把引用解析为类型定义对象; 非引用、无表、或未命中一律返回 ""。
+ * 调用方据此区分"内置分支"与"引用不命中" (后者一律不匹配, 与 Go 端 c==nil / ok=false 同口径)。
+ * @returns {object|string} 表项 (含 kind/rules|exts), 或 ""
+ */
+ResolveMatchValue(matchValue) {
+  global CustomMatchTypes
+  if not (IsCustomMatchRef(matchValue)) {
+    return ""
+  }
+  if not (IsSet(CustomMatchTypes)) {
+    return ""
+  }
+  id := SubStr(matchValue, 6)
+  if not (CustomMatchTypes.Has(id)) {
+    return ""
+  }
+  return CustomMatchTypes[id]
+}
+
+/**
+ * 仅折叠 ASCII 大写字母 A-Z (+32), 其余字符原样。与 Go 端 asciiFold 逐字对齐。
+ * 刻意不用 StrLower: 它会对非 ASCII (CJK/全角) 做区域相关变换, 造成双端分歧。
+ */
+AsciiLower(s) {
+  out := ""
+  Loop Parse, s {
+    o := Ord(A_LoopField)
+    if (o >= 65 && o <= 90) {
+      out .= Chr(o + 32)
+    } else {
+      out .= A_LoopField
+    }
+  }
+  return out
+}
+
+/**
+ * 自定义文本类型匹配: rules 之间 OR, 任一命中即命中 (与 Go 端 matchCustomRules 同语义)。
+ * 作用域约定 (方案 C7 核心风控, 两端逐字一致):
+ *   - equals / prefix: 作用于 Trim(content) 的首个非空行;
+ *   - suffix / contains: 作用于整个 Trim(content);
+ * 空 value 的 prefix/suffix/contains 恒真 (镜像 Go 的 HasPrefix/HasSuffix/Contains 对空串返回 true),
+ * 该形态由保存校验拒绝, 此处仅为手改配置的一致性兜底。
+ * @param rules [{op, value}, ...]
+ * @param content 选中文本
+ * @returns {boolean}
+ */
+MatchCustomRules(rules, content) {
+  if not (IsObject(rules)) {
+    return false
+  }
+  m := Trim(content, " `t`r`n`v`f")
+  first := ""
+  for line in StrSplit(m, "`n") {
+    line := Trim(line, " `t`r`v`f")
+    if (line != "") {
+      first := line
+      break
+    }
+  }
+  for r in rules {
+    op := r.op
+    v := AsciiLower(r.value)
+    hay := (op == "equals" || op == "prefix") ? AsciiLower(first) : AsciiLower(m)
+    switch op {
+      case "equals":
+        if (hay == v) {
+          return true
+        }
+      case "prefix":
+        if (SubStr(hay, 1, StrLen(v)) == v) {
+          return true
+        }
+      case "suffix":
+        if (v == "" || (StrLen(hay) >= StrLen(v) && SubStr(hay, -StrLen(v)) == v)) {
+          return true
+        }
+      case "contains":
+        if (v == "" || InStr(hay, v)) {
+          return true
+        }
+    }
+  }
+  return false
+}
+
+/**
+ * 数组形文件后缀匹配: 语义逐字对齐 MatchFileExt (SplitPath 取末段扩展名 / 去点 /
+ * 忽略大小写 / "*" 匹配任意文件 / 无扩展名跳过), 供 type: 文件引用复用。
+ * MatchFileExt 本体冻结不动 (注释互指, 语义唯一真源见其文档注释)。
+ * @param exts 后缀数组 (不含点)
+ * @param content 文件路径列表 (换行分隔)
+ * @returns {boolean}
+ */
+MatchFileExtList(exts, content) {
+  if not (IsObject(exts)) {
+    return false
+  }
+  for line in StrSplit(content, "`n") {
+    SplitPath(line, , , &ext)
+    if not (ext) {
+      continue
+    }
+    for v in exts {
+      v := LTrim(Trim(v), ".")
+      if v == "*" || AsciiLower(v) == AsciiLower(ext) {
+        return true
+      }
+    }
+  }
+  return false
 }
 
 /**

@@ -1278,5 +1278,257 @@
   "2502": {
     "zh": "透明度",
     "en": "Transparency"
+  },
+  "2517": {
+    "zh": "该类型暂无专属行为，当前可用行为来自通用文本类型",
+    "en": "No behavior is set for this type yet. The list below comes from general text."
+  },
+  "2518": {
+    "zh": "创建专属行为",
+    "en": "Add one"
+  },
+  "2519": {
+    "zh": "匹配类型",
+    "en": "Match types"
+  },
+  "2520": {
+    "zh": "文本特征",
+    "en": "Text features"
+  },
+  "2521": {
+    "zh": "自定义文件类型",
+    "en": "Custom file types"
+  },
+  "2522": {
+    "zh": "新建匹配类型",
+    "en": "New match type"
+  },
+  "2523": {
+    "zh": "名称",
+    "en": "Name"
+  },
+  "2524": {
+    "zh": "内部标识（自动生成，通常无需修改）",
+    "en": "Internal ID (filled in for you)"
+  },
+  "2525": {
+    "zh": "匹配内容",
+    "en": "Content to match"
+  },
+  "2527": {
+    "zh": "添加条件",
+    "en": "Add condition"
+  },
+  "2528": {
+    "zh": "文件扩展名",
+    "en": "File extensions"
+  },
+  "2529": {
+    "zh": "保存并创建专属行为",
+    "en": "Save and add a behavior"
+  },
+  "2530": {
+    "zh": "行为名称",
+    "en": "Behavior name"
+  },
+  "2531": {
+    "zh": "执行动作",
+    "en": "Action"
+  },
+  "2532": {
+    "zh": "命令模板（可选）",
+    "en": "Command (optional)"
+  },
+  "2533": {
+    "zh": "工作目录（可选）",
+    "en": "Folder to run in (optional)"
+  },
+  "2534": {
+    "zh": "保存",
+    "en": "Save"
+  },
+  "2535": {
+    "zh": "取消",
+    "en": "Cancel"
+  },
+  "2536": {
+    "zh": "删除",
+    "en": "Delete"
+  },
+  "2537": {
+    "zh": "未配置行为",
+    "en": "No behavior set"
+  },
+  "2538": {
+    "zh": "已配置行为",
+    "en": "Behaviors set"
+  },
+  "2539": {
+    "zh": "内置",
+    "en": "Built-in"
+  },
+  "2540": {
+    "zh": "内部标识格式不正确：需以小写字母开头，仅含小写字母、数字与下划线（最多 24 个字符）",
+    "en": "Use a short ID: lowercase letters, numbers or _ only, and it must start with a letter (max 24)."
+  },
+  "2541": {
+    "zh": "该内部标识已被占用，请更换",
+    "en": "That ID is already used. Try another."
+  },
+  "2542": {
+    "zh": "名称不能为空",
+    "en": "Please enter a name."
+  },
+  "2543": {
+    "zh": "至少需填写一条匹配内容",
+    "en": "Add at least one piece of text to match."
+  },
+  "2544": {
+    "zh": "文件扩展名不能为空",
+    "en": "Enter at least one file extension."
+  },
+  "2545": {
+    "zh": "确认删除匹配类型「{0}」？引用该类型的映射将不再生效。",
+    "en": "Delete \"{0}\"? Rules using it will stop working."
+  },
+  "2546": {
+    "zh": "编辑",
+    "en": "Edit"
+  },
+  "2547": {
+    "zh": "暂无自定义匹配类型",
+    "en": "No custom match types yet"
+  },
+  "2548": {
+    "zh": "匹配类型用于定义「选中什么时」触发，例如「网盘链接」这类文本特征，或自定义的文件扩展名类型。",
+    "en": "Match types define when a selection triggers — for example a netdisk link, or your own file extension type."
+  },
+  "2550": {
+    "zh": "匹配文字（示例：pan.baidu.com）",
+    "en": "Text to look for (e.g. pan.baidu.com)"
+  },
+  "2551": {
+    "zh": "按文件类型匹配",
+    "en": "Files of these types"
+  },
+  "2552": {
+    "zh": "已存在同名专属行为，请在行为库中修改",
+    "en": "A behavior with this name already exists. Edit it in the Behavior Library."
+  },
+  "2553": {
+    "zh": "＋ 新建匹配类型",
+    "en": "＋ New match type"
+  },
+  "2512": {
+    "zh": "完全相同",
+    "en": "Exact match"
+  },
+  "2513": {
+    "zh": "以该文字开头",
+    "en": "Starts with"
+  },
+  "2514": {
+    "zh": "以该文字结尾",
+    "en": "Ends with"
+  },
+  "2515": {
+    "zh": "包含该文字",
+    "en": "Contains"
+  },
+  "2554": {
+    "zh": "仅在此设置界面中显示，可自定义",
+    "en": "Only shown here. Any name works."
+  },
+  "2555": {
+    "zh": "匹配条件",
+    "en": "When to match"
+  },
+  "2556": {
+    "zh": "按文本内容匹配",
+    "en": "Text contains"
+  },
+  "2557": {
+    "zh": "输入示例内容",
+    "en": "Paste or type an example"
+  },
+  "2558": {
+    "zh": "匹配成功",
+    "en": "Match found"
+  },
+  "2559": {
+    "zh": "未匹配",
+    "en": "No match"
+  },
+  "2560": {
+    "zh": "测试匹配",
+    "en": "Test"
+  },
+  "2561": {
+    "zh": "多个扩展名以逗号分隔，如 psd, ai",
+    "en": "Separate with commas, e.g. psd, ai"
+  },
+  "2562": {
+    "zh": "选中内容包含所填文字时匹配成功",
+    "en": "It matches when the selected text contains these words."
+  },
+  "2563": {
+    "zh": "选中文件的扩展名在列表内时匹配成功",
+    "en": "It matches when a selected file has one of these types."
+  },
+  "2564": {
+    "zh": "匹配后执行的动作",
+    "en": "What happens next"
+  },
+  "2565": {
+    "zh": "仅保存类型，稍后配置行为",
+    "en": "Save type only"
+  },
+  "2566": {
+    "zh": "高级设置",
+    "en": "Advanced"
+  },
+  "2567": {
+    "zh": "英文名称（可选）",
+    "en": "English name (optional)"
+  },
+  "2568": {
+    "zh": "行为名称",
+    "en": "Behavior name"
+  },
+  "2569": {
+    "zh": "配置行为",
+    "en": "Set up"
+  },
+  "2570": {
+    "zh": "请先输入示例内容",
+    "en": "Type an example first."
+  },
+  "2571": {
+    "zh": "网盘链接",
+    "en": "Netdisk link"
+  },
+  "2572": {
+    "zh": "GitHub 仓库",
+    "en": "GitHub repo"
+  },
+  "2573": {
+    "zh": "哔哩哔哩视频",
+    "en": "Bilibili video"
+  },
+  "2574": {
+    "zh": "图片文件",
+    "en": "Images"
+  },
+  "2575": {
+    "zh": "压缩包",
+    "en": "Archives"
+  },
+  "2576": {
+    "zh": "代码文件",
+    "en": "Code files"
+  },
+  "2577": {
+    "zh": "仅自定义类型可编辑或删除",
+    "en": "Only custom types can be edited or deleted."
   }
 }

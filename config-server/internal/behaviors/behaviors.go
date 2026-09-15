@@ -45,6 +45,19 @@ var BuiltinActionIDs = map[string]bool{
 // KnownTextTypes 文本特征词表 (与 script.matchTextType / AHK MatchTextType 一致)。
 var KnownTextTypes = map[string]bool{"url": true, "path": true, "magnet": true, "plain": true}
 
+// customRefPrefix 用户自定义匹配类型 (方案 C7) 的引用前缀: 规则的前提值或行为包的 appliesTo
+// 写 "type:<id>" 即指向 config.json 的 matchTypes[] / fileGroups[] 定义。本包只需知道
+// "是不是引用", 不需要类型定义本身 —— 故不 import model 包 (避免循环依赖); 存在性由调用方
+// 经 knownText 钩子裁决。`:` 是 Windows 文件名非法字符, 故该前缀不可能与任何真实文件后缀或
+// 内置文本特征值碰撞。
+const customRefPrefix = "type:"
+
+// IsCustomRef 判断匹配值是否为自定义类型引用 ("type:<id>")。与 script.isCustomRef 同义
+// (纯前缀判断各一份, 无循环依赖)。
+func IsCustomRef(v string) bool {
+	return strings.HasPrefix(v, customRefPrefix)
+}
+
 // AppliesToEntry 生效前提: 行为声明它适用于哪些匹配前提。
 // fileExt 用显式后缀集 (["*"]=任意文件), 不存分组名 —— 分组只是设置界面的快捷填入模板,
 // 存分组名会在分组改名/删改后断关联 (fileGroups 保存写回任务的同款结论)。
@@ -82,7 +95,11 @@ type Pack struct {
 	AppliesTo   []AppliesToEntry `json:"appliesTo"`
 	Entry       Entry            `json:"entry"`
 	Permissions []string         `json:"permissions,omitempty"`
-	Source      string           `json:"source,omitempty"`
+	// BoundTypeID 该包"强绑定"的自定义匹配类型 id (方案 C7 路径①: 建类型时同时建专属行为)。
+	// 仅供 UI 展示"该类型绑定的行为"(P1-5), 不参与覆盖判定 —— 覆盖仍由 appliesTo 唯一裁决,
+	// 否则会出现"绑定即覆盖"的隐式语义, 与 Catalog.Covers 的单向推导冲突。
+	BoundTypeID string `json:"boundTypeId,omitempty"`
+	Source      string `json:"source,omitempty"`
 }
 
 // Catalog 行为目录: 内置包在前、用户包在后, 各自按 ID 字典序 (决定 DefaultFor 的稳定序)。
@@ -197,6 +214,12 @@ func normalizeExt(v string) string {
 }
 
 // RefValues 把规则的匹配前提展开为值集 (供保存校验与删除校验共用)。
+//
+// 已知限制 (方案 C7 §D.3.5 / R3-8): 自定义类型引用 "type:<id>" 在本函数里退化为
+// **整串 token 比较** —— fileExt 侧不会展开为该分组的后缀集, 故 ValidateDelete 的
+// "值级覆盖检查" 对引用成立的映射不生效 (删除文件类类型时不会拦"空前提桶")。
+// 引用侧的引用计数检查 (RuleRef.ActionType) 不受影响。彻底修正见 P2 项
+// "RefValues 类型感知"。
 func RefValues(matchType, matchValue string) []string {
 	if matchType == "fileExt" {
 		if strings.TrimSpace(matchValue) == "*" {
@@ -224,7 +247,8 @@ func entryValues(e AppliesToEntry) []string {
 }
 
 // entryCovers 判断单条前提是否覆盖规则值集: fileExt 要求规则值集 ⊆ 前提值集
-// ("*" 覆盖任意); textType 要求特征值相等。
+// ("*" 覆盖任意); textType 要求特征值相等, 但自定义类型引用 (type:<id>) 例外 ——
+// 见下方"两段式覆盖"。
 func entryCovers(e AppliesToEntry, matchType string, values []string) bool {
 	if e.Type != matchType {
 		return false
@@ -245,7 +269,20 @@ func entryCovers(e AppliesToEntry, matchType string, values []string) bool {
 		}
 		return true
 	case "textType":
-		return len(values) == 1 && strings.EqualFold(e.Value, values[0])
+		if len(values) != 1 {
+			return false
+		}
+		if strings.EqualFold(e.Value, values[0]) {
+			return true
+		}
+		// 两段式覆盖 (方案 C7 "P0-6 留桩不死胡同"的结构性解法):
+		// 自定义文本类型的判定是 url/path/magnet/plain 之外的附加特征, 通用文本行为对它同样
+		// 适用 —— 故 "plain" 前提视为覆盖任意自定义类型, 使 5 个内置 plain 包
+		// (copy / run / script / search / send_keys) 自动成为每个自定义类型的"继承行为"。
+		// 效果: 用户"先留桩、后补专属行为"时, 添加映射弹窗的勾选列表恒非空、
+		// AddMappingVm.CanConfirm 恒可用, 不会出现"空列表 + 禁用按钮"的死胡同;
+		// 专属包 (appliesTo 写 type:<id>) 仍按上面的值相等分支优先命中。
+		return IsCustomRef(values[0]) && strings.EqualFold(e.Value, "plain")
 	}
 	return false
 }
@@ -320,7 +357,16 @@ func ResolveRuleAction(c *Catalog, actionType, actionValue, workingDir string) (
 // --------------------------------------------------------------- 校验
 
 // ValidateManifest 校验包 manifest 结构合法性 (加载期与创建/更新 API 共用)。
-func ValidateManifest(p *Pack) error {
+//
+// knownText 为可选的"自定义匹配类型存在性"钩子 (方案 C7 §D.3.5): 保存链路
+// (WriteUserPack) 传入真实解析器, 于是 appliesTo/boundTypeId 里引用不存在的类型会被拒绝;
+// 加载链路 (readPack) 不传 —— 与 script.ValidateSelectedAction 的容忍口径一致, 不把含
+// 遗留数据的旧配置/旧行为包锁死在读路径上 (未定义的 type: 引用运行时不命中, 生成端会跳过)。
+func ValidateManifest(p *Pack, knownText ...func(string) bool) error {
+	var resolve func(string) bool
+	if len(knownText) > 0 {
+		resolve = knownText[0]
+	}
 	if !idPattern.MatchString(p.ID) {
 		return fmt.Errorf("行为 ID %q 不合法 (须匹配 ^[a-z][a-z0-9_]{0,31}$)", p.ID)
 	}
@@ -333,25 +379,41 @@ func ValidateManifest(p *Pack) error {
 	if len(p.AppliesTo) == 0 {
 		return fmt.Errorf("行为「%s」缺少生效前提 (appliesTo)", p.ID)
 	}
+	if IsCustomRef(strings.TrimSpace(p.BoundTypeID)) {
+		// 容错: 允许写 "type:<id>" 或裸 id 两种形态, 归一后校验存在性
+		p.BoundTypeID = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(p.BoundTypeID), customRefPrefix))
+	}
+	if p.BoundTypeID != "" && resolve != nil && !resolve(p.BoundTypeID) {
+		return fmt.Errorf("行为「%s」绑定的匹配类型「%s」不存在", p.ID, p.BoundTypeID)
+	}
 	for i := range p.AppliesTo {
 		e := &p.AppliesTo[i]
 		switch e.Type {
 		case "fileExt":
 			if len(e.Exts) == 0 {
-				return fmt.Errorf("行为「%s」第 %d 条 fileExt 前提的后缀列表为空", p.ID, i+1)
+				return fmt.Errorf("行为「%s」第 %d 条匹配条件缺少文件扩展名", p.ID, i+1)
 			}
 			for j, ext := range e.Exts {
 				if normalizeExt(ext) == "" {
-					return fmt.Errorf("行为「%s」第 %d 条前提的第 %d 个后缀为空", p.ID, i+1, j+1)
+					return fmt.Errorf("行为「%s」第 %d 条匹配条件的第 %d 个扩展名为空", p.ID, i+1, j+1)
 				}
 			}
 		case "textType":
-			if !KnownTextTypes[strings.ToLower(strings.TrimSpace(e.Value))] {
-				return fmt.Errorf("行为「%s」第 %d 条前提的文本特征 %q 不合法 (可选: url / path / magnet / plain)", p.ID, i+1, e.Value)
+			v := strings.ToLower(strings.TrimSpace(e.Value))
+			if IsCustomRef(v) {
+				// 自定义匹配类型引用 (方案 C7): 存在性只在保存链路裁决 (见函数头注释)
+				if resolve != nil && !resolve(strings.TrimPrefix(v, customRefPrefix)) {
+					return fmt.Errorf("行为「%s」第 %d 条匹配条件引用的匹配类型「%s」不存在", p.ID, i+1, e.Value)
+				}
+				e.Value = v
+				continue
 			}
-			e.Value = strings.ToLower(strings.TrimSpace(e.Value))
+			if !KnownTextTypes[v] {
+				return fmt.Errorf("行为「%s」第 %d 条匹配条件的文本特征「%s」无效（可选：链接 / 路径 / 磁力链接 / 纯文本，或已自定义的匹配类型）", p.ID, i+1, e.Value)
+			}
+			e.Value = v
 		default:
-			return fmt.Errorf("行为「%s」第 %d 条前提类型 %q 不合法 (可选: fileExt / textType)", p.ID, i+1, e.Type)
+			return fmt.Errorf("行为「%s」第 %d 条匹配条件的分类「%s」无效（可选：文本内容 / 文件类型）", p.ID, i+1, e.Type)
 		}
 	}
 	switch p.Entry.Kind {
@@ -402,7 +464,7 @@ func ValidateDelete(c *Catalog, id string, refs []RuleRef) error {
 		}
 	}
 	if refCount > 0 {
-		return fmt.Errorf("行为「%s」被 %d 条规则引用, 请先修改或删除对应规则再删除行为", p.Name, refCount)
+		return fmt.Errorf("行为「%s」仍被 %d 条映射引用，请先修改或删除相应映射", p.Name, refCount)
 	}
 	var others []*Pack
 	for _, o := range c.Packs {
@@ -429,7 +491,7 @@ func ValidateDelete(c *Catalog, id string, refs []RuleRef) error {
 		}
 	}
 	if len(uncovered) > 0 {
-		return fmt.Errorf("删除「%s」后以下前提将没有任何可用行为: %s", p.Name, strings.Join(uncovered, "、"))
+		return fmt.Errorf("删除「%s」后以下匹配条件将没有可用行为：%s", p.Name, strings.Join(uncovered, "、"))
 	}
 	return nil
 }
@@ -456,11 +518,12 @@ func displayValue(matchType, v string) string {
 }
 
 // WriteUserPack 校验并把用户包写入磁盘 (dirName = id, manifest 缩进 JSON, 无 BOM)。
-func WriteUserPack(userDir string, p *Pack) error {
+// knownText 为可选的自定义匹配类型存在性钩子 (见 ValidateManifest), 保存链路应传入。
+func WriteUserPack(userDir string, p *Pack, knownText ...func(string) bool) error {
 	if p.Source == "builtin" || BuiltinActionIDs[p.ID] {
-		return fmt.Errorf("行为 ID %q 与内置行为冲突", p.ID)
+		return fmt.Errorf("行为标识「%s」与内置行为冲突", p.ID)
 	}
-	if err := ValidateManifest(p); err != nil {
+	if err := ValidateManifest(p, knownText...); err != nil {
 		return err
 	}
 	raw, err := json.MarshalIndent(p, "", "  ")
@@ -477,7 +540,7 @@ func WriteUserPack(userDir string, p *Pack) error {
 // RemoveUserPack 删除用户包目录 (id 已由正则保证无路径穿越字符)。
 func RemoveUserPack(userDir, id string) error {
 	if BuiltinActionIDs[id] {
-		return fmt.Errorf("行为 ID %q 与内置行为冲突", id)
+		return fmt.Errorf("行为标识「%s」与内置行为冲突", id)
 	}
 	return os.RemoveAll(filepath.Join(userDir, id))
 }

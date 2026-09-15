@@ -234,7 +234,7 @@ func TestValidateDelete(t *testing.T) {
 		t.Fatalf("内置包删除应被拒绝: %v", err)
 	}
 	// 2. 被规则引用 → 拒绝
-	if err := ValidateDelete(c, "ps_edit", refs(RuleRef{"fileExt", "jpg", "ps_edit"})); err == nil || !strings.Contains(err.Error(), "引用") {
+	if err := ValidateDelete(c, "ps_edit", refs(RuleRef{"fileExt", "jpg", "ps_edit"})); err == nil || !strings.Contains(err.Error(), "映射") {
 		t.Fatalf("被引用行为删除应被拒绝: %v", err)
 	}
 	// 3. 值级覆盖: 删 ps_edit (jpg+png) 时 png 仍被 png_viewer 覆盖, 但 jpg 无覆盖 → 拒绝并点名 jpg

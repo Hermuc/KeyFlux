@@ -192,6 +192,97 @@ func (c *Config) WindowGroups() string {
 	return s.String()
 }
 
+// CustomMatchTypes 把"可用匹配类型注册表"渲染为 AHK 全局表字面量, 供生成期注入 (挂载点由
+// 模板负责, 本方法只产出片段)。表内容 = 自定义类型 (matchTypes[], 方案 C7) + 文件分组
+// (fileGroups[], 方案 D.1.2 将其升格为一等文件匹配类型)。两者共用同一 "type:<id>" 命名空间
+// (ValidateMatchTypes 已保证自定义类型 id 不与任何分组名冲突), 故运行时的引用解析只需查这一张表,
+// 与 Go 侧 matchActionRule 的解析顺序 (matchTypes → fileGroups) 一致。
+//
+// 两者皆空时返回 "" (空串先例, 沿用 WindowGroups()/selectedActionCode 的空串约定) ——
+// golden 夹具的 syntheticConfig() 既无 matchTypes 也无 fileGroups, 故既有的生成产物逐字节不变,
+// 这是方案 C7"零 golden 影响"的落点。
+// 形态 (与方案 D.4.2 一致):
+//
+//	global CustomMatchTypes := Map(
+//	  "netdisk", {kind: "text", rules: [{op: "contains", value: "pan.baidu.com"}]},
+//	  "design",  {kind: "fileExt", exts: ["psd", "ai"]}
+//	)
+//
+// 所有字符串一律经 AhkString 转义 (反引号/双引号/空格后分号), 不自己拼引号。
+func (c *Config) CustomMatchTypes() string {
+	if len(c.MatchTypes) == 0 && len(c.FileGroups) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("global CustomMatchTypes := Map(\n")
+	first := true
+	writeEntry := func(id, kind string, rules []MatchRule, exts []string) {
+		if !first {
+			b.WriteString(",\n")
+		}
+		first = false
+		b.WriteString("  ")
+		b.WriteString(AhkString(id))
+		b.WriteString(", {kind: ")
+		b.WriteString(AhkString(kind))
+		if kind == "fileExt" {
+			b.WriteString(", exts: [")
+			for j, ext := range exts {
+				if j > 0 {
+					b.WriteString(", ")
+				}
+				b.WriteString(AhkString(ext))
+			}
+			b.WriteString("]}")
+			return
+		}
+		b.WriteString(", rules: [")
+		for j, r := range rules {
+			if j > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString("{op: ")
+			b.WriteString(AhkString(r.Op))
+			b.WriteString(", value: ")
+			b.WriteString(AhkString(r.Value))
+			b.WriteString("}")
+		}
+		b.WriteString("]}")
+	}
+	for _, mt := range c.MatchTypes {
+		writeEntry(mt.ID, mt.Kind, mt.Rules, mt.Exts)
+	}
+	for _, g := range c.FileGroups {
+		if c.FindMatchType(g.Name) != nil {
+			continue // 同名已在 matchTypes 出现 (保存校验已拒绝, 此处仅防御手改配置)
+		}
+		writeEntry(g.Name, "fileExt", nil, g.Exts)
+	}
+	b.WriteString("\n)")
+	return b.String()
+}
+
+// FindMatchType 按 id 查找自定义匹配类型 (供校验/生成/模拟测试共用, type: 引用解析的文本侧入口)。
+func (c *Config) FindMatchType(id string) *MatchType {
+	for i := range c.MatchTypes {
+		if c.MatchTypes[i].ID == id {
+			return &c.MatchTypes[i]
+		}
+	}
+	return nil
+}
+
+// FileGroupExts 按 Name 取文件分组的后缀集 (type: 文件引用的解析, 与 FindMatchType 同构)。
+// 第二个返回值表示是否找到该分组。
+func (c *Config) FileGroupExts(name string) ([]string, bool) {
+	for i := range c.FileGroups {
+		if c.FileGroups[i].Name == name {
+			return c.FileGroups[i].Exts, true
+		}
+	}
+	return nil, false
+}
+
 func (c *Config) GetKeymapDisableAt(kmID int) string {
 	for _, km := range c.Keymaps {
 		if km.ID == kmID {

@@ -37,6 +37,12 @@ public sealed class Config
     [JsonPropertyName("fileGroups")]
     public List<FileGroup> FileGroups { get; set; } = [];
 
+    // 自定义匹配类型 (方案 C7): 文本特征 / 文件后缀分组的配置层一等公民;
+    // 缺段即为空集合, 与 fileGroups 同口径 (不注入默认值 —— 详见 ConfigReadDefaults 注释);
+    // json tag 与 Go MatchTypeDTO 逐字一致 (§D.3.9)。
+    [JsonPropertyName("matchTypes")]
+    public List<MatchType> MatchTypes { get; set; } = [];
+
     // omitempty: 自定义总览页 Markdown, 缺失时为 ""; 非空时总览页优先展示自定义内容
     [JsonPropertyName("overviewDocMd")]
     public string OverviewDocMd { get; set; } = "";
@@ -187,6 +193,59 @@ public sealed class FileGroup
     /// <summary>后缀列表 (不含点, 如 ["jpg","jpeg"])。</summary>
     [JsonPropertyName("exts")]
     public List<string> Exts { get; set; } = [];
+}
+
+/// <summary>
+/// 对应 Go struct MatchRule (config.json matchTypes[].rules 项; 自定义文本类型的判定谓词)。
+/// 算子词表封闭 (equals/prefix/suffix/contains), 多规则 OR 语义; 两端 (Go/AHK) 各实现一次、
+/// 用共享一致性向量锁死等价 —— 不引入正则 (见架构文档 §D.1.1 / §C7)。
+/// </summary>
+public sealed class MatchRule
+{
+    /// <summary>算子 (equals/prefix/suffix/contains); 仅 ASCII 大小写不敏感。</summary>
+    [JsonPropertyName("op")]
+    public string Op { get; set; } = "";
+
+    /// <summary>算子右值 (Trim 非空, 长度 ≤ 256)。</summary>
+    [JsonPropertyName("value")]
+    public string Value { get; set; } = "";
+}
+
+/// <summary>
+/// 对应 Go struct MatchType (config.json matchTypes 段; 自定义匹配类型, kind=text|fileExt)。
+/// 在引擎层被"解析消除" (生成期渲染为 AHK 全局表, 运行时按 <c>type:&lt;id&gt;</c> 引用求值);
+/// 内置 4 文本特征 (url/path/magnet/plain) 与 6 个默认文件分组不落此表。
+/// json tag 与 Go MatchTypeDTO 逐字一致 (§D.3.9): id/label/labelEn/kind/rules/exts/order。
+/// </summary>
+public sealed class MatchType
+{
+    /// <summary>稳定标识 (^[a-z][a-z0-9_]{0,23}$), 不可改; 引用命名空间 <c>type:&lt;id&gt;</c> 指向它。</summary>
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
+    /// <summary>用户数据 (不进 i18n), 可改; 缺省回退显示 id。</summary>
+    [JsonPropertyName("label")]
+    public string Label { get; set; } = "";
+
+    /// <summary>可选, 英文显示名。</summary>
+    [JsonPropertyName("labelEn")]
+    public string LabelEn { get; set; } = "";
+
+    /// <summary>类型种类: "text" | "fileExt"。</summary>
+    [JsonPropertyName("kind")]
+    public string Kind { get; set; } = "";
+
+    /// <summary>kind=text 必填: 判定谓词清单 (≥1 条, OR 语义)。</summary>
+    [JsonPropertyName("rules")]
+    public List<MatchRule> Rules { get; set; } = [];
+
+    /// <summary>kind=fileExt 时使用: 后缀集 (本方案文件侧走 FileGroups, 此字段一般留空)。</summary>
+    [JsonPropertyName("exts")]
+    public List<string> Exts { get; set; } = [];
+
+    /// <summary>展示序 (数组顺序即默认序, 此字段供 P1-4 显式排序)。</summary>
+    [JsonPropertyName("order")]
+    public int Order { get; set; }
 }
 
 /// <summary>对应 Go struct Action。按键绑定的单个动作, 部分字段因动作类型而异。</summary>

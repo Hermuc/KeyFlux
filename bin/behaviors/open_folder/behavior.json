@@ -1,7 +1,7 @@
 {
   "id": "open_folder",
   "name": "打开文件夹",
-  "nameEn": "Open Folder",
+  "nameEn": "Open folder",
   "version": "1.0.0",
   "specVersion": 1,
   "description": "用系统默认文件管理器打开选中路径所在文件夹",

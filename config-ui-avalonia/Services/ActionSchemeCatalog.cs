@@ -1,4 +1,5 @@
 using KeyFlux.Settings.Models;
+using MatchType = KeyFlux.Settings.Models.MatchType;
 
 namespace KeyFlux.Settings.Services;
 
@@ -15,7 +16,16 @@ namespace KeyFlux.Settings.Services;
 
 /// <summary>下拉选项条目 (Value 为配置值, Label 为显示文案; record 值相等便于 ComboBox 选中匹配)。</summary>
 /// <param name="IsSeparator">分隔行标记: true 时该项在下拉中渲染为分隔线且不可选 (类型分组与文本特征之间)。</param>
-public sealed record ComboOption(string Value, string Label, bool IsSeparator = false);
+public sealed record ComboOption(string Value, string Label, bool IsSeparator = false)
+{
+    /// <summary>
+    /// 供下拉控件直接显示标签。
+    /// record 自动生成的 ToString() 形如 <c>ComboOption { Value = search, Label = 搜索, IsSeparator = False }</c>,
+    /// 任何未写 ItemTemplate 的 ComboBox 都会把这串调试文本渲染给用户 (2026-09-15 实测缺陷:
+    /// 「匹配后执行的动作」下拉显示的就是它); 重写后即使忘记 ItemTemplate 也只显示标签。
+    /// </summary>
+    public override string ToString() => Label;
+}
 
 /// <summary>选中动作常量与共享工具方法 (2026-09 方案 D: 多方案 CRUD 工厂已随 ActionScheme 退役)。</summary>
 public static class ActionSchemeCatalog
@@ -35,7 +45,7 @@ public static class ActionSchemeCatalog
     //  FileGroupActions / FileGroupDefaultAction / FileActions / DefaultSearchUrl) 全部退役,
     // 覆盖语义: 行为前提 ⊇ 规则前提 (专属前提排前、通配排后), 合法性仍以后端 400 为准。
 
-    // 文本特征 (复刻 TEXT_TYPES)
+    // 文本特征 (复刻 TEXT_TYPES) —— 内置项真源 (后端 KnownTextTypes); 自定义文本特征走 Config.MatchTypes
     public static readonly (string Value, string LabelKey)[] TextTypes =
     [
         ("url", "1059"),
@@ -43,6 +53,43 @@ public static class ActionSchemeCatalog
         ("magnet", "1061"),
         ("plain", "1062"),
     ];
+
+    // ------------------------------------------------------------- 动态类型下拉源 (方案 C7)
+
+    /// <summary>
+    /// 「添加映射」类型下拉的动态源: 内置静态项 + 配置派生项。
+    /// 顺序 = 文件分组 (<c>group:&lt;Name&gt;</c>, 标签用其 <see cref="FileGroup.Label"/>)
+    ///        + 分隔项 + 内置 4 文本特征 (标签走 i18n 1059–1062)
+    ///        + 配置派生文本类型 (<c>Config.MatchTypes</c> kind=text, 标签用其 label/labelEn, 不走 i18n)。
+    /// 文本特征标签语义: 内置走 i18n; 自定义走用户数据 (与 §D.1.3「派生只读行」一致, 数据不进 i18n)。
+    /// </summary>
+    public static List<ComboOption> BuildTypeOptions(Config config)
+    {
+        var opts = new List<ComboOption>();
+        foreach (var g in config.FileGroups)
+        {
+            opts.Add(new ComboOption("group:" + g.Name, g.Label));
+        }
+        if (opts.Count > 0)
+        {
+            opts.Add(new ComboOption("", "", IsSeparator: true)); // 分隔项跟随最后一组 (用户要求)
+        }
+        // 内置 4 文本特征
+        opts.Add(new ComboOption("url", I18n.T("1059")));
+        opts.Add(new ComboOption("path", I18n.T("1060")));
+        opts.Add(new ComboOption("magnet", I18n.T("1061")));
+        opts.Add(new ComboOption("plain", I18n.T("1062")));
+        // 配置派生文本类型 (kind=text); 引用命名空间 type:<id>
+        foreach (var t in config.MatchTypes.Where(t => t.Kind == "text"))
+        {
+            opts.Add(new ComboOption("type:" + t.Id, CustomTextTypeLabel(t)));
+        }
+        return opts;
+    }
+
+    /// <summary>自定义匹配类型的显示标签: en 语境优先 labelEn, 否则 label; 二者皆空回退 id (用户数据, 不进 i18n)。</summary>
+    private static string CustomTextTypeLabel(MatchType t)
+        => I18n.Language == I18n.En && !string.IsNullOrEmpty(t.LabelEn) ? t.LabelEn : (t.Label ?? t.Id);
 
     // (textType / fileExt 的可选行为与默认推荐全部由 BehaviorCatalog 从行为包 appliesTo 推导,
     //  见文件顶部说明; 此处不再保留任何静态词表副本。)
@@ -99,6 +146,25 @@ public static class ActionSchemeCatalog
     public static string ActionTypeLabel(string value) => BehaviorCatalog.LabelFor(value);
 
     public static string TextTypeLabel(string value)
-        => TextTypes.FirstOrDefault(x => x.Value == value) is var t && t.Value is not null
-            ? I18n.T(t.LabelKey) : value;
+        => TextTypeLabel(value, null);
+
+    /// <summary>
+    /// 文本特征显示名: 内置值走 i18n (1059–1062), 行为不变; 自定义 <c>type:&lt;id&gt;</c> 引用
+    /// 回退显示其 label (需传入 config 解析) 或原值。无 config 上下文时回退原值 (脏值恒可见)。
+    /// </summary>
+    public static string TextTypeLabel(string value, Config? config)
+    {
+        if (TextTypes.FirstOrDefault(x => x.Value == value) is var builtin && builtin.Value is not null)
+        {
+            return I18n.T(builtin.LabelKey);
+        }
+        // 自定义文本类型引用 (type:<id>): 回退显示其 label 或原值
+        if (config is not null && value.StartsWith("type:") && value.Length > 5)
+        {
+            var id = value["type:".Length..];
+            var mt = config.MatchTypes.FirstOrDefault(t => t.Id == id && t.Kind == "text");
+            if (mt is not null) return CustomTextTypeLabel(mt);
+        }
+        return value;
+    }
 }

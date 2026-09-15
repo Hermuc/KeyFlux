@@ -1,7 +1,7 @@
 {
   "id": "run",
   "name": "执行命令",
-  "nameEn": "Run Command",
+  "nameEn": "Run a command",
   "version": "1.0.0",
   "specVersion": 1,
   "description": "执行命令, 支持 %selected% 变量, 如 notepad.exe %selected%",

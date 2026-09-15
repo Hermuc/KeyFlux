@@ -21,6 +21,8 @@ type (
 	ActionScheme      = model.ActionScheme
 	ActionRule        = model.ActionRule
 	FileGroup         = model.FileGroup
+	MatchType         = model.MatchType
+	MatchRule         = model.MatchRule
 	RuleOptions       = model.RuleOptions
 	Options           = model.Options
 	WindowGroup       = model.WindowGroup
@@ -68,6 +70,10 @@ func ParseConfig(file string) (*Config, error) {
 	// 存量迁移: 旧 actionSchemes → selectedAction 单键分发 (读时一次性, 硬切不回写;
 	// 迁移后 ActionSchemes 置 nil, save 序列化不再输出旧段)
 	MigrateSelectedAction(&config)
+
+	// 注意: matchTypes 段不在此处注入默认 —— 缺段即为 nil (与 fileGroups 同口径,
+	// 视为"无自定义匹配类型"的合理降级而非坏状态)。保存期由 ValidateMatchTypes 严格校验,
+	// 加载期容忍半量段; 生成兜底对无法解析的 type: 引用跳过该行。
 
 	return &config, nil
 }

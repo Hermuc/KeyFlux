@@ -1,7 +1,7 @@
 {
   "id": "open_url",
   "name": "默认浏览器打开网址",
-  "nameEn": "Open URL in Default Browser",
+  "nameEn": "Open link in browser",
   "version": "1.0.0",
   "specVersion": 1,
   "description": "用系统默认浏览器打开选中的网址, 不硬编码具体浏览器",

@@ -11,6 +11,7 @@ type Config struct {
 	SelectedAction *SelectedAction `json:"selectedAction,omitempty"` // 选中动作单键分发 (方案 D); 迁移后由 ParseConfig 保证非 nil, save 恒输出
 	ActionSchemes  []ActionScheme  `json:"actionSchemes,omitempty"`  // 旧多方案结构: 仅迁移读取用, ParseConfig 迁移后置 nil, save 不再输出
 	FileGroups     []FileGroup     `json:"fileGroups,omitempty"`     // 文件分组: 前端「文件后缀」条件值的快捷填充数据, 非独立匹配类型
+	MatchTypes     []MatchType     `json:"matchTypes,omitempty"`     // 自定义匹配类型 (方案 C7): 文本特征/文件后缀"一等匹配类型"; 引擎层经生成期解析消除, 缺段=nil 不注入默认
 	OverviewDocMd  string          `json:"overviewDocMd,omitempty"`  // 自定义总览页 Markdown, 设置界面优先展示; 为空时展示默认 config_doc.md
 	KeyMapping     string          `json:"-"`
 }
@@ -75,6 +76,31 @@ type FileGroup struct {
 	Name  string   `json:"name"`  // 分组标识 (英文, 如 image)
 	Label string   `json:"label"` // 中文显示名 (如 图片)
 	Exts  []string `json:"exts"`  // 后缀列表 (不含点, 如 ["jpg","jpeg"])
+}
+
+// MatchType 自定义匹配类型 (方案 C7): 用户在设置界面新增的"一等匹配类型",
+// 覆盖文本特征 (kind=text, 由 rules 算子谓词判定) 与文件后缀分组 (kind=fileExt, 由 exts 后缀集判定)。
+// 关键不变量: 类型只在配置层是一等公民, 引擎层被"解析消除" —— 映射 MatchValue 写 `type:<id>`,
+// 生成期产出 AHK 表; 无自定义类型时生成空串, 既有产物逐字节不变。
+//   - id: 稳定标识 (创建后不可改), 须匹配 ^[a-z][a-z0-9_]{0,23}$, 且不得与内置名(url/path/magnet/plain)/文件分组名冲突;
+//   - label/labelEn: 可变显示名 (用户数据, 不进 i18n); label 缺省回退显示 id;
+//   - kind: "text" | "fileExt";
+//   - rules: kind=text 必填, ≥1 条, OR 语义, 算子 ∈ {equals,prefix,suffix,contains};
+//   - exts: kind=fileExt 时使用的后缀集 (本方案文件侧主要走 FileGroups, 此字段允许同构表达)。
+type MatchType struct {
+	ID      string      `json:"id"`                // 稳定标识 (不可改)
+	Label   string      `json:"label"`             // 显示名 (用户数据, 不进 i18n)
+	LabelEn string      `json:"labelEn,omitempty"` // 可选英文显示名
+	Kind    string      `json:"kind"`              // "text" | "fileExt"
+	Rules   []MatchRule `json:"rules,omitempty"`   // kind=text: 文本算子谓词 (OR 语义)
+	Exts    []string    `json:"exts,omitempty"`    // kind=fileExt: 后缀集
+	Order   int         `json:"order,omitempty"`   // 展示序 (数组顺序即默认序, 此字段供显式排序)
+}
+
+// MatchRule 文本特征的一条匹配谓词 (封闭 4 算子, OR 语义)。
+type MatchRule struct {
+	Op    string `json:"op"`    // equals | prefix | suffix | contains
+	Value string `json:"value"` // 算子右值 (ASCII-only 大小写不敏感, 长度 ≤256)
 }
 
 // 规则按 Priority 升序匹配, 第一个匹配的规则生效

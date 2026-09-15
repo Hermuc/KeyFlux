@@ -37,11 +37,42 @@ public partial class SelectedActionPageView : UserControl
         if (TopLevel.GetTopLevel(this) is Window && DataContext is SelectedActionPageViewModel vm)
         {
             vm.ConfirmAsync = ShowConfirmAsync;
+            vm.MatchTypesDialogAsync = ShowMatchTypesDialogAsync;
         }
+    }
+
+    /// <summary>
+    /// 打开「匹配类型」弹窗 (模态), 返回本次新建的类型 id (取消/无新建为 null)。
+    /// 关闭后重拉行为目录 —— 弹窗内可能新建/删除了专属行为包, 勾选列表的覆盖集随之变化。
+    /// </summary>
+    private async Task<string?> ShowMatchTypesDialogAsync()
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner || DataContext is not SelectedActionPageViewModel vm)
+        {
+            return null;
+        }
+        var dialogVm = new MatchTypesPageViewModel(vm.Main);
+        var win = new MatchTypesDialogWindow { DataContext = dialogVm };
+        await win.ShowDialog(owner);
+        await vm.ReloadBehaviorCatalogAsync();
+        return dialogVm.LastCreatedTypeId;
     }
 
     /// <summary>「管理行为…」: 打开行为库窗口, 关闭后重拉行为目录 (行为包可能增删)。</summary>
     private async void OnManageBehaviors(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner ||
+            DataContext is not SelectedActionPageViewModel vm)
+        {
+            return;
+        }
+        var win = new BehaviorLibraryWindow { DataContext = new BehaviorLibraryViewModel(vm.Main) };
+        await win.ShowDialog(owner);
+        await vm.ReloadBehaviorCatalogAsync();
+    }
+
+    /// <summary>留桩提示条的「去创建专属行为」(2518): 打开行为库窗口 (阶段二将预填 appliesTo = 本类型; 此处先复用既有入口)。</summary>
+    private async void OnCreateDedicatedBehavior(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is not Window owner ||
             DataContext is not SelectedActionPageViewModel vm)

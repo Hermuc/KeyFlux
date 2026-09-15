@@ -1,7 +1,7 @@
 {
   "id": "open",
   "name": "程序打开",
-  "nameEn": "Open with Program",
+  "nameEn": "Open with an app",
   "version": "1.0.0",
   "specVersion": 1,
   "description": "用指定程序打开选中文件, 如 code.exe %selected%",

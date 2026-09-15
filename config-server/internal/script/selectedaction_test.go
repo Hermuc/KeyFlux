@@ -141,14 +141,14 @@ func TestValidateCoverageFailure(t *testing.T) {
 	sa := &SelectedAction{Hotkey: ">^p", Enable: true, Mappings: []SelectedMapping{
 		{MatchType: "fileExt", MatchValue: "jpg,gif", Entries: []SelectedEntry{{Behavior: "ps_edit"}}},
 	}}
-	err := ValidateSelectedAction(sa, catalogWithPsEdit())
+	err := ValidateSelectedAction(sa, catalogWithPsEdit(), nil)
 	if err == nil || !strings.Contains(err.Error(), "不匹配") {
 		t.Fatalf("gif 不在 ps_edit 前提内应拒绝: %v", err)
 	}
 	// 未知行为 ID (非内置, 目录中不存在) 同样拒绝
 	sa.Mappings[0].MatchValue = "jpg"
 	sa.Mappings[0].Entries[0].Behavior = "ghost"
-	if err := ValidateSelectedAction(sa, catalogWithPsEdit()); err == nil {
+	if err := ValidateSelectedAction(sa, catalogWithPsEdit(), nil); err == nil {
 		t.Fatal("目录外行为应拒绝")
 	}
 }
@@ -158,7 +158,7 @@ func TestValidateEntriesRange(t *testing.T) {
 	sa := &SelectedAction{Hotkey: ">^p", Enable: true, Mappings: []SelectedMapping{
 		{MatchType: "textType", MatchValue: "url", Entries: []SelectedEntry{}},
 	}}
-	if err := ValidateSelectedAction(sa, nil); err == nil || !strings.Contains(err.Error(), "没有行为") {
+	if err := ValidateSelectedAction(sa, nil, nil); err == nil || !strings.Contains(err.Error(), "没有行为") {
 		t.Fatalf("空 entries 应拒绝: %v", err)
 	}
 	// 超 9 项
@@ -167,24 +167,24 @@ func TestValidateEntriesRange(t *testing.T) {
 		entries[i] = SelectedEntry{Behavior: "open_url"}
 	}
 	sa.Mappings[0].Entries = entries
-	if err := ValidateSelectedAction(sa, nil); err == nil || !strings.Contains(err.Error(), "超过 9") {
+	if err := ValidateSelectedAction(sa, nil, nil); err == nil || !strings.Contains(err.Error(), "超过 9") {
 		t.Fatalf("超 9 项应拒绝: %v", err)
 	}
 	// 恰好 9 项放行
 	sa.Mappings[0].Entries = entries[:9]
-	if err := ValidateSelectedAction(sa, nil); err != nil {
+	if err := ValidateSelectedAction(sa, nil, nil); err != nil {
 		t.Fatalf("9 项应放行: %v", err)
 	}
 }
 
 func TestValidateHotkeyNonEmptyWhenEnabled(t *testing.T) {
 	sa := &SelectedAction{Hotkey: "", Enable: true}
-	if err := ValidateSelectedAction(sa, nil); err == nil || !strings.Contains(err.Error(), "热键") {
+	if err := ValidateSelectedAction(sa, nil, nil); err == nil || !strings.Contains(err.Error(), "热键") {
 		t.Fatalf("启用+空热键应拒绝: %v", err)
 	}
 	// 禁用 + 空热键放行 (空方案/出厂默认态可保存, 不锁死存量)
 	sa.Enable = false
-	if err := ValidateSelectedAction(sa, nil); err != nil {
+	if err := ValidateSelectedAction(sa, nil, nil); err != nil {
 		t.Fatalf("禁用+空热键应放行: %v", err)
 	}
 }
@@ -194,12 +194,12 @@ func TestValidateNilCatalogTolerant(t *testing.T) {
 	sa := &SelectedAction{Hotkey: ">^p", Enable: true, Mappings: []SelectedMapping{
 		{MatchType: "textType", MatchValue: "url", Entries: []SelectedEntry{{Behavior: "open_url"}}},
 	}}
-	if err := ValidateSelectedAction(sa, nil); err != nil {
+	if err := ValidateSelectedAction(sa, nil, nil); err != nil {
 		t.Fatalf("nil 目录应跳过覆盖检查: %v", err)
 	}
 	// textType 未知特征仍拒绝
 	sa.Mappings[0].MatchValue = "hash"
-	if err := ValidateSelectedAction(sa, nil); err == nil {
+	if err := ValidateSelectedAction(sa, nil, nil); err == nil {
 		t.Fatal("未知文本特征应拒绝")
 	}
 }
@@ -211,13 +211,13 @@ func TestValidateDuplicateMappingRejected(t *testing.T) {
 		{MatchType: "textType", MatchValue: "url", Entries: []SelectedEntry{{Behavior: "open_url"}}},
 		{MatchType: "textType", MatchValue: "url", Entries: []SelectedEntry{{Behavior: "search"}}},
 	}}
-	err := ValidateSelectedAction(sa, nil)
+	err := ValidateSelectedAction(sa, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "重复") || !strings.Contains(err.Error(), "url") {
 		t.Fatalf("同 (matchType,matchValue) 重复应拒绝且错误含重复值: %v", err)
 	}
 	// 大小写/首尾空白归一后仍视为重复 (与运行时匹配的忽略大小写语义一致)
 	sa.Mappings[1].MatchValue = " URL "
-	if err := ValidateSelectedAction(sa, nil); err == nil || !strings.Contains(err.Error(), "重复") {
+	if err := ValidateSelectedAction(sa, nil, nil); err == nil || !strings.Contains(err.Error(), "重复") {
 		t.Fatalf("大小写/空白归一后仍应视为重复: %v", err)
 	}
 	// fileExt 同值重复同样拒绝
@@ -225,7 +225,7 @@ func TestValidateDuplicateMappingRejected(t *testing.T) {
 		{MatchType: "fileExt", MatchValue: "jpg,png", Entries: []SelectedEntry{{Behavior: "open"}}},
 		{MatchType: "fileExt", MatchValue: "JPG,PNG", Entries: []SelectedEntry{{Behavior: "run"}}},
 	}}
-	if err := ValidateSelectedAction(dupExt, nil); err == nil || !strings.Contains(err.Error(), "重复") {
+	if err := ValidateSelectedAction(dupExt, nil, nil); err == nil || !strings.Contains(err.Error(), "重复") {
 		t.Fatalf("fileExt 大小写归一后重复应拒绝: %v", err)
 	}
 }
@@ -237,7 +237,7 @@ func TestValidateDistinctMappingsPass(t *testing.T) {
 		{MatchType: "textType", MatchValue: "plain", Entries: []SelectedEntry{{Behavior: "run"}}},
 		{MatchType: "fileExt", MatchValue: "jpg,png", Entries: []SelectedEntry{{Behavior: "open"}}},
 	}}
-	if err := ValidateSelectedAction(sa, nil); err != nil {
+	if err := ValidateSelectedAction(sa, nil, nil); err != nil {
 		t.Fatalf("合法多样 mapping 应通过: %v", err)
 	}
 	// 同类型不同值不算重复
@@ -245,7 +245,7 @@ func TestValidateDistinctMappingsPass(t *testing.T) {
 		{MatchType: "fileExt", MatchValue: "jpg", Entries: []SelectedEntry{{Behavior: "open"}}},
 		{MatchType: "fileExt", MatchValue: "png", Entries: []SelectedEntry{{Behavior: "open"}}},
 	}}
-	if err := ValidateSelectedAction(sameType, nil); err != nil {
+	if err := ValidateSelectedAction(sameType, nil, nil); err != nil {
 		t.Fatalf("同类型不同值不应判为重复: %v", err)
 	}
 }
@@ -257,8 +257,8 @@ func TestValidateFileExtEmptyValueRejected(t *testing.T) {
 		sa := &SelectedAction{Hotkey: ">^p", Enable: true, Mappings: []SelectedMapping{
 			{MatchType: "fileExt", MatchValue: bad, Entries: []SelectedEntry{{Behavior: "open"}}},
 		}}
-		err := ValidateSelectedAction(sa, nil)
-		if err == nil || !strings.Contains(err.Error(), "文件后缀") {
+		err := ValidateSelectedAction(sa, nil, nil)
+		if err == nil || !strings.Contains(err.Error(), "文件扩展名") {
 			t.Fatalf("fileExt 条件值 %q 归一化后为空应拒绝: %v", bad, err)
 		}
 	}
@@ -266,14 +266,14 @@ func TestValidateFileExtEmptyValueRejected(t *testing.T) {
 	ok := &SelectedAction{Hotkey: ">^p", Enable: true, Mappings: []SelectedMapping{
 		{MatchType: "fileExt", MatchValue: ".jpg, .png", Entries: []SelectedEntry{{Behavior: "open"}}},
 	}}
-	if err := ValidateSelectedAction(ok, nil); err != nil {
+	if err := ValidateSelectedAction(ok, nil, nil); err != nil {
 		t.Fatalf("含点的合法后缀列表应通过: %v", err)
 	}
 	// 通配符 "*" 放行
 	wild := &SelectedAction{Hotkey: ">^p", Enable: true, Mappings: []SelectedMapping{
 		{MatchType: "fileExt", MatchValue: "*", Entries: []SelectedEntry{{Behavior: "open"}}},
 	}}
-	if err := ValidateSelectedAction(wild, nil); err != nil {
+	if err := ValidateSelectedAction(wild, nil, nil); err != nil {
 		t.Fatalf("通配符 * 应通过: %v", err)
 	}
 }
@@ -286,23 +286,23 @@ func TestMatchSelectedAction(t *testing.T) {
 		{MatchType: "fileExt", MatchValue: "jpg,png", Entries: []SelectedEntry{{Behavior: "open"}}},
 	}}
 	// 文本 URL 命中第一个 mapping
-	if m := MatchSelectedAction(sa, false, "https://example.com"); m == nil || m.MatchType != "textType" {
+	if m := MatchSelectedAction(sa, false, "https://example.com", nil); m == nil || m.MatchType != "textType" {
 		t.Fatalf("URL 文本应命中 textType mapping: %+v", m)
 	}
 	// 文件命中第二个 mapping
-	if m := MatchSelectedAction(sa, true, `C:\pic\a.JPG`); m == nil || m.MatchType != "fileExt" {
+	if m := MatchSelectedAction(sa, true, `C:\pic\a.JPG`, nil); m == nil || m.MatchType != "fileExt" {
 		t.Fatalf("文件应命中 fileExt mapping: %+v", m)
 	}
 	// 文本不命中 fileExt, 文件不命中 textType
-	if m := MatchSelectedAction(sa, true, "https://example.com"); m != nil {
+	if m := MatchSelectedAction(sa, true, "https://example.com", nil); m != nil {
 		t.Fatal("文件不应命中 textType mapping")
 	}
 	// 无命中
-	if m := MatchSelectedAction(sa, false, "just plain text"); m != nil {
+	if m := MatchSelectedAction(sa, false, "just plain text", nil); m != nil {
 		t.Fatal("纯文本不应命中 url mapping")
 	}
 	// nil 容忍
-	if m := MatchSelectedAction(nil, false, "https://example.com"); m != nil {
+	if m := MatchSelectedAction(nil, false, "https://example.com", nil); m != nil {
 		t.Fatal("nil 输入应返回 nil")
 	}
 }

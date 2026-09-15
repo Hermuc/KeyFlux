@@ -1,7 +1,7 @@
 {
   "id": "magnet_download",
   "name": "磁力链接下载",
-  "nameEn": "Magnet Download",
+  "nameEn": "Magnet download",
   "version": "1.0.0",
   "specVersion": 1,
   "description": "用系统默认 BT 下载工具下载选中磁力链接 (走 magnet: 协议关联, 不依赖具体软件)",
