@@ -91,25 +91,13 @@
 
             <!-- ② 内联新建/编辑表单 (就地展开, 不弹窗); 操作栏常驻底部, 不随表单滚动 -->
             <Grid IsVisible="{Binding IsEditorOpen}" RowDefinitions="*,Auto">
-              <!-- 右侧留 12px 给滚动条, 避免文字被滚动条压住 -->
-              <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" x:Name="FormScroll">
-                <StackPanel Spacing="16" Margin="0,0,12,0" DataContext="{Binding Editor}">
+              <!-- 滚动条右移 (2026-09-15 用户要求: 滚动条与文字过近):
+                   视口向右扩 10 (负右 Margin 侵入卡片 20 的内边距), 滚动条随之右移 10;
+                   内容右 Margin 12 -> 22 恰好抵消扩量 ⇒ 文字换行边界与位置和改动前完全一致。
+                   (同一手法见 AbbrPageView:13-14 与 CommentSummaryPanel:19-23) -->
+              <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Margin="0,0,-10,0" x:Name="FormScroll">
+                <StackPanel Spacing="16" Margin="0,0,22,0" DataContext="{Binding Editor}">
                   <TextBlock Classes="claudeSubtitle" Text="{Binding Title}" />
-
-                <!-- 常用类型一键套用 -->
-                <ItemsControl ItemsSource="{Binding Presets}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="services:MatchTypePreset">
-                      <Button Classes="claudeSand" Margin="0,0,6,6" Padding="10,5" FontSize="12"
-                              Click="OnApplyPreset" Content="{Binding Label}" />
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
 
                 <!-- 名称 -->
                 <StackPanel Spacing="6">

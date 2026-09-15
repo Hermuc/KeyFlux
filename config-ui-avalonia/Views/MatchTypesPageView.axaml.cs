@@ -71,16 +71,6 @@ public partial class MatchTypesPageView : UserControl
         if (vm.CanSetAction) await OpenBehaviorLibraryAsync();
     }
 
-    /// <summary>「常用类型」胶囊: 一键填好名称 / 匹配条件 / 条件或扩展名 / 默认动作。</summary>
-    private void OnApplyPreset(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is MatchTypesPageViewModel { Editor: { } editor } &&
-            sender is Button { DataContext: MatchTypePreset preset })
-        {
-            editor.ApplyPresetCommand.Execute(preset);
-        }
-    }
-
     /// <summary>底部「配置行为」(2569): 打开行为库窗口为该类型建专属行为 (仅"尚未配置行为"的自定义类型可点)。</summary>
     private async void OnSetAction(object? sender, RoutedEventArgs e) => await OpenBehaviorLibraryAsync();
 

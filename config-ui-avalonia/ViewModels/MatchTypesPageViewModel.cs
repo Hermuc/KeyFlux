@@ -147,9 +147,6 @@ public sealed partial class MatchTypeEditorVm : ObservableObject
     /// <summary>「命中后做什么」候选 = 内置行为包的通俗中文名 (来自包 name)。</summary>
     public ObservableCollection<ComboOption> BaseActionOptions { get; } = [];
 
-    /// <summary>常用类型预设 (胶囊按钮组)。</summary>
-    public IReadOnlyList<MatchTypePreset> Presets => MatchTypePresets.All;
-
     [ObservableProperty] private string _id = "";
     [ObservableProperty] private string _label = "";
     [ObservableProperty] private string _labelEn = "";
@@ -262,35 +259,6 @@ public sealed partial class MatchTypeEditorVm : ObservableObject
         {
             BaseActionOptions.Add(new ComboOption(p.Id, BehaviorCatalog.LabelFor(p.Id)));
         }
-    }
-
-    /// <summary>一键套用常用类型 (填名称 / 识别方式 / 条件或扩展名 / 默认动作)。</summary>
-    [RelayCommand]
-    private void ApplyPreset(MatchTypePreset? preset)
-    {
-        if (preset is null) return;
-        Error = null;
-        _idTouched = true; // 预设自带代号基底, 不再跟随名称变化
-        IsFileExt = preset.Kind == "fileExt";
-        Label = preset.Label;
-        BehaviorName = preset.Label;
-        if (IsFileExt)
-        {
-            ExtsText = string.Join(", ", preset.Values);
-            Rules.Clear();
-            Rules.Add(new MatchRuleRowVm());
-        }
-        else
-        {
-            Rules.Clear();
-            foreach (var v in preset.Values) Rules.Add(new MatchRuleRowVm("contains", v));
-        }
-        _autoSettingId = true;
-        Id = _page.UniqueId(preset.IdHint);
-        _autoSettingId = false;
-        var want = BaseActionOptions.FirstOrDefault(o => o.Value == preset.DefaultActionId);
-        if (want is not null) SelectedBaseAction = want;
-        TryResult = "";
     }
 
     [RelayCommand]
