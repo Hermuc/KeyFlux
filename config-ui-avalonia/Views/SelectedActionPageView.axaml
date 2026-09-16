@@ -20,10 +20,10 @@
     <!-- 共享行卡模板: 文本特征/文件后缀两分区共用 (Classes 样式见 UserControl.Styles) -->
     <DataTemplate x:Key="MappingRowCard" x:DataType="vm:MappingRowVm">
 
-      <Border Classes="row-card" Classes.matched="{Binding IsMatched}"
-              Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
-              CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="12" Margin="0,0,0,8"
-              Tapped="OnRowHeaderTapped">
+        <Border Classes="row-card actionCard" Classes.matched="{Binding IsMatched}"
+                Background="{StaticResource ClaudeIvoryBrush}"
+                CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="12" Margin="0,0,0,8"
+                Tapped="OnRowHeaderTapped">
         <StackPanel Spacing="8">
           <!-- 行头: 分区标题 (仅分区首行, 沿用原徽章色) + 条件值编辑 + 行操作 -->
           <Grid ColumnDefinitions="Auto,*,Auto">
@@ -113,8 +113,8 @@
             <ItemsControl ItemsSource="{Binding Editors}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:EntryRowVm">
-                  <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
-                          CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="10" Margin="0,0,0,6">
+                    <Border Classes="actionCard" Background="{StaticResource ClaudeIvoryBrush}"
+                            CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="10" Margin="0,0,0,6">
                     <StackPanel Spacing="8">
                       <Grid ColumnDefinitions="Auto,*,Auto">
                         <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="7,2"
@@ -217,6 +217,18 @@
     <Style Selector="ToggleButton.tone-coral:checked">
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <!-- 组件框统一外观 (2026-09-16 用户要求与 Settings / 插件页同款):
+         BoxShadow ClaudeShadowCard + 描边 ClaudeBorderCreamBrush **2px**, 与 Border.settingsCard /
+         Border.pluginCard / Border.leftPanel 逐项一致 (圆角沿用各自的 Lg / 嵌套用 Md)。
+         ⚠️ 这些属性原先**内联**写在各 Border 元素上 —— Avalonia 内联值优先级高于样式 Setter,
+         必须先移除内联的 BorderBrush / BorderThickness 交由本样式承载, 否则永远不生效。
+         声明在 .row-card 状态样式**之前**: 状态样式只覆盖 BorderBrush (不动粗细/阴影),
+         故「默认态 / 选中态(.matched)」的描边粗细与阴影完全一致, 仅颜色区分 ⇒ 视觉统一协调 -->
+    <Style Selector="Border.actionCard">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
     <!-- 映射行卡: 悬停提亮边框 / 测试命中高亮 (暖陶土底 + 陶土边) -->
     <Style Selector="Border.row-card:pointerover">
@@ -324,8 +336,8 @@
         </Border>
 
         <!-- 主快捷键 + 启用开关 -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
-                CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+          <Border Classes="actionCard" Background="{StaticResource ClaudeIvoryBrush}"
+                  CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
           <StackPanel Spacing="10">
             <Grid ColumnDefinitions="*,Auto,Auto">
               <TextBlock FontWeight="SemiBold" VerticalAlignment="Center"
@@ -376,8 +388,8 @@
         </StackPanel>
 
         <!-- ===================== 底部紧凑模拟测试条 ===================== -->
-        <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
-                CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+          <Border Classes="actionCard" Background="{StaticResource ClaudeIvoryBrush}"
+                  CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
           <StackPanel Spacing="8">
             <TextBlock FontWeight="SemiBold"
                        Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=987}" />
