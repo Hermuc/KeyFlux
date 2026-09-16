@@ -301,10 +301,16 @@
     </DataTemplate>
   </UserControl.DataTemplates>
 
-  <Grid Margin="20" RowDefinitions="Auto,*">
+  <!-- 左内边距 20 -> 8, 同时给下面两行各加 12px 左 Margin —— 三者等量抵消, **视觉布局一行不变**,
+       但把 ScrollViewer 的左裁剪边界从 x=20 挪到 x=8, 让卡片左侧多出 12px 画阴影的余地。
+       原布局: 内容左对齐 => 卡片左沿与视口左沿【重合】(实测 0px 余量) => 左侧阴影被视口裁掉,
+       而右侧有 566px 余量故阴影正常 —— 表现为"右有左无"的不对称 (2026-09-16 用户报)。
+       ⚠️ 不能用 ScrollViewer.Padding 代替: Padding 会把 ScrollContentPresenter 的裁剪边界
+       一起内缩, 阴影照样被裁 (见 SettingsPageView 同名注释记录的坑) -->
+  <Grid Margin="8,20,20,20" RowDefinitions="Auto,*">
 
     <!-- ===================== 顶部: 标题 + 管理行为… + 添加映射 ===================== -->
-    <DockPanel Grid.Row="0" Margin="0,0,0,12" controls:ModalBlur.IsActive="{Binding IsAddPanelOpen}">
+    <DockPanel Grid.Row="0" Margin="12,0,0,12" controls:ModalBlur.IsActive="{Binding IsAddPanelOpen}">
       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <Button Command="{Binding ManageMatchTypesCommand}" Background="Transparent" BorderThickness="1"
                 BorderBrush="{StaticResource ClaudeBorderCreamBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,7" FontSize="13"
@@ -325,7 +331,8 @@
     </DockPanel>
 
     <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" controls:ModalBlur.IsActive="{Binding IsAddPanelOpen}">
-      <StackPanel x:Name="PageRoot" MaxWidth="860" HorizontalAlignment="Left" Spacing="14">
+      <StackPanel x:Name="PageRoot" MaxWidth="860" HorizontalAlignment="Left" Spacing="14"
+                  Margin="12,0,0,0">
 
         <!-- 说明条 (单键分发语义, 复用 960) -->
         <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,9">

@@ -116,6 +116,38 @@ public sealed class ActionPageCardStyleTests
         }
     }
 
+    /// <summary>
+    /// ④ 行卡必须在 ScrollViewer 视口内**留出画阴影的水平余量**。
+    /// 实测过的不对称: 内容左对齐贴着视口左沿时, 卡片左沿 - 视口左沿 = 0px ⇒ 左侧阴影被
+    /// ScrollViewer 视口裁掉, 而右侧有 566px 余量正常渲染 ⇒ 表现为"右有左无"。
+    /// 阴影 ClaudeShadowCard 第二层 blur=18, 水平外扩约 9px ⇒ 左余量须 >= 9px。
+    /// 修法是**移动裁剪边界而非移动内容**: 页面 Grid 左内边距 20->8, Header 与 PageRoot 各 +12 左 Margin,
+    /// 三者等量抵消故视觉布局不变, 但给左侧腾出 12px。**勿把这三处改回等值**, 否则阴影又被裁。
+    /// </summary>
+    [AvaloniaFact]
+    public void Row_Cards_Must_Leave_Room_For_Shadow_Inside_Scroller()
+    {
+        var (page, view, win) = CreateHost();
+        try
+        {
+            var scroller = view.GetVisualDescendants().OfType<ScrollViewer>().First();
+            var card = view.GetVisualDescendants().OfType<Border>()
+                .First(b => ReferenceEquals(b.DataContext, page.FileMappings[0])
+                         || ReferenceEquals(b.DataContext, page.TextMappings[0]));
+            _ = page;
+
+            var svLeft = scroller.TranslatePoint(default, win)!.Value.X;
+            var cardLeft = card.TranslatePoint(default, win)!.Value.X;
+
+            Assert.True(cardLeft - svLeft >= 9,
+                $"行卡左沿距视口左沿仅 {cardLeft - svLeft:F1}px ⇒ 左侧阴影会被视口裁掉 (需要 >=9px)");
+        }
+        finally
+        {
+            win.Close();
+        }
+    }
+
     /// <summary>② 选中态 (.matched) 只换颜色, 粗细与阴影必须与默认态完全一致。</summary>
     [AvaloniaFact]
     public void Matched_State_Keeps_Thickness_And_Shadow()
