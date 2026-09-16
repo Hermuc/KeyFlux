@@ -18,7 +18,8 @@ namespace KeyFlux.Settings.Tests;
 /// <summary>
 /// 设置页组件框三态守护 —— **以插件页 Border.pluginCard 为基准** (2026-09-15 用户要求
 /// 两页组件框描边线条视觉一致, 插件页为准):
-/// ① 静止态: **1px** 奶油边框 + ClaudeShadowCard 双层下坠影 (原为 2px, 与插件页差一倍);
+/// ① 静止态: **2px** 奶油边框 + ClaudeShadowCard 双层下坠影
+///    (2026-09-15 与插件页统一机制时曾为 1px; 2026-09-16 用户反馈两页皆偏细 ⇒ 同步加粗到 2px);
 /// ② 悬停态: **边框色不变**, 仅阴影换 ClaudeShadowCardHover (内含 1px #d1cfc5 环 + 强影)
 ///    —— 原实现把边框换成 #c9c7bd 并用去环版 Deep, 与插件页的环机制不同;
 /// ③ 卡内控件获焦 → :focus-within 边框色仍不变, 阴影换 ClaudeShadowFocusRing (Coral 2px 环)
@@ -53,9 +54,10 @@ public sealed class SettingsCardEffectTests
             var restBrush = Assert.IsType<SolidColorBrush>(card.BorderBrush);
             var restShadow = (BoxShadows)view.FindResource("ClaudeShadowCard")!;
 
-            // ① 静止态: 1px 奶油边框 + ClaudeShadowCard 双层下坠影
+            // ① 静止态: 2px 奶油边框 + ClaudeShadowCard 双层下坠影
+            //    (2026-09-16 用户反馈「两页描边都有点细」⇒ 1px -> 2px, 与插件页同步)
             Assert.Equal(creamObj!.Color, restBrush.Color);
-            Assert.Equal(1, card.BorderThickness.Left);
+            Assert.Equal(2, card.BorderThickness.Left);
             Assert.Equal(restShadow.ToString(), card.BoxShadow.ToString());
 
             // ② 悬停: headless 鼠标移到卡片中心 → :pointerover

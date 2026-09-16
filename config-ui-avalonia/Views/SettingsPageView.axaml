@@ -34,13 +34,15 @@
            静止  2px  vs 插件页 1px               → 粗细差一倍
            悬停  2px #c9c7bd vs 插件页 1px #d1cfc5 → 更深且更粗
            聚焦  实体橙边    vs 插件页 Coral 2px 环
-         现逐项对齐 Border.pluginCard: 静止 1px 奶油边; 悬停/聚焦**只换 BoxShadow 环**,
-         不再改 BorderBrush (故 ClaudeCoralBrush/#c9c7bd 两处硬编码色随之移除)。
+         现逐项对齐 Border.pluginCard: 悬停/聚焦**只换 BoxShadow 环**, 不再改 BorderBrush
+         (故 ClaudeCoralBrush/#c9c7bd 两处硬编码色随之移除)。
+         2026-09-16: 用户反馈「两页描边都有点细」⇒ 静止 BorderThickness 1 -> 2,
+         与插件页 Border.pluginCard 同步加粗 (两页仍逐项一致, 见 SettingsCardEffectTests 跨页断言)。
          注: 卡片虽在 ScrollViewer 内, 但右列 StackPanel 留有 24px 外边距
          (2026-09-12 由 Padding 改 Margin 修好"阴影被切断"), 环不被裁 -->
     <Style Selector="Border.settingsCard">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
-      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
     <Style Selector="Border.settingsCard:pointerover">
@@ -56,7 +58,7 @@
          故整页 Viewbox 缩放比不变, TopFlareWings 的 0.5px 几何守护不受影响 -->
     <Style Selector="Border.leftPanel">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
-      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
     <Style Selector="Border.leftPanel:pointerover">

@@ -29,11 +29,15 @@
     </Style>
     <!-- 插件卡: Ivory 面 + cream 细边 + 静止态柔和投影 (2026-09-11 用户反馈:
          此前静止态只有 1px 细边, 视觉上"阴影边界紧贴文字";
-         投影 blur 超出卡片边界约 20px, 依赖下方 ItemsControl 的 ClipToBounds=False 才不被裁) -->
+         投影 blur 超出卡片边界约 20px, 依赖下方 ItemsControl 的 ClipToBounds=False 才不被裁)。
+         2026-09-16 用户反馈「两页组件框描边都有点细」⇒ BorderThickness 1 -> 2;
+         Settings 页 Border.settingsCard / Border.leftPanel 同步改为 2, 两页仍逐项一致。
+         设备像素参考: 本应用卡片处 Viewbox(≈0.99)×LayoutTransform(1.12)×DPI(1.25)≈1.386,
+         故 1px 逻辑 ≈ 1.4 dp (细如发丝) 而 2px ≈ 2.8 dp (清晰) -->
     <Style Selector="Border.pluginCard">
       <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderThickness" Value="2" />
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
       <Setter Property="Padding" Value="20,16" />
       <Setter Property="Margin" Value="0,0,0,10" />
