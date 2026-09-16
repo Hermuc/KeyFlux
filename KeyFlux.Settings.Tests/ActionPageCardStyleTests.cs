@@ -14,11 +14,14 @@ using Xunit;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
-/// 选中动作页组件框外观守护 (2026-09-16 用户要求与 Settings / 插件页同款)。
+/// 选中动作页组件框外观守护 (2026-09-16)。
 ///
-/// 统一配方 (与 Border.settingsCard / Border.pluginCard / Border.leftPanel 逐项一致):
-///   BoxShadow = ClaudeShadowCard; BorderThickness = 2; BorderBrush = ClaudeBorderCreamBrush。
-/// 本页原先把这三项**内联**写在每个 Border 上且无阴影、1px 描边, 故与其它页明显不一致;
+/// 本页配方 = BoxShadow **ClaudeShadowCard** + BorderThickness **1** + ClaudeBorderCreamBrush。
+/// 阴影取 Settings / 插件页同款; **描边有意比其它三处(2px)更细** —— 用户看过实际效果后裁定
+/// 本页"线条太粗/太重": 本页卡片密集堆叠(行卡间距仅 8px, 且行卡内嵌一张子卡),
+/// 同一 2px 在此处框线密度过高而发重。**勿把本页"修正"成 2px**, 那不是笔误。
+///
+/// 本页原先把 BorderBrush/BorderThickness **内联**写在每个 Border 上且无阴影,
 /// 现统一由 Border.actionCard 样式承载 (内联值优先级高于样式 Setter, 必须移除内联项)。
 ///
 /// 另一条守护: **默认态与选中态 (.matched) 的描边粗细与阴影必须相同**, 仅颜色区分 ——
@@ -74,9 +77,37 @@ public sealed class ActionPageCardStyleTests
 
             foreach (var card in cards)
             {
-                Assert.Equal(2, card.BorderThickness.Left);
+                Assert.Equal(1, card.BorderThickness.Left);
                 Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
                 Assert.Equal(shadow.ToString(), card.BoxShadow.ToString());
+            }
+        }
+        finally
+        {
+            win.Close();
+        }
+    }
+
+    /// <summary>
+    /// ③ 承载映射行卡的两个 ItemsControl **必须关掉裁剪**。
+    /// ItemsControl 默认裁剪到自身边界, 而行卡 BoxShadow 画在卡片边界之外 ⇒
+    /// 不关掉就只剩卡片之间那一段可见, 列表外沿(首卡上/末卡下/各卡左右)的阴影全被切掉,
+    /// 即用户报的「阴影被裁切」。插件页同款坑、同款修法 (PluginsPageView.axaml 有原始注释)。
+    /// </summary>
+    [AvaloniaFact]
+    public void Mapping_Lists_Must_Not_Clip_Card_Shadow()
+    {
+        var (page, view, win) = CreateHost();
+        try
+        {
+            var lists = view.GetVisualDescendants().OfType<ItemsControl>()
+                .Where(ic => ReferenceEquals(ic.ItemsSource, page.TextMappings)
+                          || ReferenceEquals(ic.ItemsSource, page.FileMappings))
+                .ToList();
+            Assert.Equal(2, lists.Count);
+            foreach (var list in lists)
+            {
+                Assert.False(list.ClipToBounds, "映射行卡的 ItemsControl 必须 ClipToBounds=False, 否则阴影被裁");
             }
         }
         finally

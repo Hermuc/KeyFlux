@@ -218,16 +218,19 @@
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
-    <!-- 组件框统一外观 (2026-09-16 用户要求与 Settings / 插件页同款):
-         BoxShadow ClaudeShadowCard + 描边 ClaudeBorderCreamBrush **2px**, 与 Border.settingsCard /
-         Border.pluginCard / Border.leftPanel 逐项一致 (圆角沿用各自的 Lg / 嵌套用 Md)。
+    <!-- 组件框外观 (2026-09-16): 取 Settings / 插件页同款**阴影**, 但描边**有意更细**。
+         用户先要求"同款阴影+描边", 看过实际效果后裁定本页"线条太粗/太重" ⇒ BorderThickness 2 -> 1。
+         原因: 本页是**卡片密集堆叠**(行卡间距仅 8px, 且行卡内还嵌一张子卡),
+         同一 2px 在 Settings 页(卡间距 16px、无嵌套)显得正常, 在这里则框线密度过高而发重。
+         ⇒ 本页配方 = BoxShadow ClaudeShadowCard + **1px** ClaudeBorderCreamBrush
+           (其余三处 Border.pluginCard / settingsCard / leftPanel 仍为 2px, 未动)。
          ⚠️ 这些属性原先**内联**写在各 Border 元素上 —— Avalonia 内联值优先级高于样式 Setter,
          必须先移除内联的 BorderBrush / BorderThickness 交由本样式承载, 否则永远不生效。
          声明在 .row-card 状态样式**之前**: 状态样式只覆盖 BorderBrush (不动粗细/阴影),
          故「默认态 / 选中态(.matched)」的描边粗细与阴影完全一致, 仅颜色区分 ⇒ 视觉统一协调 -->
     <Style Selector="Border.actionCard">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
-      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
     <!-- 映射行卡: 悬停提亮边框 / 测试命中高亮 (暖陶土底 + 陶土边) -->
@@ -376,14 +379,17 @@
         </StackPanel>
 
         <!-- ===================== 分区一: 文本特征 ===================== -->
+        <!-- ClipToBounds=False (2026-09-16 用户报"阴影被裁切"): ItemsControl 默认裁剪到自身边界,
+             而行卡的 BoxShadow 画在卡片边界之外 ⇒ 不关掉就只剩卡片之间那一段可见,
+             列表外沿(首卡上/末卡下/各卡左右)的阴影全被切掉。与插件页同一手法与同一坑。 -->
         <StackPanel IsVisible="{Binding TextMappings.Count}">
-          <ItemsControl ItemsSource="{Binding TextMappings}"
+          <ItemsControl ItemsSource="{Binding TextMappings}" ClipToBounds="False"
                         ItemTemplate="{StaticResource MappingRowCard}" />
         </StackPanel>
 
         <!-- ===================== 分区二: 文件后缀 ===================== -->
         <StackPanel IsVisible="{Binding FileMappings.Count}">
-          <ItemsControl ItemsSource="{Binding FileMappings}"
+          <ItemsControl ItemsSource="{Binding FileMappings}" ClipToBounds="False"
                         ItemTemplate="{StaticResource MappingRowCard}" />
         </StackPanel>
 
