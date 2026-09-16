@@ -9,9 +9,9 @@
 
 /**
  * 托盘菜单被点击
- * @param ItemName 
- * @param ItemPos 
- * @param MyMenu 
+ * @param ItemName
+ * @param ItemPos
+ * @param MyMenu
  */
 TrayMenuHandler(ItemName, ItemPos, MyMenu) {
   ; 注: 不用 switch 是因为 2.0.19 解释器无法编译 case 表达式含函数调用/属性访问
@@ -147,7 +147,7 @@ KeyFluxReload() {
  *  将程序路径或参数中的{selected} 替换为选中的文字
  * @param target 程序路径的引用
  * @param args 参数的引用
- * @returns {void|number} 
+ * @returns {void|number}
  */
 ReplaceSelectedText(&target, &args) {
   text := GetSelectedText()
@@ -175,7 +175,7 @@ ReplaceSelectedText(&target, &args) {
 
 /**
  * 获取选中的文字 (阶段2: 实现已迁移到 context/SelectionContext.ahk, 保留函数签名兼容存量调用)
- * @returns {void|string} 
+ * @returns {void|string}
  */
 GetSelectedText() {
   sel := SelectionContext.Get(false)
@@ -190,7 +190,7 @@ GetSelectedText() {
  * 来源: https://www.autohotkey.com/boards/viewtopic.php?t=112741
  * @param Uri 需要编码的文本
  * @param {string} encoding 编码格式
- * @returns {string} 
+ * @returns {string}
  */
 URIEncode(Uri, encoding := "UTF-8") {
   res := ""
@@ -214,7 +214,7 @@ URIEncode(Uri, encoding := "UTF-8") {
  * @param text 需要转换的文本
  * @param color HEX颜色值
  * @param fontFamily 字体
- * @returns {string} 
+ * @returns {string}
  */
 FormatHtmlStyle(text, color, fontFamily) {
   style := "Color: '" color "'; font-family: '" fontFamily ";"
@@ -233,7 +233,7 @@ FormatHtmlStyle(text, color, fontFamily) {
 /**
  * Html编码
  * @param text 需要编码的文本
- * @returns {void} 
+ * @returns {void}
  */
 HtmlEncode(text) {
   text := strReplace(text, "&", "&amp;")

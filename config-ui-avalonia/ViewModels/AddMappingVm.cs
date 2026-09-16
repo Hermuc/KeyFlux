@@ -200,7 +200,7 @@ public sealed partial class AddMappingVm : ObservableObject
         RefreshGates();
         OnPropertyChanged(nameof(CanConfirm));
     }
-    
+
     /// <summary>行为目录变化后重建勾选列表 (保留已勾状态); 供页面 RefreshBehaviorOptions 调用。</summary>
     public void RefreshPicks() => RebuildPicks();
 

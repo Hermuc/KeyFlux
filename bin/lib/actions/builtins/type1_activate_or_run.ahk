@@ -11,7 +11,7 @@
  * @param {string} workingDir 工作文件夹
  * @param {bool} admin 是否为管理员启动
  * @param {bool} isHide 窗口是否为隐藏窗口
- * @returns {void} 
+ * @returns {void}
  */
 ActivateOrRun(winTitle := "", target := "", args := "", workingDir := "", admin := false, isHide := false, runInBackground := false) {
   ; 如果是程序或参数中带有“选中的文件” 则通过该程序打开该连接
@@ -68,7 +68,7 @@ ActivateOrRun(winTitle := "", target := "", args := "", workingDir := "", admin 
  * 轮换程序窗口
  * @param winTitle AHK中的WinTitle
  * @param hwnds 活动窗口的句柄数组
- * @returns {void|number} 
+ * @returns {void|number}
  */
 LoopRelatedWindows(winTitle?, hwnds?) {
   ; 如果没有传句柄数组则获取当前窗口的
@@ -115,7 +115,7 @@ LoopRelatedWindows(winTitle?, hwnds?) {
 
 /**
  * 一次打开多个链接或程序
- * @param urls 链接或程序 
+ * @param urls 链接或程序
  */
 LaunchMultiple(urls*) {
   for index, url in urls {

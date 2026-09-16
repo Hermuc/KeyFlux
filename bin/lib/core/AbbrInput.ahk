@@ -7,7 +7,7 @@
 /**
  * 启动InputHook，并返回EndReason
  * @param ih InputHook对象
- * @returns {void} 
+ * @returns {void}
  */
 StartInputHook(ih) {
   ; 禁用所有热键

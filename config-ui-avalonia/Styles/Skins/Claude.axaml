@@ -226,7 +226,7 @@
     <SolidColorBrush x:Key="ClaudeWindowSurfaceBrush"   Color="#B3f5f4ed" />
     <SolidColorBrush x:Key="ClaudeSidebarSurfaceBrush"  Color="#C4faf9f5" />
 
-  
+
   <!-- ToolTip 无动画直显 (2026-09-13 用户报: 淡入动画结束才显示完整文字)。覆盖 Fluent
        ControlTheme: 原版 Opacity 0 + 0.15s DoubleTransition + :open 才变 1; 本版恒 Opacity=1
        无 Transitions —— 悬浮即完整显示。模板/配色资源与 Fluent 原版逐项一致, 仅去动画。

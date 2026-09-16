@@ -7,7 +7,7 @@
 class DefaultTranslation {
   keyflux_on := "🚀  KeyFlux: On  "
   keyflux_off := "⏸️  KeyFlux: Off  "
-  
+
   menu_pause := "Pause"
   menu_exit := "Exit"
   menu_reload := "Reload"

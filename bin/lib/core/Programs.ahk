@@ -9,7 +9,7 @@
  * 获取当前程序名称
  * 自带的WinGetProcessName无法获取到uwp应用的名称
  * 来源：https://www.autohotkey.com/boards/viewtopic.php?style=7&t=112906
- * @returns {string} 
+ * @returns {string}
  */
 GetProcessName() {
   return GetActiveProcess("name")
@@ -39,8 +39,8 @@ GetActiveProcess(type) {
 /**
  * 从环境中补全程序的绝对路径
  * 来源: https://autohotkey.com/board/topic/20807-fileexist-in-path-environment/
- * @param target 程序路径 
- * @returns {string|any} 
+ * @param target 程序路径
+ * @returns {string|any}
  */
 CompleteProgramPath(target) {
   ; 工作目录下的程序
@@ -98,7 +98,7 @@ GetTargetProcessName(target) {
 
 /**
  * 通过命令行去启动程序，防止会导致以管理员启动软件的问题
- * @param target 程序路径 
+ * @param target 程序路径
  * @param arguments 参数
  * @param directory 工作目录
  * @param operation 选项 (runas/open/edit/print
@@ -130,7 +130,7 @@ RunAsAdmin(target, args, workingDir, options) {
  * @param {string} args 参数
  * @param {string} workingDir 工作目录
  * @param {number} admin 是否为管理员启动
- * @returns {void} 
+ * @returns {void}
  */
 RunPrograms(target, args := "", workingDir := "", admin := false, runInBackground := false) {
   ; 记录当前窗口的hwnd，当软件启动失败时还原焦点

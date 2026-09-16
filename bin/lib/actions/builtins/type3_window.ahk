@@ -41,7 +41,7 @@ SmartCloseWindow() {
  * 窗口居中并修改其大小
  * @param width 窗口宽度
  * @param height 窗口高度
- * @returns {void} 
+ * @returns {void}
  */
 CenterAndResizeWindow(width, height) {
   if NotActiveWin() {
@@ -112,7 +112,7 @@ ToggleWindowTopMost() {
 
 /**
  * 关闭窗口（直接杀进程）
- * @returns  
+ * @returns
  */
 CloseWindowProcesses() {
   if NotActiveWin() {
@@ -132,7 +132,7 @@ CloseWindowProcesses() {
 /**
  * 绑定当前窗口到当前键上
  * @param key 当前键
- * @returns {void} 
+ * @returns {void}
  */
 BindWindow() {
   windowID := false

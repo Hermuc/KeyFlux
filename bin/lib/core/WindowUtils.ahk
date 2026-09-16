@@ -19,7 +19,7 @@ ActivateDesktop() {
  * 激活窗口
  * @param winTitle AHK中的WinTitle
  * @param {number} isHide 窗口是否为隐藏窗口
- * @returns {number} 
+ * @returns {number}
  */
 ActivateWindow(winTitle := "", isHide := false) {
   ; 如果匹配不到窗口且认为窗口为隐藏窗口时查找隐藏窗口
@@ -101,9 +101,9 @@ TryTrayRestoreByNav(processName, winTitle) {
 }
 
 /**
- * 查找隐藏窗口返回窗口的Hwnd 
+ * 查找隐藏窗口返回窗口的Hwnd
  * @param winTitle AHK中的WinTitle
- * @returns {array} 
+ * @returns {array}
  */
 FindHiddenWindows(winTitle) {
   WS_MINIMIZEBOX := 0x00020000
@@ -131,7 +131,7 @@ FindHiddenWindows(winTitle) {
  * 返回与指定条件匹配的所有窗口
  * @param winTitle AHK中的WinTitle
  * @param predicate 过滤窗口方法，传过Hwnd，返回bool
- * @returns {array} 
+ * @returns {array}
  */
 FindWindows(winTitle, predicate?) {
   temps := WinGetList(winTitle)
@@ -177,7 +177,7 @@ GetMonitorAt(x, y, default := 1) {
 /**
  * 当前窗口是最大化还是最小化
  * @param {string} winTitle AHK中的WinTitle
- * @returns {number} 
+ * @returns {number}
  */
 WindowMaxOrMin(winTitle := "A") {
   return WinGetMinMax(winTitle)

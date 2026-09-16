@@ -5,7 +5,7 @@
  */
 
 /**
- * 自动关闭的提示窗口 
+ * 自动关闭的提示窗口
  * @param message 要提示的文本
  * @param {number} time 超时后关闭
  */
@@ -16,7 +16,7 @@ Tip(message, time := -1500) {
 
 /**
  * 禁用输入法
- * @param hwnd 
+ * @param hwnd
  */
 DisableIME(hwnd) {
   controlName := ControlGetFocus(hwnd)
@@ -31,7 +31,7 @@ DisableIME(hwnd) {
  * @param Y 光标相对于屏幕Y轴的位置
  * @param W 光标的宽度
  * @param H 光标的高度
- * @returns {void} 
+ * @returns {void}
  */
 GetCaretPos(&X?, &Y?, &W?, &H?) {
   ; UIA2 caret
