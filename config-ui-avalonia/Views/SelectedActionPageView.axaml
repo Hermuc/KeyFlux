@@ -233,6 +233,23 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
+    <!-- 悬停灰描边 (2026-09-16 用户报「快捷键 / 模拟测试 组件框缺线条描边」):
+         真因是本样式原先**只有静止态、没有 :pointerover** —— 而映射行卡另有
+         `Border.row-card:pointerover`(悬停转 RingWarm 灰), 于是只有行卡有悬停反馈,
+         快捷键卡 / 模拟测试条 / 嵌套条目卡悬停时毫无变化, 看起来像"没有描边"。
+         此处补齐, 取值与行卡逐字一致 (ClaudeRingWarmBrush), 使 5 个组件框悬停表现统一。
+         声明位置在 Border.row-card:pointerover / .matched **之前**: 行卡两者取值本就相同(无冲突),
+         而 .matched 的陶土边必须能压过悬停灰 ⇒ 靠声明顺序保证 -->
+    <Style Selector="Border.actionCard:pointerover">
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeRingWarmBrush}" />
+    </Style>
+    <!-- 悬停灰描边 (2026-09-16 用户报「快捷键 / 模拟测试 组件框缺线条描边」):
+         真因是本样式原先**只有静止态、没有 :pointerover** —— 而映射行卡另有
+         `Border.row-card:pointerover`(悬停转 RingWarm 灰), 于是只有行卡有悬停反馈,
+         快捷键卡 / 模拟测试条 / 嵌套条目卡悬停时毫无变化, 看起来像"没有描边"。
+         此处补齐, 取值与行卡逐字一致 (ClaudeRingWarmBrush), 使 5 个组件框悬停表现统一。
+         声明位置在 Border.row-card:pointerover / .matched **之前**: 行卡两者取值本就相同(无冲突),
+         而 .matched 的陶土边必须能压过悬停灰 ⇒ 靠声明顺序保证 -->
     <!-- 映射行卡: 悬停提亮边框 / 测试命中高亮 (暖陶土底 + 陶土边) -->
     <Style Selector="Border.row-card:pointerover">
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeRingWarmBrush}" />

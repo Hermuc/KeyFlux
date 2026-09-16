@@ -1,6 +1,7 @@
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -53,7 +54,9 @@ public sealed class ActionPageCardStyleTests
         page.ExpandedRow = page.FileMappings[0]; // 展开一行 ⇒ 嵌套条目卡也实例化
 
         var view = new SelectedActionPageView { DataContext = page };
-        var win = new Window { Width = 1200, Height = 820, Content = view };
+        // 窗口 1000 高: 页面内容约 900 高, 用 820 会把最底部的「模拟测试」卡切掉,
+        // 导致悬停测试的点落在窗口外 (2026-09-16 踩过)
+        var win = new Window { Width = 1200, Height = 1000, Content = view };
         win.Show();
         Dispatcher.UIThread.RunJobs();
         return (page, view, win);
@@ -148,6 +151,49 @@ public sealed class ActionPageCardStyleTests
         }
     }
 
+    /// <summary>
+    /// ⑤ 五个组件框**悬停时都必须出现灰描边** (2026-09-16 用户报「快捷键 / 模拟测试 缺线条描边」)。
+    /// 真因是 Border.actionCard 原先只有静止态、没有 :pointerover, 而行卡另有
+    /// Border.row-card:pointerover(转 RingWarm) ⇒ 只有行卡有悬停反馈, 另三处悬停毫无变化。
+    /// 本项逐个悬停并断言 BorderBrush == ClaudeRingWarmBrush, 防止将来再漏。
+    /// </summary>
+    [AvaloniaFact]
+    public void All_Action_Cards_Show_Gray_Border_On_Hover()
+    {
+        var (_, view, win) = CreateHost();
+        try
+        {
+            Assert.True(Application.Current!.TryGetResource("ClaudeRingWarmBrush", out var ringObj));
+            var ring = ((SolidColorBrush)ringObj!).Color;
+
+            var cards = view.GetVisualDescendants().OfType<Border>()
+                .Where(b => b.Classes.Contains("actionCard")).ToList();
+            Assert.True(cards.Count >= 5, $"应有 >=5 个组件框, 实得 {cards.Count}");
+
+            var checkedNames = new List<string>();
+            foreach (var card in cards)
+            {
+                var p = card.TranslatePoint(
+                    new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), win)!.Value;
+                win.MouseMove(p);
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.True(card.IsPointerOver,
+                    $"{string.Join("+", card.Classes)} 悬停应命中 (Bounds={card.Bounds})");
+                Assert.Equal(ring, ((ISolidColorBrush)card.BorderBrush!).Color);
+                checkedNames.Add(string.Join("+", card.Classes));
+
+                win.MouseMove(new Point(1, 1));
+                Dispatcher.UIThread.RunJobs();
+            }
+            Assert.Equal(5, checkedNames.Count);
+        }
+        finally
+        {
+            win.Close();
+        }
+    }
+
     /// <summary>② 选中态 (.matched) 只换颜色, 粗细与阴影必须与默认态完全一致。</summary>
     [AvaloniaFact]
     public void Matched_State_Keeps_Thickness_And_Shadow()
@@ -170,6 +216,14 @@ public sealed class ActionPageCardStyleTests
             Assert.Equal(thicknessBefore, card.BorderThickness);
             Assert.Equal(shadowBefore, card.BoxShadow.ToString());
             Application.Current!.TryGetResource("ClaudeTerracottaBrush", out var terra);
+            Assert.Equal(((ISolidColorBrush)terra!).Color, ((ISolidColorBrush)card.BorderBrush!).Color);
+
+            // 悬停已选中的行卡时仍须保持陶土边 —— 不能被新加的 actionCard:pointerover 灰边压掉
+            // (两者同属"1 类 + 1 伪类", 靠声明顺序决定; .matched 在 actionCard 之后声明)
+            var hp = card.TranslatePoint(new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), win)!.Value;
+            win.MouseMove(hp);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(card.IsPointerOver);
             Assert.Equal(((ISolidColorBrush)terra!).Color, ((ISolidColorBrush)card.BorderBrush!).Color);
         }
         finally
