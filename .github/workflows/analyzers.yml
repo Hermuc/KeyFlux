@@ -1,0 +1,50 @@
+name: analyzers
+
+# IDE 代码风格诊断闸门 —— 未使用 using / 未使用私有成员 / 未使用变量与参数 / Substring 简化。
+#
+# 为什么**独立于 release.yml** (2026-09-16 建):
+#   风格问题不该拦住发布 —— 本 workflow 只在 push / PR 上给红灯, 打 tag 出包不受影响。
+#   对应地, release.yml 保持原样未动。
+#
+# 为什么**两个项目都要跑**:
+#   该闸门此前只在 config-ui-avalonia 上跑, 测试项目 (KeyFlux.Settings.Tests) 从未受检;
+#   2026-09-16 首次补跑即命中 5 处 (IDE0059 ×3 / IDE0060 ×1 / IDE0057 ×1)。
+#
+# 命令须与 Makefile 的 `analyzers` 目标保持一致 (本地用 `make analyzers` 复现本 CI)。
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  analyzers:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # 先 build (同时完成 restore) —— 闸门命令带 --no-restore, 与该前置严格配对
+      - name: Build (restores packages)
+        run: dotnet build KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --nologo -v q
+
+      - name: Analyzers gate — config-ui-avalonia
+        run: >
+          dotnet format style config-ui-avalonia/KeyFlux.Settings.csproj
+          --verify-no-changes --no-restore --severity info
+          --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059
+
+      - name: Analyzers gate — KeyFlux.Settings.Tests
+        run: >
+          dotnet format style KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj
+          --verify-no-changes --no-restore --severity info
+          --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059

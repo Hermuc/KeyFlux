@@ -116,6 +116,14 @@ check: buildServer lint
 check-cs:
 	dotnet test KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --nologo
 
+# analyzers: IDE 代码风格诊断闸门 (未使用 using / 未使用私有成员 / 未使用变量与参数 / Substring 简化)
+# **必须两个项目都跑**: 2026-09-16 发现本闸门此前只覆盖 config-ui-avalonia, 测试项目从未受检,
+# 首次补跑即命中 5 处 (IDE0059 ×3 / IDE0060 ×1 / IDE0057 ×1, 均已修复)。
+# 前置: 需先 build/restore (故带 --no-restore); 与 .github/workflows/analyzers.yml 的命令须保持一致。
+analyzers:
+	dotnet format style config-ui-avalonia/KeyFlux.Settings.csproj --verify-no-changes --no-restore --severity info --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059
+	dotnet format style KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --verify-no-changes --no-restore --severity info --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059
+
 # sync-out: 把编译产物同步到 OUT_DIR (robocopy 退出码 0-7 均为成功)
 sync-out: | $(OUT_DIR)
 	MSYS_NO_PATHCONV=1 robocopy bin/lib $(OUT_DIR)/bin/lib /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
@@ -134,4 +142,4 @@ out: buildServer buildClientAvalonia sync-out
 deploy: check buildClientAvalonia sync-out
 	pwsh -NoProfile -Command "$$d=(Resolve-Path '$(OUT_DIR)').Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d 'KeyFlux.exe') -WorkingDirectory $$d"
 
-.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-cs lint sync-out out deploy
+.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-cs analyzers lint sync-out out deploy
