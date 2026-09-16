@@ -186,7 +186,7 @@ public sealed class I18nResourceTests
                 // 只认挂在 {StaticResource Tr} 上的 ConverterParameter (向前开 400 字符窗口),
                 // 避开其它转换器可能出现的同名参数造成误报
                 var from = Math.Max(0, m.Index - 400);
-                var window = text.Substring(from, m.Index + m.Length - from);
+                var window = text[from..(m.Index + m.Length)];
                 if (!window.Contains("StaticResource Tr}", StringComparison.Ordinal)) continue;
                 referenced.Add(m.Groups[1].Value);
             }
