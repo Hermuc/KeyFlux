@@ -59,7 +59,7 @@ public sealed class KeymapPageViewLayoutTests
     [InlineData(9)]
     public void SelectBoundKey_Does_Not_Change_Viewbox_Content_Size(int typeId)
     {
-        var (view, vm, window) = CreateHost();
+        var (view, vm, _) = CreateHost();
         vm.Keymap.Hotkeys["*a"] = [new Models.Action { WindowGroupId = 0, TypeId = typeId }];
         Dispatcher.UIThread.RunJobs();
 

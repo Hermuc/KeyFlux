@@ -21,7 +21,7 @@ public sealed class SelectedActionPageViewModelTests
         BehaviorCatalog.SeedForTests(BehaviorFixtures.Builtin(), []);
     }
 
-    private static Config BuildConfig(int mappings = 0) => new()
+    private static Config BuildConfig() => new()
     {
         FileGroups = [new FileGroup { Name = "image", Label = "图片", Exts = ["jpg", "png"] }],
     };

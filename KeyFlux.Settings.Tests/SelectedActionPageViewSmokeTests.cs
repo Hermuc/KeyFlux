@@ -127,7 +127,7 @@ public sealed class SelectedActionPageViewSmokeTests
     [AvaloniaFact]
     public void Capture_Page_Screenshot()
     {
-        var (page, view, window) = CreateHost();
+        var (_, _, window) = CreateHost();
         try
         {
             window.Background = Brushes.White; // headless 默认透明底, 截图白底更接近真实观感
