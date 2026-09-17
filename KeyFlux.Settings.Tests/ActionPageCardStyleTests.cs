@@ -152,13 +152,14 @@ public sealed class ActionPageCardStyleTests
     }
 
     /// <summary>
-    /// ⑤ 五个组件框**悬停时不得出现灰描边** (2026-09-17 用户要求清除组件框悬停灰线),
-    /// 且改为**加深投影** (ClaudeShadowCardDeep) 保留"抬起"感。
-    /// 原实现悬停把 BorderBrush 转 ClaudeRingWarmBrush(#d1cfc5 灰) —— 本项反向断言:
-    /// 悬停后 (a) 描边色仍 == 静止色(奶油), (b) BoxShadow 换 Deep 档。
+    /// ⑤ 五个组件框**悬停时既不出灰描边、也不改投影** (2026-09-17 用户最终裁定:
+    /// 「取消悬停投影加深效果, 保留基础阴影」) —— 悬停后 (a) 描边色仍 == 静止色(奶油),
+    /// (b) BoxShadow 仍 == 静止档 ClaudeShadowCard。
+    /// 历史: 原实现悬停把 BorderBrush 转 ClaudeRingWarmBrush(#d1cfc5 灰)出灰线 ⇒ 改为加深投影 ⇒
+    /// 加深不足 ⇒ 加深过重 ⇒ 用户取消加深; 本项即把最终裁定固化, 防任何一环回归。
     /// </summary>
     [AvaloniaFact]
-    public void All_Action_Cards_Hover_Deepens_Shadow_Without_Gray_Border()
+    public void All_Action_Cards_Hover_Keeps_Base_Shadow_Without_Gray_Border()
     {
         var (_, view, win) = CreateHost();
         try
@@ -166,7 +167,6 @@ public sealed class ActionPageCardStyleTests
             Assert.True(Application.Current!.TryGetResource("ClaudeBorderCreamBrush", out var creamObj));
             var cream = ((SolidColorBrush)creamObj!).Color;
             var rest = (BoxShadows)view.FindResource("ClaudeShadowCard")!;
-            var deep = (BoxShadows)view.FindResource("ClaudeShadowCardDeep")!;
 
             var cards = view.GetVisualDescendants().OfType<Border>()
                 .Where(b => b.Classes.Contains("actionCard")).ToList();
@@ -186,9 +186,9 @@ public sealed class ActionPageCardStyleTests
 
                 Assert.True(card.IsPointerOver,
                     $"{string.Join("+", card.Classes)} 悬停应命中 (Bounds={card.Bounds})");
-                // 悬停: 无灰线 (描边色不变), 只加深投影
+                // 悬停: 无灰线 (描边色不变) + 无加深 (阴影仍静止档)
                 Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
-                Assert.Equal(deep.ToString(), card.BoxShadow.ToString());
+                Assert.Equal(rest.ToString(), card.BoxShadow.ToString());
                 checkedNames.Add(string.Join("+", card.Classes));
 
                 win.MouseMove(new Point(1, 1));

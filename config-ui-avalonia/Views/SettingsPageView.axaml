@@ -15,11 +15,14 @@
          偏移影与环影均渲染完整 (左 216/右 216), 当年现象应为坑 15 的列表裁剪而非 Viewbox。
          2026-09-15: 描边由「实体 BorderThickness 2 换色」改回插件页同款「环」机制
          (悬停 ClaudeShadowCardHover / 聚焦 ClaudeShadowFocusRing), 用户要求两页视觉一致。
-         2026-09-17: 用户要求清除悬停灰描边 ⇒ 悬停改回**去环版** ClaudeShadowCardDeep
+         2026-09-17: 用户要求清除悬停灰描边 ⇒ 悬停一度改用**去环版** ClaudeShadowCardDeep
          (只加深投影、不出灰环), 与插件页同步; 聚焦环 ClaudeShadowFocusRing 保持不变。
-         同日晚些二次整改「加深更明显」: Deep 由单层 10% α 换成双层 (贴边 + 抬升弥散),
-         下坠 6→14 / 弥散 18→30, 悬停"离地"感显著; 三页共用同一令牌 ⇒ 自动同步。
-         注: 去环版因此**恢复为有消费方** (此处 settingsCard/leftPanel + 插件页 pluginCard)。 -->
+         同日晚些二次整改「加深更明显」: Deep 由单层 10% α 换成双层 (贴边 + 抬升弥散)。
+         同日三次整改「又过于明显、边缘生硬」: 减重后仍未达到预期。
+         ⇒ **最终裁定: 取消悬停投影加深, 保留基础阴影** —— 本页两处 :pointerover 投影接线
+         (settingsCard / leftPanel) 整体删除, 悬停回落静止档 ClaudeShadowCard; 聚焦态不变。
+         注: 去环版 ClaudeShadowCardDeep 因此与 ClaudeShadowCardHover 一样**不再有消费方**
+         (两者都保留在皮肤契约里作为恢复路径, 见 Claude.axaml 的令牌注释)。 -->
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -48,16 +51,19 @@
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
-    <!-- 悬停反馈 (2026-09-17 清除组件框灰描边): 改用去环版 ClaudeShadowCardDeep, 只加深投影、不出灰环 -->
-    <Style Selector="Border.settingsCard:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
-    </Style>
+    <!-- 悬停: **无投影变化** (2026-09-17 用户最终裁定「取消悬停投影加深效果, 保留基础阴影」)。
+         历史三改: ① 悬停换 ClaudeShadowCardHover → 出 1px #d1cfc5 灰环; ② 换去环版
+         ClaudeShadowCardDeep 只加深 → 用户反馈不够明显; ③ Deep 提到双层强影 → 又过于明显、
+         边缘生硬 ⇒ 故直接删除本页 :pointerover 投影接线, 悬停回落静止档 ClaudeShadowCard。
+         防回归: SettingsCardEffectTests 断言悬停后 BoxShadow 仍 == ClaudeShadowCard, 并有
+         像素级用例比对悬停/静止帧在卡下采样带**逐字节一致**。 -->
     <Style Selector="Border.settingsCard:focus-within">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
-    <!-- 左列「快捷键方案」大卡: 同样以插件页为基准, 与右列逐项一致 (同静止/悬停/聚焦三态)。
+    <!-- 左列「快捷键方案」大卡: 同样以插件页为基准, 与右列逐项一致 (同静止/聚焦两态;
+         悬停无变化, 同上)。
          ⚠️ 这三项原先是**内联**写在 Border 元素上的 —— Avalonia 内联值优先级高于样式 Setter,
-         会压掉 :pointerover / :focus-within, 故必须由样式承载才可能生效。
+         会压掉 :focus-within, 故必须由样式承载才可能生效。
          注意: 未改本卡外框尺寸 (Width 由 560 列 - 16 右边距决定 / Height 624),
          故整页 Viewbox 缩放比不变, TopFlareWings 的 0.5px 几何守护不受影响 -->
     <Style Selector="Border.leftPanel">
@@ -65,10 +71,7 @@
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
-    <!-- 悬停反馈 (2026-09-17 清除组件框灰描边): 同上, 去环版 ClaudeShadowCardDeep -->
-    <Style Selector="Border.leftPanel:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
-    </Style>
+    <!-- 悬停: 同上, **无投影变化** (2026-09-17 用户裁定取消悬停加深) -->
     <Style Selector="Border.leftPanel:focus-within">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>

@@ -43,13 +43,13 @@
       <Setter Property="Margin" Value="0,0,0,10" />
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
     </Style>
-    <!-- 悬停反馈 (2026-09-17 用户要求清除组件框悬停灰描边):
-         原用 ClaudeShadowCardHover (内含 1px #d1cfc5 灰环 + 强影) ⇒ 悬停出灰线;
-         现改用**去环版** ClaudeShadowCardDeep —— 灰线消失, 仅保留投影加深的"抬起"感。
-         2026-09-17 二次整改「加深更明显」: Deep 令牌换成双层强影档, 本页随之增强。 -->
-    <Style Selector="Border.pluginCard:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
-    </Style>
+    <!-- 悬停反馈 (2026-09-17 用户四轮裁定的终点: **取消悬停投影加深, 保留基础阴影**):
+         ① 原用 ClaudeShadowCardHover (内含 1px #d1cfc5 灰环 + 强影) ⇒ 悬停出灰线, 要求清除;
+         ② 改用去环版 ClaudeShadowCardDeep (只加深投影) ⇒ 反馈不够明显; ③ 增强为双层强影
+         ⇒ 又过于明显; ④ 降重后仍不满意 ⇒ **直接取消加深**。
+         故本 :pointerover 投影接线**整体删除** —— 悬停时 pluginCard 保持静止档 ClaudeShadowCard。
+         防回归: SettingsCardEffectTests 断言悬停阴影仍 == ClaudeShadowCard, 并有像素级用例
+         比对悬停/静止帧在卡下采样带**逐字节一致**。 -->
     <!-- 按动: inset 环 (Border 自带 BoxShadow, 无需模板部件) -->
     <Style Selector="Border.pluginCard:pressed">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />

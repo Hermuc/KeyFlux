@@ -237,21 +237,17 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
-    <!-- 悬停反馈 (2026-09-17 用户要求清除组件框悬停灰描边):
-         原实现把 BorderBrush 换成 ClaudeRingWarmBrush(#d1cfc5 灰) ⇒ 悬停出灰线。
-         现改为**不动描边色, 只加深投影** (ClaudeShadowCardDeep = 去环版强影档):
-         灰线消失, 保留"抬起"感。
-         2026-09-17 二次整改: 用户反馈加深**不够明显** ⇒ 令牌由单层 10% α 换成双层
-         (贴边 14.5% + 抬升 20%, 下坠 6→14 / 弥散 18→30), 三页同源自动同步;
-         静态"静止≈18% vs 悬停≈32%" 的对比度提升由 SkinContractTests 数值守护。
-         覆盖全部 5 个组件框: 映射行卡同时带 row-card + actionCard 两类 (见元素定义),
-         故本样式已覆盖行卡, 原「行卡专用灰边」样式随之删除。
-         声明位置仍在 .matched **之前**: 本样式只改 BoxShadow、.matched 只改 BorderBrush,
-         字段无交集 ⇒ 悬停已选中的行卡仍保持陶土边。 -->
-    <Style Selector="Border.actionCard:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
-    </Style>
-    <!-- 映射行卡: 悬停由上面的 actionCard:pointerover 统一加深投影 (不再转灰边);
+    <!-- 悬停反馈 (2026-09-17 用户四轮裁定的终点: **取消悬停投影加深, 保留基础阴影**):
+         ① 原实现把 BorderBrush 换成 ClaudeRingWarmBrush(#d1cfc5 灰) ⇒ 悬停出灰线, 用户要求清除;
+         ② 改为「只加深投影」(ClaudeShadowCardDeep) ⇒ 用户反馈加深**不够明显**;
+         ③ 令牌增强为双层强影 ⇒ 用户反馈**又过于明显、边缘生硬**;
+         ④ 降重后再调仍不满意 ⇒ 用户裁定**直接取消加深**。
+         故本 :pointerover 投影接线**整体删除**(行卡元素同时带 row-card + actionCard 两类,
+         本样式原已覆盖行卡) —— 悬停时 5 个组件框一律保持静止档 ClaudeShadowCard。
+         防回归: ActionPageCardStyleTests 逐卡断言悬停后 BorderBrush 仍为奶油色(无灰线)
+         且 BoxShadow 仍 == ClaudeShadowCard(无加深)。
+         保留 :focus-within 的 ClaudeShadowFocusRing 与 .matched 的陶土边, 均不受影响。 -->
+    <!-- 映射行卡: 悬停无投影变化 (加深已取消), 也不再有灰边;
          测试命中高亮 (暖陶土底 + 陶土边) 见下 -->
     <Style Selector="Border.row-card.matched">
       <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />

@@ -24,8 +24,10 @@ namespace KeyFlux.Settings.Tests;
 /// 两页组件框描边线条视觉一致, 插件页为准):
 /// ① 静止态: **2px** 奶油边框 + ClaudeShadowCard 双层下坠影
 ///    (2026-09-15 与插件页统一机制时曾为 1px; 2026-09-16 用户反馈两页皆偏细 ⇒ 同步加粗到 2px);
-/// ② 悬停态: **边框色不变、无灰描边**, 仅阴影换 ClaudeShadowCardDeep (去环版强影)
-///    —— 2026-09-17 用户要求清除悬停灰描边, 三页卡片统一由 Ring 版改回去环版;
+/// ② 悬停态: **边框色不变、阴影不变、无灰描边** —— 2026-09-17 用户最终裁定
+///    「取消悬停投影加深, 保留基础阴影」, 三页卡片的 :pointerover 接线已整体删除
+///    (历史: 先由 Ring 版 ClaudeShadowCardHover 出灰线, 改为去环版 Deep, 再经历
+///     加深→过重两轮调整, 最终取消);
 /// ③ 卡内控件获焦 → :focus-within 边框色仍不变, 阴影换 ClaudeShadowFocusRing (Coral 2px 环)
 ///    —— 与插件页 :focus-within 同款。
 /// 断言读 BorderBrush/BorderThickness/BoxShadow 的生效值 (样式优先级已折算)。
@@ -68,9 +70,10 @@ public sealed class SettingsCardEffectTests
             Assert.Equal(restShadow.ToString(), card.BoxShadow.ToString());
 
             // ② 悬停: headless 鼠标移到卡片中心 → :pointerover
-            //    **边框色不变** (悬停只改 BoxShadow, 不动 BorderBrush)
-            //    阴影换 ClaudeShadowCardDeep —— 去环版 (2026-09-17 用户要求清除灰描边;
-            //    原用 ClaudeShadowCardHover 会带 1px #d1cfc5 灰环, 悬停即出灰线)
+            //    **边框色不变、阴影也不变** —— 2026-09-17 用户最终裁定「取消悬停投影加深,
+            //    保留基础阴影」, 三页的 :pointerover 投影接线已删除, 悬停时回落静止配方。
+            //    (历史: 曾用 Ring 版 ClaudeShadowCardHover → 出灰线; 改去环版 Deep → 加深不足;
+            //     再加到双层强影 → 又过重; 故最终取消, 只保留静止档。)
             var pt = Avalonia.VisualExtensions.TranslatePoint(
                 card, new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), window)!.Value;
             window.MouseMove(pt);
@@ -78,8 +81,7 @@ public sealed class SettingsCardEffectTests
             Assert.True(card.IsPointerOver, "悬停应命中卡片");
             var hoverBrush = (ISolidColorBrush)card.BorderBrush!;
             Assert.Equal(creamObj.Color, hoverBrush.Color);
-            var hoverShadow = (BoxShadows)view.FindResource("ClaudeShadowCardDeep")!;
-            Assert.Equal(hoverShadow.ToString(), card.BoxShadow.ToString());
+            Assert.Equal(restShadow.ToString(), card.BoxShadow.ToString());
 
             // ③ 单击卡内开关 (ToggleSwitch 获焦) → :focus-within
             //    边框色仍不变; 阴影换 ClaudeShadowFocusRing (Coral 2px 环, 与插件页同款)
@@ -154,12 +156,13 @@ public sealed class SettingsCardEffectTests
     }
 
     /// <summary>
-    /// 跨页悬停守护 (2026-09-17 用户要求清除组件框悬停灰描边):
+    /// 跨页悬停守护 (2026-09-17 用户裁定「取消悬停投影加深, 保留基础阴影」):
     /// 插件页 pluginCard 与设置页 settingsCard / leftPanel 悬停时都必须
-    /// **描边色不变 + 投影换 ClaudeShadowCardDeep** —— 任一页漂回 Ring 版 (带 #d1cfc5 灰环) 即红。
+    /// **描边色不变 + 阴影保持静止档 ClaudeShadowCard** —— 任一页漂回 Ring 版
+    /// (带 #d1cfc5 灰环) 或又给 :pointerover 加回加深档即红。
     /// </summary>
     [AvaloniaFact]
-    public void Hover_Deepens_Shadow_Without_Gray_Ring_On_Both_Pages()
+    public void Hover_Keeps_Base_Shadow_Without_Gray_Ring_On_Both_Pages()
     {
         var pmain = new MainViewModel(new BackendSessionOptions());
         pmain.Config = new Config
@@ -180,12 +183,12 @@ public sealed class SettingsCardEffectTests
 
         try
         {
-            var deep = (BoxShadows)sview.FindResource("ClaudeShadowCardDeep")!;
+            var rest = (BoxShadows)sview.FindResource("ClaudeShadowCard")!;
 
             var pluginCard = Assert.Single(
                 pview.GetVisualDescendants().OfType<Border>(),
                 b => b.Classes.Contains("pluginCard"));
-            AssertHoverHasNoGrayRing(pwin, pluginCard, deep);
+            AssertHoverKeepsBaseShadow(pwin, pluginCard, rest);
 
             // 只悬停**可见且已布局**的组件框: 折叠分区内的卡 Bounds=0/IsVisible=False, 本就无法悬停
             // (其静止配方仍由 Settings_Cards_Match_Plugins_Card_Border_Recipe 用全集守护)
@@ -196,7 +199,7 @@ public sealed class SettingsCardEffectTests
             Assert.True(settingsCards.Count > 0, "未找到可见的 Settings 页组件框");
             foreach (var c in settingsCards)
             {
-                AssertHoverHasNoGrayRing(swin, c, deep);
+                AssertHoverKeepsBaseShadow(swin, c, rest);
             }
         }
         finally
@@ -207,15 +210,15 @@ public sealed class SettingsCardEffectTests
     }
 
     /// <summary>
-    /// 像素级证据 (2026-09-17 用户要求「悬停投影加深更明显」): 不满足于"换成了某个令牌"的字符串断言,
-    /// 而是**实测渲染结果** —— 对插件页 **最靠下**的可见卡片做 Skia 截帧, 回读卡片下沿外侧
-    /// 那几行像素的平均相对亮度, 要求悬停帧明显暗于静止帧。
-    /// 守的是"令牌数值被改弱但测试仍绿"的盲区: 只断言 BoxShadow.ToString() == Deep 无法发现
-    /// Deep 本身比静止投影还轻 (整改前正是如此: 单层 10% α vs 静止双层 11%+8%)。
+    /// 像素级证据 (2026-09-17 用户裁定「取消悬停投影加深, 保留基础阴影」): 不满足于
+    /// "BoxShadow 取值相等"的字符串断言, 而是**实测渲染结果** —— 对插件页 **最靠下**的可见卡片
+    /// 做 Skia 截帧, 逐字节比对悬停帧与静止帧在卡片下沿外侧 2..7 行的像素, 要求**完全一致**。
+    /// (历史: 本用例曾反向断言"悬停必须明显变暗, Δ亮度 ≥0.015", 见证过 加深不足→过重 两轮整改;
+    ///  用户最终取消加深效果后, 断言随之反转为"零变化"。)
     /// 取最靠下的卡是为了其下方无同层兄弟遮挡 (卡底边距 10px, 采样带 2..7 行落在空隙内)。
     /// </summary>
     [AvaloniaFact]
-    public void Hover_Shadow_Darkens_Rendered_Pixels_Below_Card()
+    public void Hover_Keeps_Base_Shadow_Rendered_Pixels_Unchanged()
     {
         var main = new MainViewModel(new BackendSessionOptions());
         main.Config = new Config
@@ -264,27 +267,33 @@ public sealed class SettingsCardEffectTests
             using var hoverFrame = window.CaptureRenderedFrame()!;
             var hoverLum = MeanLuminance(hoverFrame, x, yTop, yBottom);
 
-            Assert.True(hoverLum < restLum,
-                $"悬停必须加深卡下投影: 静止={restLum:F4} 悬停={hoverLum:F4} (采样 x={x}, y={yTop}..{yBottom})");
-            Assert.True(restLum - hoverLum >= 0.015,
-                $"加深幅度应肉眼可辨 (Δ亮度 ≥ 0.015): 静止={restLum:F4} 悬停={hoverLum:F4} Δ={restLum - hoverLum:F4}");
-
-            // 对照基线 (仅打印, 不断言): 把整改前的单层弱影值直接赋给卡片局部值
-            // (局部值优先级高于样式 Setter, 故能压过 :pointerover), 量出"改前/改后"的实际差距 ——
-            // 整改前 Δ 仅 ~0.9%, 在本采样带上实测几乎不可辨, 正是用户报"看不出加深"的量化证据。
-            card.BoxShadow = BoxShadows.Parse("0 6 20 0 #1a000000");
-            Dispatcher.UIThread.RunJobs();
-            using var legacyFrame = window.CaptureRenderedFrame()!;
-            var legacyLum = MeanLuminance(legacyFrame, x, yTop, yBottom);
+            // 悬停帧与静止帧在采样带上必须**逐字节一致** —— 用户裁定「取消悬停投影加深, 保留基础阴影」后,
+            // 悬停不得改变卡下任何像素。这比字符串断言强: 字符串只能证明 BoxShadow 取值相等,
+            // 这里量的是**渲染结果**(守"接线删了、某处又悄悄加回投影/环"的回归)。
+            var restBand = SampleBand(restFrame, x, yTop, yBottom);
+            var hoverBand = SampleBand(hoverFrame, x, yTop, yBottom);
             _output.WriteLine(
-                $"卡下投影亮度 (越低越暗): 静止={restLum:F4} | 整改前 Deep(单层10%)={legacyLum:F4} " +
-                $"Δ={restLum - legacyLum:F4} | 整改后 Deep(双层14.5%+20%)={hoverLum:F4} " +
-                $"Δ={restLum - hoverLum:F4} (采样 x={x}, y={yTop}..{yBottom}, 卡底 y={bottomCenter.Y})");
+                $"卡下采样带 (x={x}, y={yTop}..{yBottom}, 卡底 y={bottomCenter.Y}): " +
+                $"静止亮度={restLum:F4} 悬停亮度={hoverLum:F4} " +
+                $"像素一致={restBand.SequenceEqual(hoverBand)}");
+            Assert.Equal(restBand, hoverBand);
         }
         finally
         {
             window.Close();
         }
+    }
+
+    /// <summary>回读单列若干行的字节 (每像素 4 字节, 行内按 framebuffer 实际通道序)。</summary>
+    private static byte[] SampleBand(WriteableBitmap frame, int x, int yTop, int yBottom)
+    {
+        using var fb = frame.Lock();
+        var buf = new byte[(yBottom - yTop + 1) * 4];
+        for (var y = yTop; y <= yBottom; y++)
+        {
+            Marshal.Copy(fb.Address + y * fb.RowBytes + x * 4, buf, (y - yTop) * 4, 4);
+        }
+        return buf;
     }
 
     /// <summary>回读单列若干行的平均相对亮度 (0=黑, 1=白); 4 字节/像素, 通道序按 framebuffer 实际格式。</summary>
@@ -303,8 +312,8 @@ public sealed class SettingsCardEffectTests
         return sum / (yBottom - yTop + 1);
     }
 
-    /// <summary>悬停某卡片: 命中后断言描边色不变 (无灰线) 且 BoxShadow == deep 档; 随后移出复位。</summary>
-    private static void AssertHoverHasNoGrayRing(Window win, Border card, BoxShadows deep)
+    /// <summary>悬停某卡片: 命中后断言描边色不变 (无灰线) 且 BoxShadow 仍是静止档 (无加深); 随后移出复位。</summary>
+    private static void AssertHoverKeepsBaseShadow(Window win, Border card, BoxShadows rest)
     {
         var restBrush = ((ISolidColorBrush)card.BorderBrush!).Color;
         var p = Avalonia.VisualExtensions.TranslatePoint(
@@ -315,7 +324,7 @@ public sealed class SettingsCardEffectTests
         Assert.True(card.IsPointerOver,
             $"{string.Join("+", card.Classes)} 悬停应命中 (Bounds={card.Bounds}, IsVisible={card.IsVisible}, EffVisible={card.IsEffectivelyVisible}, pt={p})");
         Assert.Equal(restBrush, ((ISolidColorBrush)card.BorderBrush!).Color);
-        Assert.Equal(deep.ToString(), card.BoxShadow.ToString());
+        Assert.Equal(rest.ToString(), card.BoxShadow.ToString());
 
         win.MouseMove(new Point(1, 1));
         Dispatcher.UIThread.RunJobs();
