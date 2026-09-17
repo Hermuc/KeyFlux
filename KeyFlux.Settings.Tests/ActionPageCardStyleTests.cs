@@ -152,19 +152,21 @@ public sealed class ActionPageCardStyleTests
     }
 
     /// <summary>
-    /// ⑤ 五个组件框**悬停时都必须出现灰描边** (2026-09-16 用户报「快捷键 / 模拟测试 缺线条描边」)。
-    /// 真因是 Border.actionCard 原先只有静止态、没有 :pointerover, 而行卡另有
-    /// Border.row-card:pointerover(转 RingWarm) ⇒ 只有行卡有悬停反馈, 另三处悬停毫无变化。
-    /// 本项逐个悬停并断言 BorderBrush == ClaudeRingWarmBrush, 防止将来再漏。
+    /// ⑤ 五个组件框**悬停时不得出现灰描边** (2026-09-17 用户要求清除组件框悬停灰线),
+    /// 且改为**加深投影** (ClaudeShadowCardDeep) 保留"抬起"感。
+    /// 原实现悬停把 BorderBrush 转 ClaudeRingWarmBrush(#d1cfc5 灰) —— 本项反向断言:
+    /// 悬停后 (a) 描边色仍 == 静止色(奶油), (b) BoxShadow 换 Deep 档。
     /// </summary>
     [AvaloniaFact]
-    public void All_Action_Cards_Show_Gray_Border_On_Hover()
+    public void All_Action_Cards_Hover_Deepens_Shadow_Without_Gray_Border()
     {
         var (_, view, win) = CreateHost();
         try
         {
-            Assert.True(Application.Current!.TryGetResource("ClaudeRingWarmBrush", out var ringObj));
-            var ring = ((SolidColorBrush)ringObj!).Color;
+            Assert.True(Application.Current!.TryGetResource("ClaudeBorderCreamBrush", out var creamObj));
+            var cream = ((SolidColorBrush)creamObj!).Color;
+            var rest = (BoxShadows)view.FindResource("ClaudeShadowCard")!;
+            var deep = (BoxShadows)view.FindResource("ClaudeShadowCardDeep")!;
 
             var cards = view.GetVisualDescendants().OfType<Border>()
                 .Where(b => b.Classes.Contains("actionCard")).ToList();
@@ -173,6 +175,10 @@ public sealed class ActionPageCardStyleTests
             var checkedNames = new List<string>();
             foreach (var card in cards)
             {
+                // 静止态基线
+                Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
+                Assert.Equal(rest.ToString(), card.BoxShadow.ToString());
+
                 var p = card.TranslatePoint(
                     new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), win)!.Value;
                 win.MouseMove(p);
@@ -180,7 +186,9 @@ public sealed class ActionPageCardStyleTests
 
                 Assert.True(card.IsPointerOver,
                     $"{string.Join("+", card.Classes)} 悬停应命中 (Bounds={card.Bounds})");
-                Assert.Equal(ring, ((ISolidColorBrush)card.BorderBrush!).Color);
+                // 悬停: 无灰线 (描边色不变), 只加深投影
+                Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
+                Assert.Equal(deep.ToString(), card.BoxShadow.ToString());
                 checkedNames.Add(string.Join("+", card.Classes));
 
                 win.MouseMove(new Point(1, 1));
@@ -218,8 +226,9 @@ public sealed class ActionPageCardStyleTests
             Application.Current!.TryGetResource("ClaudeTerracottaBrush", out var terra);
             Assert.Equal(((ISolidColorBrush)terra!).Color, ((ISolidColorBrush)card.BorderBrush!).Color);
 
-            // 悬停已选中的行卡时仍须保持陶土边 —— 不能被新加的 actionCard:pointerover 灰边压掉
-            // (两者同属"1 类 + 1 伪类", 靠声明顺序决定; .matched 在 actionCard 之后声明)
+            // 悬停已选中的行卡时仍须保持陶土边 —— 2026-09-17 后悬停只改 BoxShadow、
+            // 不动描边色, 与 .matched 的 BorderBrush 无交集 ⇒ 天然不冲突;
+            // 此项防将来又把悬停改回"换描边色"而压掉陶土边。
             var hp = card.TranslatePoint(new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), win)!.Value;
             win.MouseMove(hp);
             Dispatcher.UIThread.RunJobs();

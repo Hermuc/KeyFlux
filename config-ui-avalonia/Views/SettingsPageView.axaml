@@ -14,9 +14,10 @@
          2026-09-13 在设置页真实条件 (Viewbox ≈0.9 缩小档, 软件 Skia) 下 headless 探针实证:
          偏移影与环影均渲染完整 (左 216/右 216), 当年现象应为坑 15 的列表裁剪而非 Viewbox。
          2026-09-15: 描边由「实体 BorderThickness 2 换色」改回插件页同款「环」机制
-         (悬停 ClaudeShadowCardHover / 聚焦 ClaudeShadowFocusRing), 用户要求两页视觉一致;
-         遗留: 去环版 ClaudeShadowCardDeep 因此暂无消费方, 令牌保留在皮肤清单
-         (SkinContractTests 有列名守护), 后续若确认不再需要可整体移除 -->
+         (悬停 ClaudeShadowCardHover / 聚焦 ClaudeShadowFocusRing), 用户要求两页视觉一致。
+         2026-09-17: 用户要求清除悬停灰描边 ⇒ 悬停改回**去环版** ClaudeShadowCardDeep
+         (只加深投影、不出灰环), 与插件页同步; 聚焦环 ClaudeShadowFocusRing 保持不变。
+         注: 去环版因此**恢复为有消费方** (此处 settingsCard/leftPanel + 插件页 pluginCard)。 -->
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -45,8 +46,9 @@
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
+    <!-- 悬停反馈 (2026-09-17 清除组件框灰描边): 改用去环版 ClaudeShadowCardDeep, 只加深投影、不出灰环 -->
     <Style Selector="Border.settingsCard:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHover}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
     </Style>
     <Style Selector="Border.settingsCard:focus-within">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
@@ -61,8 +63,9 @@
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
+    <!-- 悬停反馈 (2026-09-17 清除组件框灰描边): 同上, 去环版 ClaudeShadowCardDeep -->
     <Style Selector="Border.leftPanel:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHover}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
     </Style>
     <Style Selector="Border.leftPanel:focus-within">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />

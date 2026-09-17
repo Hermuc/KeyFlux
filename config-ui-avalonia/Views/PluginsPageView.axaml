@@ -43,8 +43,11 @@
       <Setter Property="Margin" Value="0,0,0,10" />
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
     </Style>
+    <!-- 悬停反馈 (2026-09-17 用户要求清除组件框悬停灰描边):
+         原用 ClaudeShadowCardHover (内含 1px #d1cfc5 灰环 + 强影) ⇒ 悬停出灰线;
+         现改用**去环版** ClaudeShadowCardDeep —— 灰线消失, 仅保留投影加深的"抬起"感。 -->
     <Style Selector="Border.pluginCard:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHover}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
     </Style>
     <!-- 按动: inset 环 (Border 自带 BoxShadow, 无需模板部件) -->
     <Style Selector="Border.pluginCard:pressed">

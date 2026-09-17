@@ -33,7 +33,7 @@
       ClaudeWarmSilverBrush   #b0aea5  Warm Silver    暗底文字
       ClaudeBorderDarkBrush   #30302e  Border Dark    暗底边
 
-    【阴影 7 项 · BoxShadows】
+    【阴影 8 项 · BoxShadows】
       ClaudeShadowHoverRing    0 0 0 1 #d1cfc5               卡片 :pointerover (Ring Warm)
       ClaudeShadowCtaRing      0 0 0 1 #c96442               主 CTA 静止态环 (DESIGN.md L126)
       ClaudeShadowPressedInset inset 0 0 0 1 #26262526       按钮 :pressed (Level 4; 0x26=15% 深)
@@ -42,7 +42,9 @@
       ClaudeShadowCard         0 2 4 0 #1c000000, 0 6 18 0 #14000000
                                                               卡片静止态柔和投影 (双层: 贴边 + 弥散)
       ClaudeShadowCardHover    0 0 0 1 #d1cfc5, 0 6 20 0 #1a000000
-                                                              卡片悬停 = Ring + 略深投影 (不丢层次)
+                                                              卡片悬停 Ring 版 (2026-09-17 起不再接线, 保留契约)
+      ClaudeShadowCardDeep     0 6 20 0 #1a000000            卡片悬停去环版 (CardHover 去掉 Ring)
+                                                              2026-09-17 起为三页卡片悬停的唯一接线档
 
     【尺寸 4 项 · x:Double】
       ClaudeRadiusSm=6  ClaudeRadiusMd=8  ClaudeRadiusLg=12  ClaudeRadiusXl=16
@@ -184,9 +186,15 @@
     <BoxShadows x:Key="ClaudeShadowFocusRing">0 0 0 2 #d97757</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowWhisper">0 4 24 0 #0d000000</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowCard">0 2 4 0 #1c000000, 0 6 18 0 #14000000</BoxShadows>
+    <!-- ClaudeShadowCardHover: 卡片悬停 "Ring + 略深投影" 档。
+         ⚠ 2026-09-17 起**不再被任何页面接线** —— 用户要求清除组件框悬停灰描边,
+         三页卡片 (SelectedAction actionCard/row-card、Plugins pluginCard、Settings
+         settingsCard/leftPanel) 统一改用下方去环版 ClaudeShadowCardDeep。
+         令牌保留在皮肤契约 (SkinContractTests 有列名守护), 暂无可视消费方。 -->
     <BoxShadows x:Key="ClaudeShadowCardHover">0 0 0 1 #d1cfc5, 0 6 20 0 #1a000000</BoxShadows>
-    <!-- ClaudeShadowCardHover 去环版 (2026-09-13): 描边走实体 BorderThickness 机制的消费方
-         (设置页 settingsCard 悬停灰描边/聚焦橙描边) 的强影档 —— 环会与 2px 描边叠成双线 -->
+    <!-- ClaudeShadowCardHover 去环版 (2026-09-13; 2026-09-17 起成为卡片悬停唯一接线档):
+         描边走实体 BorderThickness 机制的消费方 (三页组件框悬停) 的强影档 ——
+         1px 环会与实体描边叠成双线, 故悬停只保留投影加深。 -->
     <BoxShadows x:Key="ClaudeShadowCardDeep">0 6 20 0 #1a000000</BoxShadows>
 
     <!-- 尺寸 (4) · CornerRadius 类型

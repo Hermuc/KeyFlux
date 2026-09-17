@@ -20,8 +20,8 @@ namespace KeyFlux.Settings.Tests;
 /// 两页组件框描边线条视觉一致, 插件页为准):
 /// ① 静止态: **2px** 奶油边框 + ClaudeShadowCard 双层下坠影
 ///    (2026-09-15 与插件页统一机制时曾为 1px; 2026-09-16 用户反馈两页皆偏细 ⇒ 同步加粗到 2px);
-/// ② 悬停态: **边框色不变**, 仅阴影换 ClaudeShadowCardHover (内含 1px #d1cfc5 环 + 强影)
-///    —— 原实现把边框换成 #c9c7bd 并用去环版 Deep, 与插件页的环机制不同;
+/// ② 悬停态: **边框色不变、无灰描边**, 仅阴影换 ClaudeShadowCardDeep (去环版强影)
+///    —— 2026-09-17 用户要求清除悬停灰描边, 三页卡片统一由 Ring 版改回去环版;
 /// ③ 卡内控件获焦 → :focus-within 边框色仍不变, 阴影换 ClaudeShadowFocusRing (Coral 2px 环)
 ///    —— 与插件页 :focus-within 同款。
 /// 断言读 BorderBrush/BorderThickness/BoxShadow 的生效值 (样式优先级已折算)。
@@ -61,8 +61,9 @@ public sealed class SettingsCardEffectTests
             Assert.Equal(restShadow.ToString(), card.BoxShadow.ToString());
 
             // ② 悬停: headless 鼠标移到卡片中心 → :pointerover
-            //    **边框色不变** (与插件页一致: 状态变化走 BoxShadow 环, 不动 BorderBrush)
-            //    阴影换 ClaudeShadowCardHover (内含 1px #d1cfc5 环 + 强影)
+            //    **边框色不变** (悬停只改 BoxShadow, 不动 BorderBrush)
+            //    阴影换 ClaudeShadowCardDeep —— 去环版 (2026-09-17 用户要求清除灰描边;
+            //    原用 ClaudeShadowCardHover 会带 1px #d1cfc5 灰环, 悬停即出灰线)
             var pt = Avalonia.VisualExtensions.TranslatePoint(
                 card, new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), window)!.Value;
             window.MouseMove(pt);
@@ -70,7 +71,7 @@ public sealed class SettingsCardEffectTests
             Assert.True(card.IsPointerOver, "悬停应命中卡片");
             var hoverBrush = (ISolidColorBrush)card.BorderBrush!;
             Assert.Equal(creamObj.Color, hoverBrush.Color);
-            var hoverShadow = (BoxShadows)view.FindResource("ClaudeShadowCardHover")!;
+            var hoverShadow = (BoxShadows)view.FindResource("ClaudeShadowCardDeep")!;
             Assert.Equal(hoverShadow.ToString(), card.BoxShadow.ToString());
 
             // ③ 单击卡内开关 (ToggleSwitch 获焦) → :focus-within
@@ -143,5 +144,76 @@ public sealed class SettingsCardEffectTests
             pwin.Close();
             swin.Close();
         }
+    }
+
+    /// <summary>
+    /// 跨页悬停守护 (2026-09-17 用户要求清除组件框悬停灰描边):
+    /// 插件页 pluginCard 与设置页 settingsCard / leftPanel 悬停时都必须
+    /// **描边色不变 + 投影换 ClaudeShadowCardDeep** —— 任一页漂回 Ring 版 (带 #d1cfc5 灰环) 即红。
+    /// </summary>
+    [AvaloniaFact]
+    public void Hover_Deepens_Shadow_Without_Gray_Ring_On_Both_Pages()
+    {
+        var pmain = new MainViewModel(new BackendSessionOptions());
+        pmain.Config = new Config
+        {
+            Options = new Options { QuickSwitch = new QuickSwitchOption() },
+        };
+        var pview = new PluginsPageView { DataContext = new PluginsPageViewModel(pmain) };
+        var pwin = new Window { Width = 1200, Height = 760, Content = pview };
+        pwin.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var smain = new MainViewModel(new BackendSessionOptions());
+        smain.Config = ConfigReadDefaults.Apply(new Config());
+        var sview = new SettingsPageView { DataContext = new SettingsPageViewModel(smain) };
+        var swin = new Window { Width = 1500, Height = 950, Content = sview };
+        swin.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            var deep = (BoxShadows)sview.FindResource("ClaudeShadowCardDeep")!;
+
+            var pluginCard = Assert.Single(
+                pview.GetVisualDescendants().OfType<Border>(),
+                b => b.Classes.Contains("pluginCard"));
+            AssertHoverHasNoGrayRing(pwin, pluginCard, deep);
+
+            // 只悬停**可见且已布局**的组件框: 折叠分区内的卡 Bounds=0/IsVisible=False, 本就无法悬停
+            // (其静止配方仍由 Settings_Cards_Match_Plugins_Card_Border_Recipe 用全集守护)
+            var settingsCards = sview.GetVisualDescendants().OfType<Border>()
+                .Where(b => (b.Classes.Contains("settingsCard") || b.Classes.Contains("leftPanel"))
+                            && b.IsEffectivelyVisible && b.Bounds.Width > 0 && b.Bounds.Height > 0)
+                .ToList();
+            Assert.True(settingsCards.Count > 0, "未找到可见的 Settings 页组件框");
+            foreach (var c in settingsCards)
+            {
+                AssertHoverHasNoGrayRing(swin, c, deep);
+            }
+        }
+        finally
+        {
+            pwin.Close();
+            swin.Close();
+        }
+    }
+
+    /// <summary>悬停某卡片: 命中后断言描边色不变 (无灰线) 且 BoxShadow == deep 档; 随后移出复位。</summary>
+    private static void AssertHoverHasNoGrayRing(Window win, Border card, BoxShadows deep)
+    {
+        var restBrush = ((ISolidColorBrush)card.BorderBrush!).Color;
+        var p = Avalonia.VisualExtensions.TranslatePoint(
+            card, new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), win)!.Value;
+        win.MouseMove(p);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(card.IsPointerOver,
+            $"{string.Join("+", card.Classes)} 悬停应命中 (Bounds={card.Bounds}, IsVisible={card.IsVisible}, EffVisible={card.IsEffectivelyVisible}, pt={p})");
+        Assert.Equal(restBrush, ((ISolidColorBrush)card.BorderBrush!).Color);
+        Assert.Equal(deep.ToString(), card.BoxShadow.ToString());
+
+        win.MouseMove(new Point(1, 1));
+        Dispatcher.UIThread.RunJobs();
     }
 }

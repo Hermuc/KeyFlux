@@ -237,27 +237,19 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     </Style>
-    <!-- 悬停灰描边 (2026-09-16 用户报「快捷键 / 模拟测试 组件框缺线条描边」):
-         真因是本样式原先**只有静止态、没有 :pointerover** —— 而映射行卡另有
-         `Border.row-card:pointerover`(悬停转 RingWarm 灰), 于是只有行卡有悬停反馈,
-         快捷键卡 / 模拟测试条 / 嵌套条目卡悬停时毫无变化, 看起来像"没有描边"。
-         此处补齐, 取值与行卡逐字一致 (ClaudeRingWarmBrush), 使 5 个组件框悬停表现统一。
-         声明位置在 Border.row-card:pointerover / .matched **之前**: 行卡两者取值本就相同(无冲突),
-         而 .matched 的陶土边必须能压过悬停灰 ⇒ 靠声明顺序保证 -->
+    <!-- 悬停反馈 (2026-09-17 用户要求清除组件框悬停灰描边):
+         原实现把 BorderBrush 换成 ClaudeRingWarmBrush(#d1cfc5 灰) ⇒ 悬停出灰线。
+         现改为**不动描边色, 只加深投影** (ClaudeShadowCardDeep = 去环版强影档):
+         灰线消失, 仍保留轻微"抬起"感。
+         覆盖全部 5 个组件框: 映射行卡同时带 row-card + actionCard 两类 (见元素定义),
+         故本样式已覆盖行卡, 原「行卡专用灰边」样式随之删除。
+         声明位置仍在 .matched **之前**: 本样式只改 BoxShadow、.matched 只改 BorderBrush,
+         字段无交集 ⇒ 悬停已选中的行卡仍保持陶土边。 -->
     <Style Selector="Border.actionCard:pointerover">
-      <Setter Property="BorderBrush" Value="{StaticResource ClaudeRingWarmBrush}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
     </Style>
-    <!-- 悬停灰描边 (2026-09-16 用户报「快捷键 / 模拟测试 组件框缺线条描边」):
-         真因是本样式原先**只有静止态、没有 :pointerover** —— 而映射行卡另有
-         `Border.row-card:pointerover`(悬停转 RingWarm 灰), 于是只有行卡有悬停反馈,
-         快捷键卡 / 模拟测试条 / 嵌套条目卡悬停时毫无变化, 看起来像"没有描边"。
-         此处补齐, 取值与行卡逐字一致 (ClaudeRingWarmBrush), 使 5 个组件框悬停表现统一。
-         声明位置在 Border.row-card:pointerover / .matched **之前**: 行卡两者取值本就相同(无冲突),
-         而 .matched 的陶土边必须能压过悬停灰 ⇒ 靠声明顺序保证 -->
-    <!-- 映射行卡: 悬停提亮边框 / 测试命中高亮 (暖陶土底 + 陶土边) -->
-    <Style Selector="Border.row-card:pointerover">
-      <Setter Property="BorderBrush" Value="{StaticResource ClaudeRingWarmBrush}" />
-    </Style>
+    <!-- 映射行卡: 悬停由上面的 actionCard:pointerover 统一加深投影 (不再转灰边);
+         测试命中高亮 (暖陶土底 + 陶土边) 见下 -->
     <Style Selector="Border.row-card.matched">
       <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
