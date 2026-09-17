@@ -13,11 +13,15 @@ buildServer:
 #   统一收进 KeyFlux.Settings.csproj 单一真源 —— 命令行 -p: 会覆盖 csproj, 本文件勿再传。
 #   实测: bin/ui 118M→65M (deploy 140M→87M), 冷启动 598ms (R2R 保 <1s), 面板稳态内存 <200MB。
 # 注意 PATH 陷阱: C:\Program Files\dotnet 可能只有运行时没有 SDK, 须显式探测
+# 2026-09-17 修 i18n 散资源断言配方 (原写法在 POSIX shell 下必然失败): 原用双引号包裹 pwsh -Command
+#   载荷, make 折半后的 $src/$dst/$h1 会被 sh 当变量展开成空 ⇒ 载荷退化为 `+ +`, pwsh 报 ParserError
+#   (且载荷里的中文会被 pwsh 按 ANSI 码页解码, 可能吞掉紧随的引号)。改为**单引号包裹**载荷 +
+#   载荷内只用双引号与 ASCII 文案 (注释仍可中文): 单引号阻断 sh 展开, make 的 $$ 折半后原样送进 pwsh。
 buildClientAvalonia:
 	@dotnet --list-sdks | grep -q . || (echo "[错误] dotnet --list-sdks 为空: 未找到 .NET SDK (PATH 陷阱: C:\\Program Files\\dotnet 可能只有运行时无 SDK), 请安装 SDK 或将 PATH 指向含 SDK 的 dotnet.exe"; exit 1)
 	rm -f -r bin/ui
 	cd config-ui-avalonia; dotnet publish -c Release -r win-x64 --self-contained true -o ../bin/ui
-	@pwsh -NoProfile -Command "$$src='config-ui-avalonia/Resources/i18n.json'; $$dst='bin/ui/Resources/i18n.json'; if(!(Test-Path $$dst)){Write-Error '[断言失败] publish 后缺少散资源: '$$dst; exit 1}; $$h1=(Get-FileHash $$src -Algorithm SHA256).Hash; $$h2=(Get-FileHash $$dst -Algorithm SHA256).Hash; if($$h1 -ne $$h2){Write-Error ('[断言失败] i18n.json SHA256 不一致: 源=' + $$h1 + ' 产出=' + $$h2); exit 1}; Write-Host '[OK] i18n.json SHA256 一致: '$$h1"
+	@pwsh -NoProfile -Command '$$src="config-ui-avalonia/Resources/i18n.json"; $$dst="bin/ui/Resources/i18n.json"; if(!(Test-Path $$dst)){Write-Error ("[FAIL] missing loose resource: " + $$dst); exit 1}; $$h1=(Get-FileHash $$src -Algorithm SHA256).Hash; $$h2=(Get-FileHash $$dst -Algorithm SHA256).Hash; if($$h1 -ne $$h2){Write-Error ("[FAIL] i18n.json SHA256 mismatch: src=" + $$h1 + " out=" + $$h2); exit 1}; Write-Host ("[OK] i18n.json SHA256 match: " + $$h1)'
 
 copyFiles: CopyAHK
 	rm -f -r $(folder)
@@ -135,8 +139,11 @@ sync-out: | $(OUT_DIR)
 	MSYS_NO_PATHCONV=1 robocopy bin $(OUT_DIR)/bin '*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll' /XF KeyFlux.ahk /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
 
 # out: 只编译并把产物落到 OUT_DIR (不跑回归、不重启实例, 便于验证输出目录配置)
+# ⚠️ 配方里的 echo 串必须带引号: 裸写的 `-> $(OUT_DIR)` 会被 sh 解析成**重定向**
+#    (`-` 后跟 `>`), 报 "D:/...: Is a directory" 并让 make 以 Error 1 收尾 —— 依赖链已全部执行完,
+#    但退出码骗人 (2026-09-17 实测踩到, 已加引号)。同一坑对 `build` 目标不适用 (其 echo 无 `->`)。
 out: buildServer buildClientAvalonia sync-out
-	@echo ------------------------- out ok -> $(OUT_DIR) -------------------------------
+	@echo "------------------------- out ok -> $(OUT_DIR) -------------------------------"
 
 # deploy: 回归通过后编译并同步到部署目录, 重启实例 (robocopy 退出码 0-7 均为成功)
 deploy: check buildClientAvalonia sync-out

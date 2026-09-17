@@ -140,12 +140,18 @@ func matchFileExt(matchValue, content string) bool {
 	return false
 }
 
-// matchTextType 匹配文本特征: url(链接) / path(路径) / magnet(磁力链接) / plain(纯文本)
+// matchTextType 匹配文本特征: url(链接) / path(路径) / magnet(磁力链接) / bilibili(B 站视频号) / plain(纯文本)
 // 与 AHK 端 MatchTextType 保持一致
+//
+// bilibili (2026-09-17 新增): 整串恰为 AV 号 (av + 数字) 或 BV 号 (bv/BV + 10 位 [0-9A-Za-z])。
+// 用 \z 而非 $ 收尾 —— Go 的 $ 只认文本末尾, PCRE2 的 $ 还会认末尾换行前的位置, 两端会分歧。
+// 首尾都不做 Trim: 该特征值会被原样拼进视频 URL (见 bin/behaviors/open_bilibili),
+// 一旦容忍空白就会生成非法链接。双击/整行选中视频号即命中, 与既有 4 个特征的 ^ 锚定口径一致。
 func matchTextType(t, content string) bool {
 	reURL := regexp.MustCompile(`(?i)^(https?|ftp)://`)
 	rePath := regexp.MustCompile(`^(\\\\[^\\]+\\[^\\]+|[a-zA-Z]:\\)`)
 	reMagnet := regexp.MustCompile(`(?i)^magnet:`)
+	reBilibili := regexp.MustCompile(`(?i)^(av[0-9]+|bv[0-9a-z]{10})\z`)
 	switch strings.ToLower(strings.TrimSpace(t)) {
 	case "url":
 		return reURL.MatchString(content)
@@ -153,8 +159,14 @@ func matchTextType(t, content string) bool {
 		return rePath.MatchString(content)
 	case "magnet":
 		return reMagnet.MatchString(content)
+	case "bilibili":
+		return reBilibili.MatchString(content)
 	case "plain":
-		return !reURL.MatchString(content) && !rePath.MatchString(content) && !reMagnet.MatchString(content)
+		// plain = 其余全部特征都不命中。B 站号是具名特征, 必须从 plain 里排除 ——
+		// 否则映射优先级 (数组行序) 会让先建的「纯文本」映射恒遮蔽后建的「B 站」映射
+		// (添加映射恒追加到末尾), 用户会看到"配了 B 站却不生效"。
+		return !reURL.MatchString(content) && !rePath.MatchString(content) &&
+			!reMagnet.MatchString(content) && !reBilibili.MatchString(content)
 	}
 	return false
 }
@@ -252,7 +264,8 @@ func normalizeExts(exts []string) []string {
 var matchTypeIDRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,23}$`)
 
 // reservedTextTypeNames 内置文本特征名, 自定义类型不得占用 (避免与内置匹配前提混淆)。
-var reservedTextTypeNames = map[string]bool{"url": true, "path": true, "magnet": true, "plain": true}
+// 与 behaviors.KnownTextTypes / C# ActionSchemeCatalog.TextTypes 三处同批维护。
+var reservedTextTypeNames = map[string]bool{"url": true, "path": true, "magnet": true, "bilibili": true, "plain": true}
 
 // validMatchOps 封闭 4 算子。
 var validMatchOps = map[string]bool{"equals": true, "prefix": true, "suffix": true, "contains": true}

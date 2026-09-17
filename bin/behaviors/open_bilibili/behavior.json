@@ -1,0 +1,25 @@
+{
+  "id": "open_bilibili",
+  "name": "打开 B 站视频",
+  "nameEn": "Open Bilibili video",
+  "version": "1.0.0",
+  "specVersion": 1,
+  "description": "把选中的 B 站视频号 (AV 号 / BV 号) 拼成视频链接后交给系统默认方式打开, 不硬编码具体浏览器",
+  "appliesTo": [
+    {
+      "type": "textType",
+      "value": "bilibili",
+      "default": true
+    }
+  ],
+  "entry": {
+    "kind": "builtin",
+    "action": "open",
+    "params": {
+      "actionValue": "https://www.bilibili.com/video/%selected%"
+    }
+  },
+  "permissions": [
+    "run"
+  ]
+}

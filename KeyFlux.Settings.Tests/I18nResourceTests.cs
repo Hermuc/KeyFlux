@@ -57,10 +57,11 @@ public sealed class I18nResourceTests
     ///    2538 专属行为 / 2539 内置 / 2540-2544 校验提示 / 2545 删除确认 / 2546 编辑 /
     ///    2547-2548 空态 / 2550 值 / 2551 类别) -> 353。
     /// 2026-09-15 多轮文案增补 (匹配类型简化改造 / 新建流程 / 草稿行等, 详见对应提交)
-    ///   -> **385** (379 数字键 + 6 非数字键)。**新增键自 2580 起**;
+    ///   -> 385 (379 数字键 + 6 非数字键)。**新增键自 2580 起**;
     ///   权威占用表见 `config-ui-avalonia/Resources/i18n.json`, 未占用空洞:
     ///   2390-2400 / 2403 / 2419-2420 / 2440-2499 / 2503-2511 / 2516 / 2526 / 2549。
-    private const int ExpectedKeyCount = 385;
+    /// 2026-09-17 新增内置文本特征「B 站」(bilibili): 新增 2580 (B 站) -> 386。
+    private const int ExpectedKeyCount = 386;
 
     private const string LabelPrefix = "label:";
 

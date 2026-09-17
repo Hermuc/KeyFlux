@@ -46,11 +46,13 @@ public static class ActionSchemeCatalog
     // 覆盖语义: 行为前提 ⊇ 规则前提 (专属前提排前、通配排后), 合法性仍以后端 400 为准。
 
     // 文本特征 (复刻 TEXT_TYPES) —— 内置项真源 (后端 KnownTextTypes); 自定义文本特征走 Config.MatchTypes
+    // 顺序 = 界面 Toggle 顺序; plain (纯文本) 恒居末位 (它是"其余特征都不命中"的兜底语义)
     public static readonly (string Value, string LabelKey)[] TextTypes =
     [
         ("url", "1059"),
         ("path", "1060"),
         ("magnet", "1061"),
+        ("bilibili", "2580"),
         ("plain", "1062"),
     ];
 
@@ -59,7 +61,7 @@ public static class ActionSchemeCatalog
     /// <summary>
     /// 「添加映射」类型下拉的动态源: 内置静态项 + 配置派生项。
     /// 顺序 = 文件分组 (<c>group:&lt;Name&gt;</c>, 标签用其 <see cref="FileGroup.Label"/>)
-    ///        + 分隔项 + 内置 4 文本特征 (标签走 i18n 1059–1062)
+    ///        + 分隔项 + 内置 5 文本特征 (标签走 i18n 1059–1062 / 2580)
     ///        + 配置派生文本类型 (<c>Config.MatchTypes</c> kind=text, 标签用其 label/labelEn, 不走 i18n)。
     /// 文本特征标签语义: 内置走 i18n; 自定义走用户数据 (与 §D.1.3「派生只读行」一致, 数据不进 i18n)。
     /// </summary>
@@ -74,11 +76,11 @@ public static class ActionSchemeCatalog
         {
             opts.Add(new ComboOption("", "", IsSeparator: true)); // 分隔项跟随最后一组 (用户要求)
         }
-        // 内置 4 文本特征
-        opts.Add(new ComboOption("url", I18n.T("1059")));
-        opts.Add(new ComboOption("path", I18n.T("1060")));
-        opts.Add(new ComboOption("magnet", I18n.T("1061")));
-        opts.Add(new ComboOption("plain", I18n.T("1062")));
+        // 内置 5 文本特征 (顺序与 TextTypes 一致; 新增内置项只需改 TextTypes)
+        foreach (var (value, labelKey) in TextTypes)
+        {
+            opts.Add(new ComboOption(value, I18n.T(labelKey)));
+        }
         // 配置派生文本类型 (kind=text); 引用命名空间 type:<id>
         foreach (var t in config.MatchTypes.Where(t => t.Kind == "text"))
         {

@@ -390,6 +390,7 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
                 "url" => "https://github.com/Hermuc/KeyFlux",
                 "path" => "C:\\Windows\\explorer.exe",
                 "magnet" => "magnet:?xt=urn:btih:example",
+                "bilibili" => "BV1xx411c7mD",
                 _ => "hello world",
             }
             : "C:\\example\\photo.jpg";

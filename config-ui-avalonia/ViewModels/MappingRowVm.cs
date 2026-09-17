@@ -75,9 +75,9 @@ public sealed partial class MappingRowVm : ObservableObject
         }
     }
 
-    // ---- textType 行: 特征四选一 (Toggle 直选, 替代 ComboBox——所见即所选, 无 ComboOption 概念) ----
+    // ---- textType 行: 特征互斥直选 (Toggle 直选, 替代 ComboBox——所见即所选, 无 ComboOption 概念) ----
 
-    /// <summary>四个互斥开关的公共读写: 直接落 Mapping.MatchValue (含 UI 联动)。</summary>
+    /// <summary>五个互斥开关的公共读写: 直接落 Mapping.MatchValue (含 UI 联动)。</summary>
     public bool IsUrl
     {
         get => Mapping.MatchValue == "url";
@@ -92,6 +92,11 @@ public sealed partial class MappingRowVm : ObservableObject
     {
         get => Mapping.MatchValue == "magnet";
         set { if (value) SetTextType("magnet"); }
+    }
+    public bool IsBilibili
+    {
+        get => Mapping.MatchValue == "bilibili";
+        set { if (value) SetTextType("bilibili"); }
     }
     public bool IsPlain
     {
@@ -112,18 +117,19 @@ public sealed partial class MappingRowVm : ObservableObject
         RestoreOrRebindForCurrentPremise();
     }
 
-    /// <summary>切换任一 Toggle 时同步其余三个的视觉态。</summary>
+    /// <summary>切换任一 Toggle 时同步其余四个的视觉态。</summary>
     public void NotifyTogglesChanged()
     {
         OnPropertyChanged(nameof(IsUrl));
         OnPropertyChanged(nameof(IsPath));
         OnPropertyChanged(nameof(IsMagnet));
+        OnPropertyChanged(nameof(IsBilibili));
         OnPropertyChanged(nameof(IsPlain));
     }
 
     // ---- textType 行: 特征下拉 (保留: 旧序列化/兼容路径) ----
 
-    /// <summary>文本特征下拉 (url/path/magnet/plain, 预翻译副本)。</summary>
+    /// <summary>文本特征下拉 (url/path/magnet/bilibili/plain, 预翻译副本)。</summary>
     public List<ComboOption> TextTypeOptions
         => ActionSchemeCatalog.TextTypes
             .Select(t => new ComboOption(t.Value, I18n.T(t.LabelKey)))

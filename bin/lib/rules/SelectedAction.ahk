@@ -9,7 +9,7 @@
 ;     ...)
 ;   SelectedActionInit(">^p", SelectedActionData)
 ;
-; 8 列含义: matchType (textType=url/path/magnet/plain; fileExt=逗号分隔后缀) /
+; 8 列含义: matchType (textType=url/path/magnet/bilibili/plain; fileExt=逗号分隔后缀) /
 ;   matchValue (条件值) / key (菜单序号 1-9, 同一 mapping 内从 1 递增) /
 ;   behavior (行为库 ID) / action (ResolveRuleAction 展开后基础动作) /
 ;   actionValue (展开后模板) / workingDir (工作目录) / name (显示名)。
@@ -678,8 +678,13 @@ MatchFileExt(matchValue, content) {
 }
 
 /**
- * 文本特征匹配: url(链接) / path(路径) / magnet(磁力链接) / plain(纯文本)
+ * 文本特征匹配: url(链接) / path(路径) / magnet(磁力链接) / bilibili(B 站视频号) / plain(纯文本)
  * 与 config-server/internal/script/actionscheme.go 的 matchTextType 保持一致
+ *
+ * bilibili (2026-09-17 新增): 整串恰为 AV 号 (av + 数字) 或 BV 号 (bv/BV + 10 位 [0-9A-Za-z])。
+ * 用 \z 收尾而非 $ (PCRE2 的 $ 还会认末尾换行前的位置, 与 Go 侧分歧);
+ * 首尾不 Trim: 该值会被原样拼进视频 URL (bin/behaviors/open_bilibili), 容忍空白会生成非法链接。
+ * plain 必须排除 bilibili —— 否则数组行序 (映射优先级) 会让先建的「纯文本」映射恒遮蔽「B 站」映射。
  * @param t 特征类型
  * @param content 选中文本
  * @returns {boolean}
@@ -688,6 +693,7 @@ MatchTextType(t, content) {
   isURL := RegExMatch(content, "i)^(https?|ftp)://") > 0
   isPath := RegExMatch(content, "^(\\\\[^\\]+\\[^\\]+|[a-zA-Z]:\\)") > 0
   isMagnet := RegExMatch(content, "i)^magnet:") > 0
+  isBilibili := RegExMatch(content, "i)^(av[0-9]+|bv[0-9a-z]{10})\z") > 0
   switch Trim(t) {
     case "url":
       return isURL
@@ -695,8 +701,10 @@ MatchTextType(t, content) {
       return isPath
     case "magnet":
       return isMagnet
+    case "bilibili":
+      return isBilibili
     case "plain":
-      return not (isURL or isPath or isMagnet)
+      return not (isURL or isPath or isMagnet or isBilibili)
   }
   return false
 }

@@ -42,8 +42,11 @@ var BuiltinActionIDs = map[string]bool{
 	"send_keys": true, "script": true, "copy": true,
 }
 
-// KnownTextTypes 文本特征词表 (与 script.matchTextType / AHK MatchTextType 一致)。
-var KnownTextTypes = map[string]bool{"url": true, "path": true, "magnet": true, "plain": true}
+// KnownTextTypes 文本特征词表 (与 script.matchTextType / AHK MatchTextType / C# ActionSchemeCatalog.TextTypes 一致)。
+// bilibili = B 站视频号 (AV 号 / BV 号), 2026-09-17 新增。
+var KnownTextTypes = map[string]bool{
+	"url": true, "path": true, "magnet": true, "bilibili": true, "plain": true,
+}
 
 // customRefPrefix 用户自定义匹配类型 (方案 C7) 的引用前缀: 规则的前提值或行为包的 appliesTo
 // 写 "type:<id>" 即指向 config.json 的 matchTypes[] / fileGroups[] 定义。本包只需知道
@@ -64,7 +67,7 @@ func IsCustomRef(v string) bool {
 type AppliesToEntry struct {
 	Type    string   `json:"type"`            // "fileExt" | "textType"
 	Exts    []string `json:"exts,omitempty"`  // fileExt: 覆盖的后缀集 (不含点), "*"=任意文件
-	Value   string   `json:"value,omitempty"` // textType: url / path / magnet / plain
+	Value   string   `json:"value,omitempty"` // textType: url / path / magnet / bilibili / plain
 	Default bool     `json:"default,omitempty"`
 }
 

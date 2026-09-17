@@ -68,7 +68,7 @@ public sealed partial class AddMappingVm : ObservableObject
         }
         else
         {
-            // 文本特征 (内置 url/path/magnet/plain 或自定义 type:<id> 引用): 条件值即选中值本身
+            // 文本特征 (内置 url/path/magnet/bilibili/plain 或自定义 type:<id> 引用): 条件值即选中值本身
             MatchValue = TypeSelected?.Value ?? "";
         }
         OnPropertyChanged(nameof(IsFileExt));
@@ -234,15 +234,10 @@ public sealed partial class AddMappingVm : ObservableObject
         foreach (var t in _typeOptions)
         {
             var idx = _typeOptions.IndexOf(t);
-            // 内置 4 文本特征重新翻译 (走 i18n); 分组 / 自定义 type: 标签为用户数据, 不重译
-            _typeOptions[idx] = t.Value switch
-            {
-                "url" => t with { Label = I18n.T("1059") },
-                "path" => t with { Label = I18n.T("1060") },
-                "magnet" => t with { Label = I18n.T("1061") },
-                "plain" => t with { Label = I18n.T("1062") },
-                _ => t,
-            };
+            // 内置文本特征 (ActionSchemeCatalog.TextTypes, 唯一静态词表) 重新翻译 (走 i18n);
+            // 分组 / 自定义 type: 标签为用户数据, 不重译 —— 故新增内置特征无需再改这里
+            var builtin = ActionSchemeCatalog.TextTypes.FirstOrDefault(x => x.Value == t.Value);
+            _typeOptions[idx] = builtin.Value is not null ? t with { Label = I18n.T(builtin.LabelKey) } : t;
         }
         OnPropertyChanged(nameof(TypeOptions));
         OnPropertyChanged(nameof(Hint));

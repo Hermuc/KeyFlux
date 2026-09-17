@@ -11,7 +11,7 @@ using KeyFlux.Settings.Views;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
-/// 文本特征四选一 Toggle 的互斥性验证: 依次点击各 Toggle, 同一时刻必须只有一个点亮,
+/// 文本特征互斥直选 Toggle 的互斥性验证: 依次点击各 Toggle, 同一时刻必须只有一个点亮,
 /// 且 MatchValue 与点亮项一致 (用户反馈"最多能点亮两个"的排查)。
 /// </summary>
 [Collection("I18nSerial")]
@@ -38,7 +38,7 @@ public sealed class TextTypeToggleExclusiveTests
         return (page, row, view, window);
     }
 
-    /// <summary>行头里的四个类型 Toggle (textType 行特有)。</summary>
+    /// <summary>行头里的全部类型 Toggle (textType 行特有)。</summary>
     private static List<ToggleButton> TypeToggles(SelectedActionPageView view)
         => view.GetVisualDescendants().OfType<ToggleButton>()
             .Where(b => b.Classes.Contains("type-toggle"))
@@ -54,11 +54,12 @@ public sealed class TextTypeToggleExclusiveTests
         try
         {
             var toggles = TypeToggles(view);
-            Assert.Equal(4, toggles.Count);
+            Assert.Equal(5, toggles.Count);
             Assert.Equal(["链接"], LitLabels(toggles)); // 初始: url 行只有"链接"亮
 
-            // 依次点击其余三个: 每次点击后必须恰有一个亮, 且是刚点的那个
-            foreach (var expect in new[] { "路径", "磁力链接", "纯文本" })
+            // 依次点击其余四个: 每次点击后必须恰有一个亮, 且是刚点的那个
+            // (顺序同 ActionSchemeCatalog.TextTypes; plain 恒居末位)
+            foreach (var expect in new[] { "路径", "磁力链接", "B 站", "纯文本" })
             {
                 var target = toggles.First(t => (t.Content?.ToString() ?? "").StartsWith(expect[..2]));
                 target.IsChecked = true; // 模拟点击 (与用户点击走同一绑定/事件链路)
