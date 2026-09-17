@@ -8,102 +8,59 @@ import (
 	"settings/internal/behaviors"
 )
 
-// ============ matchTextType: 5 个内置文本特征的单一真源语义 ============
+// ============ matchTextType: 注册表分派壳的少量非向量断言 ============
 //
-// 与 AHK 端 bin/lib/rules/SelectedAction.ahk 的 MatchTextType **逐条对齐** —— 任一侧改动必须双端同批,
-// 否则生成端 (Go 匹配/校验/模拟测试) 与运行时 (AHK) 会给出不同答案。
-// bilibili 为 2026-09-17 新增特征 (AV 号 / BV 号)。
+// 逐条命中语义已于 2026-09-17 迁到**共享一致性向量**
+// (testdata/text_types.json + texttype_vector_test.go), 覆盖 63 条边界用例并与 AHK 运行时同源。
+// 本文件只保留不便写进向量的断言: 特征名归一化口径、未知值口径、行为包覆盖前置。
 
-func TestMatchTextType_BuiltinValues(t *testing.T) {
-	cases := []struct {
-		content string
-		want    string
-	}{
-		{"https://github.com/Hermuc/KeyFlux", "url"},
-		{"ftp://example.com/x", "url"},
-		{`C:\Windows\explorer.exe`, "path"},
-		{`\\server\share\a.txt`, "path"},
-		{"magnet:?xt=urn:btih:abc", "magnet"},
-		{"av170001", "bilibili"},
-		{"BV1xx411c7mD", "bilibili"},
-		{"hello world", "plain"},
-		{"这是一段纯文本", "plain"},
-	}
-	for _, c := range cases {
-		if !matchTextType(c.want, c.content) {
-			t.Errorf("matchTextType(%q, %q) = false, want true", c.want, c.content)
+func TestMatchTextType_ValueNormalization(t *testing.T) {
+	// 特征名: 去首尾空白 + 大小写归一 (与旧实现 strings.ToLower(TrimSpace(t)) 同口径)
+	for _, name := range []string{"bilibili", "BILIBILI", " bilibili ", "\tBiliBili\n"} {
+		if !matchTextType(name, "av170001") {
+			t.Errorf("特征名 %q 应归一为 bilibili 并命中", name)
 		}
 	}
-	// 大小写与首尾空白: 特征名走 ToLower+Trim; 内容一律不 Trim (锚定口径与既有 4 个特征一致)
-	if !matchTextType("BILIBILI", "av170001") {
-		t.Error("特征名大小写应被归一 (BILIBILI -> bilibili)")
-	}
+	// 内容一律不 Trim: 该值会被原样拼进视频 URL (bin/behaviors/open_bilibili)
 	if matchTextType("bilibili", " av170001") {
-		t.Error("内容含前导空格不应命中 (该值会被原样拼进视频 URL)")
+		t.Error("内容含前导空格不应命中")
+	}
+	// 未知特征名: false (与旧 switch 的 default 分支同口径)
+	for _, name := range []string{"", "unknown", "type:custom", "url2"} {
+		if matchTextType(name, "https://x") {
+			t.Errorf("未知特征名 %q 应返回 false", name)
+		}
+	}
+	// 自定义引用 (type:<id>) 不是内置特征: 由 matchActionRule 另走解析路径, 注册表不该认识它
+	if behaviors.IsKnownTextType("type:custom") {
+		t.Error("IsKnownTextType 不应把 type: 引用当内置特征")
 	}
 }
 
-// B 站号的命中面: AV 号 (av+数字) 与 BV 号 (bv/BV + 10 位 [0-9A-Za-z]), 必须**整串**命中。
-func TestMatchTextType_Bilibili(t *testing.T) {
-	hits := []string{
-		"av170001",
-		"AV170001",
-		"av2",
-		"BV1xx411c7mD",
-		"bv1xx411c7md",
-		"BV1xx411c7m0",
-	}
-	for _, c := range hits {
-		if !matchTextType("bilibili", c) {
-			t.Errorf("matchTextType(bilibili, %q) = false, want true", c)
-		}
-		// plain 必须排除 B 站号: 映射按数组行序取首个命中, 而「添加映射」恒追加到末尾 ⇒
-		// 若 plain 也命中, 先建的「纯文本」映射会恒遮蔽后建的「B 站」映射 (配了却不生效)。
-		if matchTextType("plain", c) {
-			t.Errorf("matchTextType(plain, %q) = true, 但 B 站号必须从 plain 排除", c)
-		}
-	}
-
-	misses := []string{
-		"av",                 // 缺数字
-		"av12x",              // 混字母
-		"av 170001",          // 含空格
-		"BV1xx411c7m",        // BV 后仅 9 位
-		"BV1xx411c7mDx",      // BV 后 11 位
-		"BV1xx411c7m_",       // 下划线不在 [0-9A-Za-z]
-		"1xx411c7mD",         // 缺 BV 前缀
-		"av170001 BV1xx411c", // 两个号拼接
-	}
-	for _, c := range misses {
-		if matchTextType("bilibili", c) {
-			t.Errorf("matchTextType(bilibili, %q) = true, want false", c)
-		}
-	}
-
-	// 完整 B 站链接不侵占既有特征: 仍归 url (由「默认浏览器打开网址」处理)
-	const link = "https://www.bilibili.com/video/BV1xx411c7mD"
-	if matchTextType("bilibili", link) || !matchTextType("url", link) {
-		t.Error("完整 B 站链接应命中 url 而非 bilibili")
-	}
-}
-
-// ============ 行为包前置: 新特征必须在「添加映射」弹窗里有可用行为 ============
+// ============ 行为包前置: 每个内置特征必须在「添加映射」弹窗里有可用行为 ============
 //
 // 方案 C7 的死胡同: 特征值没有行为覆盖时, 弹窗勾选列表为空且确认按钮禁用。
 // 本夹具刻意读**真实** bin/behaviors (而非内联夹具): 新增内置特征却漏建行为包时,
 // 其余 Go 单测会全绿, 缺陷只在用户界面里暴露 —— 故必须在此处兜住。
-func TestBuiltinCatalog_CoversBilibili(t *testing.T) {
+//
+// 覆盖检查由注册表驱动 —— 新增特征时**无需改本测试**, 只要行为包缺失就会变红。
+func TestBuiltinCatalog_CoversEveryTextFeature(t *testing.T) {
 	cat := behaviors.LoadCatalog(filepath.Join("..", "..", "..", "bin", "behaviors"), filepath.Join(t.TempDir(), "user"))
 	if len(cat.Errors) > 0 {
 		t.Fatalf("内置行为包目录加载有错: %v", cat.Errors)
 	}
-	if !cat.Covers("open_bilibili", "textType", []string{"bilibili"}) {
-		t.Fatal("内置行为 open_bilibili 未声明 appliesTo textType=bilibili")
+	for _, v := range behaviors.TextFeatureValues() {
+		// DefaultFor 无 default 标记时回退"第一条覆盖包" ⇒ 非空 == 存在覆盖该前提的行为包
+		if got := cat.DefaultFor("textType", []string{v}); got == "" {
+			t.Errorf("内置文本特征 %q 没有任何内置行为包覆盖 (appliesTo textType=%s) —— "+
+				"「添加映射」弹窗该类型下会是空列表", v, v)
+			continue
+		}
 	}
 	if got := cat.DefaultFor("textType", []string{"bilibili"}); got != "open_bilibili" {
-		t.Fatalf("textType=bilibili 的默认行为 = %q, want open_bilibili", got)
+		t.Errorf("textType=bilibili 的默认行为 = %q, want open_bilibili", got)
 	}
-	// 模板必须把选中值拼进 B 站视频地址: entry.action 是通用的 open (RunReplaced),
+	// bilibili 的模板必须把选中值拼进 B 站视频地址: entry.action 是通用的 open (RunReplaced),
 	// 模板缺失时会把视频号当命令直接 Run。
 	p := cat.Get("open_bilibili")
 	if p == nil || !strings.Contains(p.Entry.Params.ActionValue, "https://www.bilibili.com/video/") ||

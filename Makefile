@@ -109,9 +109,17 @@ CHECK_CONFIG := $(DEPLOY_DIR)/data/config.json
 lint:
 	python tools/lint_ident.py $$(find bin/lib -name '*.ahk')
 
-# check: 一键回归 = 标识符 lint + Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
+# check-texttypes: 内置文本特征**三端一致性**闸门 (Go 注册表 behaviors/textfeatures.go ⇄
+# AHK TextFeatureSpecs ⇄ 共享向量 config-server/internal/script/testdata/text_types.json)。
+# 两层: ① 静态对账 (值/大小写开关/正则/顺序逐项比对, 兜底项唯一且居末);
+#       ② 运行时对账 (从 AHK 源逐字提取函数体跑向量全部用例 —— 2026-09-17 之前
+#          SelectedAction.ahk 声称由 match_ops.json 守护, 但该向量只有 Go 侧消费, 属无强制契约)。
+check-texttypes:
+	python tools/texttype_conformance.py
+
+# check: 一键回归 = 标识符 lint + 文本特征一致性 + Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
 # (MSYS_NO_PATHCONV: 防止 Git Bash 把 /ErrorStdOut /Validate 等开关误转换为路径)
-check: buildServer lint
+check: buildServer lint check-texttypes
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./config-server/templates/keyflux.tmpl ./bin/KeyFlux.ahk
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate ./bin/KeyFlux.ahk
 	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/oracle.ps1
@@ -149,4 +157,4 @@ out: buildServer buildClientAvalonia sync-out
 deploy: check buildClientAvalonia sync-out
 	pwsh -NoProfile -Command "$$d=(Resolve-Path '$(OUT_DIR)').Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d 'KeyFlux.exe') -WorkingDirectory $$d"
 
-.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-cs analyzers lint sync-out out deploy
+.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-texttypes check-cs analyzers lint sync-out out deploy

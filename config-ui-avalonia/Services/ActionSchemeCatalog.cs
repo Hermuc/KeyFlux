@@ -45,8 +45,13 @@ public static class ActionSchemeCatalog
     //  FileGroupActions / FileGroupDefaultAction / FileActions / DefaultSearchUrl) 全部退役,
     // 覆盖语义: 行为前提 ⊇ 规则前提 (专属前提排前、通配排后), 合法性仍以后端 400 为准。
 
-    // 文本特征 (复刻 TEXT_TYPES) —— 内置项真源 (后端 KnownTextTypes); 自定义文本特征走 Config.MatchTypes
-    // 顺序 = 界面 Toggle 顺序; plain (纯文本) 恒居末位 (它是"其余特征都不命中"的兜底语义)
+    // 文本特征 —— 界面侧镜像 (真源 = 后端内置文本特征注册表 config-server/internal/behaviors/textfeatures.go;
+    // 自定义文本特征走 Config.MatchTypes)。顺序 = 界面 Toggle 顺序, **兜底特征 plain 恒居末位**
+    // (它是"其余特征都不命中"的派生兜底); 该不变量由 TextFeatureRegistryConsistencyTests 钉死。
+    //
+    // 排除集自动派生 (2026-09-17 起): plain 的命中条件在后端由注册表派生 ("其余具名特征全不命中"),
+    // 界面侧**无需**知道排除集 —— 新增内置特征只改 TextTypes 一行 + i18n 键 + Toggle 三处。
+    // 三端 (Go/AHK/C#) 顺序一致性由 make check-texttypes + TextFeatureRegistryConsistencyTests 强制。
     public static readonly (string Value, string LabelKey)[] TextTypes =
     [
         ("url", "1059"),
@@ -56,12 +61,15 @@ public static class ActionSchemeCatalog
         ("plain", "1062"),
     ];
 
+    /// <summary>兜底特征值 (注册表末位; 新增兜底语义特征时同步更新此值与末位元素)。</summary>
+    public const string FallbackTextType = "plain";
+
     // ------------------------------------------------------------- 动态类型下拉源 (方案 C7)
 
     /// <summary>
     /// 「添加映射」类型下拉的动态源: 内置静态项 + 配置派生项。
     /// 顺序 = 文件分组 (<c>group:&lt;Name&gt;</c>, 标签用其 <see cref="FileGroup.Label"/>)
-    ///        + 分隔项 + 内置 5 文本特征 (标签走 i18n 1059–1062 / 2580)
+    ///        + 分隔项 + 内置文本特征 (标签走 i18n, 顺序同 <see cref="TextTypes"/>, 兜底居末)
     ///        + 配置派生文本类型 (<c>Config.MatchTypes</c> kind=text, 标签用其 label/labelEn, 不走 i18n)。
     /// 文本特征标签语义: 内置走 i18n; 自定义走用户数据 (与 §D.1.3「派生只读行」一致, 数据不进 i18n)。
     /// </summary>
@@ -76,7 +84,7 @@ public static class ActionSchemeCatalog
         {
             opts.Add(new ComboOption("", "", IsSeparator: true)); // 分隔项跟随最后一组 (用户要求)
         }
-        // 内置 5 文本特征 (顺序与 TextTypes 一致; 新增内置项只需改 TextTypes)
+        // 内置文本特征 (顺序与 TextTypes 一致; 新增内置项只需改 TextTypes 一行)
         foreach (var (value, labelKey) in TextTypes)
         {
             opts.Add(new ComboOption(value, I18n.T(labelKey)));

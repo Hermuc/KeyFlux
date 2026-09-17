@@ -13,6 +13,7 @@ namespace KeyFlux.Settings.Tests;
 /// <summary>
 /// 文本特征互斥直选 Toggle 的互斥性验证: 依次点击各 Toggle, 同一时刻必须只有一个点亮,
 /// 且 MatchValue 与点亮项一致 (用户反馈"最多能点亮两个"的排查)。
+/// Toggle 数量/顺序与 <see cref="ActionSchemeCatalog.TextTypes"/> 一致, 由注册表派生断言保证。
 /// </summary>
 [Collection("I18nSerial")]
 public sealed class TextTypeToggleExclusiveTests
@@ -54,7 +55,8 @@ public sealed class TextTypeToggleExclusiveTests
         try
         {
             var toggles = TypeToggles(view);
-            Assert.Equal(5, toggles.Count);
+            // 数量由注册表派生 (不再硬编码): 新增内置文本特征而漏加 XAML Toggle 时, 这里立即变红
+            Assert.Equal(ActionSchemeCatalog.TextTypes.Length, toggles.Count);
             Assert.Equal(["链接"], LitLabels(toggles)); // 初始: url 行只有"链接"亮
 
             // 依次点击其余四个: 每次点击后必须恰有一个亮, 且是刚点的那个

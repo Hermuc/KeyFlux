@@ -9,7 +9,7 @@
 ;     ...)
 ;   SelectedActionInit(">^p", SelectedActionData)
 ;
-; 8 列含义: matchType (textType=url/path/magnet/bilibili/plain; fileExt=逗号分隔后缀) /
+; 8 列含义: matchType (textType=内置文本特征值, 见 TextFeatureSpecs; fileExt=逗号分隔后缀) /
 ;   matchValue (条件值) / key (菜单序号 1-9, 同一 mapping 内从 1 递增) /
 ;   behavior (行为库 ID) / action (ResolveRuleAction 展开后基础动作) /
 ;   actionValue (展开后模板) / workingDir (工作目录) / name (显示名)。
@@ -678,33 +678,70 @@ MatchFileExt(matchValue, content) {
 }
 
 /**
- * 文本特征匹配: url(链接) / path(路径) / magnet(磁力链接) / bilibili(B 站视频号) / plain(纯文本)
- * 与 config-server/internal/script/actionscheme.go 的 matchTextType 保持一致
+ * 内置文本特征注册表 —— AHK 侧唯一真源。
  *
- * bilibili (2026-09-17 新增): 整串恰为 AV 号 (av + 数字) 或 BV 号 (bv/BV + 10 位 [0-9A-Za-z])。
- * 用 \z 收尾而非 $ (PCRE2 的 $ 还会认末尾换行前的位置, 与 Go 侧分歧);
- * 首尾不 Trim: 该值会被原样拼进视频 URL (bin/behaviors/open_bilibili), 容忍空白会生成非法链接。
- * plain 必须排除 bilibili —— 否则数组行序 (映射优先级) 会让先建的「纯文本」映射恒遮蔽「B 站」映射。
+ * 组织方式 (与 Go 端 config-server/internal/behaviors/textfeatures.go **同构** 且同序):
+ *   - 表的顺序 = 界面顺序 (「添加映射」类型下拉 / 映射行特征 Toggle), **兜底特征恒居末位**;
+ *   - named=true  具名特征: 各持一条**锚定**正则, 命中即"属于该特征";
+ *   - named=false 兜底特征 (目前仅 plain): **不持正则**, 命中条件由具名集**派生** ——
+ *     "其余全部具名特征都不命中"。故新增具名特征时 plain 的排除集自动扩大, 无需手工同步
+ *     (2026-09-17 之前这里是硬编码的 `not (isURL or isPath or isMagnet or isBilibili)`,
+ *      加第 5 个特征时靠人肉改 —— 正是本次重构要消灭的失败模式);
+ *   - ignoreCase 与 pattern 分离: 正则源串与 Go 端**逐字相同**, 大小写开关运行时施加
+ *     (AHK 加 "i)" 前缀 / Go 编译期加 (?i)) ⇒ 可工具化比对 (tools/texttype_conformance.py)。
+ *
+ * 为什么 plain 必须排除全部具名特征: 映射按数组行序取**首个**命中, 而「添加映射」恒追加到末尾
+ * ⇒ 若 plain 也命中某具名特征的样例, 先建的「纯文本」映射会恒遮蔽后建的具名映射 (配了却不生效)。
+ *
+ * 不要用 $ 收尾: PCRE2 的 $ 还会认末尾换行前的位置, 而 Go 的 $ 只认文本末尾 ⇒ 多行选中时两端分歧;
+ * \z 在两侧都表示"文本绝对末尾", 是方言交集。
+ *
+ * @returns {array} 特征表 (static, 只求值一次)
+ */
+TextFeatureSpecs() {
+  static specs := [
+    {value: "url", named: true, ignoreCase: true, pattern: "^(https?|ftp)://"},
+    {value: "path", named: true, ignoreCase: false, pattern: "^(\\\\[^\\]+\\[^\\]+|[a-zA-Z]:\\)"},
+    {value: "magnet", named: true, ignoreCase: true, pattern: "^magnet:"},
+    {value: "bilibili", named: true, ignoreCase: true, pattern: "^(av[0-9]+|bv[0-9a-z]{10})\z"},
+    {value: "plain", named: false, ignoreCase: false, pattern: ""},
+  ]
+  return specs
+}
+
+/**
+ * 单个特征的命中判定 (fallback 特征的排除集从注册表**派生**, 非硬编码)。
+ * @param spec TextFeatureSpecs() 的表项
+ * @param content 选中文本 (不 Trim —— 具名特征都是 ^ 锚定, 且该值可能被原样拼进 URL)
+ * @returns {boolean}
+ */
+TextFeatureHit(spec, content) {
+  if (spec.named) {
+    return RegExMatch(content, (spec.ignoreCase ? "i)" : "") . spec.pattern) > 0
+  }
+  for other in TextFeatureSpecs() {
+    if (other.named and RegExMatch(content, (other.ignoreCase ? "i)" : "") . other.pattern) > 0) {
+      return false
+    }
+  }
+  return true
+}
+
+/**
+ * 文本特征匹配入口 —— 与 Go 端 behaviors.MatchTextFeature 逐字对齐。
+ * 特征名归一化: 去首尾空白 (大小写敏感比较, 与旧 switch 同口径 —— AHK 的 switch/`=` 对字符串
+ * 是大小写不敏感而 `==` 敏感, 这里刻意用 `==` 保持"配置值必须小写"的既有严格性);
+ * content 一律不 Trim (锚定口径)。未知特征名返回 false (与 Go 端同口径)。
  * @param t 特征类型
  * @param content 选中文本
  * @returns {boolean}
  */
 MatchTextType(t, content) {
-  isURL := RegExMatch(content, "i)^(https?|ftp)://") > 0
-  isPath := RegExMatch(content, "^(\\\\[^\\]+\\[^\\]+|[a-zA-Z]:\\)") > 0
-  isMagnet := RegExMatch(content, "i)^magnet:") > 0
-  isBilibili := RegExMatch(content, "i)^(av[0-9]+|bv[0-9a-z]{10})\z") > 0
-  switch Trim(t) {
-    case "url":
-      return isURL
-    case "path":
-      return isPath
-    case "magnet":
-      return isMagnet
-    case "bilibili":
-      return isBilibili
-    case "plain":
-      return not (isURL or isPath or isMagnet or isBilibili)
+  tv := Trim(t)
+  for spec in TextFeatureSpecs() {
+    if (spec.value == tv) {
+      return TextFeatureHit(spec, content)
+    }
   }
   return false
 }

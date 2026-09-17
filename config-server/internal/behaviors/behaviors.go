@@ -42,11 +42,9 @@ var BuiltinActionIDs = map[string]bool{
 	"send_keys": true, "script": true, "copy": true,
 }
 
-// KnownTextTypes 文本特征词表 (与 script.matchTextType / AHK MatchTextType / C# ActionSchemeCatalog.TextTypes 一致)。
-// bilibili = B 站视频号 (AV 号 / BV 号), 2026-09-17 新增。
-var KnownTextTypes = map[string]bool{
-	"url": true, "path": true, "magnet": true, "bilibili": true, "plain": true,
-}
+// 内置文本特征词表 (KnownTextTypes) 已于 2026-09-17 迁至 textfeatures.go 的声明式注册表
+// (值 / 中文名 / 正则 / 大小写 / 具名与兜底), 对外经 IsKnownTextType / TextFeatureHint /
+// FindTextFeature / MatchTextFeature 取用 —— 本文件不再持有任何词表副本。
 
 // customRefPrefix 用户自定义匹配类型 (方案 C7) 的引用前缀: 规则的前提值或行为包的 appliesTo
 // 写 "type:<id>" 即指向 config.json 的 matchTypes[] / fileGroups[] 定义。本包只需知道
@@ -411,8 +409,9 @@ func ValidateManifest(p *Pack, knownText ...func(string) bool) error {
 				e.Value = v
 				continue
 			}
-			if !KnownTextTypes[v] {
-				return fmt.Errorf("行为「%s」第 %d 条匹配条件的文本特征「%s」无效（可选：链接 / 路径 / 磁力链接 / 纯文本，或已自定义的匹配类型）", p.ID, i+1, e.Value)
+			if !IsKnownTextType(v) {
+				return fmt.Errorf("行为「%s」第 %d 条匹配条件的文本特征「%s」无效（可选：%s，或已自定义的匹配类型）",
+					p.ID, i+1, e.Value, TextFeatureHint())
 			}
 			e.Value = v
 		default:

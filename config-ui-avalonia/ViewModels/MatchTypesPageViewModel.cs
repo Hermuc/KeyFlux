@@ -506,7 +506,8 @@ public sealed partial class MatchTypeEditorVm : ObservableObject
 }
 
 /// <summary>
-/// 匹配类型弹窗 VM。数据真源 = Config.MatchTypes (自定义) + 后端 KnownTextTypes (4 个内置文本特征)。
+/// 匹配类型弹窗 VM。数据真源 = Config.MatchTypes (自定义) + 后端内置文本特征注册表
+/// (behaviors/textfeatures.go, 界面侧镜像 = ActionSchemeCatalog.TextTypes, 顺序须一致)。
 /// </summary>
 public sealed partial class MatchTypesPageViewModel : ObservableObject, ILanguageRefresh
 {
