@@ -45,7 +45,8 @@
     </Style>
     <!-- 悬停反馈 (2026-09-17 用户要求清除组件框悬停灰描边):
          原用 ClaudeShadowCardHover (内含 1px #d1cfc5 灰环 + 强影) ⇒ 悬停出灰线;
-         现改用**去环版** ClaudeShadowCardDeep —— 灰线消失, 仅保留投影加深的"抬起"感。 -->
+         现改用**去环版** ClaudeShadowCardDeep —— 灰线消失, 仅保留投影加深的"抬起"感。
+         2026-09-17 二次整改「加深更明显」: Deep 令牌换成双层强影档, 本页随之增强。 -->
     <Style Selector="Border.pluginCard:pointerover">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardDeep}" />
     </Style>

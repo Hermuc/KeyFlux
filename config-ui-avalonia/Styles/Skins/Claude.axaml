@@ -43,7 +43,8 @@
                                                               卡片静止态柔和投影 (双层: 贴边 + 弥散)
       ClaudeShadowCardHover    0 0 0 1 #d1cfc5, 0 6 20 0 #1a000000
                                                               卡片悬停 Ring 版 (2026-09-17 起不再接线, 保留契约)
-      ClaudeShadowCardDeep     0 6 20 0 #1a000000            卡片悬停去环版 (CardHover 去掉 Ring)
+      ClaudeShadowCardDeep     0 4 12 0 #25000000, 0 14 30 0 #33000000
+                                                              卡片悬停去环版 (双层: 贴边 + 抬升弥散)
                                                               2026-09-17 起为三页卡片悬停的唯一接线档
 
     【尺寸 4 项 · x:Double】
@@ -192,10 +193,20 @@
          settingsCard/leftPanel) 统一改用下方去环版 ClaudeShadowCardDeep。
          令牌保留在皮肤契约 (SkinContractTests 有列名守护), 暂无可视消费方。 -->
     <BoxShadows x:Key="ClaudeShadowCardHover">0 0 0 1 #d1cfc5, 0 6 20 0 #1a000000</BoxShadows>
-    <!-- ClaudeShadowCardHover 去环版 (2026-09-13; 2026-09-17 起成为卡片悬停唯一接线档):
+    <!-- ClaudeShadowCardDeep 去环版 (2026-09-13; 2026-09-17 起成为卡片悬停唯一接线档):
          描边走实体 BorderThickness 机制的消费方 (三页组件框悬停) 的强影档 ——
-         1px 环会与实体描边叠成双线, 故悬停只保留投影加深。 -->
-    <BoxShadows x:Key="ClaudeShadowCardDeep">0 6 20 0 #1a000000</BoxShadows>
+         1px 环会与实体描边叠成双线, 故悬停只保留投影加深。
+         ⚠ 2026-09-17 二次整改「悬停加深更明显」: 旧值 `0 6 20 0 #1a000000` 是**单层 10% α**,
+         而静止态 ClaudeShadowCard 是**双层 11% + 8%** —— 悬停的实际墨量并不比静止重多少,
+         这正是"看不出反馈"的算术根因。现改为与静止态同族的**双层**配方:
+           贴边层 0 4 12 α0x25(14.5%)  → 让边框下沿立即变实, 不牺牲卡片边界清晰度
+           抬升层 0 14 30 α0x33(20.0%) → 下坠距离 6→14、弥散 18→30, 悬停时卡片明显"离地"
+         下沿叠加处静止≈18% / 悬停≈32% (≈1.7×), 浅米底上肉眼可辨 (对照上文"≥10% 才可感知"的教训)。
+         调节口径 (如需更强/更弱只改本行, 三页自动同步):
+           更明显 → 抬升层 y 14→18、blur 30→36、α 0x33→0x3d;
+           更含蓄 → 只保留贴边层并降到 α0x22, 或抬升层 blur 收到 24。
+         ⚠ 任何变体都**不得**引入 `0 0 0 N` 零扩散层 —— 那会重新画出悬停灰线 (本次整改的初衷)。 -->
+    <BoxShadows x:Key="ClaudeShadowCardDeep">0 4 12 0 #25000000, 0 14 30 0 #33000000</BoxShadows>
 
     <!-- 尺寸 (4) · CornerRadius 类型
          注意: 令牌被赋给 CornerRadius 属性, 必须用 CornerRadius 类型。

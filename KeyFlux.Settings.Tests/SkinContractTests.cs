@@ -193,6 +193,44 @@ public sealed class SkinContractTests
     }
 
     /// <summary>
+    /// 契约: 悬停档 <c>ClaudeShadowCardDeep</c> 必须**明显重于**静止档 <c>ClaudeShadowCard</c>。
+    /// 这是 2026-09-17 用户要求「悬停投影加深更明显」的数值闸门 ——
+    /// 只断言"页面悬停时换成了 Deep"只能证明**接线**对, 不能证明 Deep 真的更重:
+    /// 整改前 Deep 是**单层 10% α / blur 20 / y6**, 而 Card 是**双层 11%+8% / blur 4+18**,
+    /// 墨量与下坠都不占优 ⇒「有反应但看不出反应」。此处把"更明显"固化成可比数字。
+    /// 口径: ① 无零扩散环层 (否则会重新画出悬停灰线); ② 墨量 Σα 增强 ≥1.4×; ③ 下坠 maxOffsetY ≥1.4×。
+    /// </summary>
+    [AvaloniaFact]
+    public void Skin_Contract_Hover_Shadow_Is_Visibly_Stronger_Than_Rest()
+    {
+        var rest = ShadowLayers("ClaudeShadowCard");
+        var deep = ShadowLayers("ClaudeShadowCardDeep");
+
+        // ① 去环: 不得出现 blur=0 的环层 (0 0 0 N 就是悬停灰线的来源)
+        Assert.DoesNotContain(deep, l => l.Blur == 0);
+
+        // ② 墨量: 各层 α 之和 (0..1) —— 决定浅米底上能否被感知
+        var restInk = rest.Sum(l => l.Color.A / 255.0);
+        var deepInk = deep.Sum(l => l.Color.A / 255.0);
+        Assert.True(deepInk >= restInk * 1.4,
+            $"悬停投影墨量应 ≥ 静止的 1.4×: 静止={restInk:F3} 悬停={deepInk:F3}");
+
+        // ③ 下坠: 最大 y 偏移 —— "抬起"感来自位移, 不只是浓度
+        var restDrop = rest.Max(l => l.OffsetY);
+        var deepDrop = deep.Max(l => l.OffsetY);
+        Assert.True(deepDrop >= restDrop * 1.4,
+            $"悬停投影下坠应 ≥ 静止的 1.4×: 静止={restDrop} 悬停={deepDrop}");
+    }
+
+    /// <summary>读令牌并展平成层列表 (BoxShadows 是有序定长集合, 用 Count + 索引器)。</summary>
+    private static List<BoxShadow> ShadowLayers(string key)
+    {
+        Assert.True(Application.Current!.TryFindResource(key, out var v), $"缺少令牌 {key}");
+        var s = (BoxShadows)v!;
+        return Enumerable.Range(0, s.Count).Select(i => s[i]).ToList();
+    }
+
+    /// <summary>
     /// 契约: 半径令牌的类型必须是 <see cref="CornerRadius"/>。
     /// 历史事故回归锁 —— 曾把 4 个半径令牌定义成 <c>x:Double</c>, 构建 0 错误,
     /// 但每个引用它们的窗口 XAML 加载即抛 InvalidCastException (含 MainWindow)。

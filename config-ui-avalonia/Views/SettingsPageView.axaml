@@ -17,6 +17,8 @@
          (悬停 ClaudeShadowCardHover / 聚焦 ClaudeShadowFocusRing), 用户要求两页视觉一致。
          2026-09-17: 用户要求清除悬停灰描边 ⇒ 悬停改回**去环版** ClaudeShadowCardDeep
          (只加深投影、不出灰环), 与插件页同步; 聚焦环 ClaudeShadowFocusRing 保持不变。
+         同日晚些二次整改「加深更明显」: Deep 由单层 10% α 换成双层 (贴边 + 抬升弥散),
+         下坠 6→14 / 弥散 18→30, 悬停"离地"感显著; 三页共用同一令牌 ⇒ 自动同步。
          注: 去环版因此**恢复为有消费方** (此处 settingsCard/leftPanel + 插件页 pluginCard)。 -->
   </UserControl.Resources>
 

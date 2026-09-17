@@ -1,10 +1,13 @@
 using System.Linq;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using KeyFlux.Settings.Models;
@@ -12,6 +15,7 @@ using KeyFlux.Settings.Services;
 using KeyFlux.Settings.ViewModels;
 using KeyFlux.Settings.Views;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace KeyFlux.Settings.Tests;
 
@@ -30,6 +34,9 @@ namespace KeyFlux.Settings.Tests;
 [Collection("I18nSerial")]
 public sealed class SettingsCardEffectTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public SettingsCardEffectTests(ITestOutputHelper output) => _output = output;
     [AvaloniaFact]
     public void SettingsCard_States_Switch_Border_And_Effect()
     {
@@ -197,6 +204,94 @@ public sealed class SettingsCardEffectTests
             pwin.Close();
             swin.Close();
         }
+    }
+
+    /// <summary>
+    /// 像素级证据 (2026-09-17 用户要求「悬停投影加深更明显」): 不满足于"换成了某个令牌"的字符串断言,
+    /// 而是**实测渲染结果** —— 对插件页 **最靠下**的可见卡片做 Skia 截帧, 回读卡片下沿外侧
+    /// 那几行像素的平均相对亮度, 要求悬停帧明显暗于静止帧。
+    /// 守的是"令牌数值被改弱但测试仍绿"的盲区: 只断言 BoxShadow.ToString() == Deep 无法发现
+    /// Deep 本身比静止投影还轻 (整改前正是如此: 单层 10% α vs 静止双层 11%+8%)。
+    /// 取最靠下的卡是为了其下方无同层兄弟遮挡 (卡底边距 10px, 采样带 2..7 行落在空隙内)。
+    /// </summary>
+    [AvaloniaFact]
+    public void Hover_Shadow_Darkens_Rendered_Pixels_Below_Card()
+    {
+        var main = new MainViewModel(new BackendSessionOptions());
+        main.Config = new Config
+        {
+            Options = new Options { QuickSwitch = new QuickSwitchOption() },
+        };
+        var view = new PluginsPageView { DataContext = new PluginsPageViewModel(main) };
+        var window = new Window { Width = 1200, Height = 900, Content = view, Background = Brushes.White };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            var card = view.GetVisualDescendants().OfType<Border>()
+                .Where(b => b.Classes.Contains("pluginCard")
+                            && b.IsEffectivelyVisible && b.Bounds.Width > 0 && b.Bounds.Height > 0)
+                .OrderByDescending(b => b.Bounds.Bottom)
+                .First();
+
+            var bottomCenter = Avalonia.VisualExtensions.TranslatePoint(
+                card, new Point(card.Bounds.Width / 2, card.Bounds.Height), window)!.Value;
+            var x = (int)bottomCenter.X;
+            var yTop = (int)bottomCenter.Y + 2; // 避开卡片自身的抗锯齿边
+            var yBottom = (int)bottomCenter.Y + 7;
+            Assert.True(yBottom < window.Height,
+                $"采样带需落在窗口内: 卡下沿 y={bottomCenter.Y}, 窗口高={window.Height}");
+
+            using var restFrame = window.CaptureRenderedFrame()!;
+            var restLum = MeanLuminance(restFrame, x, yTop, yBottom);
+
+            var center = Avalonia.VisualExtensions.TranslatePoint(
+                card, new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), window)!.Value;
+            window.MouseMove(center);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(card.IsPointerOver, "悬停应命中卡片");
+
+            using var hoverFrame = window.CaptureRenderedFrame()!;
+            var hoverLum = MeanLuminance(hoverFrame, x, yTop, yBottom);
+
+            Assert.True(hoverLum < restLum,
+                $"悬停必须加深卡下投影: 静止={restLum:F4} 悬停={hoverLum:F4} (采样 x={x}, y={yTop}..{yBottom})");
+            Assert.True(restLum - hoverLum >= 0.015,
+                $"加深幅度应肉眼可辨 (Δ亮度 ≥ 0.015): 静止={restLum:F4} 悬停={hoverLum:F4} Δ={restLum - hoverLum:F4}");
+
+            // 对照基线 (仅打印, 不断言): 把整改前的单层弱影值直接赋给卡片局部值
+            // (局部值优先级高于样式 Setter, 故能压过 :pointerover), 量出"改前/改后"的实际差距 ——
+            // 整改前 Δ 仅 ~0.9%, 在本采样带上实测几乎不可辨, 正是用户报"看不出加深"的量化证据。
+            card.BoxShadow = BoxShadows.Parse("0 6 20 0 #1a000000");
+            Dispatcher.UIThread.RunJobs();
+            using var legacyFrame = window.CaptureRenderedFrame()!;
+            var legacyLum = MeanLuminance(legacyFrame, x, yTop, yBottom);
+            _output.WriteLine(
+                $"卡下投影亮度 (越低越暗): 静止={restLum:F4} | 整改前 Deep(单层10%)={legacyLum:F4} " +
+                $"Δ={restLum - legacyLum:F4} | 整改后 Deep(双层14.5%+20%)={hoverLum:F4} " +
+                $"Δ={restLum - hoverLum:F4} (采样 x={x}, y={yTop}..{yBottom}, 卡底 y={bottomCenter.Y})");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>回读单列若干行的平均相对亮度 (0=黑, 1=白); 4 字节/像素, 通道序按 framebuffer 实际格式。</summary>
+    private static double MeanLuminance(WriteableBitmap frame, int x, int yTop, int yBottom)
+    {
+        using var fb = frame.Lock();
+        var bgra = fb.Format == PixelFormat.Bgra8888;
+        var buf = new byte[4];
+        double sum = 0;
+        for (var y = yTop; y <= yBottom; y++)
+        {
+            Marshal.Copy(fb.Address + y * fb.RowBytes + x * 4, buf, 0, 4);
+            var (r, g, b) = bgra ? (buf[2], buf[1], buf[0]) : (buf[0], buf[1], buf[2]);
+            sum += (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0;
+        }
+        return sum / (yBottom - yTop + 1);
     }
 
     /// <summary>悬停某卡片: 命中后断言描边色不变 (无灰线) 且 BoxShadow == deep 档; 随后移出复位。</summary>
