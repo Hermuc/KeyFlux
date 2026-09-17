@@ -1,5 +1,6 @@
 using System.Linq;
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -17,7 +18,8 @@ namespace KeyFlux.Settings.Tests;
 /// <summary>
 /// 选中动作页组件框外观守护 (2026-09-16)。
 ///
-/// 本页配方 = BoxShadow **ClaudeShadowCard** + BorderThickness **1** + ClaudeBorderCreamBrush。
+/// 本页配方 = BoxShadow **ClaudeShadowCardHalo** (静止) / **ClaudeShadowCardHaloHover** (悬停光圈)
+/// + BorderThickness **1** + ClaudeBorderCreamBrush。
 /// 阴影取 Settings / 插件页同款; **描边有意比其它三处(2px)更细** —— 用户看过实际效果后裁定
 /// 本页"线条太粗/太重": 本页卡片密集堆叠(行卡间距仅 8px, 且行卡内嵌一张子卡),
 /// 同一 2px 在此处框线密度过高而发重。**勿把本页"修正"成 2px**, 那不是笔误。
@@ -74,7 +76,7 @@ public sealed class ActionPageCardStyleTests
             Assert.True(cards.Count >= 5,
                 $"应有 >=5 个组件框 (2 张行卡 + 主快捷键卡 + 模拟测试条 + 嵌套条目卡), 实得 {cards.Count}");
 
-            var shadow = (BoxShadows)view.FindResource("ClaudeShadowCard")!;
+            var shadow = (BoxShadows)view.FindResource("ClaudeShadowCardHalo")!;
             Assert.True(Application.Current!.TryGetResource("ClaudeBorderCreamBrush", out var creamObj));
             var cream = ((SolidColorBrush)creamObj!).Color;
 
@@ -83,6 +85,12 @@ public sealed class ActionPageCardStyleTests
                 Assert.Equal(1, card.BorderThickness.Left);
                 Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
                 Assert.Equal(shadow.ToString(), card.BoxShadow.ToString());
+                // 悬停光圈必须是**淡入**的: 卡片自带 BoxShadow 过渡 (皮肤令牌 120ms),
+                // 否则光晕会硬切 —— 与"过渡自然"的要求相悖 (动画播放本身不在 headless 断言,
+                // 只锁接线, 同 MotionSmokeTests 的约定)。
+                var t = Assert.Single(card.Transitions!.OfType<BoxShadowsTransition>());
+                Assert.Equal("BoxShadow", t.Property!.Name);
+                Assert.Equal(ClaudeMotion.Micro, t.Duration);
             }
         }
         finally
@@ -152,47 +160,61 @@ public sealed class ActionPageCardStyleTests
     }
 
     /// <summary>
-    /// ⑤ 五个组件框**悬停时既不出灰描边、也不改投影** (2026-09-17 用户最终裁定:
-    /// 「取消悬停投影加深效果, 保留基础阴影」) —— 悬停后 (a) 描边色仍 == 静止色(奶油),
-    /// (b) BoxShadow 仍 == 静止档 ClaudeShadowCard。
-    /// 历史: 原实现悬停把 BorderBrush 转 ClaudeRingWarmBrush(#d1cfc5 灰)出灰线 ⇒ 改为加深投影 ⇒
-    /// 加深不足 ⇒ 加深过重 ⇒ 用户取消加深; 本项即把最终裁定固化, 防任何一环回归。
+    /// ⑤ 五个组件框**悬停时描边色不变 (无灰线) 且点亮陶土色光圈** (2026-09-17 裁定:
+    /// 先「取消悬停投影加深, 保留基础阴影」, 后要求「悬停时周围显示一圈光圈, 不能是纯线条」)。
+    /// 悬停后 (a) 描边色仍 == 静止色 (奶油), (b) BoxShadow == ClaudeShadowCardHaloHover ——
+    /// 该档 = 静止两层的**逐位复制** + 第 3 层陶土弥散光圈, 故"只加光圈、不动投影与描边"。
+    /// 历史: 灰线 (RingWarm 描边) ⇒ 加深不足 ⇒ 加深过重 ⇒ 取消加深 ⇒ 光圈; 本项把终点固化。
+    /// ⚠ 读终点态前必须先把**全部**卡片的过渡摘掉, 并用 SettleShadow 结算 (见用例内注释):
+    /// headless 下过渡动画走真实时钟且不会被 RunJobs 推进, 否则会在全量跑时偶发红。
     /// </summary>
     [AvaloniaFact]
-    public void All_Action_Cards_Hover_Keeps_Base_Shadow_Without_Gray_Border()
+    public void All_Action_Cards_Hover_Adds_Halo_Without_Gray_Border()
     {
         var (_, view, win) = CreateHost();
         try
         {
             Assert.True(Application.Current!.TryGetResource("ClaudeBorderCreamBrush", out var creamObj));
             var cream = ((SolidColorBrush)creamObj!).Color;
-            var rest = (BoxShadows)view.FindResource("ClaudeShadowCard")!;
+            var rest = (BoxShadows)view.FindResource("ClaudeShadowCardHalo")!;
+            var hover = (BoxShadows)view.FindResource("ClaudeShadowCardHaloHover")!;
 
             var cards = view.GetVisualDescendants().OfType<Border>()
                 .Where(b => b.Classes.Contains("actionCard")).ToList();
             Assert.True(cards.Count >= 5, $"应有 >=5 个组件框, 实得 {cards.Count}");
 
+            // ★ 先摘掉**全部**卡片的 BoxShadow 过渡, 再动指针 (2026-09-17 修本用例偶发红):
+            // 过渡动画由真实时钟驱动, 一旦启动不会因摘掉 Transitions 而中止; 而悬停某张卡可能
+            // 连带点亮与它重叠/嵌套的卡, 那张卡就会在下一轮被读「静止档」时停在插值中间值上 ——
+            // 实测拿到第 3 层 alpha=0x0a 的半途值 (期望 0x00), 表现为「单跑绿、全量红」。
+            // 全部提前摘除 ⇒ 本用例期间不再有任何过渡在飞。悬停**接线**不靠本用例守护,
+            // 由 Action_Cards_Use_Unified_Card_Recipe 断言。
+            foreach (var c in cards)
+            {
+                c.Transitions = new Transitions();
+            }
+
             var checkedNames = new List<string>();
             foreach (var card in cards)
             {
-                // 静止态基线
+                // 静止态基线: 指针先停到不压任何卡片的角落, 让本卡的悬停态彻底复位
+                win.MouseMove(new Point(1, 1));
+                SettleShadow(card, rest, $"静止档 [{checkedNames.Count}]");
+
+                Assert.False(card.IsPointerOver,
+                    $"{string.Join("+", card.Classes)} 指针停在 (1,1) 时不应命中 (Bounds={card.Bounds})");
                 Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
-                Assert.Equal(rest.ToString(), card.BoxShadow.ToString());
 
                 var p = card.TranslatePoint(
                     new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), win)!.Value;
                 win.MouseMove(p);
-                Dispatcher.UIThread.RunJobs();
+                SettleShadow(card, hover, $"悬停档 [{checkedNames.Count}]");
 
                 Assert.True(card.IsPointerOver,
                     $"{string.Join("+", card.Classes)} 悬停应命中 (Bounds={card.Bounds})");
-                // 悬停: 无灰线 (描边色不变) + 无加深 (阴影仍静止档)
+                // 悬停: 无灰线 (描边色不变) + 光圈档 (前两层与静止逐位相同, 第 3 层才亮)
                 Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
-                Assert.Equal(rest.ToString(), card.BoxShadow.ToString());
                 checkedNames.Add(string.Join("+", card.Classes));
-
-                win.MouseMove(new Point(1, 1));
-                Dispatcher.UIThread.RunJobs();
             }
             Assert.Equal(5, checkedNames.Count);
         }
@@ -200,6 +222,33 @@ public sealed class ActionPageCardStyleTests
         {
             win.Close();
         }
+    }
+
+    /// <summary>
+    /// 把卡片的 BoxShadow 推到期望的**终点态**再断言 —— headless 下过渡动画由平台时钟驱动,
+    /// 而 `Dispatcher.UIThread.RunJobs()` **不推进**它 (MotionSmokeTests 已立约定「动画本身不在
+    /// headless 断言」) ⇒ 带过渡直接读只能拿到插值中间值。故显式 `ForceRenderTimerTick` 逐帧推进
+    /// (过渡 = `ClaudeMotion.Micro` 120ms ≈ 8 帧 @60fps, 上限给 40 帧) 直到取值等于期望。
+    /// 正常路径上过渡已在调用前摘除 ⇒ 首轮 RunJobs 即命中; 本函数主要作**兜底与诊断**
+    /// (2026-09-17: 曾出现静止档读到第 3 层 alpha=0x0a 的半途值, 导致本用例「单跑绿、全量红」)。
+    /// </summary>
+    private static void SettleShadow(Border card, BoxShadows expected, string what)
+    {
+        for (var i = 0; i < 40; i++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            if (card.BoxShadow.ToString() == expected.ToString())
+            {
+                return;
+            }
+
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        }
+
+        Assert.True(false,
+            $"{what} {string.Join("+", card.Classes)} 40 帧后仍未到终点态: 期望 {expected}; " +
+            $"实得 {card.BoxShadow}; IsPointerOver={card.IsPointerOver}; " +
+            $"Transitions={card.Transitions.Count}; Bounds={card.Bounds}");
     }
 
     /// <summary>② 选中态 (.matched) 只换颜色, 粗细与阴影必须与默认态完全一致。</summary>

@@ -19,10 +19,11 @@
          (只加深投影、不出灰环), 与插件页同步; 聚焦环 ClaudeShadowFocusRing 保持不变。
          同日晚些二次整改「加深更明显」: Deep 由单层 10% α 换成双层 (贴边 + 抬升弥散)。
          同日三次整改「又过于明显、边缘生硬」: 减重后仍未达到预期。
-         ⇒ **最终裁定: 取消悬停投影加深, 保留基础阴影** —— 本页两处 :pointerover 投影接线
-         (settingsCard / leftPanel) 整体删除, 悬停回落静止档 ClaudeShadowCard; 聚焦态不变。
-         注: 去环版 ClaudeShadowCardDeep 因此与 ClaudeShadowCardHover 一样**不再有消费方**
-         (两者都保留在皮肤契约里作为恢复路径, 见 Claude.axaml 的令牌注释)。 -->
+         ⇒ ④ **最终裁定: 取消悬停投影加深, 保留基础阴影**; ⑤ 同日晚再要求「悬停时组件框周围
+         显示一圈**光圈**(不能是纯线条)」⇒ 落地为 ClaudeShadowCardHalo 家族 (陶土色弥散层,
+         无偏移 + Blur=16, 非零扩散描边), 本页 settingsCard / leftPanel 悬停 = 静止两层投影 + 光圈。
+         注: 旧档 ClaudeShadowCardHover / ClaudeShadowCardDeep 因此**不再有消费方**
+         (两者仍保留在皮肤契约里作为恢复路径, 见 Claude.axaml 的令牌注释)。 -->
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -47,18 +48,30 @@
          注: 卡片虽在 ScrollViewer 内, 但右列 StackPanel 留有 24px 外边距
          (2026-09-12 由 Padding 改 Margin 修好"阴影被切断"), 环不被裁 -->
     <Style Selector="Border.settingsCard">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+      <!-- 悬停光圈淡入 (120ms = 皮肤令牌 ClaudeMotion.Micro) -->
+      <Setter Property="Transitions">
+        <Transitions>
+          <BoxShadowsTransition Property="BoxShadow" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+        </Transitions>
+      </Setter>
     </Style>
-    <!-- 悬停: **无投影变化** (2026-09-17 用户最终裁定「取消悬停投影加深效果, 保留基础阴影」)。
-         历史三改: ① 悬停换 ClaudeShadowCardHover → 出 1px #d1cfc5 灰环; ② 换去环版
-         ClaudeShadowCardDeep 只加深 → 用户反馈不够明显; ③ Deep 提到双层强影 → 又过于明显、
-         边缘生硬 ⇒ 故直接删除本页 :pointerover 投影接线, 悬停回落静止档 ClaudeShadowCard。
-         防回归: SettingsCardEffectTests 断言悬停后 BoxShadow 仍 == ClaudeShadowCard, 并有
-         像素级用例比对悬停/静止帧在卡下采样带**逐字节一致**。 -->
+    <!-- 悬停: **只加光圈, 不改描边, 不改投影前两层** (2026-09-17 当日五轮整改的终点)。
+         历史: ① 悬停换 ClaudeShadowCardHover → 出 1px #d1cfc5 灰环; ② 换去环版
+         ClaudeShadowCardDeep 只加深 → 不够明显; ③ Deep 提到双层强影 → 又过于明显、边缘生硬;
+         ④ 降重后仍不满意 ⇒ 先裁定**取消加深**; ⑤ 本次用户要求「悬停时周围显示一圈**光圈**,
+         不能是纯线条」⇒ 落地为 Halo 族第 3 层的陶土色弥散 (Blur=16, 无偏移, alpha 18%)。
+         故此处 :pointerover 是**新增的光圈档**, 与步骤④"取消加深"不矛盾: 投影前两层与静止档
+         逐位相同, 悬停新增的只有光圈; 也不会复现灰线 (光圈层 Blur>0, 非零扩散描边)。
+         防回归: SettingsCardEffectTests 断言悬停阴影 == ClaudeShadowCardHaloHover, 描边仍奶油色,
+         并有像素级用例证明卡下暖色光圈真的亮了。 -->
+    <Style Selector="Border.settingsCard:pointerover">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloHover}" />
+    </Style>
     <Style Selector="Border.settingsCard:focus-within">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
     </Style>
     <!-- 左列「快捷键方案」大卡: 同样以插件页为基准, 与右列逐项一致 (同静止/聚焦两态;
          悬停无变化, 同上)。
@@ -67,13 +80,21 @@
          注意: 未改本卡外框尺寸 (Width 由 560 列 - 16 右边距决定 / Height 624),
          故整页 Viewbox 缩放比不变, TopFlareWings 的 0.5px 几何守护不受影响 -->
     <Style Selector="Border.leftPanel">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <BoxShadowsTransition Property="BoxShadow" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+        </Transitions>
+      </Setter>
     </Style>
-    <!-- 悬停: 同上, **无投影变化** (2026-09-17 用户裁定取消悬停加深) -->
+    <!-- 悬停: 与右列 settingsCard 同款「只加光圈」(逐项一致, 见 SettingsCardEffectTests 跨页断言) -->
+    <Style Selector="Border.leftPanel:pointerover">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloHover}" />
+    </Style>
     <Style Selector="Border.leftPanel:focus-within">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
     </Style>
     <!-- 分区标题按钮: 压制 Fluent 模板部件基态/悬停/按下的自带灰底 (坑13/18) ——
          悬停反馈交给所在 settingsCard, 按钮自身零视觉 -->

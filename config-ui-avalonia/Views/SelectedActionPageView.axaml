@@ -233,21 +233,34 @@
          声明在 .row-card 状态样式**之前**: 状态样式只覆盖 BorderBrush (不动粗细/阴影),
          故「默认态 / 选中态(.matched)」的描边粗细与阴影完全一致, 仅颜色区分 ⇒ 视觉统一协调 -->
     <Style Selector="Border.actionCard">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+      <!-- 悬停光圈淡入 (120ms = 皮肤令牌 ClaudeMotion.Micro, 与全局"悬停微交互最短"的频率闸门一致)。
+           光圈层在静止档 / 悬停档 / 按下档 / 聚焦档里**恒占第 3 层**(静止为 alpha=0 的占位),
+           层数相等 ⇒ BoxShadowsAnimator 逐层插值, 移入/移出都是平滑渐隐而非跳变。 -->
+      <Setter Property="Transitions">
+        <Transitions>
+          <BoxShadowsTransition Property="BoxShadow" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+        </Transitions>
+      </Setter>
     </Style>
-    <!-- 悬停反馈 (2026-09-17 用户四轮裁定的终点: **取消悬停投影加深, 保留基础阴影**):
-         ① 原实现把 BorderBrush 换成 ClaudeRingWarmBrush(#d1cfc5 灰) ⇒ 悬停出灰线, 用户要求清除;
-         ② 改为「只加深投影」(ClaudeShadowCardDeep) ⇒ 用户反馈加深**不够明显**;
-         ③ 令牌增强为双层强影 ⇒ 用户反馈**又过于明显、边缘生硬**;
-         ④ 降重后再调仍不满意 ⇒ 用户裁定**直接取消加深**。
-         故本 :pointerover 投影接线**整体删除**(行卡元素同时带 row-card + actionCard 两类,
-         本样式原已覆盖行卡) —— 悬停时 5 个组件框一律保持静止档 ClaudeShadowCard。
-         防回归: ActionPageCardStyleTests 逐卡断言悬停后 BorderBrush 仍为奶油色(无灰线)
-         且 BoxShadow 仍 == ClaudeShadowCard(无加深)。
-         保留 :focus-within 的 ClaudeShadowFocusRing 与 .matched 的陶土边, 均不受影响。 -->
-    <!-- 映射行卡: 悬停无投影变化 (加深已取消), 也不再有灰边;
+    <!-- 悬停反馈 (2026-09-17 又一轮裁定: **取消投影加深** 之后新增**陶土色弥散光圈**):
+         历史: ① BorderBrush 换 ClaudeRingWarmBrush(#d1cfc5) ⇒ 悬停出灰线, 用户要求清除;
+               ② 改用去环版「只加深投影」⇒ 加深不够明显; ③ 增强为双层强影 ⇒ 又过于明显;
+               ④ 降重后仍不满意 ⇒ 用户先裁定取消加深 (悬停 = 静止档);
+               ⑤ 本次 (同日) 用户要求「悬停时组件框周围显示一圈**光圈**」并明确**不能是纯线条**。
+         实现 = 在原有双层投影之上追加一层无偏移/大模糊/低透明度的陶土色弥散 (ClaudeShadowCardHaloHover),
+         而不是加描边环 —— `0 0 0 N` 零扩散层就是一根线 (步骤①的灰线即它), 已明令清除;
+         Halo 的光圈层 Blur=16 ⇒ 约 8px 渐隐尾巴, 无生硬边缘。
+         描边色**不变** (仍奶油色, 无灰线); 投影前两层也与静止档逐位相同 ⇒ 只有光圈在动。
+         防回归: ActionPageCardStyleTests 逐卡断言悬停后 BorderBrush 仍为奶油色 (无灰线)
+         且 BoxShadow == ClaudeShadowCardHaloHover。
+         .matched 的陶土边不受影响 (本样式只动 BoxShadow)。 -->
+    <Style Selector="Border.actionCard:pointerover">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloHover}" />
+    </Style>
+    <!-- 映射行卡: 悬停只加光圈 (行卡元素同时带 row-card + actionCard 两类, 上一条已覆盖),
          测试命中高亮 (暖陶土底 + 陶土边) 见下 -->
     <Style Selector="Border.row-card.matched">
       <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />

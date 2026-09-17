@@ -166,6 +166,9 @@ public sealed class SkinContractTests
         "ClaudeShadowHoverRing", "ClaudeShadowCtaRing", "ClaudeShadowPressedInset",
         "ClaudeShadowFocusRing", "ClaudeShadowWhisper", "ClaudeShadowCard",
         "ClaudeShadowCardHover", "ClaudeShadowCardDeep",
+        // 组件框悬停光圈族 (2026-09-17 新增; 三页组件框唯一消费方) —— 四档层数必须相等 (各 3 层)
+        "ClaudeShadowCardHalo", "ClaudeShadowCardHaloHover",
+        "ClaudeShadowCardHaloPressed", "ClaudeShadowCardHaloFocus",
     ];
 
     private static readonly string[] RadiusKeys =
@@ -207,7 +210,12 @@ public sealed class SkinContractTests
     [AvaloniaFact]
     public void Skin_Contract_Card_Shadow_Tokens_Contain_No_Ring_Layer()
     {
-        foreach (var key in new[] { "ClaudeShadowCard", "ClaudeShadowCardDeep" })
+        foreach (var key in new[]
+                 {
+                     "ClaudeShadowCard", "ClaudeShadowCardDeep",
+                     // 光圈族的静止/悬停档同属"去环"档: 它们的光圈层必须是**模糊弥散**而非描边环
+                     "ClaudeShadowCardHalo", "ClaudeShadowCardHaloHover",
+                 })
         {
             var layers = ShadowLayers(key);
             Assert.NotEmpty(layers);
@@ -217,6 +225,61 @@ public sealed class SkinContractTests
         // Ring 版的特征必须保留: 它是"带 1px #d1cfc5 环"的历史档, 语义上与 Deep 相对
         var ringVersion = ShadowLayers("ClaudeShadowCardHover");
         Assert.Contains(ringVersion, l => l.Blur == 0);
+    }
+
+    /// <summary>
+    /// 契约: 悬停光圈 (<c>ClaudeShadowCardHalo</c> 家族, 2026-09-17) 必须是**柔和暖橙弥散**, 不是线条:
+    ///   ① 光圈层 <c>Blur &gt; 0</c> —— <c>Blur==0</c> 的 <c>0 0 0 N</c> 画出来就是一根描边线
+    ///      (2026-09-17「悬停灰描边」事故的成因), 用户明确要求"不能是纯线条";
+    ///   ② 光圈层偏移必须为 0 —— 否则只在单侧出现, 不成"一圈";
+    ///   ③ 光圈层是暖色 (R&gt;B) 且 alpha ∈ (0, 0x40] —— 橙色 (用户优先指定) 且不过重
+    ///      (此前"过于明显"的悬停效果已被否决过两次);
+    ///   ④ 四档**层数相等** —— Avalonia 的 BoxShadowsAnimator 在 progress&lt;1 时按
+    ///      <c>oldValue.Count</c> 输出层数, 不等会让光圈在动画**末帧**突然出现/消失;
+    ///   ⑤ 静止档第 3 层 alpha 必须为 0 (仅占位, 静止态不得发光)。
+    /// </summary>
+    [AvaloniaFact]
+    public void Skin_Contract_Hover_Halo_Is_Soft_Warm_And_Not_A_Line()
+    {
+        var rest = ShadowLayers("ClaudeShadowCardHalo");
+        var hover = ShadowLayers("ClaudeShadowCardHaloHover");
+        var pressed = ShadowLayers("ClaudeShadowCardHaloPressed");
+        var focus = ShadowLayers("ClaudeShadowCardHaloFocus");
+
+        // ④ 层数相等 (四档) —— 动画逐层插值的前提, 也是"过渡自然"的必要条件
+        Assert.Equal(3, rest.Count);
+        Assert.Equal(rest.Count, hover.Count);
+        Assert.Equal(rest.Count, pressed.Count);
+        Assert.Equal(rest.Count, focus.Count);
+
+        // ⑤ 静止档光圈层 = 全透明占位
+        Assert.Equal((byte)0, rest[2].Color.A);
+
+        // ① ② ③ 悬停光圈层 = 有模糊 + 无偏移 + 暖色 + 不过重
+        var glow = hover[2];
+        Assert.True(glow.Blur > 0,
+            "光圈层 Blur==0 ⇒ 会画成一根描边线 (灰线事故成因), 必须用模糊弥散成形");
+        Assert.Equal(0, glow.OffsetX);
+        Assert.Equal(0, glow.OffsetY);
+        Assert.True(glow.Color.R > glow.Color.B, $"光圈必须为暖色/橙色, 实际 {glow.Color}");
+        // alpha 上界 0x60 (≈38%): 这是"不过重"的令牌级闸门 —— 历史教训是悬停效果被连否两轮
+        // ("过于明显" / "边缘生硬"), 故源 alpha 不得突破此线 (弥散后可见峰值本就只有一半)。
+        Assert.InRange(glow.Color.A, (byte)1, (byte)0x60);
+        // Spread 允许少量外推 (把光圈从卡沿推出去, 形成"圈"的形), 但不得大到只剩硬边,
+        // 也不得超过 Blur 的 1/4 (否则看起来像描边而非弥散)
+        Assert.InRange(glow.Spread, 0, glow.Blur / 4);
+
+        // 悬停"只加光圈": 前两层必须与静止档逐位相同 (防偷偷加深投影)
+        Assert.Equal(rest[0].ToString(), hover[0].ToString());
+        Assert.Equal(rest[1].ToString(), hover[1].ToString());
+
+        // 聚焦档: 第 3 层 = 既有 Coral 焦点环 (这里的 Blur==0 实环是**有意**的),
+        // 前两层透明化 ⇒ 视觉与 ClaudeShadowFocusRing 一致, 只是层数对齐成 3
+        Assert.Equal(0, focus[2].Blur);
+        Assert.Equal(Color.Parse("#d97757"), focus[2].Color);
+        Assert.True(focus[2].Color.A > 0);
+        Assert.Equal((byte)0, focus[0].Color.A);
+        Assert.Equal((byte)0, focus[1].Color.A);
     }
 
     /// <summary>读令牌并展平成层列表 (BoxShadows 是有序定长集合, 用 Count + 索引器)。</summary>

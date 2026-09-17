@@ -41,25 +41,40 @@
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
       <Setter Property="Padding" Value="20,16" />
       <Setter Property="Margin" Value="0,0,0,10" />
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCard}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
+      <!-- 悬停光圈淡入 (120ms = 皮肤令牌 ClaudeMotion.Micro) -->
+      <Setter Property="Transitions">
+        <Transitions>
+          <BoxShadowsTransition Property="BoxShadow" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+        </Transitions>
+      </Setter>
     </Style>
-    <!-- 悬停反馈 (2026-09-17 用户四轮裁定的终点: **取消悬停投影加深, 保留基础阴影**):
-         ① 原用 ClaudeShadowCardHover (内含 1px #d1cfc5 灰环 + 强影) ⇒ 悬停出灰线, 要求清除;
-         ② 改用去环版 ClaudeShadowCardDeep (只加深投影) ⇒ 反馈不够明显; ③ 增强为双层强影
-         ⇒ 又过于明显; ④ 降重后仍不满意 ⇒ **直接取消加深**。
-         故本 :pointerover 投影接线**整体删除** —— 悬停时 pluginCard 保持静止档 ClaudeShadowCard。
-         防回归: SettingsCardEffectTests 断言悬停阴影仍 == ClaudeShadowCard, 并有像素级用例
-         比对悬停/静止帧在卡下采样带**逐字节一致**。 -->
-    <!-- 按动: inset 环 (Border 自带 BoxShadow, 无需模板部件) -->
+    <!-- 悬停反馈 (2026-09-17 又一轮裁定: **取消投影加深** 之后新增**陶土色弥散光圈**):
+         历史: ① ClaudeShadowCardHover (含 1px #d1cfc5 灰环) ⇒ 悬停出灰线, 要求清除;
+               ② 去环版 ClaudeShadowCardDeep 只加深 ⇒ 不够明显; ③ 双层强影 ⇒ 过于明显;
+               ④ 降重后仍不满意 ⇒ 先裁定**取消加深**; ⑤ 本次新增「组件框周围一圈**光圈**」,
+               并明确**不能是纯线条**。
+         实现 = 追加一层无偏移/大模糊/低透明度的陶土色弥散层 (HaloHover 第 3 层), 不是加描边环:
+         `0 0 0 N` 零扩散层就是一根线 (步骤①的灰线即它), 已明令清除; 光圈层 Blur=16 ⇒
+         约 8px 渐隐尾巴。描边色不变, 投影前两层与静止档逐位相同 ⇒ 只有光圈在动。
+         防回归: SettingsCardEffectTests 断言悬停阴影 == ClaudeShadowCardHaloHover (无灰环即
+         无 Blur==0 层), 并有像素级用例证明悬停确实点亮了卡下暖色光圈。 -->
+    <Style Selector="Border.pluginCard:pointerover">
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloHover}" />
+    </Style>
+    <!-- 按动: inset 环 (Border 自带 BoxShadow, 无需模板部件)。
+         用 Halo 族按下档而非裸 ClaudeShadowPressedInset: 层数同为 3 ⇒ 按压/回弹也走平滑插值
+         (层数不等会让光圈在动画末帧跳变, 见 Claude.axaml 令牌注释)。 -->
     <Style Selector="Border.pluginCard:pressed">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowPressedInset}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloPressed}" />
     </Style>
-    <!-- 焦点环 (键盘聚焦卡片内开关/按钮时显示; Border 非可聚焦, 故补 :focus-within) -->
+    <!-- 焦点环 (键盘聚焦卡片内开关/按钮时显示; Border 非可聚焦, 故补 :focus-within)。
+         视觉与 ClaudeShadowFocusRing 完全一致 (Coral 2px 实环, 前两层透明化), 只是层数对齐 3。 -->
     <Style Selector="Border.pluginCard:focus-visible">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
     </Style>
     <Style Selector="Border.pluginCard:focus-within">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
     </Style>
     <!-- 卡片信息区按钮: 全透明 (视觉与 StackPanel 无异, 仅提供可点性)。
          ⚠ 必须在 基态/:pointerover/:pressed 三态都压 /template/ PART_ContentPresenter 的背景 ——

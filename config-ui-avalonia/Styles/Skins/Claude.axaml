@@ -33,7 +33,7 @@
       ClaudeWarmSilverBrush   #b0aea5  Warm Silver    暗底文字
       ClaudeBorderDarkBrush   #30302e  Border Dark    暗底边
 
-    【阴影 8 项 · BoxShadows】
+    【阴影 12 项 · BoxShadows】
       ClaudeShadowHoverRing    0 0 0 1 #d1cfc5               卡片 :pointerover (Ring Warm)
       ClaudeShadowCtaRing      0 0 0 1 #c96442               主 CTA 静止态环 (DESIGN.md L126)
       ClaudeShadowPressedInset inset 0 0 0 1 #26262526       按钮 :pressed (Level 4; 0x26=15% 深)
@@ -41,13 +41,25 @@
       ClaudeShadowWhisper      0 4 24 0 #0d000000            浮层/对话框/窗口 (Level 3; 0x0d=5% 黑)
       ClaudeShadowCard         0 2 4 0 #1c000000, 0 6 18 0 #14000000
                                                               卡片静止态柔和投影 (双层: 贴边 + 弥散)
-                                                              **三页卡片的唯一在接线影档**
+                                                              通用卡 (Border.claudeCard 等) 用此档;
+                                                              三页组件框自 2026-09-17 起改用下方 Halo 家族
       ClaudeShadowCardHover    0 0 0 1 #d1cfc5, 0 6 20 0 #1a000000
                                                               卡片悬停 Ring 版 (无消费方; 契约保留)
       ClaudeShadowCardDeep     0 2 10 0 #18000000, 0 10 26 0 #2b000000
                                                               卡片悬停去环版 (无消费方; 契约保留)
                                                               ⚠ 悬停加深已于 2026-09-17 取消,
-                                                              三页 :pointerover 接线删除 ⇒ 悬停=静止档
+                                                              三页 :pointerover 加深接线删除
+      —— 组件框悬停光圈族 (2026-09-17 新增; 三页组件框在为唯一消费方) ——
+      ClaudeShadowCardHalo         0 2 4 0 #1c000000, 0 6 18 0 #14000000, 0 0 16 2 #00c96442
+                                                            静止档 = 原双层投影 + **alpha=0 的光圈占位层**
+                                                            (占位层不可见, 只为与悬停档层数对齐)
+      ClaudeShadowCardHaloHover    0 2 4 0 #1c000000, 0 6 18 0 #14000000, 0 0 16 2 #4dc96442
+                                                            悬停档: 第 3 层 = 陶土色弥散光圈 (橙色 α30%)
+      ClaudeShadowCardHaloPressed  inset 0 0 0 1 #26262526, 0 6 18 0 #00000000, 0 0 16 2 #00c96442
+                                                            按下档 (层数同为 3, 供平滑插值)
+      ClaudeShadowCardHaloFocus    0 2 4 0 #00000000, 0 6 18 0 #00000000, 0 0 0 2 #d97757
+                                                            聚焦档 = 现有 Coral 2px 焦点环前移到第 3 层
+                                                            (前两层透明化, 层数与静止档一致)
 
     【尺寸 4 项 · x:Double】
       ClaudeRadiusSm=6  ClaudeRadiusMd=8  ClaudeRadiusLg=12  ClaudeRadiusXl=16
@@ -111,9 +123,13 @@
               ClaudeSidebarSurfaceBrush  ← 侧栏面 (半透明 Ivory)
               暗色桩 (定义但不接线): ClaudeDarkSurfaceBrush / ClaudeDeepDarkBrush /
               ClaudeWarmSilverBrush / ClaudeBorderDarkBrush
-    阴影 (8):  ClaudeShadowHoverRing / ClaudeShadowCtaRing /
+    阴影 (12): ClaudeShadowHoverRing / ClaudeShadowCtaRing /
               ClaudeShadowPressedInset / ClaudeShadowFocusRing / ClaudeShadowWhisper /
-              ClaudeShadowCard / ClaudeShadowCardHover / ClaudeShadowCardDeep
+              ClaudeShadowCard / ClaudeShadowCardHover / ClaudeShadowCardDeep /
+              ClaudeShadowCardHalo / ClaudeShadowCardHaloHover /
+              ClaudeShadowCardHaloPressed / ClaudeShadowCardHaloFocus
+              ⚠ Halo 四档必须层数相等 (各 3 层) —— BoxShadowsAnimator 按 oldValue.Count
+                输出层数, 不等会在动画末帧跳变; 且**光圈层 Blur 必须 >0** (Blur==0 即描边线)。
     尺寸 (4):  ClaudeRadiusSm / ClaudeRadiusMd / ClaudeRadiusLg / ClaudeRadiusXl
               ⚠ 类型必须是 CornerRadius (不是 x:Double) —— 历史事故: 曾定义成 Double,
                 构建 0 错误但所有窗口加载即抛 InvalidCastException。
@@ -177,7 +193,7 @@
     <SolidColorBrush x:Key="ClaudeWarmSilverBrush"   Color="#b0aea5" />
     <SolidColorBrush x:Key="ClaudeBorderDarkBrush"   Color="#30302e" />
 
-    <!-- 阴影 (7) · BoxShadows
+    <!-- 阴影 (12) · BoxShadows
          ClaudeShadowCard/CardHover (2026-09-11): 插件卡静止态此前只有 1px cream 细边,
          用户反馈"阴影边界紧贴内容" —— 补双层柔和投影 (贴边 + 弥散) 让卡片与画布拉开层次。
          悬停必须在 Ring 之外保留投影: BoxShadow 是单属性, 悬停若只给 Ring 会把静止投影整个替换掉。
@@ -209,6 +225,56 @@
            ② 下坠 ≥ 1.4× 静止 (层次感来自位移);
            ③ 最大弥散 ≥ 静止档 (减重靠"摊薄"而非"收紧", 否则边缘生硬)。 -->
     <BoxShadows x:Key="ClaudeShadowCardDeep">0 2 10 0 #18000000, 0 10 26 0 #2b000000</BoxShadows>
+
+    <!-- ── 组件框悬停光圈 (ClaudeShadowCardHalo 家族, 2026-09-17 新增) ──
+         需求: 三页 (选中动作 / 插件 / Settings) 的组件框悬停时周围显示"一圈光圈"。
+         硬约束: **不能是纯线条**; 颜色优先橙色, 由实现方判断取最协调者。
+
+         ▶ 为什么这么实现 (而不是加一圈描边)
+           零扩散环层 (`0 0 0 N #...`, Blur=0) 画出来就是一根**描边线** ——
+           2026-09-17 早先的"悬停灰描边"事故正是它 (`0 0 0 1 #d1cfc5`, 与卡片 2px 实体奶油边
+           叠成双线), 用户已明令清除。故光圈用**无偏移 + 大模糊 + 低不透明度**的弥散层成形:
+             layer3 = `0 0 16 0 <#aarrggbb>` —— offset 恒 0 ⇒ 四周等量外扩;
+                                              Blur=16 ⇒ 约 8px 的渐隐尾巴, 无生硬边缘。
+           SkinContractTests 对 Halo/HaloHover 有"光圈层必须 Blur>0"的反线条断言 (Blur==0 即红)。
+
+         ▶ 颜色为何选 Terracotta #c96442
+           Coral #d97757 是**键盘焦点环专用色** (ClaudeShadowFocusRing, 2px 实环), 亮度更高,
+           在浅米底上做弥散对比不足, 且会与焦点态语义打架 (悬停=橙光晕 / 焦点=橙实环, 需可区分);
+           Terracotta 是品牌主 CTA 色, 更深一档, 同族暖橙既满足"橙色优先", 又与 Parchment/Ivory
+           同源和谐。第 3 层取 `0 0 16 2` (无偏移 / Blur 16 / Spread 2): Spread 2 把光圈从卡沿
+           **推出 2px** 再让 Blur 16 化开 ⇒ 卡边一圈约 8px 的橙色渐隐带 (有"圈"的形, 无"线"的硬)。
+
+         ▶ alpha 标定 (2026-09-17 实测两轮)
+           首版 0x2e (18%) 经 Skia 截帧实测卡下 2..7 行 Δ亮度仅 0.0134 (暖度 Δ(R−B)=3.33) ——
+           与历史"看不出变化"的档 (Δ0.0085) 太近, 偏弱; 现提为 0x4d (30%)。
+           量级参照 (本项目实测库): Δ0.0085 = 用户判"没有变化"; Δ0.074 起 = 用户判"过于明显"。
+           光圈是**彩色**层, 同 Δ 下的感知强度高于黑色投影 (色相变化本身可辨), 故收敛目标
+           取黑投影"过重线"之下的一半量级附近。改 alpha 后必须跑
+           SettingsCardEffectTests.Hover_Halo_Lights_Warm_Pixels_Below_Card 复测 (用例内含
+           0.004 下界与 0.12 上界两道闸, 兼顾"看不见"与"过重"两种历史翻车)。
+           注: 弥散层的可见峰值只约源 alpha 的一半 (另一半落在卡片下方被卡面遮住),
+           故弥散比普通投影需要更高的源 alpha 才等效。
+
+         ▶ ⚠ 四档必须**层数相等 (各 3 层)** —— 这不是风格问题, 是动画正确性
+           Avalonia 的 BoxShadowsAnimator 在 progress<1 时按 **oldValue.Count** 输出层数:
+             `int cnt = progress >= 1d ? newValue.Count : oldValue.Count;`
+           层数不等 ⇒ 多出来的层在动画**结束的那一帧**才突然出现/消失 (悬停移出时表现为
+           "投影两段跳")。故静止档用一个 alpha=0 的同形光圈层占位, 与悬停/按下/聚焦档逐层对齐:
+             L0 = 原贴边影 (HaloFocus 里透明化, 与 Coral 实环的 morph 由 L2 承担)
+             L1 = 原弥散影 (同上)
+             L2 = 光圈层 (静止 alpha=0 → 悬停 18% → 按下/聚焦回落 0)
+           改本族任何一个 alpha / blur 时, **四个键必须一起看**, 并保持层数一致。
+
+         ▶ 接线位置 (三页, 2026-09-17)
+           SelectedActionPageView `Border.actionCard` (含 row-card) / PluginsPageView
+           `Border.pluginCard` / SettingsPageView `Border.settingsCard` + `Border.leftPanel`,
+           均为 `:pointerover` → HaloHover + `BoxShadowsTransition` (ClaudeMotion.Micro 120ms)。
+           页面内不再出现旧的 :pointerover 加深接线; 旧档 CardHover / CardDeep 仍无消费方。 -->
+    <BoxShadows x:Key="ClaudeShadowCardHalo">0 2 4 0 #1c000000, 0 6 18 0 #14000000, 0 0 16 2 #00c96442</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowCardHaloHover">0 2 4 0 #1c000000, 0 6 18 0 #14000000, 0 0 16 2 #4dc96442</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowCardHaloPressed">inset 0 0 0 1 #26262526, 0 6 18 0 #00000000, 0 0 16 2 #00c96442</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowCardHaloFocus">0 2 4 0 #00000000, 0 6 18 0 #00000000, 0 0 0 2 #d97757</BoxShadows>
 
     <!-- 尺寸 (4) · CornerRadius 类型
          注意: 令牌被赋给 CornerRadius 属性, 必须用 CornerRadius 类型。
