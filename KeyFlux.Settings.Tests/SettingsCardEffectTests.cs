@@ -245,6 +245,15 @@ public sealed class SettingsCardEffectTests
 
             using var restFrame = window.CaptureRenderedFrame()!;
             var restLum = MeanLuminance(restFrame, x, yTop, yBottom);
+            // 通道序自证: CaptureRenderedFrame 的 framebuffer 在部分 Avalonia/Skia 组合下是 RGBA 而非
+            // BGRA —— 按错序读会把奶油色读成偏蓝色 (2026-09-16 曾因此误判"边框变蓝")。
+            // 这里直接打印格式与原始 4 字节, 免得后人重踩。
+            using (var probe = restFrame.Lock())
+            {
+                var one = new byte[4];
+                Marshal.Copy(probe.Address + yTop * probe.RowBytes + x * 4, one, 0, 4);
+                _output.WriteLine($"帧格式={probe.Format}, 静止像素原始字节={one[0]},{one[1]},{one[2]},{one[3]}");
+            }
 
             var center = Avalonia.VisualExtensions.TranslatePoint(
                 card, new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), window)!.Value;
