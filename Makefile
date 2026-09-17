@@ -119,9 +119,20 @@ check-texttypes:
 
 # check: 一键回归 = 标识符 lint + 文本特征一致性 + Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
 # (MSYS_NO_PATHCONV: 防止 Git Bash 把 /ErrorStdOut /Validate 等开关误转换为路径)
-check: buildServer lint check-texttypes
-	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./config-server/templates/keyflux.tmpl ./bin/KeyFlux.ahk
-	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate ./bin/KeyFlux.ahk
+# 2026-09-17 修「生成产物落点」缺陷 (原配方只要部署配置启用了插件就**必然**失败, 实测阻断 make deploy):
+#   生成器给插件入口发的是**相对输出文件所在目录**的 `#Include ../data/plugins/<id>/<file>`
+#   (generators/plugins.go renderPluginBlocks, 硬编码 ../data/plugins); 这套相对关系只在
+#   部署树成立 (bin/ 与 data/ 同级), 而仓库根根本没有 data/plugins ⇒ 产物写回 ./bin/KeyFlux.ahk
+#   后 /Validate 必然报 (26): #Include file "../data/plugins/sample_greeter/main.ahk" cannot be opened。
+#   修法: 主生成落点改为**部署树** bin/KeyFlux.ahk (相对关系正确, 且校验覆盖真实的插件注入路径),
+#         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
+#   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
+#       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
+check: buildServer lint check-texttypes | $(OUT_DIR)
+	@mkdir -p "$(DEPLOY_DIR)/bin"
+	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./config-server/templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
+	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
+	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/oracle.ps1
 
 # check-cs: C# 设置界面单元测试 (dotnet SDK 须在 PATH; 本机 SDK 在 Scoop 的 dotnet-sdk)
@@ -154,7 +165,13 @@ out: buildServer buildClientAvalonia sync-out
 	@echo "------------------------- out ok -> $(OUT_DIR) -------------------------------"
 
 # deploy: 回归通过后编译并同步到部署目录, 重启实例 (robocopy 退出码 0-7 均为成功)
+# 2026-09-17 修重启步骤的 shell 展开缺陷: 原写法用**双引号**包裹 pwsh 载荷, make 折半后的 $$d
+#   会被 /bin/sh 先按变量展开成空串 ⇒ pwsh 收到 `=(Resolve-Path ...).Path`, 报
+#   "The term '=' is not recognized" + "Join-Path: missing mandatory parameters: ChildPath"
+#   (实测 make Error 1; 此时前置步骤其实已全部成功, 只是实例没被重启)。
+#   改为**单引号**包裹载荷 (与 buildClientAvalonia 的 i18n 校验行同款): 单引号阻断 sh 展开,
+#   make 的 $$ 折半后原样送进 pwsh; 载荷内只用双引号与 ASCII。
 deploy: check buildClientAvalonia sync-out
-	pwsh -NoProfile -Command "$$d=(Resolve-Path '$(OUT_DIR)').Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d 'KeyFlux.exe') -WorkingDirectory $$d"
+	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
 .PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-texttypes check-cs analyzers lint sync-out out deploy
