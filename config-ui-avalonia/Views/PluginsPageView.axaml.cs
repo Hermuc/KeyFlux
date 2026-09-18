@@ -50,12 +50,19 @@ public partial class PluginsPageView : UserControl
             .FirstOrDefault(b => b.Classes.Contains("cardBody"))?.Focus();
     }
 
-    /// <summary>卡信息区点击: 内置卡 (CanConfigure) 弹 QuickSwitchDialogWindow; 用户卡暂无配置。</summary>
+    /// <summary>
+    /// 卡信息区点击: 按卡来源分流到对应配置对话框 ——
+    /// 内置 QuickSwitch 走专属对话框 (值落 config.json, 经 SaveAsync 重启引擎);
+    /// 有设置声明的用户插件走声明式设置对话框 (值落 data/plugin-settings.json,
+    /// 插件在下次触发时重读该文件, 不重启引擎)。无设置的卡不可配置, 点击不响应。
+    /// </summary>
     private async void OnCardConfigureClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button { CommandParameter: PluginCardVm card } && card.CanConfigure
-            && DataContext is PluginsPageViewModel vm
-            && TopLevel.GetTopLevel(this) is Window owner)
+        if (sender is not Button { CommandParameter: PluginCardVm card } || !card.CanConfigure) return;
+        if (DataContext is not PluginsPageViewModel vm) return;
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+
+        if (card.IsBuiltin)
         {
             var dialog = new QuickSwitchDialogWindow
             {
@@ -63,7 +70,14 @@ public partial class PluginsPageView : UserControl
             };
             await dialog.ShowDialog(owner);
             vm.Refresh();
+            return;
         }
+
+        var pluginDialog = new PluginSettingsDialogWindow
+        {
+            DataContext = new PluginSettingsDialogViewModel(vm.Main, card.Manifest),
+        };
+        await pluginDialog.ShowDialog(owner);
     }
 
     /// <summary>导入本地插件包: 选 zip -> 读字节 -> POST /api/plugins/import。</summary>

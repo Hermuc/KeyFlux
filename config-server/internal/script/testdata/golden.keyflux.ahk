@@ -9,6 +9,7 @@
 #Include lib/core/Programs.ahk
 #Include lib/core/WindowUtils.ahk
 #Include lib/core/AbbrInput.ahk
+#Include lib/core/CommandInputHooks.ahk
 #Include lib/actions/Actions.ahk
 #Include lib/core/KeymapManager.ahk
 #Include lib/core/InputTipWindow.ahk
@@ -54,8 +55,13 @@ InitKeymap()
   capsHook := InputHook("", "{CapsLock}{Esc}", "edit,expr,jk,multi,web")
   capsHook.KeyOpt("{CapsLock}", "S")
   capsHook.KeyOpt("{Backspace}", "N")
-  capsHook.OnChar := (ih, char) => (PostCharToCaspAbbr(ih, char), FuzzySuffixFire(ih, char, "capslock"))
-  capsHook.OnKeyDown := PostBackspaceToCaspAbbr
+  ; Up/Down/Enter 仅用于「通知」: 命令框内插件下拉列表的导航键 (由 CommandInputHooks 分发)。
+  ; 无 provider 消费时它们不投递任何字符 —— 与历史实现行为一致。
+  capsHook.KeyOpt("{Up}", "N")
+  capsHook.KeyOpt("{Down}", "N")
+  capsHook.KeyOpt("{Enter}", "N")
+  capsHook.OnChar := (ih, char) => CommandInputOnChar(ih, char, "capslock")
+  capsHook.OnKeyDown := (ih, vk, sc) => CommandInputOnKeyDown(ih, vk, sc, "capslock")
   Run("bin\KeyFlux-CommandInput.exe")
 
   semiHook := InputHook("", "{CapsLock}{Esc}{;}", ",,,sys")

@@ -19,9 +19,13 @@ EnterCapslockAbbr(capsHook) {
   ; }
 
   ; 显示命令框窗口
+  ; 先开会话 (记下当前前台窗口 —— 命令框显示后可能抢走前台, 插件取选中文字要切回去)
+  CommandInputHooks.BeginSession()
   PostMessageToCpasAbbr(SHOW_COMMAND_INPUT)
 
   endReason := StartInputHook(capsHook)
+  ; 输入结束: 让插件收起自建浮层 (下拉列表等)
+  CommandInputHooks.EndSession()
   if (InStr(endReason, "Match")) {
     char := SubStr(capsHook.Match, -1)
     PostCharToCaspAbbr(, char)

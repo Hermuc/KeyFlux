@@ -128,7 +128,7 @@ check-texttypes:
 #         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
 #   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
 #       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
-check: buildServer lint check-texttypes | $(OUT_DIR)
+check: buildServer lint check-texttypes sync-plugins | $(OUT_DIR)
 	@mkdir -p "$(DEPLOY_DIR)/bin"
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./config-server/templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
@@ -147,8 +147,18 @@ analyzers:
 	dotnet format style config-ui-avalonia/KeyFlux.Settings.csproj --verify-no-changes --no-restore --severity info --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059
 	dotnet format style KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --verify-no-changes --no-restore --severity info --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059
 
+# sync-plugins: 把官方示例插件放到部署树 data/plugins。
+#   由来 (2026-09-18): 生成端只扫 `<config.json 同级>/plugins` (generators/plugins.go),
+#   而 check 用**部署树**的 config.json 生成 + /Validate, 所以插件必须先落到
+#   $(OUT_DIR)/data/plugins 才在真实的插件注入路径上被校验到 —— 否则 check 会
+#   在「插件未部署」的空目录上假绿, 插件自身的语法错误要等运行时才炸。
+#   robocopy 刻意**不带 /MIR**: 只增改, 不删 —— 用户自己导入到 data/plugins 的插件
+#   不会被这一步清掉 (仓库里的 plugins/examples 是「随软件分发的官方插件」单一真源)。
+sync-plugins: | $(OUT_DIR)
+	MSYS_NO_PATHCONV=1 robocopy plugins/examples $(OUT_DIR)/data/plugins /E /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
+
 # sync-out: 把编译产物同步到 OUT_DIR (robocopy 退出码 0-7 均为成功)
-sync-out: | $(OUT_DIR)
+sync-out: sync-plugins | $(OUT_DIR)
 	MSYS_NO_PATHCONV=1 robocopy bin/lib $(OUT_DIR)/bin/lib /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
 	MSYS_NO_PATHCONV=1 robocopy bin/templates $(OUT_DIR)/bin/templates /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
 	MSYS_NO_PATHCONV=1 robocopy site-assets $(OUT_DIR)/bin/site /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
@@ -174,4 +184,4 @@ out: buildServer buildClientAvalonia sync-out
 deploy: check buildClientAvalonia sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-texttypes check-cs analyzers lint sync-out out deploy
+.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-texttypes check-cs analyzers lint sync-out sync-plugins out deploy

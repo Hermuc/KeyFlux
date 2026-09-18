@@ -1192,8 +1192,8 @@
     "en": "Plugins"
   },
   "2421": {
-    "zh": "运行时支持开发中",
-    "en": "Runtime in development"
+    "zh": "第三方插件",
+    "en": "Third-party"
   },
   "2422": {
     "zh": "在文件对话框里一键跳转到最近使用或历史记录中的文件夹。",
@@ -1208,8 +1208,8 @@
     "en": "OFF"
   },
   "2425": {
-    "zh": "第三方插件运行时正在开发中：现在可以导入、启停与管理插件，引擎加载将在后续版本生效。",
-    "en": "The third-party plugin runtime is in development: plugins can be imported, toggled and managed now; engine loading arrives in a later release."
+    "zh": "第三方插件由插件作者提供：导入后在引擎启动时加载，可随时停用或删除。有配置项的插件，点击卡片即可调整。",
+    "en": "Third-party plugins come from their authors: imported plugins load when the engine starts, and can be disabled or removed at any time. Plugins with settings can be configured by clicking the card."
   },
   "2426": {
     "zh": "点击卡片即可调整该插件的配置。",
@@ -1546,5 +1546,29 @@
   "2581": {
     "zh": "选项",
     "en": "Options"
+  },
+  "2582": {
+    "zh": "浏览",
+    "en": "Browse"
+  },
+  "2583": {
+    "zh": "选择文件",
+    "en": "Choose a file"
+  },
+  "2584": {
+    "zh": "设置加载失败",
+    "en": "Failed to load settings"
+  },
+  "2585": {
+    "zh": "保存失败",
+    "en": "Failed to save settings"
+  },
+  "2586": {
+    "zh": "该插件没有可配置的选项。",
+    "en": "This plugin has no configurable options."
+  },
+  "2587": {
+    "zh": "当前为空格",
+    "en": "Current value: Space"
   }
 }

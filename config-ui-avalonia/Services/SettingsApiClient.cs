@@ -144,6 +144,10 @@ public interface ISettingsApi
     Task<ApiResponse<PluginListResponse>> GetPluginsAsync(CancellationToken ct = default);
     Task<ApiResponse<PluginManifest>> ImportPluginAsync(byte[] zipBytes, string fileName, CancellationToken ct = default);
     Task<ApiResponse<MessageBody>> DeletePluginAsync(string id, CancellationToken ct = default);
+
+    // 插件设置 (声明式 schema + 值; 存 data/plugin-settings.json, 引擎侧免重启热生效)
+    Task<ApiResponse<PluginSettingsResponse>> GetPluginSettingsAsync(string id, CancellationToken ct = default);
+    Task<ApiResponse<PluginSettingsResponse>> SavePluginSettingsAsync(string id, Dictionary<string, string> values, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -232,6 +236,12 @@ public sealed class SettingsApiClient : ISettingsApi, IDisposable
 
     public Task<ApiResponse<MessageBody>> DeletePluginAsync(string id, CancellationToken ct = default)
         => SendAsync<MessageBody>(HttpMethod.Delete, $"api/plugins/{id}", content: null, ct);
+
+    public Task<ApiResponse<PluginSettingsResponse>> GetPluginSettingsAsync(string id, CancellationToken ct = default)
+        => SendAsync<PluginSettingsResponse>(HttpMethod.Get, $"api/plugins/{id}/settings", content: null, ct);
+
+    public Task<ApiResponse<PluginSettingsResponse>> SavePluginSettingsAsync(string id, Dictionary<string, string> values, CancellationToken ct = default)
+        => SendAsync<PluginSettingsResponse>(HttpMethod.Put, $"api/plugins/{id}/settings", new PluginSettingsRequest { Values = values }, ct);
 
     /// <summary>
     /// 非契约端点的便捷原始文本 GET (如 Home 页的 /config_doc.html 静态资源)。

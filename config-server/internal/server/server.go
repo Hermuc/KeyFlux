@@ -58,6 +58,9 @@ func Run(hasError chan<- struct{}, rainDone <-chan struct{}, debug bool, headles
 	router.GET("/api/plugins", GetPluginsHandler)
 	router.POST("/api/plugins/import", ImportPluginHandler)
 	router.DELETE("/api/plugins/:id", DeletePluginHandler)
+	// 插件设置 (声明式 schema + 值; 存 data/plugin-settings.json, 引擎侧免重启热生效)
+	router.GET("/api/plugins/:id/settings", GetPluginSettingsHandler)
+	router.PUT("/api/plugins/:id/settings", SavePluginSettingsHandler)
 
 	// 先尝试 12333 端口, 失败了则用随机端口. 因为 12333 端口可能已被占用, 或者被禁:
 	// An attempt was made to access a socket in a way forbidden by its access permissions.

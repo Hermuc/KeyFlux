@@ -26,7 +26,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // SpecVersion 当前插件包格式版本; 与包内 specVersion 字段不一致即拒绝 (前向兼容锚点)。
@@ -48,17 +50,109 @@ type Entry struct {
 	Func string `json:"func,omitempty"` // script: 入口函数名
 }
 
+// 设置项类型词表。词表是协议的一部分: 设置界面按 type 决定编辑器控件,
+// 后端按 type 决定值校验口径 —— 两端必须一致, 故在此收口。
+const (
+	SettingTypeChar   = "char"   // 单个可打印字符 (如触发键)
+	SettingTypeText   = "text"   // 任意短文本
+	SettingTypeNumber = "number" // 整数 (可带 min/max)
+	SettingTypeFile   = "file"   // 本地文件路径 (界面上给文件选择器)
+)
+
+// settingTypes 合法类型集。
+var settingTypes = map[string]bool{
+	SettingTypeChar:   true,
+	SettingTypeText:   true,
+	SettingTypeNumber: true,
+	SettingTypeFile:   true,
+}
+
+// SettingsPermission 声明 settings 所必需的能力位 (值必须为单字符)。
+const SettingsPermission = "settings"
+
+// MaxSettingsPerPlugin 单个插件可声明的设置项上限 (防 manifest 失控)。
+const MaxSettingsPerPlugin = 32
+
+// MaxSettingValueLen 单个设置值的长度上限 (字符数; 路径/文本共用一条够用的线)。
+const MaxSettingValueLen = 1024
+
+var settingKeyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,31}$`)
+
+// Setting 插件设置项声明 (manifest.settings[])。
+//
+// 这是「声明式设置」契约: manifest 只描述**有哪些设置、长什么样、默认值多少**,
+// 真实值存在 data/plugin-settings.json (见 store.go), 由设置界面写入、引擎侧
+// ConfigProvider.ahk 读取 —— 两端的键空间都是 "<pluginId>:<key>"。
+type Setting struct {
+	Key     string `json:"key"`
+	Type    string `json:"type"`
+	Label   string `json:"label"`
+	LabelEn string `json:"labelEn,omitempty"`
+	Default string `json:"default,omitempty"`
+	// Filter 仅 type=file 使用: 文件选择器的类型过滤名 (如 "everything.exe"),
+	// 同时充当界面上的后缀提示。空 = 不过滤。
+	Filter string `json:"filter,omitempty"`
+	Hint   string `json:"hint,omitempty"`
+	HintEn string `json:"hintEn,omitempty"`
+	// Min/Max 仅 type=number 使用 (闭区间, 整数); nil = 不限。
+	Min *float64 `json:"min,omitempty"`
+	Max *float64 `json:"max,omitempty"`
+	// MaxLength 仅 type=text 使用: 值长度上限 (0 = 用 MaxSettingValueLen)。
+	MaxLength int `json:"maxLength,omitempty"`
+}
+
+// ValueLimit 该设置项允许的最大值长度 (字符数)。
+func (s Setting) ValueLimit() int {
+	if s.Type == SettingTypeChar {
+		return 1
+	}
+	if s.Type == SettingTypeText && s.MaxLength > 0 && s.MaxLength < MaxSettingValueLen {
+		return s.MaxLength
+	}
+	return MaxSettingValueLen
+}
+
 // Manifest 插件包 manifest (plugin.json)。
 type Manifest struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	NameEn      string   `json:"nameEn,omitempty"`
-	Version     string   `json:"version,omitempty"`
-	SpecVersion int      `json:"specVersion"`
-	Description string   `json:"description,omitempty"`
-	Author      string   `json:"author,omitempty"`
-	Entry       Entry    `json:"entry"`
-	Permissions []string `json:"permissions,omitempty"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	NameEn      string    `json:"nameEn,omitempty"`
+	Version     string    `json:"version,omitempty"`
+	SpecVersion int       `json:"specVersion"`
+	Description string    `json:"description,omitempty"`
+	Author      string    `json:"author,omitempty"`
+	Entry       Entry     `json:"entry"`
+	Permissions []string  `json:"permissions,omitempty"`
+	Settings    []Setting `json:"settings,omitempty"`
+}
+
+// HasPermission 该 manifest 是否声明了指定能力位。
+func (m *Manifest) HasPermission(name string) bool {
+	for _, p := range m.Permissions {
+		if p == name {
+			return true
+		}
+	}
+	return false
+}
+
+// SettingByKey 按 key 取设置项声明 (不存在返回 nil, false)。
+func (m *Manifest) SettingByKey(key string) (Setting, bool) {
+	for _, s := range m.Settings {
+		if s.Key == key {
+			return s, true
+		}
+	}
+	return Setting{}, false
+}
+
+// AllowedSettings 该 manifest 声明的全部设置键 (校验 PUT 请求用)。
+func (m *Manifest) AllowedSettings() map[string]Setting {
+	out := make(map[string]Setting, len(m.Settings))
+	for _, s := range m.Settings {
+		out[s.Key] = s
+	}
+	return out
 }
 
 // Catalog 用户插件目录快照: 按 ID 字典序 + 逐包错误隔离 (坏包不拖垮整个目录)。
@@ -88,6 +182,96 @@ func ValidateManifest(p *Manifest) error {
 		}
 	default:
 		return fmt.Errorf("插件「%s」的 entry.kind %q 不合法 (当前仅支持 script)", p.ID, p.Entry.Kind)
+	}
+	return validateSettings(p)
+}
+
+// validateSettings 校验声明式设置块。
+//
+// 刻意在加载期 (而非保存期) 就把非法声明拦掉: manifest 是设置界面的渲染契约,
+// 一处坏声明 (如 type 拼错) 会让界面渲染出无法编辑的控件, 而错误要到用户点开
+// 才暴露 —— 坏包在目录加载时即隔离并计入 errors 更省事。
+func validateSettings(p *Manifest) error {
+	if len(p.Settings) == 0 {
+		return nil
+	}
+	if len(p.Settings) > MaxSettingsPerPlugin {
+		return fmt.Errorf("插件「%s」声明的设置项过多 (%d > %d)", p.ID, len(p.Settings), MaxSettingsPerPlugin)
+	}
+	// 设置值经 APIBridge 的 config.* 读写, 必须持有 settings 能力位,
+	// 否则插件读得到声明却读不到值 —— 属于声明自相矛盾, 直接拒绝。
+	if !p.HasPermission(SettingsPermission) {
+		return fmt.Errorf("插件「%s」声明了 settings 但未申请 %q 权限", p.ID, SettingsPermission)
+	}
+	seen := make(map[string]bool, len(p.Settings))
+	for i, s := range p.Settings {
+		if !settingKeyPattern.MatchString(s.Key) {
+			return fmt.Errorf("插件「%s」第 %d 个设置项的 key %q 不合法 (须匹配 ^[A-Za-z][A-Za-z0-9_]{0,31}$)", p.ID, i+1, s.Key)
+		}
+		if seen[s.Key] {
+			return fmt.Errorf("插件「%s」设置项 key %q 重复", p.ID, s.Key)
+		}
+		seen[s.Key] = true
+		if !settingTypes[s.Type] {
+			return fmt.Errorf("插件「%s」设置项 %q 的 type %q 不合法 (仅支持 char/text/number/file)", p.ID, s.Key, s.Type)
+		}
+		if strings.TrimSpace(s.Label) == "" {
+			return fmt.Errorf("插件「%s」设置项 %q 缺少 label", p.ID, s.Key)
+		}
+		if s.Min != nil && s.Max != nil && *s.Min > *s.Max {
+			return fmt.Errorf("插件「%s」设置项 %q 的 min 大于 max", p.ID, s.Key)
+		}
+		if s.Type != SettingTypeNumber && (s.Min != nil || s.Max != nil) {
+			return fmt.Errorf("插件「%s」设置项 %q 不是 number 类型, 不应带 min/max", p.ID, s.Key)
+		}
+		if s.Type != SettingTypeFile && s.Filter != "" {
+			return fmt.Errorf("插件「%s」设置项 %q 不是 file 类型, 不应带 filter", p.ID, s.Key)
+		}
+		// number 是整数语义, 小数边界会让界面与后端校验口径分叉
+		for _, v := range []*float64{s.Min, s.Max} {
+			if v != nil && *v != float64(int64(*v)) {
+				return fmt.Errorf("插件「%s」设置项 %q 的 min/max 必须是整数", p.ID, s.Key)
+			}
+		}
+		// 默认值必须自洽, 否则界面一打开就显示一个存不进去的值
+		if err := ValidateSettingValue(s, s.Default); err != nil {
+			return fmt.Errorf("插件「%s」设置项 %q 的默认值不合法: %w", p.ID, s.Key, err)
+		}
+	}
+	return nil
+}
+
+// ValidateSettingValue 校验单个值是否符合设置项声明 (PUT 请求与默认值自查共用)。
+// 约定: 空串一律合法 (语义 = 未设置, 回落 Default); 非空串按类型逐项校验。
+func ValidateSettingValue(s Setting, value string) error {
+	if value == "" {
+		return nil
+	}
+	if utf8.RuneCountInString(value) > s.ValueLimit() {
+		return fmt.Errorf("%q 超过长度上限 %d", value, s.ValueLimit())
+	}
+	if strings.ContainsRune(value, 0) {
+		return errors.New("值不能包含 NUL 字符")
+	}
+	switch s.Type {
+	case SettingTypeChar:
+		// 单字符 + 必须可打印: 控制字符 (换行/制表) 做不了触发键, 放进来只会得到
+		// 一个「看着有值却永远触发不了」的设置。
+		r := []rune(value)[0]
+		if r < 0x20 || r == 0x7F {
+			return fmt.Errorf("%q 不是可打印字符", value)
+		}
+	case SettingTypeNumber:
+		n, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("%q 不是整数", value)
+		}
+		if s.Min != nil && float64(n) < *s.Min {
+			return fmt.Errorf("%d 小于下限 %v", n, *s.Min)
+		}
+		if s.Max != nil && float64(n) > *s.Max {
+			return fmt.Errorf("%d 大于上限 %v", n, *s.Max)
+		}
 	}
 	return nil
 }

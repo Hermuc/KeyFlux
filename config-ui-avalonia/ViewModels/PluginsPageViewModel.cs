@@ -248,8 +248,12 @@ public sealed partial class PluginCardVm : ObservableObject
     /// <summary>仅用户插件可删除。</summary>
     public bool CanDelete => !IsBuiltin;
 
-    /// <summary>仅内置插件有配置对话框 (QuickSwitch; 用户插件配置为后续阶段)。</summary>
-    public bool CanConfigure => IsBuiltin;
+    /// <summary>
+    /// 可点开配置对话框: 内置卡 (QuickSwitch 专属对话框) 或有设置声明的用户插件
+    /// (声明式设置对话框, 见 PluginSettingsDialogWindow)。无设置的插件点击不响应 ——
+    /// 与本次改动前的行为一致 (此前用户卡一律不可配置)。
+    /// </summary>
+    public bool CanConfigure => IsBuiltin || Manifest.Settings is { Count: > 0 };
 
     /// <summary>启停开关 (内置卡 = collectEnabled; 用户卡 = 注册表 disabled 的反义)。</summary>
     [ObservableProperty]

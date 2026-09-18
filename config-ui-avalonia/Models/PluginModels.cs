@@ -34,6 +34,95 @@ public sealed class PluginManifest
 
     [JsonPropertyName("permissions")]
     public List<string>? Permissions { get; set; }
+
+    /// <summary>
+    /// 声明式设置项 (可选)。非空即代表「该插件可通过点击卡片配置」——
+    /// 设置界面据此渲染编辑器, 后端据此校验值 (见 plugin_settings.go)。
+    /// </summary>
+    [JsonPropertyName("settings")]
+    public List<PluginSetting>? Settings { get; set; }
+}
+
+/// <summary>
+/// 单个插件设置项的声明 (manifest.settings[], 与 Go internal/plugins.Setting 同构)。
+/// 只描述「有哪些设置、长什么样」; 真实值在 GET/PUT /api/plugins/:id/settings 里。
+/// </summary>
+public sealed class PluginSetting
+{
+    /// <summary>存储键 (也是 values 字典的键): ^[A-Za-z][A-Za-z0-9_]{0,31}$。</summary>
+    [JsonPropertyName("key")]
+    public string Key { get; set; } = "";
+
+    /// <summary>编辑器类型: char / text / number / file (未知值按 text 处理)。</summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = PluginSettingTypes.Text;
+
+    /// <summary>中文标签。</summary>
+    [JsonPropertyName("label")]
+    public string Label { get; set; } = "";
+
+    /// <summary>英文标签 (英文界面优先)。</summary>
+    [JsonPropertyName("labelEn")]
+    public string? LabelEn { get; set; }
+
+    /// <summary>默认值 (未存过时界面显示的初值)。</summary>
+    [JsonPropertyName("default")]
+    public string? Default { get; set; }
+
+    /// <summary>仅 file: 文件选择器的类型过滤名 (如 "everything.exe")。</summary>
+    [JsonPropertyName("filter")]
+    public string? Filter { get; set; }
+
+    [JsonPropertyName("hint")]
+    public string? Hint { get; set; }
+
+    [JsonPropertyName("hintEn")]
+    public string? HintEn { get; set; }
+
+    /// <summary>仅 number: 闭区间下限 (null = 不限)。</summary>
+    [JsonPropertyName("min")]
+    public double? Min { get; set; }
+
+    /// <summary>仅 number: 闭区间上限 (null = 不限)。</summary>
+    [JsonPropertyName("max")]
+    public double? Max { get; set; }
+
+    /// <summary>仅 text: 值长度上限 (0 = 用后端默认上限)。</summary>
+    [JsonPropertyName("maxLength")]
+    public int MaxLength { get; set; }
+}
+
+/// <summary>设置项类型常量 (与 Go internal/plugins 的 SettingType* 词表一致)。</summary>
+public static class PluginSettingTypes
+{
+    public const string Char = "char";
+    public const string Text = "text";
+    public const string Number = "number";
+    public const string File = "file";
+}
+
+/// <summary>PUT /api/plugins/:id/settings 请求体。</summary>
+public sealed class PluginSettingsRequest
+{
+    [JsonPropertyName("values")]
+    public Dictionary<string, string> Values { get; set; } = [];
+}
+
+/// <summary>
+/// GET/PUT /api/plugins/:id/settings 响应体: 声明 (渲染契约) + 值 (数据) 一并返回,
+/// 端点自洽 —— 打开对话框不必先另外拉一次 manifest。
+/// </summary>
+public sealed class PluginSettingsResponse
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
+    [JsonPropertyName("settings")]
+    public List<PluginSetting> Settings { get; set; } = [];
+
+    /// <summary>已存值合并 manifest 默认值后的完整值表 (键 = PluginSetting.Key)。</summary>
+    [JsonPropertyName("values")]
+    public Dictionary<string, string> Values { get; set; } = [];
 }
 
 /// <summary>插件入口声明: script = 包内 AHK 脚本 + 入口函数 (运行时加载为阶段 2)。</summary>

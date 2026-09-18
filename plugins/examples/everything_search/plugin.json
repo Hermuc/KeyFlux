@@ -1,0 +1,53 @@
+{
+  "id": "everything_search",
+  "name": "Everything 搜索",
+  "nameEn": "Everything Search",
+  "version": "1.0.0",
+  "specVersion": 1,
+  "description": "在命令框里按下前置键 (默认空格), 用 Everything 搜索当前选中的文字; 搜索结果在命令框正下方以下拉列表展示, 可用 ↑↓ 选择、回车打开。Everything 未运行时自动拉起。",
+  "author": "KeyFlux",
+  "entry": {"kind": "script", "file": "main.ahk", "func": "EverythingSearchMain"},
+  "permissions": ["selection", "run", "settings"],
+  "settings": [
+    {
+      "key": "triggerKey",
+      "type": "char",
+      "label": "前置触发键",
+      "labelEn": "Trigger key",
+      "default": " ",
+      "hint": "命令框内按此键触发搜索 (单个可打印字符, 默认空格)。",
+      "hintEn": "Press this key inside the command box to search (single printable character, default: space)."
+    },
+    {
+      "key": "everythingPath",
+      "type": "file",
+      "label": "Everything 路径",
+      "labelEn": "Everything path",
+      "default": "",
+      "filter": "everything.exe",
+      "hint": "everything.exe 的完整路径; 未运行时插件会自动拉起它。",
+      "hintEn": "Full path to everything.exe; the plugin launches it automatically if it is not running."
+    },
+    {
+      "key": "esPath",
+      "type": "file",
+      "label": "es.exe 路径 (可选)",
+      "labelEn": "es.exe path (optional)",
+      "default": "",
+      "filter": "es.exe",
+      "hint": "Everything 官方命令行 es.exe。留空则自动依次尝试: everything.exe 同目录 → 插件 bin/ → 系统 PATH。",
+      "hintEn": "Official Everything CLI. When empty, tries: folder of everything.exe → plugin bin/ → system PATH."
+    },
+    {
+      "key": "limit",
+      "type": "number",
+      "label": "结果条数上限",
+      "labelEn": "Max results",
+      "default": "20",
+      "min": 1,
+      "max": 100,
+      "hint": "下拉列表最多展示多少条 (1-100)。",
+      "hintEn": "Maximum number of rows shown in the dropdown (1-100)."
+    }
+  ]
+}

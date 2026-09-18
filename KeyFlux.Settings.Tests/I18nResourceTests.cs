@@ -65,7 +65,13 @@ public sealed class I18nResourceTests
     ///   由 config `name` 改为 i18n 常量 (原 "Settings" 与窗口级「设置」语义冲突); 另改**值**
     ///   913/939 总览|文档 -> 使用指南/Guide, 931/936/2406/2407 措辞同步, 937 「设置」页 -> 「选项」页
     ///   (仅改值不改键, 不增加键数)。**新增键自 2582 起** -> 387。
-    private const int ExpectedKeyCount = 387;
+    /// 2026-09-18 首个真实插件 everything_search + 声明式插件设置:
+    ///   新增 6 键 (2582 浏览 / 2583 选择文件 / 2584 设置加载失败 / 2585 保存失败 /
+    ///   2586 无可配置选项 / 2587 当前为空格) -> 393;
+    ///   另改**值** 2421 运行时支持开发中 -> 第三方插件、2425 运行时说明改写为真实加载行为
+    ///   (插件运行时已随 2026-09-12「插件市场可用」里程碑落地, 原文案已失真; 仅改值不改键)。
+    ///   **新增键自 2588 起**。
+    private const int ExpectedKeyCount = 393;
 
     private const string LabelPrefix = "label:";
 

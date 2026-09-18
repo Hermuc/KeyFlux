@@ -1,0 +1,101 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:KeyFlux.Settings.ViewModels"
+        x:Class="KeyFlux.Settings.Views.PluginSettingsDialogWindow"
+        TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
+        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
+        x:Name="DlgRoot"
+        x:DataType="vm:PluginSettingsDialogViewModel"
+        Title="Setting"
+        Width="520" SizeToContent="Height" MaxHeight="620"
+        WindowStartupLocation="CenterOwner">
+
+  <!-- 用户插件设置对话框 (点击插件卡打开)。
+       表单完全由 manifest.settings 声明驱动 —— 插件作者声明字段, 这里只负责渲染,
+       故新增插件不需要改本文件 (这也是「声明式设置」相对硬编码表单的价值)。
+       四类编辑器: char=单字符输入框 / file=输入框+浏览 / number=数字输入框 / text=文本输入框;
+       后端按同一份声明校验, 前端的即时校验只是省一次往返。 -->
+  <Border Padding="20">
+    <DockPanel>
+
+      <!-- 底部按钮: 取消 (611) / 保存 (610) —— 与 QuickSwitchDialogWindow 同款 -->
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="10"
+                  HorizontalAlignment="Right" Margin="0,14,0,0">
+        <Button Click="OnCancelClick" Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
+          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=611}" />
+        </Button>
+        <Button Click="OnSaveClick"
+                Background="{StaticResource ClaudeTerracottaBrush}" Foreground="{StaticResource ClaudeIvoryBrush}" Padding="16,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
+          <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=610}" />
+        </Button>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+
+        <!-- 插件名 (来自 manifest, 随语言切换) -->
+        <TextBlock Text="{Binding DisplayName}" FontSize="15" FontWeight="SemiBold"
+                   Foreground="{StaticResource ClaudeNearBlackBrush}" />
+
+        <!-- 加载中 (复用 2439) -->
+        <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2439}"
+                   Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="13"
+                   IsVisible="{Binding IsLoading}" />
+
+        <!-- 加载失败: 红字说明, 表单不呈现 -->
+        <TextBlock Text="{Binding LoadError}" TextWrapping="Wrap"
+                   Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12"
+                   IsVisible="{Binding LoadError, Converter={StaticResource NotEmpty}}" />
+
+        <!-- 空态: 该插件没有声明任何设置项 -->
+        <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2586}"
+                   TextWrapping="Wrap" Foreground="{StaticResource ClaudeOliveGrayBrush}" FontSize="13"
+                   IsVisible="{Binding ShowEmptyState}" />
+
+        <ScrollViewer MaxHeight="420" IsVisible="{Binding ShowForm}">
+          <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PluginSettingRowVm">
+                <StackPanel Spacing="5" Margin="0,8,0,0">
+
+                  <!-- 标签 + 数字项区间徽标 -->
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding Label}" FontSize="13" VerticalAlignment="Center"
+                               Foreground="{StaticResource ClaudeCharcoalWarmBrush}" />
+                    <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="9" Padding="7,1"
+                            VerticalAlignment="Center" IsVisible="{Binding HasRange}">
+                      <TextBlock Text="{Binding RangeHint}" FontSize="10"
+                                 Foreground="{StaticResource ClaudeCharcoalWarmBrush}" />
+                    </Border>
+                  </StackPanel>
+
+                  <!-- 输入行: 输入框 + (仅 file) 浏览按钮 -->
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <!-- MaxLength 与后端 ValueLimit 口径一致; 提示语放在 Watermark 里,
+                         保存清空即「回落默认值」的语义由插件自己的 hint 说明 -->
+                    <TextBox Grid.Column="0" Text="{Binding Value}" Padding="6,4" FontSize="13"
+                             MaxLength="{Binding MaxLength}" Watermark="{Binding Hint}" />
+                    <Button Grid.Column="1" Click="OnBrowseClick" IsVisible="{Binding IsFile}"
+                            Background="{StaticResource ClaudeSandBrush}" Foreground="{StaticResource ClaudeCharcoalWarmBrush}"
+                            Padding="12,6" CornerRadius="{StaticResource ClaudeRadiusMd}">
+                      <TextBlock Text="{Binding #DlgRoot.((vm:PluginSettingsDialogViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2582}" />
+                    </Button>
+                  </Grid>
+
+                  <!-- 当前触发键的可读回显 (空格在输入框里看不出内容) -->
+                  <TextBlock Text="{Binding #DlgRoot.((vm:PluginSettingsDialogViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2587}"
+                             FontSize="11" Foreground="{StaticResource ClaudeTerracottaBrush}"
+                             IsVisible="{Binding ShowSpaceToken}" />
+
+                  <!-- 字段说明 (来自 manifest.hint / hintEn) -->
+                  <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" FontSize="11"
+                             Foreground="{StaticResource ClaudeStoneGrayBrush}" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</Window>
