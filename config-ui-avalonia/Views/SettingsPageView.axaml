@@ -48,6 +48,10 @@
          注: 卡片虽在 ScrollViewer 内, 但右列 StackPanel 留有 24px 外边距
          (2026-09-12 由 Padding 改 Margin 修好"阴影被切断"), 环不被裁 -->
     <Style Selector="Border.settingsCard">
+      <!-- 点组件框非交互区 = 选中该框: 见 SelectedActionPageView actionCard 同款注释
+           (FocusManager 上溯聚焦卡片 ⇒ ComponentFocusRing 挂 .ring; Tab 不停靠) -->
+      <Setter Property="Focusable" Value="True" />
+      <Setter Property="IsTabStop" Value="False" />
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
@@ -70,16 +74,20 @@
     <Style Selector="Border.settingsCard:pointerover">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloHover}" />
     </Style>
-    <Style Selector="Border.settingsCard:focus-within">
+    <!-- 焦点环 (2026-09-18 起由 ComponentFocusRing 挂 .ring 类, 取代 :focus-within ——
+         后者会同时点亮所有祖先卡, 无法表达「最内层唯一/子框自饰则让位」) -->
+    <Style Selector="Border.settingsCard.ring">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
     </Style>
     <!-- 左列「快捷键方案」大卡: 同样以插件页为基准, 与右列逐项一致 (同静止/聚焦两态;
          悬停无变化, 同上)。
          ⚠️ 这三项原先是**内联**写在 Border 元素上的 —— Avalonia 内联值优先级高于样式 Setter,
-         会压掉 :focus-within, 故必须由样式承载才可能生效。
+         会压掉 .ring 焦点环样式, 故必须由样式承载才可能生效。
          注意: 未改本卡外框尺寸 (Width 由 560 列 - 16 右边距决定 / Height 624),
          故整页 Viewbox 缩放比不变, TopFlareWings 的 0.5px 几何守护不受影响 -->
     <Style Selector="Border.leftPanel">
+      <Setter Property="Focusable" Value="True" />
+      <Setter Property="IsTabStop" Value="False" />
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
@@ -93,7 +101,7 @@
     <Style Selector="Border.leftPanel:pointerover">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloHover}" />
     </Style>
-    <Style Selector="Border.leftPanel:focus-within">
+    <Style Selector="Border.leftPanel.ring">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
     </Style>
     <!-- 分区标题按钮: 压制 Fluent 模板部件基态/悬停/按下的自带灰底 (坑13/18) ——
@@ -277,7 +285,7 @@
            1px 逻辑描边横跨 1.386 设备像素, 列宽固定使右缘相位恒定 → 右边框覆盖率 ~50% 渲染成
            半透明细线, 用户报「第一列方框右边缘被切割」。像素对齐后描边落在整数设备像素上恒清晰。
            只挂本卡不挂整页: 右列 TopFlareWings 几何守护断言容差 0.5px, 页级取整有破坏风险 -->
-      <Border Grid.Column="0" Classes="leftPanel" UseLayoutRounding="True" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16"
+      <Border Grid.Column="0" Classes="leftPanel" UseLayoutRounding="True" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16"
               Height="624" VerticalAlignment="Top" Margin="0,0,16,0">
         <!-- LayoutTransform 等比放大卡内全部内容 (字号/输入框/开关随框一起变大):
              1.12 = 加宽后内容区 528 / 原内容区 468; 卡高 624 = 528x1.12 + Padding 32 -->
@@ -392,7 +400,7 @@
                    FontSize="16" FontWeight="SemiBold" />
 
         <!-- 开机自启 + 隐藏矩阵 (顶部常驻开关行) -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="6">
             <StackPanel Orientation="Horizontal" Spacing="14">
               <ToggleSwitch IsChecked="{Binding Startup}" />
@@ -409,7 +417,7 @@
         </Border>
 
         <!-- 🌐 切换语言 (label:781) -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="language">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=781}"
@@ -430,7 +438,7 @@
         </Border>
 
         <!-- 😺 编辑程序分组 (label:601, 复刻 WindowGroupDialog.vue 入口按钮) -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <Button Classes="sectionHeader" Click="OnEditWindowGroups">
             <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=601}"
                        FontWeight="SemiBold" />
@@ -440,7 +448,7 @@
         <!-- ⌨️ 自定义热键 (label:1116, 原 Custom Hotkeys 页迁入 2026-09-08):
              展开 = 热键/功能 两列同行列表; 热键列点击聚焦即编辑 (失焦提交复刻 @change),
              功能列 (原「备注」) 点击弹 ActionEditorWindow 编辑动作; 底部新建 (label:1118) -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16"
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16"
                 IsVisible="{Binding CustomHotkeys, Converter={StaticResource NotNull}}">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}"
@@ -492,7 +500,7 @@
         </Border>
 
         <!-- 🖱️ 修改鼠标参数 (label:701, 含滚轮参数) -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="mouse">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=701}"
@@ -555,7 +563,7 @@
         </Border>
 
         <!-- ⌨️ 修改键盘布局 (label:721) -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="layout">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=721}"
@@ -586,7 +594,7 @@
         </Border>
 
         <!-- 🕗 设置触发延时 (label:761, 默认展开) -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="delay">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=761}"
@@ -612,7 +620,7 @@
         </Border>
 
         <!-- ✨ 命令框皮肤 (label:741, 18 字段数据驱动) -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="skin">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=741}"
@@ -637,7 +645,7 @@
         <!-- 🪟 窗口毛玻璃 (亚克力): 开关 + 透明度滑杆
              透明度 = 0 时窗口底色为【实心】Parchment (不带 alpha), 避免叠在背后未知像素上发灰/花屏。
              改动即时生效 (窗口底色走 DynamicResource), 按 Ctrl+S 才会写入 config.json。 -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="acrylic">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2500}"
@@ -665,7 +673,7 @@
         </Border>
 
         <!-- 🧩 编辑路径变量 (label:907, Vue 中被注释, 按任务规格补齐) -->
-        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusLg}" Padding="16">
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="10">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="pathvars">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=907}"

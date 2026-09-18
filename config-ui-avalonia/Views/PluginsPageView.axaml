@@ -35,10 +35,14 @@
          设备像素参考: 本应用卡片处 Viewbox(≈0.99)×LayoutTransform(1.12)×DPI(1.25)≈1.386,
          故 1px 逻辑 ≈ 1.4 dp (细如发丝) 而 2px ≈ 2.8 dp (清晰) -->
     <Style Selector="Border.pluginCard">
+      <!-- 点组件框非交互区 = 选中该框: 见 SelectedActionPageView actionCard 同款注释
+           (FocusManager 上溯聚焦卡片 ⇒ ComponentFocusRing 挂 .ring; Tab 不停靠) -->
+      <Setter Property="Focusable" Value="True" />
+      <Setter Property="IsTabStop" Value="False" />
       <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
       <Setter Property="BorderThickness" Value="2" />
-      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusCard}" />
       <Setter Property="Padding" Value="20,16" />
       <Setter Property="Margin" Value="0,0,0,10" />
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
@@ -68,12 +72,14 @@
     <Style Selector="Border.pluginCard:pressed">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloPressed}" />
     </Style>
-    <!-- 焦点环 (键盘聚焦卡片内开关/按钮时显示; Border 非可聚焦, 故补 :focus-within)。
+    <!-- 焦点环 (键盘聚焦卡片内开关/按钮时显示; Border 非可聚焦, 故 2026-09-18 起由
+         ComponentFocusRing 挂 .ring 类替代 :focus-within —— 卡内自饰子框 (输入框/快捷键框)
+         获焦时环让位给子框自己的描边)。
          视觉与 ClaudeShadowFocusRing 完全一致 (Coral 2px 实环, 前两层透明化), 只是层数对齐 3。 -->
     <Style Selector="Border.pluginCard:focus-visible">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
     </Style>
-    <Style Selector="Border.pluginCard:focus-within">
+    <Style Selector="Border.pluginCard.ring">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
     </Style>
     <!-- 卡片信息区按钮: 全透明 (视觉与 StackPanel 无异, 仅提供可点性)。
@@ -243,13 +249,13 @@
 
       <!-- 目录加载失败 (含逐包告警): Ivory 面 + crimson 文字 -->
       <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
-              CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="14" IsVisible="{Binding ShowLoadError}">
+              CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="14" IsVisible="{Binding ShowLoadError}">
         <TextBlock Text="{Binding PluginsLoadError}" TextWrapping="Wrap"
                    Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12" />
       </Border>
 
       <!-- 空态引导 (无用户插件时): Warm Sand 面 -->
-      <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="14"
+      <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="14"
               IsVisible="{Binding ShowEmptyState}">
         <StackPanel Spacing="5">
           <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2429}"

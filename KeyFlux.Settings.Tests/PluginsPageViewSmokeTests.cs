@@ -208,7 +208,7 @@ public sealed class PluginsPageViewSmokeTests
     /// <summary>
     /// ④ 卡内任意区域点击 = 选中 (用户报: 只有点文字部分才有橙环): 点卡片边缘内衬
     /// (Border Padding 内、信息区按钮覆盖不到的角落) 应把焦点转移到 cardBody,
-    /// 由 Border.pluginCard:focus-within 点亮橙色焦点环。
+    /// 由 ComponentFocusRing 给 Border.pluginCard 挂 .ring 点亮橙色焦点环。
     /// </summary>
     [AvaloniaFact]
     public void PluginsPage_Click_Card_Padding_Focuses_CardBody()
@@ -238,7 +238,7 @@ public sealed class PluginsPageViewSmokeTests
             window.MouseUp(new Avalonia.Point(2, 2), Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.None);
             Dispatcher.UIThread.RunJobs();
 
-            // 点卡片边缘内衬 (非交互区) → cardBody 获焦 → :focus-within 橙环
+            // 点卡片边缘内衬 (非交互区) → cardBody 获焦 → .ring 橙环
             window.MouseDown(pt, Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.None);
             window.MouseUp(pt, Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.None);
             Dispatcher.UIThread.RunJobs();

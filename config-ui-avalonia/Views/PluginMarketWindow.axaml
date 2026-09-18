@@ -29,10 +29,13 @@
       <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
     </Style>
     <Style Selector="Border.marketCard">
+      <!-- 点组件框非交互区 = 选中该框: 见 SelectedActionPageView actionCard 同款注释 -->
+      <Setter Property="Focusable" Value="True" />
+      <Setter Property="IsTabStop" Value="False" />
       <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusCard}" />
       <Setter Property="Padding" Value="18,14" />
       <Setter Property="Margin" Value="0,0,0,10" />
     </Style>
@@ -45,7 +48,8 @@
     <Style Selector="Border.marketCard:focus-visible">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
-    <Style Selector="Border.marketCard:focus-within">
+    <!-- 焦点环 (2026-09-18 起由 ComponentFocusRing 挂 .ring 类, 取代 :focus-within) -->
+    <Style Selector="Border.marketCard.ring">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
     </Style>
     <Style Selector="Button.cta">
@@ -109,7 +113,7 @@
 
             <!-- 拉取失败: 原因 + 重试 (920) -->
             <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
-                    CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="14" IsVisible="{Binding ShowError}">
+                    CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="14" IsVisible="{Binding ShowError}">
               <StackPanel Spacing="10">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2433}"
                            FontWeight="SemiBold" Foreground="{StaticResource ClaudeErrorBrush}" TextWrapping="Wrap" />
@@ -155,7 +159,7 @@
                       </Button>
                       <Border Grid.Column="1" VerticalAlignment="Center"
                               IsVisible="{Binding IsInstalled}"
-                              Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,6">
+                              Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="12,6">
                         <TextBlock FontSize="12" Foreground="{StaticResource ClaudeOliveGrayBrush}" FontWeight="SemiBold"
                                    Text="{Binding #DlgRoot.((vm:PluginMarketViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2435}" />
                       </Border>

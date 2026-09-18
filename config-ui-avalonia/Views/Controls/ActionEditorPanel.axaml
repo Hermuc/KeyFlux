@@ -14,7 +14,7 @@
        被等比缩小 (点选键后页面抖动 bug)。固定 430 = 最高编辑器 422 + 字体度量余量;
        编辑器内容区包 ScrollViewer 兜底, 超出时滚动而非撑高, 保证缩放比恒定 -->
   <Border Background="{StaticResource ClaudeIvoryBrush}"
-          CornerRadius="{StaticResource ClaudeRadiusLg}"
+          CornerRadius="{StaticResource ClaudeRadiusCard}"
           BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
           Height="430" Padding="16,12" HorizontalAlignment="Stretch">
     <DockPanel>
@@ -139,7 +139,7 @@
                                Padding="8,6" />
               <!-- 复刻 RemapKey.vue 的 singlePress 报错卡片 -->
               <Border BorderBrush="{StaticResource ClaudeErrorBrush}" BorderThickness="1"
-                      CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="10,6"
+                      CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="10,6"
                       IsVisible="{Binding IsSinglePress}">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=954}"
                            Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12" TextWrapping="Wrap" />

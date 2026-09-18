@@ -72,9 +72,9 @@ public sealed class ActionPageCardStyleTests
         try
         {
             var cards = view.GetVisualDescendants().OfType<Border>()
-                .Where(b => b.Classes.Contains("actionCard")).ToList();
-            Assert.True(cards.Count >= 5,
-                $"应有 >=5 个组件框 (2 张行卡 + 主快捷键卡 + 模拟测试条 + 嵌套条目卡), 实得 {cards.Count}");
+                .Where(b => b.Classes.Contains("actionCard") && !b.Classes.Contains("rowEditor")).ToList();
+            Assert.True(cards.Count >= 4,
+                $"应有 >=4 个组件框 (2 张行卡 + 主快捷键卡 + 模拟测试条), 实得 {cards.Count}");
 
             var shadow = (BoxShadows)view.FindResource("ClaudeShadowCardHalo")!;
             Assert.True(Application.Current!.TryGetResource("ClaudeBorderCreamBrush", out var creamObj));
@@ -91,6 +91,17 @@ public sealed class ActionPageCardStyleTests
                 var t = Assert.Single(card.Transitions!.OfType<BoxShadowsTransition>());
                 Assert.Equal("BoxShadow", t.Property!.Name);
                 Assert.Equal(ClaudeMotion.Micro, t.Duration);
+            }
+
+            // 行内编辑器卡豁免统一配方 (2026-09-18 用户裁定): 它是行卡内的嵌套面板,
+            // 双层投影与外层行卡阴影叠加显脏 ⇒ 静止档必须零阴影, 只留 1px 奶油描边分层。
+            var editors = view.GetVisualDescendants().OfType<Border>()
+                .Where(b => b.Classes.Contains("rowEditor")).ToList();
+            Assert.NotEmpty(editors);
+            var zero = BoxShadows.Parse("0 0 0 0 Transparent");
+            foreach (var e in editors)
+            {
+                Assert.Equal(zero.ToString(), e.BoxShadow.ToString());
             }
         }
         finally
@@ -160,7 +171,7 @@ public sealed class ActionPageCardStyleTests
     }
 
     /// <summary>
-    /// ⑤ 五个组件框**悬停时描边色不变 (无灰线) 且点亮陶土色光圈** (2026-09-17 裁定:
+    /// ⑤ 四个组件框**悬停时描边色不变 (无灰线) 且点亮陶土色光圈** (2026-09-17 裁定:
     /// 先「取消悬停投影加深, 保留基础阴影」, 后要求「悬停时周围显示一圈光圈, 不能是纯线条」)。
     /// 悬停后 (a) 描边色仍 == 静止色 (奶油), (b) BoxShadow == ClaudeShadowCardHaloHover ——
     /// 该档 = 静止两层的**逐位复制** + 第 3 层陶土弥散光圈, 故"只加光圈、不动投影与描边"。
@@ -180,8 +191,8 @@ public sealed class ActionPageCardStyleTests
             var hover = (BoxShadows)view.FindResource("ClaudeShadowCardHaloHover")!;
 
             var cards = view.GetVisualDescendants().OfType<Border>()
-                .Where(b => b.Classes.Contains("actionCard")).ToList();
-            Assert.True(cards.Count >= 5, $"应有 >=5 个组件框, 实得 {cards.Count}");
+                .Where(b => b.Classes.Contains("actionCard") && !b.Classes.Contains("rowEditor")).ToList();
+            Assert.True(cards.Count >= 4, $"应有 >=4 个组件框, 实得 {cards.Count}");
 
             // ★ 先摘掉**全部**卡片的 BoxShadow 过渡, 再动指针 (2026-09-17 修本用例偶发红):
             // 过渡动画由真实时钟驱动, 一旦启动不会因摘掉 Transitions 而中止; 而悬停某张卡可能
@@ -216,7 +227,20 @@ public sealed class ActionPageCardStyleTests
                 Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
                 checkedNames.Add(string.Join("+", card.Classes));
             }
-            Assert.Equal(5, checkedNames.Count);
+            Assert.Equal(4, checkedNames.Count);
+
+            // 行内编辑器卡: 悬停也必须保持零阴影 (2026-09-18 去影裁定, 光圈不适用于嵌套面板)
+            var editor = view.GetVisualDescendants().OfType<Border>()
+                .First(b => b.Classes.Contains("rowEditor"));
+            editor.Transitions = new Transitions();
+            win.MouseMove(new Point(1, 1));
+            Dispatcher.UIThread.RunJobs();
+            var ep = editor.TranslatePoint(
+                new Point(editor.Bounds.Width / 2, editor.Bounds.Height / 2), win)!.Value;
+            win.MouseMove(ep);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(editor.IsPointerOver, "编辑器卡悬停应命中 (否则本断言是空跑)");
+            Assert.Equal(BoxShadows.Parse("0 0 0 0 Transparent").ToString(), editor.BoxShadow.ToString());
         }
         finally
         {

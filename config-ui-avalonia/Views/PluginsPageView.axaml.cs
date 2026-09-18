@@ -19,6 +19,7 @@ public partial class PluginsPageView : UserControl
     public PluginsPageView()
     {
         InitializeComponent();
+        ComponentFocusRing.Attach(this); // 焦点环最内层转移 (替代 :focus-within)
         Loaded += OnLoaded;
     }
 
@@ -34,7 +35,7 @@ public partial class PluginsPageView : UserControl
 
     /// <summary>
     /// 卡内任意区域点击 = 选中该卡 (用户报: 只有点文字部分才有橙环): 非交互区域 (内衬/空隙/纯文字)
-    /// 按下时把焦点转移到信息区按钮, 由 Border.pluginCard:focus-within 点亮橙色焦点环。
+    /// 按下时把焦点转移到信息区按钮, 由 ComponentFocusRing 给 Border.pluginCard 挂 .ring 点亮橙色焦点环。
     /// 交互子项 (开关/删除按钮) 自己处理焦点与语义, 不抢 —— Avalonia 无 ButtonBase,
     /// ToggleSwitch/ToggleButton/普通按钮全是 Button 派生, is Button 一网打尽。
     /// </summary>

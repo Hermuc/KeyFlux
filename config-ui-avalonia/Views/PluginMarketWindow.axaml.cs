@@ -14,6 +14,7 @@ public partial class PluginMarketWindow : Window
     public PluginMarketWindow()
     {
         InitializeComponent();
+        ComponentFocusRing.Attach(this); // 焦点环最内层转移 (替代 :focus-within)
         Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => UnsubscribeLanguage();
         I18n.Changed += OnLanguageChanged;

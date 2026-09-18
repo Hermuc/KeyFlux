@@ -17,6 +17,7 @@ public partial class SettingsPageView : UserControl
     public SettingsPageView()
     {
         InitializeComponent();
+        ComponentFocusRing.Attach(this); // 焦点环最内层转移 (替代 :focus-within)
         // 动效闸门: 设 KEYFLUX_NO_MOTION=1 时不上 .motion 类, 页内入场级联/分区展开动画
         // 整体跳过 (XAML 里动画选择器均以 .motion 开头); 默认播放 (裁定见 MotionPreferences)
         if (MotionPreferences.AnimationsEnabled)
@@ -73,7 +74,7 @@ public partial class SettingsPageView : UserControl
         var header = card.GetVisualDescendants().OfType<Button>()
             .FirstOrDefault(b => b.Classes.Contains("sectionHeader"));
         if (header is null) return;
-        // 先聚焦标题按钮: 橙色线圈挂 :focus-within (卡内控件获焦即亮),
+        // 先聚焦标题按钮: 橙色线圈挂 .ring (ComponentFocusRing, 卡内非自饰控件获焦即亮),
         // 点空白处不聚焦的话展开生效但橙圈不出现 (用户报)
         header.Focus();
         if (header.Command?.CanExecute(header.CommandParameter) == true)

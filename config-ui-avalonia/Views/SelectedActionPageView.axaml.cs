@@ -7,6 +7,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using KeyFlux.Settings.Services;
 using KeyFlux.Settings.ViewModels;
 
 namespace KeyFlux.Settings.Views;
@@ -19,6 +20,7 @@ public partial class SelectedActionPageView : UserControl
     public SelectedActionPageView()
     {
         InitializeComponent();
+        ComponentFocusRing.Attach(this); // 焦点环最内层转移 (替代 :focus-within)
         DataContextChanged += (_, _) => InjectConfirmDialog();
         // 视图随导航重建而 VM 是单例, 确认框必须始终指向挂在树上的当前视图
         AttachedToVisualTree += (_, _) =>

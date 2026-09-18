@@ -22,7 +22,7 @@
                StrokeDashArray="4,4" Margin="0,0,0,14" />
     <!-- 可点击编辑区: 全宽浅边框卡片, 手型光标, 悬停高亮 (见上方样式) -->
     <Border Classes="edit-zone" BorderThickness="1"
-            CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="0,11" Cursor="Hand" Tapped="OnZoneTapped">
+            CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="0,11" Cursor="Hand" Tapped="OnZoneTapped">
       <TextBlock x:Name="HintText"
                  FontSize="13" Foreground="{StaticResource ClaudeTerracottaBrush}" HorizontalAlignment="Center" />
     </Border>

@@ -29,7 +29,7 @@ namespace KeyFlux.Settings.Tests;
 ///    2026-09-17 用户先裁定「取消悬停投影加深, 保留基础阴影」, 当日又要求「悬停时组件框周围
 ///    显示一圈**光圈**, 不能是纯线条」⇒ 落地为 ClaudeShadowCardHaloHover (Blur=16 弥散,
 ///    非零扩散描边), 描边与投影均不动;
-/// ③ 卡内控件获焦 → :focus-within 边框色仍不变, 阴影换 ClaudeShadowCardHaloFocus
+/// ③ 卡内控件获焦 → ComponentFocusRing 挂 .ring, 边框色仍不变, 阴影换 ClaudeShadowCardHaloFocus
 ///    (视觉 == ClaudeShadowFocusRing 的 Coral 2px 实环, 只是层数对齐成 3 以便平滑过渡)。
 /// 断言读 BorderBrush/BorderThickness/BoxShadow 的生效值 (样式优先级已折算)。
 /// 另含跨页一致性测试: Settings 卡与插件页卡的描边配方逐项相同。
@@ -92,7 +92,7 @@ public sealed class SettingsCardEffectTests
             Assert.Equal(restShadow[0].ToString(), hoverShadow[0].ToString());
             Assert.Equal(restShadow[1].ToString(), hoverShadow[1].ToString());
 
-            // ③ 单击卡内开关 (ToggleSwitch 获焦) → :focus-within
+            // ③ 单击卡内开关 (ToggleSwitch 获焦) → .ring 焦点环
             //    边框色仍不变; 阴影换 ClaudeShadowCardHaloFocus (视觉 == Coral 2px 焦点环)
             var toggle = card.GetVisualDescendants().OfType<ToggleSwitch>().First();
             var tp = Avalonia.VisualExtensions.TranslatePoint(

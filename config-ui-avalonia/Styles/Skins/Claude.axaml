@@ -61,8 +61,9 @@
                                                             聚焦档 = 现有 Coral 2px 焦点环前移到第 3 层
                                                             (前两层透明化, 层数与静止档一致)
 
-    【尺寸 4 项 · x:Double】
+    【尺寸 6 项 · x:Double】
       ClaudeRadiusSm=6  ClaudeRadiusMd=8  ClaudeRadiusLg=12  ClaudeRadiusXl=16
+      ClaudeRadiusCard=14 (页面级组件框)  ClaudeRadiusPanel=4 (嵌套面板/提示条, 组件框两档制)
 
     【字体 2 项 · FontFamily】
       AppUiFont       = MiSans 全局 UI 字体 (2026-09-13 换, 随应用打包, 见定义处注释)
@@ -130,7 +131,8 @@
               ClaudeShadowCardHaloPressed / ClaudeShadowCardHaloFocus
               ⚠ Halo 四档必须层数相等 (各 3 层) —— BoxShadowsAnimator 按 oldValue.Count
                 输出层数, 不等会在动画末帧跳变; 且**光圈层 Blur 必须 >0** (Blur==0 即描边线)。
-    尺寸 (4):  ClaudeRadiusSm / ClaudeRadiusMd / ClaudeRadiusLg / ClaudeRadiusXl
+    尺寸 (6):  ClaudeRadiusSm / ClaudeRadiusMd / ClaudeRadiusLg / ClaudeRadiusXl /
+              ClaudeRadiusCard / ClaudeRadiusPanel
               ⚠ 类型必须是 CornerRadius (不是 x:Double) —— 历史事故: 曾定义成 Double,
                 构建 0 错误但所有窗口加载即抛 InvalidCastException。
     字体 (2):  AppUiFont + ClaudeSerifFont (均 MiSans, 见定义处注释)
@@ -284,6 +286,12 @@
     <CornerRadius x:Key="ClaudeRadiusMd">8,8,8,8</CornerRadius>
     <CornerRadius x:Key="ClaudeRadiusLg">12,12,12,12</CornerRadius>
     <CornerRadius x:Key="ClaudeRadiusXl">16,16,16,16</CornerRadius>
+    <!-- 组件框两档制 (2026-09-18 用户裁定): 描边/光圈类 bug 高发于圆角不一致 ——
+         嵌套卡半径不等 ⇒ halo 弧段外溢; 大半径弧在 Viewbox 分数缩放下线宽失真。
+         凡"组件框"(卡片容器, 不含 toggle/chip/按钮/输入框) 只许用这两档:
+         Card = 页面级组件框 (明确需要大圆角), Panel = 嵌套面板/提示条 (接近直角)。 -->
+    <CornerRadius x:Key="ClaudeRadiusCard">14,14,14,14</CornerRadius>
+    <CornerRadius x:Key="ClaudeRadiusPanel">4,4,4,4</CornerRadius>
 
     <!-- 字体 (2) · FontFamily -->
     <!-- AppUiFont: 全局 UI 字体单源 (2026-09-13 用户指定 MiSans, 随应用打包,
@@ -504,7 +512,7 @@
     <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusCard}" />
   </Style>
   <Style Selector="Border.claudeCard:pointerover">
     <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowHoverRing}" />
@@ -714,10 +722,10 @@
        收敛成皮肤类后两窗共用同一套: 圆角层级 = 容器 Lg(12) / 行·按钮·输入 Md(8) / 徽标 Sm(6);
        配色 = Ivory 面 · Sand 悬停 · Parchment 选中 · Terracotta 指示条。 -->
 
-  <!-- 提示条: Sand 面 + Md 圆角 (原在选中动作页与匹配类型页各写一份本地 .hint) -->
+  <!-- 提示条: Sand 面 + Panel 档圆角 (组件框两档制, 2026-09-18) (原在选中动作页与匹配类型页各写一份本地 .hint) -->
   <Style Selector="Border.claudeHint">
     <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
-    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusPanel}" />
     <Setter Property="Padding" Value="10,8" />
   </Style>
 

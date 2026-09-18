@@ -67,7 +67,7 @@ public sealed class SkinContractTests
     /// 半径令牌必须是 <see cref="CornerRadius"/> 类型并正确落到 <c>CornerRadius</c> 属性上。
     /// 历史回归: 曾定义为 <c>x:Double</c>, 赋给 <c>CornerRadius</c> 时抛
     /// <c>InvalidCastException: Setter value '12' is not a valid value for property 'CornerRadius'</c>。
-    /// <c>Border.claudeCard</c> 用 <c>ClaudeRadiusLg</c> (12)。
+    /// <c>Border.claudeCard</c> 用 <c>ClaudeRadiusCard</c> (14, 组件框两档制之页面级档)。
     /// </summary>
     [AvaloniaFact]
     public void Radius_Token_Applies_To_CornerRadius_Property()
@@ -79,7 +79,7 @@ public sealed class SkinContractTests
         Dispatcher.UIThread.RunJobs();
         try
         {
-            Assert.Equal(new CornerRadius(12), card.CornerRadius);
+            Assert.Equal(new CornerRadius(14), card.CornerRadius);
             // 同一 Class 的另一令牌: Ivory 卡片面 (#faf9f5), 证明画刷令牌也已解析
             Assert.Equal(Color.Parse("#faf9f5"), ((ISolidColorBrush)card.Background!).Color);
         }
@@ -113,7 +113,8 @@ public sealed class SkinContractTests
     }
 
     /// <summary>
-    /// 管理类弹窗共享类 (2026-09-15): <c>Border.claudeHint</c> = Sand 面 + Md(8) 圆角;
+    /// 管理类弹窗共享类 (2026-09-15): <c>Border.claudeHint</c> = Sand 面 + Panel(4) 圆角
+    /// (组件框两档制, 2026-09-18: 嵌套提示条走近似直角档);
     /// <c>ListBox.claudeList</c> = 透明无边框 + 6 内边距 (行样式由该类的后代选择器接管)。
     /// 「匹配类型」与「行为库」两窗共用这组类, 此断言防止后续换肤时单边漂移。
     /// </summary>
@@ -129,9 +130,9 @@ public sealed class SkinContractTests
         Dispatcher.UIThread.RunJobs();
         try
         {
-            // Sand 面 (#e8e6dc) + 尺寸令牌 ClaudeRadiusMd(8) —— 与皮肤顶部契约清单一致
+            // Sand 面 (#e8e6dc) + 尺寸令牌 ClaudeRadiusPanel(4) —— 与皮肤顶部契约清单一致
             Assert.Equal(Color.Parse("#e8e6dc"), ((ISolidColorBrush)hint.Background!).Color);
-            Assert.Equal(new CornerRadius(8), hint.CornerRadius);
+            Assert.Equal(new CornerRadius(4), hint.CornerRadius);
             // 列表本体不带边线/底色, 容器面由外层 Border.claudeCard 提供
             Assert.Equal(0, list.BorderThickness.Left);
             Assert.Equal(new Thickness(6), list.Padding);
@@ -172,7 +173,11 @@ public sealed class SkinContractTests
     ];
 
     private static readonly string[] RadiusKeys =
-        ["ClaudeRadiusSm", "ClaudeRadiusMd", "ClaudeRadiusLg", "ClaudeRadiusXl"];
+    [
+        "ClaudeRadiusSm", "ClaudeRadiusMd", "ClaudeRadiusLg", "ClaudeRadiusXl",
+        // 组件框两档制 (2026-09-18): 卡片容器圆角只许这两档, 其余令牌归按钮/徽标/输入框
+        "ClaudeRadiusCard", "ClaudeRadiusPanel",
+    ];
 
     /// <summary>
     /// 契约: 每一个必需令牌键都必须能在应用资源中解析。
