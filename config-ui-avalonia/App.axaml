@@ -31,6 +31,35 @@
          主题模板内的 {DynamicResource ScrollBarSize} 沿逻辑树查找资源, 不经过样式集合资源. -->
     <x:Double x:Key="ScrollBarSize">10</x:Double>
 
+    <!-- ===================== 滚动条 Thumb 缩放变换: 细条居中 =====================
+         2026-09-18 用户要求: 滚动条细条从「贴滚动区域右缘」改为「居中于滚动条带」,
+         且鼠标悬浮展开时**向两侧对称变粗** (原为只向左单侧延伸)。
+
+         成因 (已查 Fluent 11.3.20 模板源 src/Avalonia.Themes.Fluent/Controls/ScrollBar.xaml):
+         竖直 Thumb 模板内联 `RenderTransformOrigin="100%,50%"` (= 以**右缘**为缩放原点)
+         并绑定本资源 `VerticalSmallScrollThumbScaleTransform`; 原值
+         `scaleX(0.125) translateX(-2px)` —— 缩放锚在右缘故细条紧贴右侧,
+         再向左挪 2px 留出边距 ⇒ 展开时左缘位移而右缘固定 = 单侧变粗。
+         水平条同族: 原点 `50%,100%` (下缘) + `scaleY(0.125) translateY(-2px)`, 向上单侧变粗。
+
+         改法: 把贴边位移换成**居中补偿位移** -(ScrollBarSize - ScrollBarSize x 0.125) / 2
+         = -(10 - 1.25) / 2 = -4.375px ⇒ 细条渲染范围变为 [4.375, 5.625] (宽 1.25),
+         中心 5.0 = 滚动条带正中 (即中心距视口右缘 5px, 左/右余量各 4.375px)。
+         展开时中心恒定的证明: 设参数 s 缩放、位置 t, 渲染中心 = W - W*s/2 + t;
+         取 t = -W(1-s)/2 代入得中心恒 = W/2, 与 s 无关 —— 故过渡动画每一帧都居中,
+         两侧对称扩展 (不是只有终态居中)。
+
+         注意 (为什么必须在 Application.Resources): 模板内用 {DynamicResource} 取本资源,
+         沿【逻辑树】查找, 不经过样式集合资源 (与上方 ScrollBarSize 同一原因)。
+         注意 (为什么不用样式改 RenderTransformOrigin): 该属性由模板**内联**赋值,
+         写入优先级为 Template, 高于应用级 Style(实测: 应用级 Thumb 样式设 0.5,0.5 无效,
+         读回仍是 "100%, 50%") ⇒ 只能从变换自身下手。
+         注意 (字面量耦合): -4.375px 同时耦合 ScrollBarSize=10 与 Fluent 的 0.125 缩放系数,
+         改任一值都必须同改此处; 守护用例 ScrollBarStylesTests 会因「细条不居中」而红。
+         >> 换肤须知: 以下值不属于配色, 换肤无需替换 << -->
+    <TransformOperations x:Key="VerticalSmallScrollThumbScaleTransform">scaleX(0.125) translateX(-4.375px)</TransformOperations>
+    <TransformOperations x:Key="HorizontalSmallScrollThumbScaleTransform">scaleY(0.125) translateY(-4.375px)</TransformOperations>
+
     <!-- ===================== 系统强调色暖色化 (2026-09-13 全局冷蓝清零) =====================
          Fluent 的 RadioButton 选中圆 / CheckBox 勾选框 / Slider 轨道填充 / AutoCompleteBox
          下拉选中等所有「强调色态」都引用 SystemAccentColor 系 (默认取 OS 强调色 = 蓝 #0078d7),

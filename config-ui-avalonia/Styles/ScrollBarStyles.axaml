@@ -13,7 +13,17 @@
      4. 整体宽度: Fluent 主题中滚动条宽度由 ScrollBarSize 资源控制 (ScrollBar 的 MinWidth、
         Thumb 的 Width、两端按钮尺寸均绑定它), 已在 App.axaml 的 Application.Resources 中
         覆盖为 10 整体收窄. 注意资源覆盖必须放在 Application.Resources ——
-        Styles.Resources 不在主题模板内 DynamicResource 的逻辑树查找链上, 覆盖无效. -->
+        Styles.Resources 不在主题模板内 DynamicResource 的逻辑树查找链上, 覆盖无效.
+     5. 细条居中 + 悬停向两侧对称变粗 (2026-09-18 用户要求, 原为贴右缘、只向左单侧延伸):
+        实际改动**不在本文件**, 而是覆盖模板绑定的缩放变换资源
+        VerticalSmallScrollThumbScaleTransform / HorizontalSmallScrollThumbScaleTransform
+        (见 App.axaml 同名注释: 成因 = 模板内联的 RenderTransformOrigin 以右缘/下缘为缩放原点).
+        之所以不能在此处用样式改 RenderTransformOrigin —— 该属性由模板内联赋值, 写入优先级
+        Template 高于应用级 Style (实测: 此处设 0.5,0.5 无效, 读回仍是 "100%, 50%"),
+        且 "/template/" 与后代选择器均无法命中模板内元素 (同第 3 条).
+        本文件保留的原因: 第 1~3 条 (悬停延迟/圆角) 仍需在此声明; 第 5 条作为机制索引,
+        免得后来者在本文件里找不到"居中"的实现而误以为漏改.
+        守护用例: KeyFlux.Settings.Tests/ScrollBarStylesTests.cs. -->
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
