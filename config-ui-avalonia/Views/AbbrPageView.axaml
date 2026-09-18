@@ -44,9 +44,12 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- 命令框 (label:406; 回车执行 del/rn/选中) -->
+        <!-- 命令框 (label:406; 回车执行 del/rn/选中)
+             边框显式 1.5px 暖灰: 控件默认 1px 边框经 Viewbox 分数缩放后四边渲染不均 (上边偏深),
+             局部值只压基础态, 焦点/悬停态由主题直接设 PART_BorderElement 仍生效 -->
         <TextBox Text="{Binding CmdText}" KeyDown="OnCmdKeyDown"
                  Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=406}"
+                 BorderBrush="{StaticResource ClaudeWarmSilverBrush}" BorderThickness="1.5"
                  Margin="2,16,0,0" Padding="8,6" />
 
         <controls:ActionEditorPanel x:Name="EditorPanel" Width="570" Margin="0,18,0,0" DataContext="{Binding Editor}" />
