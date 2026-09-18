@@ -3,7 +3,7 @@ using System.Diagnostics;
 namespace KeyFlux.Settings.Services;
 
 // ============================================================================
-// LinkOpener: 链接打开策略 (总览页 markdown 链接的点击行为)
+// LinkOpener: 链接打开策略 (使用指南页 markdown 链接的点击行为)
 //
 // 规则 (复刻 Vue 版 iframe 内点击链接的默认行为):
 //   - 内部路径 (以 / 开头): 拼上后端地址后用系统默认浏览器打开 (后端静态站点);
@@ -12,7 +12,7 @@ namespace KeyFlux.Settings.Services;
 // ============================================================================
 public static class LinkOpener
 {
-    /// <summary>打开链接。失败静默 (如空地址), 不影响总览页。</summary>
+    /// <summary>打开链接。失败静默 (如空地址), 不影响使用指南页。</summary>
     public static void Open(string url, int backendPort)
     {
         if (string.IsNullOrWhiteSpace(url)) return;
@@ -23,7 +23,7 @@ public static class LinkOpener
         }
         catch
         {
-            // 打开失败静默, 不影响总览页
+            // 打开失败静默, 不影响使用指南页
         }
     }
 }

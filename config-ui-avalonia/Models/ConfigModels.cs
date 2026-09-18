@@ -43,7 +43,7 @@ public sealed class Config
     [JsonPropertyName("matchTypes")]
     public List<MatchType> MatchTypes { get; set; } = [];
 
-    // omitempty: 自定义总览页 Markdown, 缺失时为 ""; 非空时总览页优先展示自定义内容
+    // omitempty: 自定义使用指南页 Markdown, 缺失时为 ""; 非空时使用指南页优先展示自定义内容
     [JsonPropertyName("overviewDocMd")]
     public string OverviewDocMd { get; set; } = "";
 }

@@ -8,14 +8,14 @@ namespace KeyFlux.Settings.Controls;
 /// <summary>
 /// 可复用「编辑区提示」控件: 虚线分割线 + 可点击说明区域。
 /// 使用方仅需设置 Text (说明文案) 并订阅 Click 事件, 即可把页面底部
-/// 变成「点击进入编辑」入口 (当前用于总览页替代原右上角「编辑总览」按钮)。
+/// 变成「点击进入编辑」入口 (当前用于使用指南页替代原右上角「编辑使用指南」按钮)。
 /// 业务逻辑不在本控件内, 由使用方在 Click 中实现, 保持视图与逻辑解耦。
 /// </summary>
 public partial class EditZoneHint : UserControl
 {
     public EditZoneHint() => InitializeComponent();
 
-    /// <summary>说明文案 (如 "点击此区域编辑总览")。</summary>
+    /// <summary>说明文案 (如 "点击此区域编辑使用指南")。</summary>
     public static readonly StyledProperty<string> TextProperty =
         AvaloniaProperty.Register<EditZoneHint, string>(nameof(Text), defaultValue: "");
 

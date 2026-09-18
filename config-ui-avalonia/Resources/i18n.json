@@ -112,12 +112,12 @@
     "en": "Markdown supported: # heading, - list, [text](link), ![image](url), `code`; takes effect after save; clear and save to restore the default document"
   },
   "2406": {
-    "zh": "编辑总览页",
-    "en": "Edit Overview Page"
+    "zh": "编辑使用指南",
+    "en": "Edit Guide"
   },
   "2407": {
-    "zh": "点击此区域编辑总览",
-    "en": "Click here to edit the overview"
+    "zh": "点击此区域编辑使用指南",
+    "en": "Click here to edit the guide"
   },
   "25": {
     "zh": "鼠标上移",
@@ -704,8 +704,8 @@
     "en": "Delete"
   },
   "913": {
-    "zh": "总览",
-    "en": "Overview"
+    "zh": "使用指南",
+    "en": "Guide"
   },
   "914": {
     "zh": "选中动作",
@@ -744,8 +744,8 @@
     "en": "Save"
   },
   "931": {
-    "zh": "总览页内容来自 config_doc.md (后端静态站点); 点击下方编辑区可自定义",
-    "en": "Overview content comes from config_doc.md (backend static site); click the edit zone below to customize"
+    "zh": "使用指南内容来自 config_doc.md (后端静态站点); 点击下方编辑区可自定义",
+    "en": "Guide content comes from config_doc.md (backend static site); click the edit zone below to customize"
   },
   "932": {
     "zh": "帮助文档暂不可用 (后端未提供 config_doc.md)",
@@ -764,20 +764,20 @@
     "en": "Quick start"
   },
   "936": {
-    "zh": "左侧导航列出已启用的快捷键方案, 点击进入对应方案; 总览文档可在页面底部编辑区自定义。",
-    "en": "The left navigation lists enabled keymaps. Click one to open it; the document can be customized via the edit zone at the bottom of the Overview page."
+    "zh": "左侧导航列出已启用的快捷键方案, 点击进入对应方案; 使用指南内容可在页面底部编辑区自定义。",
+    "en": "The left navigation lists enabled keymaps. Click one to open it; the guide can be customized via the edit zone at the bottom of the page."
   },
   "937": {
-    "zh": "在「设置」页可调整鼠标参数、命令框皮肤、触发延时、键盘布局、开机自启等。",
-    "en": "On the Settings page you can tune mouse options, command-window skin, modifier delay, keyboard layout, startup, etc."
+    "zh": "在「选项」页可调整鼠标参数、命令框皮肤、触发延时、键盘布局、开机自启等。",
+    "en": "On the Options page you can tune mouse options, command-window skin, modifier delay, keyboard layout, startup, etc."
   },
   "938": {
     "zh": "按 Ctrl+S 或点击左下角「保存配置」把改动写回 config.json。",
     "en": "Press Ctrl+S or click Save to write changes back to config.json."
   },
   "939": {
-    "zh": "文档",
-    "en": "Documentation"
+    "zh": "使用指南",
+    "en": "Guide"
   },
   "950": {
     "zh": "开启时不允许删除",
@@ -1542,5 +1542,9 @@
   "2580": {
     "zh": "B 站",
     "en": "Bilibili"
+  },
+  "2581": {
+    "zh": "选项",
+    "en": "Options"
   }
 }

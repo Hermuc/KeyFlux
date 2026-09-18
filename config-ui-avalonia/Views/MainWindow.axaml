@@ -6,7 +6,7 @@
         x:Class="KeyFlux.Settings.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         FontFamily="{StaticResource AppUiFont}"
-        Title="Setting"
+        Title="KeyFlux Settings"
         Icon="avares://KeyFlux.Settings/Assets/logo.png"
         Width="1200" Height="760"
         MinWidth="1210" MinHeight="600"
@@ -145,7 +145,7 @@
           </Button>
         </StackPanel>
 
-        <!-- 导航列表: 总览 / 选中动作 / 启用的 keymap -->
+        <!-- 导航列表: 使用指南 / 选中动作 / 启用的 keymap -->
         <ListBox ItemsSource="{Binding NavItems}"
                  SelectedItem="{Binding CurrentNavItem, Mode=TwoWay}"
                  Background="Transparent" BorderThickness="0" Margin="10,0">

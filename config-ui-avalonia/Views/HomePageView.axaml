@@ -5,11 +5,11 @@
              x:Class="KeyFlux.Settings.Views.HomePageView"
              x:DataType="vm:HomePageViewModel">
 
-  <!-- 总览页文字全部可选中复制: 文档块/静态文案均用 SelectableTextBlock
+  <!-- 使用指南页文字全部可选中复制: 文档块/静态文案均用 SelectableTextBlock
        (Avalonia 11.3 无 TextBlock.IsTextSelectionEnabled, SelectableTextBlock 为官方可选中文本控件,
        继承 TextBlock 全部属性; 链接为内嵌 TextBlock + Tapped 打开, 选词不误触跳转) -->
   <!--
-    总览页 (复刻 Home.vue): Vue 版为 <iframe src="/config_doc.html">。
+    使用指南页 (复刻 Home.vue): Vue 版为 <iframe src="/config_doc.html">。
     Avalonia 无内嵌浏览器, 等价实现: 渲染 config_doc.md (config_doc.html 的源),
     保留标题层级/图片/链接; 用户自定义 (config.overviewDocMd) 时优先展示自定义内容;
     拉取失败时回退到内置快速上览引导 (信息完整性保留)。
@@ -32,7 +32,7 @@
         <ItemsControl ItemsSource="{Binding DocBlocks}" />
         <SelectableTextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=931}"
                              Foreground="{StaticResource ClaudeWarmSilverBrush}" FontSize="12" Margin="0,24,0,0" />
-        <!-- 底部编辑区: 虚线分割线 + 可点击说明 (替代原右上角「编辑总览」按钮) -->
+        <!-- 底部编辑区: 虚线分割线 + 可点击说明 (替代原右上角「编辑使用指南」按钮) -->
         <controls:EditZoneHint Margin="0,26,0,0"
                                Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2407}"
                                Click="OnEditOverviewClick" />

@@ -80,7 +80,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <see cref="BuildNav"/> 重建导航时执行 `NavItems.Clear()`, 双向绑定到 SelectedItem 的
     /// 导航 ListBox 会**瞬间把选中项置空**并把 null 推回本属性; 若照单全收, `CurrentPage`
     /// 会被置为 null ⇒ 内容区空白一帧, 用户看到整窗闪白 (实测变化序列 `null -> page`)。
-    /// 导航恒有至少一个可选项 (总览/选中动作/插件), "空选中"在本应用无业务含义 ⇒ 忽略 null,
+    /// 导航恒有至少一个可选项 (使用指南/选中动作/插件), "空选中"在本应用无业务含义 ⇒ 忽略 null,
     /// 内容区保持当前页不变。此修复对 BuildNav 的所有触发者生效 (失焦提交/开关联动/换上层/删行)。
     /// </remarks>
     partial void OnCurrentNavItemChanged(NavItem? value)
@@ -91,7 +91,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ------------------------------------------------------------- 初始化
 
-    /// <summary>启动流程: 连接后端 -> 加载配置 -> 构建导航 -> 默认打开总览页。永不抛出。</summary>
+    /// <summary>启动流程: 连接后端 -> 加载配置 -> 构建导航 -> 默认打开使用指南页。永不抛出。</summary>
     public async Task InitializeAsync()
     {
         IsLoading = true;
@@ -136,7 +136,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch { /* 忽略 */ }
 
-        // 总览文档异步拉取, 不阻塞首屏
+        // 使用指南文档异步拉取, 不阻塞首屏
         _ = HomeVm.LoadAsync();
     }
 
@@ -168,7 +168,7 @@ public sealed partial class MainViewModel : ObservableObject
     public void OnNavInvalidated() => BuildNav();
 
     /// <summary>
-    /// 复刻 NavigationDrawer: 总览 + 选中动作 + 插件 + 启用的 keymap 列表。
+    /// 复刻 NavigationDrawer: 使用指南 + 选中动作 + 插件 + 启用的 keymap 列表。
     /// keymap/1 (自定义热键) 不再入导航 —— 2026-09-08 迁入设置页「其他设置」卡片。
     /// 重建时保持原选中项 (按稳定 Id)。
     /// </summary>
@@ -212,7 +212,15 @@ public sealed partial class MainViewModel : ObservableObject
             items.Add(new NavItem
             {
                 Id = $"keymap-{km.Id}",
-                Title = string.IsNullOrEmpty(km.Name) ? hotkey : km.Name,
+                // km.Id == 4 (设置页入口) 的标题固定取 i18n 常量: config 里的 name ("Settings")
+                // 与窗口级「设置」语义冲突 (整窗即 KeyFlux 设置面板), 且该字段不能改 ——
+                // 它会被 config-server 的 generators.go 写进生成的 AHK NewKeymap(...),
+                // 改动会连带 golden/oracle 基线与用户 live config 迁移。改由 i18n 提供
+                // 可零数据风险获得中英双语标题 (2026-09-18 「Settings」-> 「选项」/Options)。
+                // 其余 keymap (id>4) 仍用用户自定义 name (数据驱动, 见 2554)。
+                Title = km.Id == 4
+                    ? I18n.T("2581")
+                    : (string.IsNullOrEmpty(km.Name) ? hotkey : km.Name),
                 IconName = MdiIcon.IconFor(hotkey),
                 Page = PageForKeymap(km),
             });

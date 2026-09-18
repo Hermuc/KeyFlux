@@ -3,7 +3,7 @@
         x:Class="KeyFlux.Settings.Views.OverviewEditWindow"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
         Background="{DynamicResource ClaudeWindowSurfaceBrush}"
-        Title="Setting"
+        Title="Edit Guide"
         Width="780" Height="600"
         MinWidth="560" MinHeight="400"
         WindowStartupLocation="CenterOwner"
@@ -11,7 +11,7 @@
         ShowInTaskbar="False"
         FontFamily="{StaticResource AppUiFont}">
 
-  <!-- 总览页编辑窗口: 编辑 markdown 原文 (纯文本, 支持 # 标题 / 列表 / [链接] / ![图片] / `代码`) -->
+  <!-- 使用指南页编辑窗口: 编辑 markdown 原文 (纯文本, 支持 # 标题 / 列表 / [链接] / ![图片] / `代码`) -->
   <DockPanel Margin="20">
     <TextBlock x:Name="TipText" DockPanel.Dock="Top" Text="2405-TIP"
                Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10" />

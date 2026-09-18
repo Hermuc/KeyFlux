@@ -6,8 +6,8 @@ using KeyFlux.Settings.ViewModels;
 namespace KeyFlux.Settings.Views;
 
 /// <summary>
-/// 总览页编辑窗口: 编辑 markdown 原文, 保存到 config.overviewDocMd (data/config.json 真源,
-/// 部署同步不覆盖)。保存成功置 DialogResult=true, 由 HomePageView 负责刷新总览渲染。
+/// 使用指南页编辑窗口: 编辑 markdown 原文, 保存到 config.overviewDocMd (data/config.json 真源,
+/// 部署同步不覆盖)。保存成功置 DialogResult=true, 由 HomePageView 负责刷新使用指南渲染。
 /// 清空内容并保存 = 恢复默认文档 (config_doc.md)。
 /// </summary>
 public partial class OverviewEditWindow : Window
@@ -15,7 +15,7 @@ public partial class OverviewEditWindow : Window
     private readonly MainViewModel _main;
     private bool _saving;
 
-    /// <summary>保存成功后置 true (HomePageView 据此刷新总览渲染)。</summary>
+    /// <summary>保存成功后置 true (HomePageView 据此刷新使用指南渲染)。</summary>
     public bool Saved { get; private set; }
 
     public OverviewEditWindow(MainViewModel main, string initialMd)
@@ -37,7 +37,7 @@ public partial class OverviewEditWindow : Window
 
     private void OnRestoreClick(object? sender, RoutedEventArgs e)
     {
-        // 清空自定义内容; 保存后总览页即回到默认文档 (config_doc.md)
+        // 清空自定义内容; 保存后使用指南页即回到默认文档 (config_doc.md)
         Editor.Text = "";
         Editor.Focus();
     }

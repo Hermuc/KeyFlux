@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace KeyFlux.Settings.Services;
 
 // ============================================================================
-// MarkdownParser: 总览页文档解析器 (纯逻辑, 零 UI 依赖)
+// MarkdownParser: 使用指南页文档解析器 (纯逻辑, 零 UI 依赖)
 //
 // 权威蓝本: bin/site/config_doc.md (config_doc.html 的源, Typora 导出)。
 // 仅支持文档实际用到的语法子集:
@@ -37,7 +37,7 @@ public sealed record MdList(List<MdListItem> Items) : MdBlock;
 /// <summary>图片块 (Src 为原始路径, Alt 为描述)。</summary>
 public sealed record MdImage(string Src, string Alt) : MdBlock;
 
-/// <summary>总览文档解析器: markdown 文本 -> 块模型列表。</summary>
+/// <summary>使用指南文档解析器: markdown 文本 -> 块模型列表。</summary>
 public static class MarkdownParser
 {
     /// <summary>解析整篇 markdown, 返回按文档顺序排列的块模型。</summary>

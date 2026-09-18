@@ -11,7 +11,7 @@ using SkiaSharp;
 namespace KeyFlux.Settings.Services;
 
 // ============================================================================
-// MarkdownRenderer: 总览页文档渲染层 (块模型 -> Avalonia 控件)
+// MarkdownRenderer: 使用指南页文档渲染层 (块模型 -> Avalonia 控件)
 //
 // 消费 MarkdownParser 的不可变块模型, 构建展示控件树。
 // 外部依赖全部经回调注入, 不感知会话/网络细节:

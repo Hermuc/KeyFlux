@@ -3,7 +3,7 @@ using KeyFlux.Settings.Services;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
-/// MarkdownParser 契约守护: 总览页文档 (config_doc.md 子集) 的解析结果。
+/// MarkdownParser 契约守护: 使用指南页文档 (config_doc.md 子集) 的解析结果。
 /// 覆盖标题层级/段落合并/列表嵌套/图片/行内链接与代码。
 /// </summary>
 public sealed class MarkdownParserTests

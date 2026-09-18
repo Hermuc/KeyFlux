@@ -12,7 +12,7 @@ type Config struct {
 	ActionSchemes  []ActionScheme  `json:"actionSchemes,omitempty"`  // 旧多方案结构: 仅迁移读取用, ParseConfig 迁移后置 nil, save 不再输出
 	FileGroups     []FileGroup     `json:"fileGroups,omitempty"`     // 文件分组: 前端「文件后缀」条件值的快捷填充数据, 非独立匹配类型
 	MatchTypes     []MatchType     `json:"matchTypes,omitempty"`     // 自定义匹配类型 (方案 C7): 文本特征/文件后缀"一等匹配类型"; 引擎层经生成期解析消除, 缺段=nil 不注入默认
-	OverviewDocMd  string          `json:"overviewDocMd,omitempty"`  // 自定义总览页 Markdown, 设置界面优先展示; 为空时展示默认 config_doc.md
+	OverviewDocMd  string          `json:"overviewDocMd,omitempty"`  // 自定义使用指南页 Markdown, 设置界面优先展示; 为空时展示默认 config_doc.md
 	KeyMapping     string          `json:"-"`
 }
 

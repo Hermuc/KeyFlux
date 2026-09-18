@@ -4,17 +4,17 @@ using KeyFlux.Settings.ViewModels;
 
 namespace KeyFlux.Settings.Views;
 
-/// <summary>总览页视图 (复刻 Home.vue 的 config_doc 展示)。</summary>
+/// <summary>使用指南页视图 (复刻 Home.vue 的 config_doc 展示)。</summary>
 public partial class HomePageView : UserControl
 {
     public HomePageView() => InitializeComponent();
 
-    /// <summary>「编辑总览」入口 (底部编辑区点击): 弹出 markdown 编辑窗口, 保存成功后刷新渲染。</summary>
+    /// <summary>「编辑使用指南」入口 (底部编辑区点击): 弹出 markdown 编辑窗口, 保存成功后刷新渲染。</summary>
     private async void OnEditOverviewClick(object? sender, RoutedEventArgs e)
         => await OpenOverviewEditorAsync();
 
     /// <summary>
-    /// 打开总览编辑对话框 (独立方法, 与具体入口控件解耦:
+    /// 打开使用指南编辑对话框 (独立方法, 与具体入口控件解耦:
     /// 原右上角按钮与现底部编辑区均复用此逻辑, 编辑区控件本身不含业务代码)。
     /// </summary>
     private async Task OpenOverviewEditorAsync()

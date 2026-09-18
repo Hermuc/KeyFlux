@@ -61,7 +61,11 @@ public sealed class I18nResourceTests
     ///   权威占用表见 `config-ui-avalonia/Resources/i18n.json`, 未占用空洞:
     ///   2390-2400 / 2403 / 2419-2420 / 2440-2499 / 2503-2511 / 2516 / 2526 / 2549。
     /// 2026-09-17 新增内置文本特征「B 站」(bilibili): 新增 2580 (B 站) -> 386。
-    private const int ExpectedKeyCount = 386;
+    /// 2026-09-18 设置面板页面改名 (零数据变更): 新增 2581 (选项/Options) —— 导航 keymap id=4 的标题
+    ///   由 config `name` 改为 i18n 常量 (原 "Settings" 与窗口级「设置」语义冲突); 另改**值**
+    ///   913/939 总览|文档 -> 使用指南/Guide, 931/936/2406/2407 措辞同步, 937 「设置」页 -> 「选项」页
+    ///   (仅改值不改键, 不增加键数)。**新增键自 2582 起** -> 387。
+    private const int ExpectedKeyCount = 387;
 
     private const string LabelPrefix = "label:";
 

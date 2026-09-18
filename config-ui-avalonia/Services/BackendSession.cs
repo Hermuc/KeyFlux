@@ -167,7 +167,7 @@ public sealed class BackendSession : IAsyncDisposable
     }
 
     /// <summary>
-    /// 便捷原始字节 GET (总览页 markdown 图片等静态资源)。
+    /// 便捷原始字节 GET (使用指南页 markdown 图片等静态资源)。
     /// 失败时返回 null, 调用方自行降级 (如隐藏图片)。
     /// </summary>
     public async Task<byte[]?> GetBytesAsync(string path, CancellationToken ct = default)
