@@ -109,7 +109,7 @@ class EverythingSession {
 
     ; 已激活: 继续输入 = 追加检索词; 同时投递字符让命令框显示 (视觉回显)
     this.query .= c
-    PostCharToCaspAbbr(ih, c)
+    CommandDisplay.EchoChar(ih, c)
     this.Refresh()
     return true
   }
@@ -123,7 +123,7 @@ class EverythingSession {
     if (vk = EverythingSession.VK_BACK) {
       if (this.query != "")
         this.query := SubStr(this.query, 1, -1)
-      PostBackspaceToCaspAbbr(ih, vk, sc)   ; 命令框视觉同步退格
+      CommandDisplay.EchoBackspace(ih, vk, sc)   ; 命令框视觉同步退格
       this.Refresh()
       return true
     }
@@ -152,6 +152,12 @@ class EverythingSession {
    *   - 选中文件 (type=file) -> 首个文件名 (资源管理器里选中文件时, 用户意图通常是「找同名/同类」);
    *   - 未取到 -> 空 (浮层提示继续输入)。
    * 取文字前先把前台切回会话开始时的窗口 (命令框可能抢了前台, 否则 Ctrl+C 发不到目标程序)。
+   *
+   * 🔴 取完必须把焦点还给命令框 (2026-09-19 v4.1 透传补丁): ActivateBackend 把前台切到了
+   * 原窗口 —— 历史形态无影响 (显示靠投递 WM_CHAR, 与焦点无关, 且当时命令框本就不在
+   * 前台, ActivateBackend 实际是 no-op); 透传模式下物理键按「焦点窗口」路由, 焦点不还原
+   * 则后续字符全部漏进原窗口 (命令框看不见, 原窗口还会被打字污染)。用户实测: 按空格
+   * 触发后能搜索但命令框看不见字符, 即此因。
    */
   SeedFromSelection() {
     this.capturing := true
@@ -166,6 +172,8 @@ class EverythingSession {
       this.query := ""
     }
     this.capturing := false
+    ; 焦点还原 (返回值忽略: 激活失败只损失显示, 搜索路径不依赖焦点)
+    CommandDisplay.ActivateCommandWindow()
   }
 
   /** 按当前检索词刷新浮层 (空词/失败/无结果分别给引导文案)。 */

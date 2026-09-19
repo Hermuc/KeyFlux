@@ -128,6 +128,16 @@ check-texttypes:
 check-hooks:
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut tools/command_input_hooks_test.ahk
 
+# check-ime: ImeInputHost 的存在理由回归闸门 —— 断言 InputHook **无 V 时**确实无法承载 IME 输入
+# (该事实正是 §3.12 动态可见性方案的理论基础: IME 开启的会话由 MakeCapsHook 建为 V 透传)。
+# ⚠ 本目标需要**按键注入**, 且 KeyFlux 必须已退出 (其 #UseHook 独占键盘钩子会让全部用例收 0 字符)。
+#   因此刻意**不并入 check**: check 是「随时可跑」的无副作用闸门, 而本目标会短暂占用键盘钩子
+#   并依赖系统已装中文输入法。改动 command-box 输入通道 (ImeInputHost / CommandDisplay /
+#   CommandInputHooks) 时手动跑一次; 若断言变红 (无 V 也收到了中文码点), 说明 AHK 默认形态
+#   已透传 IME, 应更新 §3.12 的断言前提, 而非退役模块 (2026-09-19 v3 起动态 V 方案已落地)。
+check-ime:
+	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut tools/ime_input_test.ahk
+
 # check: 一键回归 = 标识符 lint + 文本特征一致性 + 命令框拦截点契约 + Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
 # (MSYS_NO_PATHCONV: 防止 Git Bash 把 /ErrorStdOut /Validate 等开关误转换为路径)
 # 2026-09-17 修「生成产物落点」缺陷 (原配方只要部署配置启用了插件就**必然**失败, 实测阻断 make deploy):
@@ -195,4 +205,4 @@ out: buildServer buildClientAvalonia sync-out
 deploy: check buildClientAvalonia sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-texttypes check-cs analyzers lint sync-out sync-plugins out deploy
+.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-texttypes check-cs check-hooks check-ime analyzers lint sync-out sync-plugins out deploy

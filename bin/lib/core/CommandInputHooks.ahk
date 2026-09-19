@@ -67,7 +67,7 @@ class CommandInputHooks {
     this._Notify("OnSessionBegin")
   }
 
-  /** 输入结束后调用: 通知全部 provider 收尾 (隐藏浮层等)。 */
+  /** 输入结束后调用: 通知全部 provider 收尾 (复位会话状态等)。 */
   static EndSession() {
     this.SessionActive := false
     this._Notify("OnSessionEnd")
@@ -161,25 +161,58 @@ class CommandInputHooks {
 }
 
 /**
- * 命令框 OnChar 入口 (模板 keyflux.tmpl 绑定): 先给 provider 机会消费, 未消费则保持
- * 原有语义 —— 字符投递到命令框 + 逐字符后缀模糊匹配 (顺序与历史实现完全一致)。
+ * 命令框 OnChar 入口 (模板 keyflux.tmpl 绑定)。
+ *
+ * 显示与匹配双通道 (§3.12 v4.2, 2026-09-19):
+ *   * 字符显示: 透传模式下物理键已原生直显, EchoChar 经 ShouldEcho 兑停 (no-op);
+ *     历史形态照常投递。
+ *   * 缩写匹配: FuzzySuffixFire **恒跑** (v4 的透传旁路已撤) —— 用户裁决: 设置面板
+ *     的命令全部由英文字母组成, 命令框内需要输入中文的唯一场景是前置键 (如空格)
+ *     触发插件之后, 而那时字符已被插件 OnChar 消费 (DispatchChar 提前 return),
+ *     根本到不了本匹配层 ⇒ v4 假设的「拼音后缀误触发」场景不存在。搜索期
+ *     MatchList 的安全性由「全串匹配被空格前缀挡住」保障 (检索词 Input 形如
+ *     " se" ≠ "se"); providers 派发仍最先 (插件消费即不进匹配层)。
+ *   * (v4 的「providers 派发保留」维持不变; Match 分支的 EchoChar 同样被 ShouldEcho
+ *     兑停, 防二次显示。)
+ *
+ * 🔴 EchoChar 与 FuzzySuffixFire 必须 try 包裹 (2026-09-19 加固): 二者在 InputHook 回调
+ * 线程上直接运行, 任何异常都无 try/catch 兜底 —— 后果是 AHK 错误对话框 + 线程死亡 +
+ * StartInputHook 已执行的 Suspend(true) 永远不会恢复 ⇒ 全部热键失效 (用户视角:
+ * "报错弹窗 + 命令框卡死, 无法关闭也无法输入")。实测 PostMessage 到已消失的命令框
+ * 窗口会抛 TargetError (kf_diag2: "PostMessage 抛出: TargetError: Target window not
+ * found."), 正是此路径。provider 派发已有逐个 try (DispatchChar), 这里补齐剩余两段。
  */
 CommandInputOnChar(ih, char, scope) {
   if (CommandInputHooks.DispatchChar(ih, char, scope))
     return
-  PostCharToCaspAbbr(ih, char)
-  FuzzySuffixFire(ih, char, scope)
+  ; 回显统一过 CommandDisplay: 透传模式下 ShouldEcho 全停 (no-op), 历史形态照常投递
+  try CommandDisplay.EchoChar(ih, char)
+  catch as e
+    CommandInputHooks._log("EchoChar 异常: " e.Message)
+  ; 缩写匹配恒跑 (v4.2): 逐字符后缀查表, 命中即执行 —— 与历史形态行为一致
+  ; (透传模式词表已恢复, MatchList 全串精确 + 本函数后缀模糊, 双通道同历史)
+  try FuzzySuffixFire(ih, char, scope)
+  catch as e
+    CommandInputHooks._log("FuzzySuffixFire 异常: " e.Message)
 }
 
 /**
- * 命令框 OnKeyDown 入口 (模板 keyflux.tmpl 绑定): 先给 provider 机会消费, 未消费则仅对
- * 退格保持原语义。历史实现是无条件调 PostBackspaceToCaspAbbr, 但当时只有 {Backspace} 被
- * KeyOpt("{Backspace}", "N") 通知到, 等价于「只有退格会走到这里」; 现在 Up/Down/Enter 也
- * 参与通知 (供插件下拉列表导航), 故必须按 vk 分流, 避免方向键被当成退格投递。
+ * 命令框 OnKeyDown 入口 (模板 keyflux.tmpl 绑定)。
+ * v4 起无整体守卫: providers 派发照常 (透传模式下插件导航/触发仍是有效功能);
+ * 退格投递由 CommandDisplay.EchoBackspace 自身守卫兑停 —— 物理退格已随 V hook 透传
+ * (IME 组合期删组合串 / 其余时刻命令框原生删除), 再投递即二次删除 (§3.12 v4)。
+ *
+ * 先给 provider 机会消费, 未消费则仅对退格保持原语义。历史实现是无条件调
+ * PostBackspaceToCaspAbbr, 但当时只有 {Backspace} 被 KeyOpt("{Backspace}", "N") 通知到,
+ * 等价于「只有退格会走到这里」; 现在 Up/Down/Enter 也参与通知 (供插件下拉列表导航),
+ * 故必须按 vk 分流, 避免方向键被当成退格投递。
  */
 CommandInputOnKeyDown(ih, vk, sc, scope) {
   if (CommandInputHooks.DispatchKey(ih, vk, sc, scope))
     return
-  if (vk = 0x08)
-    PostBackspaceToCaspAbbr(ih, vk, sc)
+  if (vk = 0x08) {
+    try CommandDisplay.EchoBackspace(ih, vk, sc)
+    catch as e
+      CommandInputHooks._log("EchoBackspace 异常: " e.Message)
+  }
 }

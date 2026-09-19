@@ -36,7 +36,36 @@ TrayMenuHandler(ItemName, ItemPos, MyMenu) {
  */
 KeyFluxExit(ExitReason?, ExitCode?) {
   ProcessClose("KeyFlux-CommandInput.exe")
+  ; 命令框输入通道收尾: 复位回显策略 + 收起 IME 回显浮层 (避免残留窗口与状态)
+  try CommandDisplay.Reset()
+  try ImeInputHost.Disable()
   ExitApp
+}
+
+/**
+ * 引擎级未捕获异常兜底 (2026-09-19 新增, 模板在 auto-exec 早期 OnError 注册)。
+ *
+ * 为什么必须有: 无 OnError 时, 热键/Timer 线程的未捕获异常 = AHK 错误对话框 + 线程死亡。
+ * 若异常发生在命令框会话中 (StartInputHook 已 Suspend(true) 但永远走不到恢复), 全部热键
+ * 随之失效 —— 用户视角即「报错弹窗 + 命令框卡死, 无法关闭也无法输入」(2026-09-19 实测现象)。
+ *
+ * 处理策略 (kf_diag2.ahk 实测语义):
+ *   * 热键/Timer 线程: 记日志后返回 1 ⇒ 线程终止、**无弹窗**、脚本其余部分继续;
+ *     本函数内 Suspend(false) 把 StartInputHook 的暂停态一并复位, 避免热键残死。
+ *   * auto-exec 主线程: mode=Exit, 返回值被忽略, 脚本退出 —— 但错误全文已落盘,
+ *     事后凭 logs\engine_error.log 可精确复盘 (替代人工抄弹窗)。
+ * @returns {Integer} 恒为 1 (压制默认错误对话框)
+ */
+EngineOnError(err, mode) {
+  try {
+    Suspend(false)   ; 会话中线程死亡会残留 Suspend(true), 必须复位否则热键全灭
+    DirCreate("logs")
+    msg := FormatTime(, "yyyy-MM-dd HH:mm:ss") " [" mode "] " Type(err) ": " err.Message
+         . "`n    file=" err.File " line=" err.Line "`n    stack=" err.Stack "`n"
+    FileAppend(msg, "logs\engine_error.log", "UTF-8")
+    Tip("KeyFlux 内部错误已记录 (logs\engine_error.log)", -2000)
+  }
+  return 1
 }
 
 /**

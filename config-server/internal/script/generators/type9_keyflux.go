@@ -14,7 +14,7 @@ func keyfluxActions9(a model.Action, inAbbrContext bool) string {
 		3: `KeyFluxExit()`,
 		4: `KeyFluxOpenSettings()`,
 		5: `EnterSemicolonAbbr(semiHook, semiHookAbbrWindow)`,
-		6: `EnterCapslockAbbr(capsHook)`,
+		6: `EnterCapslockAbbr()`,
 		7: `ToggleCapslock()`,
 		8: `km.ToggleLock`,
 		9: `QuickSwitchGoto()`,

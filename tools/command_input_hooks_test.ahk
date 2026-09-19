@@ -34,15 +34,23 @@ try {
 ; ---- 依赖桩 ----
 ; 被测文件底部的两个入口函数 (CommandInputOnChar / CommandInputOnKeyDown) 会调用引擎的这三个
 ; 函数 (真身定义在 bin/lib/core/AbbrInput.ahk 与 bin/lib/commands/CommandResolver.ahk)。
-; 本探针只直接调 DispatchChar / DispatchKey, 故这三个桩**永不执行** —— 仅为满足加载期的
-; 符号解析。被测的 _Call / DispatchChar / DispatchKey 仍是逐字引入的真身, 同源性未受影响。
+; 第 11/12 组会经 CommandDisplay.EchoChar / CommandInputOnChar 触发到它们 —— 桩只做
+; Rec 记录不跑真逻辑, 借此断言「抑制态不投递 / Fuzzy 旁路 / 历史形态照常」。
+; 被测的 _Call / DispatchChar / DispatchKey / ShouldEcho 仍是逐字引入的真身, 同源性未受影响。
 PostCharToCaspAbbr(ih, char) {
+    Rec.Add("PostChar", [ih, char])
 }
 FuzzySuffixFire(ih, char, scope) {
+    Rec.Add("FuzzySuffixFire", [ih, char, scope])
 }
 PostBackspaceToCaspAbbr(ih, vk, sc) {
+    Rec.Add("PostBackspace", [ih, vk, sc])
 }
 
+; 被测文件的入口函数经 CommandDisplay 收口回显 (反八角 keycap 策略, 见 core/CommandDisplay.ahk),
+; 故必须**逐字引入该真身**而非另写桩 —— 与引入 CommandInputHooks 同一纪律: 桩只能验证桩自己。
+; CommandDisplay 消费的上面三个桩函数即为它调用的 Post* 系列。
+#Include ..\bin\lib\core\CommandDisplay.ahk
 #Include ..\bin\lib\core\CommandInputHooks.ahk
 
 ; ---- 断言基建 ----
@@ -269,6 +277,104 @@ try CommandInputHooks.ActivateBackend()
 catch
     threw := true
 Check(!threw, "ActivateBackend 在无可用后台窗口时不抛异常")
+
+; ============================================================
+; 11) CommandDisplay —— 回显收口 / 八角 keycap 抑制
+;
+; 背景: 命令框 exe 对 a-zA-Z0-9 会画八角 keycap, 且描边与字符同用一支画刷 (RTTI 证据),
+; 无法只去框留字。故「移除八角框」的实现方式是**不下发这些字符** ——
+; 本组断言守住的就是那条判据 (白名单边界必须与 exe 逐字一致)。
+; ============================================================
+
+Check(CommandDisplay.SuppressKeycap = false, "CommandDisplay 默认不抑制 (零行为变更)")
+
+; 白名单边界: 恰好 a-zA-Z0-9, 一个不多一个不少
+Check(CommandDisplay.IsKeycapChar("a") = true, "白名单: 'a' 命中")
+Check(CommandDisplay.IsKeycapChar("Z") = true, "白名单: 'Z' 命中")
+Check(CommandDisplay.IsKeycapChar("0") = true, "白名单: '0' 命中")
+Check(CommandDisplay.IsKeycapChar("9") = true, "白名单: '9' 命中")
+Check(CommandDisplay.IsKeycapChar("/") = false, "白名单外: '/' 不命中")
+Check(CommandDisplay.IsKeycapChar(":") = false, "白名单外: ':' 不命中")
+Check(CommandDisplay.IsKeycapChar("@") = false, "白名单外: '@' 不命中")
+Check(CommandDisplay.IsKeycapChar(" ") = false, "白名单外: 空格不命中")
+Check(CommandDisplay.IsKeycapChar("中") = false, "白名单外: 中文不命中 (exe 也不给中文画框)")
+Check(CommandDisplay.IsKeycapChar("（") = false, "白名单外: 全角括号不命中")
+Check(CommandDisplay.IsKeycapChar("") = false, "空串不命中 (边界不崩)")
+Check(CommandDisplay.IsKeycapChar("ab") = false, "多字符串不命中 (只接受单字符)")
+
+; 抑制关闭时: 所有字符照常下发 (历史行为)
+Check(CommandDisplay.ShouldEcho("a") = true, "未抑制: 'a' 下发")
+Check(CommandDisplay.ShouldEcho("中") = true, "未抑制: '中' 下发")
+Check(CommandDisplay.ShouldEcho(" ") = true, "未抑制: 空格下发")
+
+; 抑制开启时: 全部停投 (v4 §3.12: 透传已原生显示, 任何投递都是二次显示 —— 不再区分白名单)
+CommandDisplay.SuppressKeycap := true
+Check(CommandDisplay.ShouldEcho("a") = false, "已抑制: 'a' 不下发 (透传已原生显示)")
+Check(CommandDisplay.ShouldEcho("9") = false, "已抑制: '9' 不下发")
+Check(CommandDisplay.ShouldEcho("中") = false, "已抑制: '中' 不下发 (v4 全停, 防中文双显)")
+Check(CommandDisplay.ShouldEcho(" ") = false, "已抑制: 空格不下发")
+Check(CommandDisplay.ShouldEcho("（") = false, "已抑制: 全角符号不下发")
+
+; EchoChar 返回值语义: true = 确实投递, false = 被抑制
+Check(CommandDisplay.EchoChar(ih, "a") = false, "EchoChar 被抑制时返回 false")
+Check(CommandDisplay.EchoChar(ih, "中") = false, "EchoChar 中文同样被抑制 (v4 全停)")
+
+; Reset 复位
+CommandDisplay.Reset()
+Check(CommandDisplay.SuppressKeycap = false, "Reset 后抑制关闭 (会话间不泄漏状态)")
+Check(CommandDisplay.EchoChar(ih, "中") = true, "未抑制: EchoChar 正常投递")
+Check(Rec.Count("PostChar") = 1, "未抑制投递确实到达 PostChar 桩 (镜像显示通道)")
+
+; --- 12) 入口函数 CommandInputOnChar 的透传守卫语义 (§3.12 v4.2) ---
+; 抑制态: DispatchChar 照跑 (providers 派发保留), EchoChar 被兑停 (ShouldEcho 全停),
+;         FuzzySuffixFire 恒跑 (v4.2 恢复: 缩写全英文字母, 中文意图仅在前置键之后,
+;         那时字符已被插件消费, 到不了匹配层 —— v4 的旁路已撤, 与历史形态对齐)。
+Rec.Reset()
+CommandInputHooks.Unregister(pSkipped)
+CommandDisplay.SuppressKeycap := true
+
+threw := false
+try
+    CommandInputOnChar(ih, "a", "capslock")
+catch
+    threw := true
+Check(!threw, "CommandInputOnChar 在透传模式下不抛异常")
+Check(CommandDisplay.ShouldEcho("a") = false, "透传模式下 'a' 确实被拦下")
+Check(Rec.Count("PostChar") = 0, "透传模式下字符未投递 (EchoChar no-op)")
+Check(Rec.Count("FuzzySuffixFire") = 1, "透传模式下 FuzzySuffixFire 恒跑 (v4.2 恢复, 即输即执行)")
+
+; 透传模式下 providers 派发保留, 且**消费型** provider 会短路: DispatchChar 提前
+; return ⇒ EchoChar 与 FuzzySuffixFire 都不执行 (搜索期不误触发缩写的双保险 #2)
+pWatch := FakeProvider("W", "ok", true)
+CommandInputHooks.Register(pWatch)
+Rec.Reset()
+CommandInputOnChar(ih, "b", "capslock")
+Check(Rec.Count("OnChar") = 1, "透传模式下 providers 派发保留 (v4 语义)")
+Check(Rec.Count("PostChar") = 0, "透传模式下仍不投递")
+Check(Rec.Count("FuzzySuffixFire") = 0, "插件消费字符后 FuzzySuffixFire 不跑 (搜索期不误触发, 双保险)")
+CommandInputHooks.Unregister(pWatch)
+
+; 历史形态 (未抑制): EchoChar 照常投递, FuzzySuffixFire 照常
+CommandDisplay.Reset()
+Rec.Reset()
+CommandInputOnChar(ih, "a", "capslock")
+Check(Rec.Count("PostChar") = 1, "历史形态下字符照常投递")
+Check(Rec.Count("FuzzySuffixFire") = 1, "历史形态下缩写模糊匹配照常")
+CommandDisplay.Reset()
+
+; --- 13) 焦点激活 ActivateCommandWindow 的降级语义 (§3.12 v4.1, 2026-09-19) ---
+; 测试环境无命令框窗口: WinWait 0.5s 超时 -> 必须返回 false (触发调用方降级),
+; 且函数自身不得触碰 SuppressKeycap (降级决策归编排层, 单一职责)。
+threw := false
+skBefore := CommandDisplay.SuppressKeycap
+retActivate := true
+try
+    retActivate := CommandDisplay.ActivateCommandWindow()
+catch
+    threw := true
+Check(!threw, "ActivateCommandWindow 在无命令框窗口时不抛异常")
+Check(retActivate = false, "ActivateCommandWindow 无窗口返回 false (调用方降级依据)")
+Check(CommandDisplay.SuppressKeycap = skBefore, "ActivateCommandWindow 不触碰 SuppressKeycap (单一职责)")
 
 ; ============================================================
 ; 收尾

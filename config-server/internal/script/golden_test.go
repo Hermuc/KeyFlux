@@ -100,7 +100,7 @@ func TestSyntheticConfigCoversMatrix(t *testing.T) {
 		{`TypeID7 textFeatures7 send 分支`, `Send("{blind}^{left}")`},
 		{`TypeID7 textFeatures7 callMap 分支 (HoldDownModifierKey)`, `HoldDownModifierKey("LShift")`},
 		{`TypeID8 builtinFunctions8 (AHKCode 直出)`, `MsgBox("hello")`},
-		{`TypeID9 ValueID6 capslock 缩写启用`, `EnterCapslockAbbr(capsHook)`},
+		{`TypeID9 ValueID6 capslock 缩写启用`, `EnterCapslockAbbr()`},
 		{`TypeID9 ValueID5 semicolon 缩写启用`, `EnterSemicolonAbbr(semiHook, semiHookAbbrWindow)`},
 		{`TypeID9 ValueID9 QuickSwitch 薄壳 (callMap[9])`, `km.Map("*z", _ => QuickSwitchGoto())`},
 		// TypeID5 重映射特殊路径 -> 模板尾部 .KeyMapping

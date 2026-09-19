@@ -406,7 +406,204 @@ provider 为实现以下方法的对象(类实例), **全部可选, 缺失即视
 
 回归守门人: `tools/command_input_hooks_test.ahk` + `make check-hooks`(已挂入 `make check`)。
 探针逐字 `#Include` 实现真身而非另写桩, 并把工作目录隔离到 `%TEMP%`(被测 `_log` 写相对路径
-`logs\command_input_hooks.log`)。旧写法下 13 项红, 新写法下 23 项全绿。
+`logs\command_input_hooks.log`)。旧写法下 13 项红, 新写法下 23 项全绿; 2026-09-19 扩入
+`CommandDisplay` 白名单断言后为 49 项全绿。
+
+### 3.11 CommandDisplay —— 命令框回显收口 / 八角 keycap 抑制 (2026-09-19 冻结)
+
+**背景: 命令框 exe 的绘制约束 (反汇编 + 实测结论, 不可绕过的物理事实)**
+
+命令框本体是上游预编译二进制(`bin/KeyFlux-CommandInput.exe`, 无源码)。经 PE 解析与
+`.pdata` 函数表定位 `SampleWindow::DrawKeys`, 确认:
+
+1. **只有 `a-zA-Z0-9` 会套八角 keycap** —— 白名单为 exe 内 UTF-16 字面量(VA `0x1daa0`);
+   中文/全角/其他符号**不套**, 以普通字形直绘(DirectWrite 系统字体回退)。
+2. **描边与字符由同一支画刷绘制** —— RTTI 签名 `SampleWindow::DrawKeys(ComPtr<ID2D1DeviceContext>&,
+   D2D_RECT_F&, ComPtr<ID2D1SolidColorBrush>& brush, D2D1::Matrix3x2F&)` 只收**一支**
+   `ID2D1SolidColorBrush`; exe 内**不存在**独立的边框绘制函数(仅 `DrawKeys` + `DrawInputVisual`)。
+   皮肤键 `keyColor`/`keyOpacity` 驱动的就是这支画刷。
+3. 实测反证(三条, 全部已在真机验证):
+   - `keyOpacity = 0.0` ⇒ **字符与描边一起消失**(该透明度是**图层级**, 不是描边级);
+   - `keyColor = #FFFFFF` ⇒ 描边与字符**同为白色**;
+   - `keyColor = #FF0000` ⇒ 描边与字符**同为红色**(八角内部透明)。
+4. **patch 二进制跳过 `DrawGeometry` 会破坏窗口初始化** (2026-09-19 试过并已回滚):
+   `0x7258` 处的 `call [rax+0x78]` 之后紧跟 `test eax,eax / jne`, 其返回值不是纯错误码 ——
+   跳过它令命令框**完全不弹出**。⇒ 该路径不可作为「去框」手段。
+5. **命令框的显示 = 纯投递的 WM_CHAR (0x0102)**: capsHook 以 `InputHook("", ...)` 创建
+   (无 V ⇒ 默认不可见, 吞掉文本键), 物理键到不了命令框窗口。实测铁证: 抑制投递后
+   字母全部消失 (2026-09-19)。
+6. **✅ 已落地: 数据 patch (2026-09-19)** —— 白名单是 `.rdata` 中的**绘制判定数据**
+   (62 字符 UTF-16LE, 文件偏移 `0x1cca0` = RVA `0x1daa0`, 前后紧邻 `Draw()`/`dwriteF…`),
+   已替换为不可匹配字符 U+0001×62 (保留长度): 字母/数字走普通字形路径 ⇒ **命令框内
+   直接显示, 无八角框**。与已证伪的代码 patch (第 4 条) 性质完全不同: 改常量数据
+   不动控制流。patch 前后 SHA 与还原路径: 部署树 `KeyFlux-CommandInput.orig.exe`
+   (SHA256 `f14bba71…468ab3`) 为原始备份, 覆盖回去即还原。
+
+**结论**: 「只去八角框、保留文字」的可行路径 = **数据 patch 白名单** (已落地, 只改常量
+数据); 代码 patch (跳调用) 与皮肤调参 (单画刷同源) 均已证伪, 勿再尝试。
+
+**契约**
+
+```ahk
+class CommandDisplay {
+  static SuppressKeycap := false        ; 「IME 会话中」代理: true = 投递/缩写匹配/providers 全旁路
+  static IsKeycapChar(c) => bool        ; 单字符; a-zA-Z0-9 ⇒ true (判定保留, 与 exe 已脱钩)
+  static ShouldEcho(c) => bool          ; 抑制开启且命中白名单 ⇒ false
+  static EchoChar(ih, c) => bool        ; true = 确实投递; false = 被抑制跳过
+  static EchoBackspace(ih, vk?, sc?)    ; IME 会话中不投递 (物理退格已透传给 IME, 防二次删除)
+  static Reset()                        ; 复位 (引擎退出)
+}
+```
+
+**硬约束**:
+
+1. 🔴 **所有命令框回显必须经本模块收口** —— 不得再直接调 `PostCharToCaspAbbr` /
+   `PostBackspaceToCaspAbbr`(插件侧亦然)。散落直调会让「抑制」出现漏洞: 有的字符被拦、
+   有的漏过去, 症状是**部分字母仍带八角框**, 且静态检查查不出。
+   当前调用点: `CommandInputHooks.CommandInputOnChar/OnKeyDown`、
+   `type9_keyflux.EnterCapslockAbbr`(Match 分支)、`everything_search` 的 `EverythingSession`;
+   替换为 `AbbrInput` 的底层函数仅限这四处。
+2. `IsKeycapChar` 的白名单语义保留原值 (仅 `0x30-0x39` / `0x41-0x5A` / `0x61-0x7A`)。
+   ⚠ exe 内烧录值已由数据 patch 改为 U+0001 (见背景第 6 条) —— **AHK 侧与 exe 脱钩是
+   有意为之, 勿"同步修复"**。本判定现在只服务于 ShouldEcho 的语义完整性 (IME 会话中
+   「本来会画框的字符」不投递) 与排查对照。
+3. `SuppressKeycap` 默认 **false**(零行为变更), 语义为「**透传模式总开关**」(§3.12 v4.2):
+   由 `ImeInputHost.OnSessionBegin` 置位 (启用时**恒 true**, 不再查 IME 状态 —— 查询
+   已整体证伪)、`OnSessionEnd` 复位。true = 投递通道整体关闭 (EchoChar/EchoBackspace
+   恒 no-op —— v3 只停白名单字符是错的, 中文 U+4E00+ 会漏网双显); **providers 派发与
+   缩写匹配保留** (v4.2 起: 词表恢复 + FuzzySuffixFire 恒跑 —— 用户裁决缩写命令全为
+   英文字母, 中文输入仅发生在前置键之后, 那时字符已被插件消费、到不了匹配层)。
+4. ⚠ **sync-out 会用仓库侧 (未 patch) exe 覆盖部署树** —— patch 后重跑 `make sync-out`
+   会把八角框带回来。纪律: patch 是部署树本地事实, 重跑 sync-out 后必须重新执行
+   patch (脚本: `%TEMP%\kf_patch_whitelist.py`, 前置校验 + 回读复核内置)。
+
+回归守门人: `tools/command_input_hooks_test.ahk` 第 11/12 组(白名单边界 12 项 + 抑制语义 9 项)。
+
+### 3.12 ImeInputHost —— 命令框透传模式开关 / 恒可见 hook (2026-09-19 v4.2 冻结, 焦点修复 + 缩写执行恢复)
+
+**根因 (实证修正, 覆盖 v3 表述)**: capsHook 以 `InputHook("", ...)` 创建, 无 V 选项 ⇒
+**默认不可见 = 吞掉文本键**, 物理键到不了命令框窗口, IME 上下文永远收不到键, 组合无从
+发生。官方文档那句 "does not support IME" 的实际含义: 钩子在按键抵达 IME **之前**就把
+它翻译成 ASCII —— 吞键模式下中文确实不可能; **但 V (可见) 模式下物理键会透传到焦点窗口
+的 IME 上下文, 组合/候选/上屏全部由输入法原生完成** (上屏中文以 WM_CHAR 直达命令框,
+不经 AHK 回调)。
+
+❗ 定位过程中证伪并已废弃的前提 (记录以免重走; 第 5/6 条为 v3→v4 的死因链):
+- 「原软件对输入法有硬性限制」—— 不存在 (`DisableIME()` 全仓 0 调用点, exe 未导入
+  imm32, 无子控件)。
+- 「皮肤 keyColor/keyOpacity 可只去框留字」—— 不可行, 见 §3.11。
+- 「ImmGetCompositionStringW 能在引擎进程读到组合串做浮层回显」—— **证伪**: ImmGetContext
+  只能取本线程上下文, 引擎进程永远看不到前台 IME 的组合 (浮层恒空)。浮层方案 (v2)
+  已整体删除 (用户否决: 要求字母直接显示在命令框内)。
+- 🔴 **「跨进程读 IME 开关状态做条件透传 (v3 设计)」—— 证伪, 即 v3 的死因**: HIMC 是
+  进程本地句柄, 跨进程 `ImmGetContext` 恒返回 0 (kf_p1_ime_crossproc 探针实测
+  notepad 同样 hIMC=0) ⇒ `_QueryImeOpen` 恒 -1 ⇒ `SuppressKeycap` 恒 false ⇒ hook 恒
+  吞键 ⇒ 中文打不出 (2026-09-19 用户真机确认; v3 的透传分支从未生效过)。
+- 🔴 **「TSF 全局 compartment 读 IME 中英模式」—— 证伪**: AHK 内 DllCall 消费 TSF
+  四连败: CLSID_TF_ThreadMgr REGDB_E_CLASSNOTREG → `TF_CreateThreadMgr` 免 COM 路径
+  成功, 但 `ITfThreadMgr::Activate` 在 AHK 主线程 DllCall 直接挂死 (须跳过),
+  `GetGlobalCompartment` (vtable idx14, IDL 序) 调用即抛异常 (kf_p2b/p2c/p2d 探针)。
+  结论: **放弃一切 IME 状态预查, 透传恒开**。
+
+**现行方案 (v4.2)**: hook 恒 V (本模块启用时) —— `MakeCapsHook` 建 `InputHook("V", …)`
++ **原词表** (v4.2 恢复, 两形态共用); `ImeInputHost.OnSessionBegin` **恒置**
+`CommandDisplay.SuppressKeycap := true`。物理键透传接管一切显示: 英文字母原生直显;
+拼音进 IME 原生组合/候选/上屏, 上屏中文以 WM_CHAR 直达命令框 (非白名单, 无框)。
+投递通道整体关闭 (§3.11 硬约束 3); **缩写匹配两形态恒开** (词表 MatchList 全串 +
+FuzzySuffixFire 后缀, 与历史形态完全一致 —— 用户裁决: 缩写全英文字母, 中文意图仅在
+前置键之后, 那时字符已被插件消费)。providers 派发保留。回退 = 注释掉模板的
+`Register(ImeInputHost)`/`Enable()` 两行 ⇒ hook 回历史形态 (无 V + 词表 + 投递显示),
+自洽。
+
+**焦点契约 (v4.1, 2026-09-19 用户真机反馈后新增)**: 透传模式下物理键按「焦点窗口」路由,
+而命令框窗口带 **WS_EX_NOACTIVATE**(kf_focus_probe v5 探针实测 exStyle=0x8200008,
+NOACTIVATE=1 + TOPMOST) —— SHOW 消息只改可见性、从不带来键盘焦点 ⇒ 透传的按键会全部
+打进会话开始时的原文本框(用户实测: 英文无法输入 + 焦点滞留)。故 `EnterCapslockAbbr`
+在 SHOW 之后、建 hook 之前必须调用 `CommandDisplay.ActivateCommandWindow()` 显式激活:
+等窗口可见 → WinActivate → 循环回读 WinActive → 失败兜底 AttachThreadInput + SetFocus;
+**激活失败则置 `SuppressKeycap := false` 降级历史形态**(吞键 + 投递显示, 英文仍可用;
+OnSessionEnd 复位标志, 降级自洽无泄漏)。会话结束 (非 Match 分支) 经
+`CommandInputHooks.ActivateBackend` 把前台还给会话开始时的窗口 —— 该函数的
+WinActive 检查保证历史形态会话零行为变更 (命令框本就不在前台)。Match 分支不恢复
+(命令体自会接管前台)。
+
+```ahk
+class ImeInputHost {                    ; 注册为 CommandInputHooks provider (全 static)
+  static Enabled / InSession            ; 闸门 / 会话标志 (PrevOpen 已随查询退役)
+  static OnSessionBegin()               ; 恒置 CommandDisplay.SuppressKeycap := true (不查任何状态)
+  static OnSessionEnd() / Disable()     ; 复位 false (hook 回历史形态)
+  static OnChar/OnKey => false          ; 防御性透明旁路
+}
+```
+
+**硬约束**:
+
+0. 🔴 **四个 `On*` 回调必须声明为 `static`** —— `CommandInputHooks.Register(ImeInputHost)`
+   注册的是**类对象本身**, 而 AHK v2 类对象上**实例方法的 `HasProp` 为 `false`**(实测:
+   `Foo.HasProp("Inst")=0`), 非静态会让 `_Call` 的 `HasProp` 守卫**静默跳过** ⇒ provider
+   从不运行且零日志。全静态、全类名引用。(对照: EverythingController 注册的是实例。)
+1. 🔴 **永远不要试图查询 IME 状态来驱动可见性** —— 跨进程 IMM (HIMC 进程本地) 与 TSF
+   (AHK 主线程 DllCall 不可行) 均已证伪 (见上方证伪链第 5/6 条)。可见性一律恒 V
+   (启用时), 中/英文差异由物理键透传天然完成。**勿重蹈 v3 覆辙。**
+2. 🔴 **词表两形态恒用 (v4.2 恢复, 不得再清空)** —— v4 曾为防「拼音误触发缩写」清空
+   词表, 结果透传会话里缩写命令全部失效 (用户实测 `se` 不再打开设置面板)。用户裁决:
+   **缩写命令全部由英文字母组成, 唯一需要输入中文的场景是前置键 (如空格) 之后** ——
+   那时字符已被插件 (providers) 消费, DispatchChar 提前 return, 根本到不了匹配层,
+   「拼音误触发缩写」在实践中不存在。残余理论边界见硬约束 7 (用户接受)。
+3. 🔴 **`FuzzySuffixFire` 恒跑 (v4.2 恢复, 不得再旁路)** —— 它查 `CommandResolver`
+   注册表 (与 hook 词表无关), 逐字符后缀命中即 `ih.Stop()`+执行命令, 是「打完即执行」
+   的兜底通道, 必须与历史形态行为一致 (v4 旁路导致缩写失效)。搜索期不误触发的双保险:
+   ① 词表 MatchList 是**全串精确**匹配, 检索词 Input 形如 `" se"` (带空格前缀) 永不
+   等于 `"se"`; ② 插件消费字符后 DispatchChar 提前 return, Fuzzy 根本不进 (回归守门:
+   check-hooks 第 12 组两条断言)。
+4. **providers 派发在透传模式下保留** —— 插件 OnChar/OnKey 消费路径不受透传影响
+   (内置插件均经 OnKey 触发, 无 OnChar 消费者)。v3 的「OnChar/OnKeyDown 顶部整体
+   旁路」已废弃: 它会连 everything_search 的空格触发一起杀掉。
+5. **Up/Down/Enter/Backspace 在 V 模式下必须保持透传 (KeyOpt 仅 "N" 无 "S")** —— IME
+   组合期它们是选候选/翻页/确认拼音原文/删组合串的原生操作, 吞掉即毁 IME 交互;
+   CapsLock 与 Esc 为 EndKey + "S" (抑制透传防切大小写/防触发 exe 原生行为, EndKey
+   检测不受 S 影响)。
+6. 🔴 **透传会话必须显式激活命令框窗口, 激活失败必须降级** —— 窗口 NOACTIVATE, SHOW 不
+   带键盘焦点; 不激活则物理键全部漏进原窗口 (2026-09-19 用户真机实测: 英文无法输入)。
+   落点: `EnterCapslockAbbr` 在 SHOW 与 MakeCapsHook 之间调用
+   `CommandDisplay.ActivateCommandWindow()`, 返回 false ⇒ `SuppressKeycap := false`
+   (降级历史形态)。`ActivateCommandWindow` 自身不得触碰 SuppressKeycap (单一职责,
+   check-hooks 第 13 组)。
+7. **已知局限 (语义正确, 非缺陷)**: IME 开启且**未按前置键**直接打拼音时, 拼音全串
+   (MatchList) 或其任一后缀 (FuzzySuffixFire) 若恰好等于某缩写会触发执行 —— 用户裁决
+   接受: 缩写全为英文字母, 中文输入只发生在前置键之后 (那时字符已被插件消费, 不进
+   匹配层), 该场景概率极低; everything_search 的空格前置触发与 IME 选字键共用物理
+   空格 —— 中文组合期按空格既选字也可能触发插件下拉 (接受, 边缘场景, Esc 可收起)。
+8. **check-ime 判据**: `tools/ime_input_test.ahk` 断言**无 V 时**收不到中文码点 ——
+   该事实仍成立且是本方案的理论基础 (故保留为回归闸门)。「断言变红 ⇒ 模块退役」的
+   旧判据作废: 变红说明 AHK 默认形态已透传 IME, 应改断言而非退役。
+
+回归守门人: `tools/command_input_hooks_test.ahk` (61 项, 含 v4.2 恒跑/消费即停守卫
+语义 + v4.1 焦点降级语义) + `tools/ime_input_test.ahk` + `make check-ime`(手动,
+需退出 KeyFlux)。
+⚠ 透传端到端 (V → IME 组合 → 上屏 WM_CHAR) 无法在 AHK 探针内完整自动化, 由用户真机验证。
+
+### 3.13 EngineOnError —— 引擎级未捕获异常兑底 (2026-09-19 冻结)
+
+**背景**: 无 OnError 时, 热键/Timer 线程的未捕获异常 = 错误弹窗 + 线程死亡; 若发生在
+命令框会话中 (`StartInputHook` 已 `Suspend(true)` 而永远走不到恢复), **全部热键随线程
+死亡而失效** —— 用户视角即「报错弹窗 + 命令框卡死, 无法关闭也无法输入」(2026-09-19 实测)。
+实测依据: `PostMessage` 到已消失的命令框窗口会抛 `TargetError`(KF_diag2 探针);
+`EchoChar`/`FuzzySuffixFire`/命令体执行原先都在热键线程**裸奄**, 任何一步抛出即触发上述现象。
+
+**双层修复**:
+1. **源头包裹** (CommandInputHooks.ahk / type9_keyflux.ahk): `CommandInputOnChar` 里的
+   `EchoChar`、`FuzzySuffixFire`, `CommandInputOnKeyDown` 里的 `EchoBackspace`, 以及
+   `EnterCapslockAbbr` Match 分支的 `EchoChar` 与 `ExecCapslockAbbr`(命令体), 全部 try 包裹
+   → 异常记入 `logs\command_input_hooks.log`, 命令体失败另给 Tip 提示。
+2. **兑底网络** (Functions.ahk `EngineOnError`, 模板在 auto-exec 早期 `OnError` 注册):
+   记录 `Type/Message/File/Line/Stack` 全文到 `logs\engine_error.log` (UTF-8) +
+   `Suspend(false)` 复位残留暂停态 + Tip 提示 + 返回 1 压制弹窗。实测语义: 热键/Timer
+   线程异常 ⇒ 线程终止、无弹窗、脚本其余部分继续; auto-exec 线程 ⇒ 退出但日志已落盘。
+
+**契约**: 任何新加的热键/Timer/输入回调代码, 不允许存在会向外抛异常且无 try 包裹的外部调用
+(文件 IO、PostMessage、Run、用户命令体); 新 provider 的注册对象若是**类**而非实例,
+其 `On*` 方法必须 `static`(见 §3.12 硬约束 0)。排查命令框故障时先看 `logs\engine_error.log`。
 
 ## 4. 插件清单格式(冻结)
 
@@ -548,3 +745,10 @@ action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经
 | 2026-09-18 | 设置面板**页面改名** (纯文案层变更, 零数据/API/DB/route/protocol 变更): ① 原「总览」(导航 i18n `913`) 与页内 H1 (`939`) 统一改为**「使用指南」/ Guide** —— 该页实际渲染 `config_doc.md` 使用文档 + 底部自定义编辑区 + 回退引导, 「总览」名不副实, 且页内 H1 原本就叫「文档」; ② 原导航项「Settings」改为**「选项」/ Options** —— 整窗即「KeyFlux 设置面板」(窗口标题原 `Setting`), 页面再叫「Settings」导致同一层级「设置」指代两个范围, 「选项」不含「设置」二字且与之形成 *设置面板 > 选项* 的清晰层级 (Windows/Firefox 中文惯例)。**关键实现**: 导航 keymap `id=4` 的标题**改由 i18n 常量提供** (`MainViewModel.BuildNav` 特判 `km.Id == 4` 取 `I18n.T("2581")`), **不再读 config 的 `name`** —— 该字段会被 `config-server/internal/script/generators/generators.go:145` 写进生成的 AHK `NewKeymap(...)`, 改动将连带 golden/oracle 基线与用户 live config 迁移, 且 `id=4` 不在设置页「快捷键方案」列表内 (只列 `Id > 4`) 故无法在 UI 改名; 走 i18n 还顺带获得中英双语标题。窗口标题 `MainWindow.axaml` 由 `Setting` 改为 `KeyFlux Settings` (`OverviewEditWindow.axaml` 的 XAML 占位同步为 `Edit Guide`, 其运行时标题本就由 `I18n.T("2406")` 覆盖; 另 4 个对话框窗口仍为静态 `Title="Setting"`, 未纳入本次范围)。关联文案同步: i18n `931`/`936`/`2406`/`2407` 去「总览」化, `937` 的「设置」页引用改「选项」页; `site-assets/config_doc.md` 与 `config_doc.html`「点开 Settings 页」→「点开「选项」页」; 代码注释与 `readme.md` 全量去「总览」(31 处)。新增 i18n `2581` (选项/Options) ⇒ `I18nResourceTests.ExpectedKeyCount` 386→387 (**新增键自 2582 起**)。⚠ **踩坑**: 仅改 Go 侧注释 (`config-server/internal/script/model/types.go`) 即触发 `SettingsTestServer.AssertBackendNotStale` 前置守卫 (比较 exe 与 Go 源 mtime), 22 个端点测试全红 —— 必须 `make buildServer` 并把 `bin/settings.exe` 复制到 `%TEMP%\mk_settings_headless\` 才恢复。校验: C# 269/269, analyzers×2 exit 0, `make check` lint CLEAN / texttypes 315 次求值一致 / ORACLE PASS |
 | 2026-09-18 | 首个**真实可用**的第三方插件 `everything_search` + **声明式插件设置**落地 (纯增量, 既有 API/route/protocol 零改动): ① **命令框插件拦截点** `bin/lib/core/CommandInputHooks.ahk` (新增) —— 可插拔 provider 列表, 命令框输入期的 OnChar/OnKeyDown 先过 provider, 返回 true 即消费; `keyflux.tmpl` 的 capsHook 改绑 `CommandInputOnChar/OnKeyDown` 并为 `{Up}/{Down}/{Enter}` 加 `KeyOpt(...,"N")`(无 provider 消费时不投递字符, 与历史行为一致; 半角分号钩子不受影响 —— 它是缩写提示窗, 与命令框无关)。② **Everything 插件** `plugins/examples/everything_search/`(manifest + main.ahk + src/ 六层: Messages/Settings/Providers/Search/Dropdown/Session): 命令框内按下**前置触发键**(默认空格, 由设置面板配置)时取当前选中文字, 经 **es.exe 官方 CLI** 检索, 结果以不激活的浮层下拉列在命令框正下方, ↑↓ 选择 / 回车在资源管理器打开/定位; Everything 未运行时按配置的 everything.exe 路径自动拉起(轮询 6s); 通道选型见该目录 `EverythingProviders.ahk` 文件头(WM_COPYDATA IPC 在 Everything 1.5.0.1418 上回复不稳定, SDK DLL 路线官方只支持 1.4.x —— 与 Flow Launcher 文档一致, 故取 ES CLI; `everything.exe -search` 仅作降级)。③ **声明式设置**: `plugin.json` 新增 `settings[]`(key/type/label/labelEn/default/filter/hint/hintEn/min/max/maxLength), Go `ValidateManifest` 全量校验(key 命名空间 / type 词表 char|text|number|file / label 非空 / key 唯一 / 声明 settings 必须申请 settings 权限 / 默认值自身合法); 新增 `internal/plugins.SettingsStore`(与 AHK `ConfigProvider` 同一文件同一扁平格式, 关闭 HTML 转义 + 临时文件 rename 原子落盘) 与两个端点 `GET/PUT /api/plugins/:id/settings`(PUT 逐键按同一份声明校验、**整单拒绝**、空串=删除回落默认值); C# 侧 `PluginSetting`/`PluginSettingsResponse` DTO + `ISettingsApi` 两方法 + `PluginSettingsDialogWindow`(按 settings[] 渲染 char/file+浏览/number/text 四类编辑器) + `PluginsPageViewModel.CanConfigure` 放开到「有 settings 声明的用户插件」。④ **免重启生效**: 插件在每次会话开始时重读 plugin-settings.json (`EverythingSettings.Load` 仅在值真变时返回 true ⇒ 只在必要时让通道探测缓存失效, 避免每次会话白起一次 `es.exe -version` 子进程)。⑤ **部署链**: Makefile 新增 `sync-plugins`(robocopy plugins/examples → `$(OUT_DIR)/data/plugins`, 刻意不带 /MIR ⇒ 用户自装插件不被清掉), 并挂为 `check` 与 `sync-out` 的前置 —— 生成端只扫 `<config.json 同级>/plugins`, 插件不到位则 check 会在空目录上假绿; `make check` 现覆盖真实插件注入路径。i18n 新增 6 键(2582 浏览/2583 选择文件/2584 设置加载失败/2585 保存失败/2586 无可配置项/2587 当前为空格) ⇒ `ExpectedKeyCount` 387→393(**新增键自 2588 起**); 另改**值** 2421「运行时支持开发中」→「第三方插件」与 2425 运行时说明(插件运行时已随 2026-09-12 里程碑落地, 原文案失真; 仅改值不改键)。**闸门**: Go `go test ./...` 全过(新增 manifest 设置校验 15 例 + ValidateSettingValue 19 例 + SettingsStore 8 例 + 端点 5 例); golden 快照随模板的 Include/KeyOpt 变更刷新(`UPDATE_GOLDEN=1`, diff 仅该 6 行); C# 288/288(277→288, 新增 `PluginSettingsDialogTests` 11 例, 含**直读仓库真实 plugin.json** 的契约夹具 —— 该用例当场抓出 limit 未声明 min/max 与 hint 文案不一致); analyzers×2 exit 0; `make check` lint CLEAN / texttypes 315 求值一致 / `/Validate` exit 0 / ORACLE PASS; AHK 端到端探针 ALL PASS(热重载 changed 语义、新触发键即刻生效、零配置 SelfEsPath 自探测走 es-cli 并真实返回结果、会话状态机回归)。实机部署: es.exe(官方 CLI, voidtools 签名 Valid, v1.1.0.37, SHA256 3BE71857...) 置于部署树 `data/plugins/everything_search/bin/` (插件 `SelfEsPath` 的设计落点, **不入库** —— 第三方二进制不含在仓库) |
 | 2026-09-19 | 修复缺陷: **CommandInputHooks 的 provider 分发从未真正执行** ⇒ 命令框按前置触发键(空格)毫无反应 (拦截点引入于 2026-09-18, 自始未生效)。**根因**: `_Call` 写成 `fn := p.%name%` + `fn.Call(args*)`, 而 **AHK v2 的 `obj.Method` 取到的是未绑定 `this` 的函数对象**(`this` 只是普通首参, 取值前无值 —— 与 Python/JS 的 bound method 语义相反, 官方作者 lexikos 明示), 于是首个实参被顶替成 `this`、末位实参缺失, 每次回调在**调用边界**抛 `Missing a required parameter.`; 该异常被 `DispatchChar/DispatchKey/_Notify` 的 try/catch 吞掉并「视为未消费」⇒ provider 一次都没执行, 日志只剩一行被吞掉的噪声。**判据**: 插件 `OnSessionBegin()` 声明**零参**, 零实参 `.Call()` 仍报缺参 ⇒ 缺的只能是隐式 `this`。**修复**: 改用动态名直接调用 `p.%name%(args*)`(同仓先例 `bin/lib/Monitor.ahk:363`), 等价备选 `ObjBindMethod(p, name).Call(args*)`。**为何此前无闸门可拦**: `/Validate`(语法)与 `lint`(标识符遮蔽)均为静态检查, 查不出该纯运行时语义; 而外部症状「按键毫无反应」与「插件没注册」完全一致, 极易误判到插件侧。**新增守门人**: `tools/command_input_hooks_test.ahk` + `make check-hooks`(已挂入 `make check`), 23 项断言覆盖 this 绑定 / 实参位置 / 返回值透传 / HasProp 守卫 / 异常隔离且继续分发 / 短路 / 注册幂等 / 注销生效 / 无后台窗口; 探针**逐字 `#Include` 实现真身**而非另写桩(否则只验证自己的桩, 回归价值归零), 并把工作目录隔离到 `%TEMP%`(被测 `_log` 写相对路径, 不隔离会污染部署 `logs/`); **反转验证**: 旧写法 13 项红 / 新写法 23 项全绿。同批清理插件侧 5 处零引用死代码(`hint_continue` / `title_key_space` / `err_empty` / `EverythingMessages.F()` / `EverythingSettings.TriggerName()`), 插件文案表加「只保留有实调用点的键」纪律。**契约**: 新增 §3.10 冻结 `CommandInputHooks` provider 契约(方法签名 / 返回值语义 / `this` 绑定要求) |
+
+| 2026-09-19 | **命令框中文输入 + 移除文字外围八角边框** (两项用户需求, 零 API/DB/route/protocol 变更; 未提交 —— 本机验证中): ① **中文输入**: 用户前提「原软件对输入法有硬性限制」经查**不成立** —— `DisableIME()`(`bin/lib/core/Utils.ahk`, 基于 `ImmAssociateContext(ctrl,0)`)全仓 **0 调用点**(上游 MyKeymap 亦只定义不调用), exe 未导入 `imm32.dll`, 命令框无子控件(离线实测 `controls = []`)。**真正根因**是 AHK 官方文档明示的架构限制: *"AutoHotkey does not support Input Method Editors (IME). The keyboard hook intercepts keyboard events and translates them to text by using `ToUnicodeEx` or `ToAsciiEx`."* —— 钩子在按键抵达 IME **之前**就翻译成 ASCII。**自动化实证**(新增 `tools/ime_input_test.ahk`, 用 `SendEvent` 注入 + `ImmSetOpenStatus` 程序化开关输入法, 无需人工打字): IME 实测 `openStatus=1` 下注入 `zhong`+空格, `OnChar` 收到 `7A 68 6F 6E 67 20`(拼音原文+空格), 「中」从未出现; 6 用例(zhong/zhongkong/ascii × 空格/回车)全部零中文码点。**手段侧实证**: AHK 能把任意 Unicode 逐码点注入目标窗口 `WM_CHAR`(含 emoji 走 UTF-16 代理对两条, 与 `PostCharToCaspAbbr(0x0102, Ord(c))` 语义兼容)。**落地**: 新增 `bin/lib/core/ImeInputHost.ahk`(注册为 CommandInputHooks provider) + `bin/lib/core/ime_messages.ahk`(模块自带中英文案, 不污染引擎词表) —— 会话期建**不激活**临时窗口同步 IME 打开标志, 用 `ImmGetCompositionStringW(GCS_COMPSTR)` 读组合串并在自绘浮层回显; `OnChar`/`OnKey` **始终返回 false**(透明旁路, 绝不消费 —— 中文通道与 `bb`/`ca` 缩写匹配是正交需求, 消费即让全部缩写失效, 与 everything_search 的「前置触发键」消费语义形成对照); 注入一律 `SendEvent`/`SendText`, **禁用 `SendInput`**(AHK 会临时卸载自身钩子致注入按键被自己漏掉, 这同时是探针能自动化的前提); `Injecting` 捕获锁吞掉自身注入的按键回流。默认由 `keyflux.tmpl` 的 `CommandInputHooks.Register(ImeInputHost)` + `ImeInputHost.Enable()` **启用**(注释掉两行即回退历史行为)。② **移除八角框**: 反汇编 + RTTI + 三条真机实测确认**皮肤路线无解** —— exe 内 `SampleWindow::DrawKeys(..., ComPtr<ID2D1SolidColorBrush>& brush, ...)` 只收**一支**画刷(描边与字符同源), 不存在独立边框绘制函数; `keyOpacity=0.0` ⇒ 字符与描边一起消失(图层级), `keyColor=#FFFFFF`/`#FF0000` ⇒ 描边与字符同色(八角内部透明)。**patch 二进制路线亦被证伪并已回滚**: 跳过 `DrawGeometry`(`RVA 0x7258` 的 `call [rax+0x78]`) 令命令框**完全不弹出** —— 其返回值不是纯错误码, 紧随的 `test eax,eax / jne` 之后是绘制必经路径(部署树已还原, 原文件备份为 `KeyFlux-CommandInput.orig.exe`, SHA256 `f14bba71…`)。**唯一可行路径 = 让 exe 不画那些字符**: 新增 `bin/lib/core/CommandDisplay.ahk` 作为**回显唯一收口**(`IsKeycapChar` 白名单与 exe 内 UTF-16 字面量 `a-zA-Z0-9`(VA `0x1daa0`)逐字一致; `SuppressKeycap` 默认 false ⇒ 零行为变更; `Enable()` 时置位), 四处调用点(`CommandInputHooks.CommandInputOnChar/OnKeyDown`、`type9_keyflux.EnterCapslockAbbr` Match 分支、`everything_search.EverythingSession`)全部改为经该模块。**闸门**: `tools/command_input_hooks_test.ahk` 23→**49 项**(新增 CommandDisplay 白名单边界 12 项 + 抑制语义 9 项 + 收口断言 2 项 + 引入 CommandDisplay 真身; 该 include 缺失时探针**连 `/Validate` 都会挂起**, 已在探针注释记录); 新增 `tools/ime_input_test.ahk` **14 项** + `make check-ime`(**刻意不并入 `make check`** —— 需按键注入、短暂占用键盘钩子、依赖系统已装中文输入法, 不属「随时可跑」闸门; 运行前 KeyFlux 必须退出, 因其 `#UseHook` + High 优先级独占钩子会让全用例收 0 字符); `make check` lint CLEAN / texttypes 315 求值一致 / `/Validate` exit 0 / ORACLE PASS; golden 快照与部署树产物同步刷新; `check-cs`/`analyzers` 未跑(**本批零 C# 改动**, 且本机 PATH 无 .NET SDK)。**契约**: 新增 §3.11 `CommandDisplay`(含 exe 绘制约束的四条物理事实与「回显必须收口」红线)与 §3.12 `ImeInputHost`(含四条硬约束与「探针变红即可退役」判据) |
+| 2026-09-19 | **修复「打开命令框报错弹窗 + 卡死」** (用户实测: AHK 错误对话框 + 命令框无法关闭无法输入; 未提交)。**三层定位**: ① 隔离复现探针实测 **AHK v2 类对象上实例方法的 `HasProp` 为 `false`**(`Foo.HasProp("Inst")=0` / 静态方法 `=1`, 方法调用抛 `MethodError`) ⇒ `CommandInputHooks.Register(ImeInputHost)` 注册的是**类对象**, 而其四个 `On*` 回调是**实例方法** ⇒ `_Call` 的 `HasProp` 守卫**静默跳过** ⇒ 中文承载 provider 自部署起从未运行(与 13:35 会话 `command_input_hooks.log` 零新增条目吻合)。修复: 四个 `On*` 改 `static`(§3.12 硬约束 0)。② 隔离探针实测 **`PostMessage` 到已消失窗口抛 `TargetError`** + 热键线程未捕获异常 = 错误弹窗 + 线程死亡 + `StartInputHook` 已执行的 `Suspend(true)` 永远无法恢复 ⇒ **全部热键失效**(用户视角「卡死」的机制); `EchoChar`/`FuzzySuffixFire`/命令体执行原在热键线程**裸奔**, 任何一步抛出即触发。修复: `CommandInputOnChar` 的 `EchoChar`+`FuzzySuffixFire`、`CommandInputOnKeyDown` 的 `EchoBackspace`、`EnterCapslockAbbr` Match 分支的 `EchoChar`+`ExecCapslockAbbr`(命令体) 全部 try 包裹并记入 hook 日志(命令体失败另 Tip 提示)。③ 新增**引擎级兜底** `EngineOnError`(`bin/lib/core/Functions.ahk`, 模板 auto-exec 早期 `OnError` 注册): 全文记录 `Type/Message/File/Line/Stack` 到 `logs\engine_error.log`(UTF-8) + `Suspend(false)` 复位残留暂停态 + Tip 提示 + 返回 1 压制弹窗; 实测语义(kf_diag2): 热键/Timer 线程异常 ⇒ 线程终止、无弹窗、脚本继续(40/40 循环完成); auto-exec ⇒ 退出但日志落盘。另: `ImeInputHost._ShowLayer` 补 `DetectHiddenWindows(1)`(会话开始时命令框仍是隐藏窗口, 否则锚点取不到、浮层跑到屏幕中央兜底位)。**门禁**: `make check` 全绿(lint 仅 6 项既有 WARN / hooks 49/49 / texttypes / Validate exit 0 / ORACLE PASS), golden +12 行(3 include + OnError 注册 + provider 注册段), 部署树逐文件 SHA 全 MATCH + Validate exit 0。**契约**: §3.12 硬约束 0(static 注册) + 新增 §3.13 `EngineOnError`(回调代码不得存在无包裹的外部抛出点; 排查命令框故障先看 `engine_error.log`) |
+| 2026-09-19 | **命令框「字母无八角框 + 中文输入」v3 定稿: 数据 patch + 动态可见性 hook** (未提交 — 本机验证中; 用户否决 v2 浮层回显, 要求字母直接显示在命令框内): ① **数据 patch 移除八角框 (§3.11 背景第 6 条)** — keycap 白名单 = `.rdata` 绘制判定数据 (62 字符 UTF-16LE, 文件偏移 `0x1cca0` = RVA `0x1daa0`, 前邻 `Draw()`/后邻 `dwriteF…`), 替换为不可匹配字符 U+0001×62 (保留长度): 字母/数字走普通字形路径 ⇒ **命令框内直接显示、无八角框**; 与已证伪的代码 patch (NOP 跳调用破坏窗口初始化) 性质完全不同 — 改常量数据不动控制流; patch 脚本内置前置校验 + 回读复核; 原文件备份 `KeyFlux-CommandInput.orig.exe` (SHA `f14bba71…468ab3`)。② **中文打不出的真根因 (实证修正)**: capsHook 以 `InputHook("", …)` 创建 (无 V ⇒ 默认不可见, **吞掉文本键**), 物理键到不了命令框窗口的 IME 上下文, 组合无从发生 (铁证: 显示=纯投递 WM_CHAR, 抑制投递后字母全部消失); ⇒ **IME 开启的会话 hook 必须 V (可见)** — 物理键透传给 IME 原生组合/候选/上屏, 上屏中文以 WM_CHAR 直达命令框 (不在白名单, 无框)。③ **落地**: `EnterCapslockAbbr()` 无参化 + 模板顶层 `MakeCapsHook()` (每会话动态创建: IME 开 ⇒ `InputHook("V",…)`+空词表; 关 ⇒ 历史形态+原词表; **必须在 BeginSession 之后调用**, 否则读到陈旧 IME 值); `ImeInputHost` 瘦身为「IME 状态同步器」(浮层/ImmGetCompositionStringW/ImmSetOpenStatus 全套删除, 只读 `_QueryImeOpen` → `SuppressKeycap := (PrevOpen=1)`, -1 按「关」处理宁多显示不吞输入); `CommandInputOnChar/OnKeyDown` 顶部新增 **IME 会话守卫** (SuppressKeycap=true ⇒ 整体旁路: 投递/缩写匹配/providers 派发全跳过 — 防拼音与 IME 组合 UI 重复显示、防拼音中途触发命令执行毁掉会话、防下拉列表误触发; 退格投递同样跳过防二次删除); `CommandDisplay` 删 Buf/OnBufferChanged/ClearBuf (v2 过渡产物, 消费者已无); `ime_messages.ahk` 退役 (模板 include 已删, **文件本体删除待用户确认** — D 盘删除需审批)。④ **链式变更**: `type9_keyflux.go` callMap[6] → `EnterCapslockAbbr()` (golden_test.go 断言同步); golden 重刷 (`UPDATE_GOLDEN=1`)。⑤ **门禁**: check-hooks 49/49, `/Validate` exit 0, ORACLE PASS (capslock 38 条), lint CLEAN; 首轮 check 曾抓到部署树同步缺口 (部署树 lib 为旧定义 → `Too few parameters passed to function: EnterCapslockAbbr`) — `make sync-out` 修复; ⚠ sync-out 的 `robocopy bin '*.exe'` 会用仓库侧**未 patch** exe 覆盖部署树 ⇒ 纪律: patch 后重跑 sync-out 必须重新 patch (§3.11 硬约束 4)。**契约**: §3.11 重写 (数据 patch 事实 + AHK/exe 白名单脱钩系有意 + sync-out 覆盖警告), §3.12 重写 (动态可见性方案 + 6 条硬约束 + check-ime 判据更新), Makefile check-ime 注释同步。⚠ IME 开启会话的端到端 (V 透传→组合→上屏) 无法被 AHK 探针完整自动化, 待用户真机验证 |
+| 2026-09-19 | **命令框中文输入 v4: 恒透传方案** (承接同日 v3; 用户实测反馈「英文可输、无八角框, 中文打不出」; 未提交)。**v3 死因 (两层证伪)**: ① 跨进程 `ImmGetContext` 恒 hIMC=0 (HIMC 进程本地句柄, kf_p1 探针 notepad 同样为 0) ⇒ `_QueryImeOpen` 恒 -1 ⇒ `SuppressKeycap` 恒 false ⇒ hook 恒吞键 ⇒ v3 的透传分支从未生效; ② 兜底的 TSF 路线四连败 (CLSID REGDB_E_CLASSNOTREG → `TF_CreateThreadMgr` 虽成功但 `Activate` 在 AHK 主线程挂死 + `GetGlobalCompartment` idx14 抛异常, kf_p2b/c/d 探针)。**v4 决策: 放弃一切 IME 状态预查, hook 恒 V + 透传接管** — `MakeCapsHook` 建为 `InputHook("V",…)`+空词表 (词表必须空: MatchList 先于 OnChar, 拼音后缀命中即误执行), `ImeInputHost.OnSessionBegin` 恒置 `SuppressKeycap := true` (查询函数全删, 类退化为启闭开关); `CommandDisplay.ShouldEcho` **全停投递** (v3 只停白名单字符是错的 —— 中文 U+4E00+ 漏网双显); `FuzzySuffixFire` 单点旁路 (查注册表非词表, 拼音后缀命中缩写词即 ih.Stop()+执行命令毁会话); **providers 派发保留** (v3 整体旁路会连 everything_search 空格触发一起杀掉); Up/Down/Enter/Backspace 维持 KeyOpt "N" 透传 (IME 组合期选候选/翻页/确认拼音原文/删组合串的原生操作, 吞掉即毁 IME 交互), Esc 补 "S" (EndKey 检测不受影响); EchoBackspace 自身守卫兜停投递 (OnKeyDown 顶部守卫删除)。**门禁**: check-hooks 49→**57/57** (新增: 抑制态全停×5 + EchoChar 中文抑制 + Fuzzy 旁路 + providers 保留 + 历史形态照常; Post*/Fuzzy 桩改 Rec 记录可观测), golden 重刷, `/Validate` exit 0, ORACLE PASS 38 条, lint CLEAN; 部署树 bin/lib + KeyFlux.ahk 手动同步 (robocopy /E 避开 sync-out 的 exe 覆盖 — §3.11 硬约束 4), 四核心文件 SHA 全 MATCH。**契约**: §3.11 硬约束 3 改「透传模式总开关」语义, §3.12 重写 (恒透传, 硬约束 0-7, 新增「勿再查 IME 状态」「词表必须空」两条), ImeInputHost/CommandDisplay/CommandInputHooks/keyflux.tmpl/type9_keyflux 注释全量同步。⚠ 端到端待用户真机验证 (重启 KeyFlux 后: 英文直显 / IME 开打中文上屏 / 缩写触发 / 退格删除) |
+| 2026-09-19 | **命令框 v4.1: 透传焦点修复** (承接同日 v4; 用户实测反馈「英文也没法输入了, 且焦点在其他文本框时打开命令框后仍在原文本框打字」; 未提交)。**根因 (kf_focus_probe v5 探针实证)**: 命令框窗口 exStyle=`0x8200008` (WS_EX_**NOACTIVATE**=1 + TOPMOST=1) —— SHOW 消息只改可见性、从不带来键盘焦点; v4 透传后物理键按「焦点窗口」路由, 而焦点滞留在会话开始时的原文本框 ⇒ 按键全部漏进原窗口、命令框一个都收不到 (两个症状同源)。**修复**: ① `CommandDisplay.ActivateCommandWindow()` 新增 (等窗口可见 0.5s → WinActivate → 循环回读 WinActive 400ms → 失败兜底 AttachThreadInput+SetFocus 200ms; 探针判定 WinActive 可成功激活 NOACTIVATE+TOPMOST 命令框, focusIsCmdWindow=1; 函数自身不触碰 SuppressKeycap, 单一职责); ② `EnterCapslockAbbr` 编排: SHOW 之后 MakeCapsHook 之前调用, **激活失败 ⇒ `SuppressKeycap := false` 降级历史形态** (吞键+投递显示, 英文仍可用; OnSessionEnd 复位标志, 自洽无泄漏); ③ 会话结束 (非 Match 分支) `CommandInputHooks.ActivateBackend()` 把前台还给会话开始时的窗口 (该函数的 WinActive 检查保证历史形态会话零行为变更); Match 分支不恢复 (命令体自会接管)。**探针沙箱四坑 (本轮新发现, 记入技能)**: ① AHK 内置 `PostMessage` 对投递失败抛 TargetError 无 try 即弹错误框挂死探针 —— 统一 `DllCall("PostMessageW",...)` + ret 检查; ② `WinGet`/`IsFunc`/`WinGetPIDs` 在 KeyFlux 分发的 AHK 解释器 (v2.0.19) 中**不存在** —— 调用即加载期 #Warn 弹框挂死 (「This global variable appears to never be assigned a value」); 已实证存在: WinExist/WinActivate/WinActive/WinWait/WinGetExStyle/WinGetList/WinGetPID/WinGetTitle/WinGetText/WinGetControls/DetectHiddenWindows/DllCall/PostMessageW; 取 ExStyle 用 `WinGetExStyle`; ③ 挂死探针的错误对话框在沙箱里不可见 —— 诊断法: 另起 AHK 探针用 `WinGetList("ahk_exe AutoHotkey64.exe")` + `WinGetText` 读挂死进程的对话框文本; ④ 多行 OUT 表达式续行用 `. ` 前缀 (行尾 `)` 不是开括号, 不构成续行)。**门禁**: check-hooks 57→**60/60** (第 13 组: 无窗口不抛异常 / 返回 false / 不触碰标志), 其余随 make check 全量复跑; 部署树 robocopy /E 同步 (避开 exe)。**契约**: §3.12 标题 v4.1 化, 新增「焦点契约」段 + 硬约束 6 (原 6/7 顺延为 7/8), 回归守门人 60 项, 变更记录本行 |
+| 2026-09-19 | **命令框 v4.2: 缩写执行恢复 (打完即执行)** (承接同日 v4/v4.1; 用户实测反馈「输入 `se` 不再打开设置面板」; 未提交)。**根因**: v4 为防「拼音误触发缩写」清空 hook 词表 + 单点旁路 `FuzzySuffixFire` ⇒ 透传会话里缩写匹配双通道全灭 (`se` 等全部缩写不再执行)。**用户裁决**: 设置面板命令全部由英文字母组成, 唯一需要输入中文的场景是前置键 (如空格) 之后 —— 那时字符已被插件消费、到不了匹配层 ⇒ 「拼音误触发」场景不存在 ⇒ 恢复「打完即执行」。**落地**: ① `CommandInputOnChar` 撤旁路, `FuzzySuffixFire` 恒跑 (与历史形态一致); ② 两份模板 `keyflux.tmpl` 词表恢复 (`InputHook(SuppressKeycap ? "V" : "", …, CapslockAbbrKeys)`, bin 与 config-server 副本 SHA 一致); ③ `CommandDisplay`/`ImeInputHost` 注释 v4.2 化; ④ check-hooks 第 12 组断言反转 (「透传恒跑」=1) + 新增「插件消费后 Fuzzy 不跑」=0 (双保险)。**搜索期不误触发双保险**: 词表 MatchList 全串精确匹配被空格前缀挡住 (检索词 `" se"` ≠ `"se"`); 插件消费字符后 DispatchChar 提前 return。**门禁**: check-hooks 60→**61/61** + make check 全量复跑 + 部署树 robocopy /E 同步 (避开 exe) + SHA 校验。**契约**: §3.11 硬约束 3 与 §3.12 现行方案/硬约束 2/3/7 重写为恢复语义, 回归守门人 61 项, 变更记录本行 |

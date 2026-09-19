@@ -9,6 +9,8 @@
 #Include lib/core/Programs.ahk
 #Include lib/core/WindowUtils.ahk
 #Include lib/core/AbbrInput.ahk
+#Include lib/core/CommandDisplay.ahk
+#Include lib/core/ImeInputHost.ahk
 #Include lib/core/CommandInputHooks.ahk
 #Include lib/actions/Actions.ahk
 #Include lib/core/KeymapManager.ahk
@@ -38,7 +40,18 @@ SendMode "Event"                                          ; 执行 SendInput 的
 SetKeyDelay 0                                             ; 默认 10 太慢了, https://www.reddit.com/r/AutoHotkey/comments/gd3z4o/possible_unreliable_detection_of_the_keyup_event/
 ProcessSetPriority "High"
 SetWorkingDir("../")
+; 引擎级未捕获异常兜底: 替代「错误弹窗 + 线程死亡 + Suspend 残留 (热键全灭)」,
+; 记录全文到 logs\engine_error.log (见 Functions.ahk 的 EngineOnError 注释)。
+OnError(EngineOnError)
 InitTrayMenu()
+; 命令框中文输入 + 八角框移除 (CONTRACTS §3.11/§3.12 v4):
+; 八角框由 exe 数据 patch 移除 (keycap 白名单串 -> U+0001, 字母走普通字形路径);
+; 中文输入由透传 hook 承担: hook 恒 V, 物理键透传 -> 英文原生显示 / IME 原生组合上屏;
+; 投递通道整体关闭 (SuppressKeycap), providers 照常派发。
+; 本注册即透传模式的启闭开关 (不查任何 IME 状态 —— 跨进程查询已整体证伪, 见 §3.12)。
+; 若要回到「命令框历史行为」(吞键 + 投递显示), 注释掉下面两行即可 (零其它改动)。
+CommandInputHooks.Register(ImeInputHost)
+ImeInputHost.Enable()
 InitKeymap()
 InitQuickSwitch({collectEnabled: true, autoShow: true, autoJumpOpen: true, autoJumpSave: false, pollIntervalMs: 800, maxHistory: 200, overlayRows: 8, overlayRowsCompact: 4, excludedPrefixes: ["D:\Archive", "C:\Temp"]})
 OnExit(KeyFluxExit)
@@ -52,16 +65,7 @@ InitKeymap()
   fast := MouseKeymap("fast mouse", false, mouseTip, 6, 60, "T200", "T600", 3, "T200", "T600", slow)
   slow.Map("*space", slow.LButtonUp())
 
-  capsHook := InputHook("", "{CapsLock}{Esc}", "edit,expr,jk,multi,web")
-  capsHook.KeyOpt("{CapsLock}", "S")
-  capsHook.KeyOpt("{Backspace}", "N")
-  ; Up/Down/Enter 仅用于「通知」: 命令框内插件下拉列表的导航键 (由 CommandInputHooks 分发)。
-  ; 无 provider 消费时它们不投递任何字符 —— 与历史实现行为一致。
-  capsHook.KeyOpt("{Up}", "N")
-  capsHook.KeyOpt("{Down}", "N")
-  capsHook.KeyOpt("{Enter}", "N")
-  capsHook.OnChar := (ih, char) => CommandInputOnChar(ih, char, "capslock")
-  capsHook.OnKeyDown := (ih, vk, sc) => CommandInputOnKeyDown(ih, vk, sc, "capslock")
+  ; hook 每会话经 MakeCapsHook() 动态创建 (见其函数注释): 透传模式 -> V, 否则历史形态
   Run("bin\KeyFlux-CommandInput.exe")
 
   semiHook := InputHook("", "{CapsLock}{Esc}{;}", ",,,sys")
@@ -118,7 +122,7 @@ InitKeymap()
   km.Map("*9", _ => (Send("{blind}^{left}")))
   km.Map("*0", _ => MsgBox("hello"))
   km.Map("*e", _ => KeyFluxToggleSuspend(), , , , "S")
-  km.Map("*q", _ => EnterCapslockAbbr(capsHook))
+  km.Map("*q", _ => EnterCapslockAbbr())
   km.Map("*r", km.ToggleLock)
   km.Map("*w", _ => EnterSemicolonAbbr(semiHook, semiHookAbbrWindow))
   km.Map("*z", _ => QuickSwitchGoto())
@@ -150,6 +154,38 @@ InitKeymap()
 
 ExecCapslockAbbr(command) {
   CommandResolver.Resolve("capslock", command)
+}
+
+/**
+ * 动态创建 CapsLock 命令框 InputHook (每会话一次, 在 EnterCapslockAbbr 内调用)。
+ *
+ * 🔴 为什么动态: InputHook 对象一次性, 每会话新建。可见性按透传开关二态:
+ *   透传模式 (SuppressKeycap=true, ImeInputHost 启用时恒如此) => InputHook("V"):
+ *   物理键透传到命令框窗口 —— 英文字母原生显示; 拼音进 IME 原生组合/上屏, 上屏中文
+ *   以 WM_CHAR 直达 (非白名单, 无框)。词表必须置空: V 模式下拼音字母照样进
+ *   ih.Input 缓冲, MatchList 内建匹配先于 OnChar, 拼音后缀命中缩写词会误执行命令。
+ *   历史形态 (false) => InputHook(""): 吞文本键, 显示靠投递 (数据 patch 后无八角框)。
+ * 时序: EnterCapslockAbbr 先 BeginSession() (OnSessionBegin 已置 SuppressKeycap),
+ * 再调本函数, 此刻读该标志即拿到正确形态。
+ */
+MakeCapsHook() {
+  ih := InputHook(CommandDisplay.SuppressKeycap ? "V" : "", "{CapsLock}{Esc}"
+                  , CommandDisplay.SuppressKeycap ? "" : "edit,expr,jk,multi,web")
+  ih.KeyOpt("{CapsLock}", "S")
+  ih.KeyOpt("{Esc}", "S")
+  ; S = V 模式下抑制透传 (EndKey 默认透传): CapsLock 防切大小写状态, Esc 防触发 exe
+  ; 原生行为; EndKey 检测不受 S 影响, 会话照常结束。历史形态下 S 无副作用 (本来就吞)。
+  ih.KeyOpt("{Backspace}", "N")
+  ; 🔴 Up/Down/Enter/Backspace 在 V 模式下必须保持透传 (只有 N 无 S): IME 组合期它们是
+  ; 选候选/翻页/确认拼音原文/删组合串的原生操作, 吞掉即毁 IME 交互。
+  ; N 仅保留 OnKeyDown 通知 (供插件下拉列表导航, 由 CommandInputHooks 分发);
+  ; exe 是纯镜像显示窗口 (只处理 WM_CHAR), 对非字符键无原生行为, 透传噪声可忽略。
+  ih.KeyOpt("{Up}", "N")
+  ih.KeyOpt("{Down}", "N")
+  ih.KeyOpt("{Enter}", "N")
+  ih.OnChar := (ih2, char) => CommandInputOnChar(ih2, char, "capslock")
+  ih.OnKeyDown := (ih2, vk, sc) => CommandInputOnKeyDown(ih2, vk, sc, "capslock")
+  return ih
 }
 
 ExecSemicolonAbbr(command) {
