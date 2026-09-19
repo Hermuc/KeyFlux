@@ -102,6 +102,8 @@ class EverythingSession {
       if (c != EverythingSettings.TriggerKey)
         return false
       this.active := true
+      ; 已进入搜索模式: 放开中文输入 (KeyOpt 文本键透传, 允许中文检索)。传 ih 供运行时切换。
+      CommandImeGuard.UnlockForSearch(ih)
       this.SeedFromSelection()
       this.Refresh()
       return true     ; 消费触发键本身 (不投递到命令框)

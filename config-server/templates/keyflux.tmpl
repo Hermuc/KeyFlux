@@ -1,4 +1,4 @@
-﻿#Requires AutoHotkey v2.0
+#Requires AutoHotkey v2.0
 #SingleInstance Force
 #UseHook true
 
@@ -11,6 +11,7 @@
 #Include lib/core/AbbrInput.ahk
 #Include lib/core/CommandDisplay.ahk
 #Include lib/core/ImeInputHost.ahk
+#Include lib/core/CommandImeGuard.ahk
 #Include lib/core/CommandInputHooks.ahk
 #Include lib/actions/Actions.ahk
 #Include lib/core/KeymapManager.ahk
@@ -52,6 +53,11 @@ InitTrayMenu()
 ; 若要回到「命令框历史行为」(吞键 + 投递显示), 注释掉下面两行即可 (零其它改动)。
 CommandInputHooks.Register(ImeInputHost)
 ImeInputHost.Enable()
+; 命令框会话内「锁英文」(CommandImeGuard): 在 OnSessionBegin 强制历史形态(吞键+投递英文,
+; 不使用输入法), 从而英文态弹框不会变中文, Shift 也无中文可切。注册顺序必须在
+; ImeInputHost 之后(后生效, 覆盖其透传标志)。插件无关, 可注释此行整体关闭。
+; 见 docs/design-ime-guard.md。
+CommandInputHooks.Register(CommandImeGuard)
 InitKeymap()
 InitQuickSwitch({collectEnabled: {{ .Options.QuickSwitch.CollectEnabled }}, autoShow: {{ .Options.QuickSwitch.AutoShow }}, autoJumpOpen: {{ .Options.QuickSwitch.AutoJumpOpen }}, autoJumpSave: {{ .Options.QuickSwitch.AutoJumpSave }}, pollIntervalMs: {{ .Options.QuickSwitch.PollIntervalMs }}, maxHistory: {{ .Options.QuickSwitch.MaxHistory }}, overlayRows: {{ .Options.QuickSwitch.OverlayRows }}, overlayRowsCompact: {{ .Options.QuickSwitch.OverlayRowsCompact }}, excludedPrefixes: [{{ range $i, $p := .Options.QuickSwitch.ExcludedPrefixes }}{{ if $i }}, {{ end }}{{ ahkString $p }}{{ end }}]})
 OnExit(KeyFluxExit)
