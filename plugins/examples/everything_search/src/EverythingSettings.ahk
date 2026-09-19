@@ -71,11 +71,4 @@ class EverythingSettings {
       return 20
     return n
   }
-
-  /** 触发键显示名 (提示文案用)。 */
-  static TriggerName() {
-    if (this.TriggerKey = " ")
-      return EverythingMessages.T("title_key_space")
-    return this.TriggerKey
-  }
 }

@@ -117,7 +117,18 @@ lint:
 check-texttypes:
 	python tools/texttype_conformance.py
 
-# check: 一键回归 = 标识符 lint + 文本特征一致性 + Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
+# check-hooks: CommandInputHooks 的 provider 分发契约回归探针 (AHK 运行时断言, 自带 0/1 退出码)。
+# 2026-09-19: _Call 曾以「取方法引用再 .Call()」的方式派发, 而 AHK v2 的 `obj.Method` **不绑定 this**
+#   (this 只是普通首参, 取值前无值) ⇒ 首个实参被顶成 this、末位实参缺失 ⇒ 每次回调抛
+#   `Missing a required parameter.`, 被分发的 try/catch 吞掉并视为「未消费」。
+#   症状: provider 从未执行 = 命令框按空格触发键完全无反应, 且与「插件没挂上」无法区分 ——
+#   /Validate 与 lint 都查不出 (纯运行时语义)。本目标即该缺陷的守门人。
+#   实测: 旧实现 4 项断言红, 修复后全绿。
+# (MSYS_NO_PATHCONV: 防止 Git Bash 把 /ErrorStdOut 误转换为路径)
+check-hooks:
+	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut tools/command_input_hooks_test.ahk
+
+# check: 一键回归 = 标识符 lint + 文本特征一致性 + 命令框拦截点契约 + Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
 # (MSYS_NO_PATHCONV: 防止 Git Bash 把 /ErrorStdOut /Validate 等开关误转换为路径)
 # 2026-09-17 修「生成产物落点」缺陷 (原配方只要部署配置启用了插件就**必然**失败, 实测阻断 make deploy):
 #   生成器给插件入口发的是**相对输出文件所在目录**的 `#Include ../data/plugins/<id>/<file>`
@@ -128,7 +139,7 @@ check-texttypes:
 #         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
 #   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
 #       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
-check: buildServer lint check-texttypes sync-plugins | $(OUT_DIR)
+check: buildServer lint check-texttypes check-hooks sync-plugins | $(OUT_DIR)
 	@mkdir -p "$(DEPLOY_DIR)/bin"
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./config-server/templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk

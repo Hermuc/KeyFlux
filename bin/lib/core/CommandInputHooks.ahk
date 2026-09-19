@@ -117,12 +117,22 @@ class CommandInputHooks {
 
   ; ---- 内部 ----
 
-  ; 调用 provider 方法: 未实现该方法时返回 false (不抛错, 免日志噪声)
+  ; 调用 provider 方法: 未实现该方法时返回 false (不抛错, 免日志噪声)。
+  ;
+  ; 🔴 必须用「动态名直接调用」写法 p.%name%(args*) —— 不可写成
+  ;    `fn := p.%name%` 再 `fn.Call(args*)`:
+  ; AHK v2 的 `obj.Method` 取到的是**未绑定 this** 的函数对象 (this 只是普通首参, 取值前无值;
+  ; 与 Python/JS 的 bound method 语义相反)。于是 `.Call(args*)` 会把首个实参顶替成 this,
+  ; 并令末位实参缺失 ⇒ 每次回调都抛 `Missing a required parameter.`, 而该异常会被
+  ; DispatchChar/DispatchKey/_Notify 的 try/catch 吞掉并「视为未消费」⇒ provider 从未真正执行,
+  ; 症状是「插件像没挂上」——命令框按前置触发键完全无反应, 且 /Validate 与 lint 都查不出
+  ; (纯运行时语义)。2026-09-19 实测: everything_search 插件按空格无反应即此因, 见
+  ; tools/command_input_hooks_test.ahk (回归探针) 与 Makefile 的 check-hooks 目标。
+  ; 同仓库先例: bin/lib/Monitor.ahk:363 `this.%GetMethodName%(hPhysicalMonitor, params*)`。
   static _Call(p, name, args*) {
     if (!p.HasProp(name))
       return false
-    fn := p.%name%
-    return fn.Call(args*)
+    return p.%name%(args*)
   }
 
   static _Notify(name) {

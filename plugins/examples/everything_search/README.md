@@ -67,7 +67,7 @@
 
 ---
 
-## 4. 三条实测得出的硬约束（踩过的坑）
+## 4. 四条实测得出的硬约束（踩过的坑）
 
 ### 4.1 活动 InputHook 看得见脚本自身 Send 的按键
 
@@ -85,6 +85,32 @@
 探针脚本里若用 `$TEMP` 拼路径再传给原生 exe，Bash 只在内建解析时把它当 `C:` 临时目录，
 传出去会变成字面量 `/tmp` → 被解释成 `D:\tmp`，于是「Script file not found」。
 → 开发期一律写显式 `C:\Users\<user>\AppData\Local\Temp\...`。
+
+### 4.4 🔴 AHK v2 的 `obj.Method` **不绑定 `this`**（引擎侧踩的；症状最像「插件根本没挂上」）
+
+`CommandInputHooks` 分发 provider 回调时若写成：
+
+```ahk
+fn := p.%name%
+return fn.Call(args*)          ; ❌ 每一次都抛 Missing a required parameter.
+```
+
+就会**全盘静默失效**。AHK v2 里 `this` 只是函数的普通首参（与 Python/JS 的 bound method 语义**相反**）
+—— 官方作者 lexikos 原话：*"`this` is just a parameter of the function, and doesn't have a value
+until you provide one when you call or bind the function"*。故 `obj.Method` 取到的是**未绑定**的
+函数对象，`fn.Call(ih, char, scope)` 会把 `ih` 顶替成 `this`、末位实参缺失 → 每次回调在**调用边界**
+就抛 `Missing a required parameter.`；异常随即被分发层的 try/catch 吞掉并「视为未消费」
+⇒ **provider 一次都没执行**，日志里只留一行被吞掉的噪声。
+
+→ 动态派发必须显式给出接收者：`p.%name%(args*)`（本仓库采用，先例 `bin/lib/Monitor.ahk:363`）
+或 `ObjBindMethod(p, name).Call(args*)`。
+
+**为什么这条很难自己发现**：`/Validate`（语法）与 `lint`（标识符遮蔽）都是**静态**检查，查不出纯运行时
+语义；而症状「按触发键毫无反应」与「插件压根没注册」在外部表现上完全一致 —— 第一反应必然是去查插件。
+
+回归守门人 = `tools/command_input_hooks_test.ahk`（`make check-hooks`，已挂入 `make check`）：
+旧写法下 **13 项红 / 10 项绿**，新写法下 **23 项全绿**。探针**逐字 `#Include` 引擎真身**而非另写桩
+实现（否则只会验证自己的桩，回归价值归零），并把工作目录隔离到 `%TEMP%` 以免污染部署日志。
 
 ---
 

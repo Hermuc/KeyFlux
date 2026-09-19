@@ -367,6 +367,47 @@ class ConfigProvider {
 - 实现: `internal/behaviors/` (加载/覆盖/校验), `internal/server/behaviors.go` (API),
   `internal/script/generators` 注入 `BehaviorCatalog` (渲染 + plan 镜像同步展开)。
 
+### 3.10 CommandInputHooks —— 命令框输入期拦截点(provider 契约)
+
+命令框本体是上游预编译二进制(只做按键镜像), 真正的键盘捕获在主进程的 InputHook。任何
+「输入期间的新交互」(插件按下前置键唤起下拉列表等)都只能挂在 InputHook 的 OnChar/OnKeyDown 上,
+本类即那一层稳定扩展点(2026-09-18 引入, 随 everything_search 首个消费者落地)。
+
+```ahk
+class CommandInputHooks {
+  static Register(provider) => bool     ; 幂等: 已注册过返回 false
+  static Unregister(provider) => bool
+  static BeginSession() / EndSession()  ; 命令框显示前 / 输入结束后
+  static DispatchChar(ih, char, scope) => bool   ; true = 已消费
+  static DispatchKey(ih, vk, sc, scope) => bool  ; true = 已消费
+  static ActivateBackend() => bool      ; 把前台切回会话开始时的窗口(取选中文字用)
+}
+```
+
+provider 为实现以下方法的对象(类实例), **全部可选, 缺失即视为不处理**(`HasProp` 守卫, 不抛不记):
+
+| 方法 | 何时被调 |
+|---|---|
+| `OnSessionBegin()` | `BeginSession()`, 命令框显示前(设置热重载的挂点) |
+| `OnSessionEnd()` | `EndSession()`, 输入结束(含命中/Esc/超时) |
+| `OnChar(ih, char, scope) -> bool` | 每个输入字符, 返回 true = 消费(引擎不再投递字符、不做缩写模糊匹配) |
+| `OnKey(ih, vk, sc, scope) -> bool` | 每个被 `KeyOpt(..., "N")` 通知的按键(退格/↑/↓/回车) |
+
+**两条硬约束(违反即静默失效, `/Validate` 与 lint 都查不出)**:
+
+1. 🔴 **分发时 `this` 必须由引擎显式传入**。AHK v2 的 `obj.Method` 取到的是**未绑定**的函数对象
+   (`this` 只是普通首参, 取值前无值 —— 与 Python/JS 的 bound method 相反), 故 `fn := p.%name%`
+   + `fn.Call(args*)` 会把首个实参顶成 `this` 并令末位实参缺失 → 每次回调在调用边界抛
+   `Missing a required parameter.`。**必须**写 `p.%name%(args*)` 或 `ObjBindMethod(p, name).Call(args*)`。
+   (2026-09-19 实测缺陷: 旧写法令 provider 一次都没执行, 症状 = 命令框按触发键毫无反应,
+   而日志只有一行被 catch 吞掉的噪声, 与「插件没注册」无法区分。)
+2. provider 抛异常**只记日志并视为未消费**(错误隔离, 与 `PluginManager` 同策略), 不拖垮命令框,
+   且**继续询问后续 provider**; 前序 provider 返回 true 则短路。
+
+回归守门人: `tools/command_input_hooks_test.ahk` + `make check-hooks`(已挂入 `make check`)。
+探针逐字 `#Include` 实现真身而非另写桩, 并把工作目录隔离到 `%TEMP%`(被测 `_log` 写相对路径
+`logs\command_input_hooks.log`)。旧写法下 13 项红, 新写法下 23 项全绿。
+
 ## 4. 插件清单格式(冻结)
 
 `data/plugins/<id>/plugin.json`:
@@ -506,3 +547,4 @@ action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经
 | 2026-09-17 | 三页组件框新增**悬停光圈** (承接同日「清除灰描边」→「加深」→「降重」→「取消加深」四轮, 纯视觉, 零 API/DB/route/protocol 变更): 用户要求「悬停时组件框周围显示一圈**光圈**, 注意**不能是纯线条**」, 颜色优先橙色。落地 = 皮肤新增**光圈令牌族 4 档** (`ClaudeShadowCardHalo` / `HaloHover` / `HaloPressed` / `HaloFocus`), 在卡片原有两层投影之上**追加第 3 层无偏移大模糊层** (`0 0 16 2 <color>`) ⇒ 四周等量外扩的**弥散光晕**, 而非 `0 0 0 N` 零扩散描边环 (后者正是当日灰线事故的成因, 已明令排除); Spread 2 把光圈从卡沿推出后由 Blur 16 化开 ⇒ 有"圈"的形、无"线"的硬。颜色取 **Terracotta `#c96442`** (品牌主 CTA 色): Coral `#d97757` 是焦点环专用色且更亮, 浅米底上弥散对比不足并与焦点态语义打架; 悬停档源 alpha **0x4d (30%)** —— 首版 0x2e(18%) 经 Skia 截帧实测卡下 2..7 行 Δ亮度仅 0.0134, 逼近历史"看不出变化"档 (0.0085) 故上调, 复测 **Δ亮度 0.0358 / 暖度 Δ(R−B)=10.0** (量级参照: 0.0085=用户判"没有变化", 0.074 起=用户判"过于明显")。**四档层数强制相等 (各 3 层)**: Avalonia `BoxShadowsAnimator` 在 progress<1 时按 `oldValue.Count` 输出层数 (源码 `int cnt = progress >= 1d ? newValue.Count : oldValue.Count;`), 层数不等会让光圈在动画**末帧**突然出现/消失 (回弹时表现为投影两段跳) ⇒ 静止档用 alpha=0 同形占位层对齐, 聚焦档把既有 Coral 2px 实环前移到第 3 层 (前两层透明化, 视觉与 `ClaudeShadowFocusRing` 一致)。接线: SelectedAction `Border.actionCard` (含同时带 row-card 的映射行卡) / Plugins `Border.pluginCard` / Settings `Border.settingsCard` + `Border.leftPanel`, 均 `:pointerover` → `HaloHover` 且挂 `BoxShadowsTransition` (`ClaudeMotion.Micro` 120ms) ⇒ 光圈淡入淡出; 悬停**不动描边色、不动投影前两层** ⇒ 既不复活灰线, 也不等于"偷偷加深"。测试: ① `SkinContractTests.Skin_Contract_Hover_Halo_Is_Soft_Warm_And_Not_A_Line` (光圈层 Blur>0 / 偏移 0 / Spread∈[0, Blur/4] / 暖色 R>B / α∈(0,0x60] / 四档层数相等 / 静止档 α=0); ② `Skin_Contract_Card_Shadow_Tokens_Contain_No_Ring_Layer` 扩到 Halo 静止+悬停两档; ③ `Skin_Contract_All_Token_Keys_Resolve` 影档 8→12; ④ `SettingsCardEffectTests` 三态断言改 Halo 族 + 新增 `Hover_Halo_Transition_Is_Wired_On_All_Three_Pages` (过渡接线: 断言 `Transitions` 含 `BoxShadowsTransition` 且时长 == `ClaudeMotion.Micro`; headless 不推动画时钟故只锁接线, 同 `MotionSmokeTests` 约定) + 像素用例更名 `Hover_Halo_Lights_Warm_Pixels_Below_Card` (**实测**: 卡下 2..7 行亮度下降且 R−B 上升 ⇒ 证明橙色弥散真的渲染出来, 断言区间 (0.004, 0.12) 同时防"看不见"与"过重"); ⑤ `ActionPageCardStyleTests` 悬停断言改 `HaloHover` + 逐卡过渡接线断言。⚠ headless 读"终点态"前必须先摘过渡 (局部值优先级高于样式 Setter, 已封装 `DetachShadowTransition`), 否则读到的是插值中间值, 结果随真实耗时抖动。C# 267→269/269, analyzers×2 exit 0; **另修本批新增用例的 headless 抖动**: `All_Action_Cards_Hover_Adds_Halo_Without_Gray_Border` 在静止档偶发读到第 3 层 alpha=0x0a 的插值中间值 (期望 0x00), 表现为「单跑绿、全量红」—— 根因是过渡动画由**真实时钟**驱动而 `Dispatcher.UIThread.RunJobs()` 不推进该时钟, 且摘除 `Transitions` **不会**中止已在飞的动画, 故原来「先断言静止档、后摘过渡」的顺序留下了窗口 (悬停某卡可连带点亮与之重叠/嵌套的卡); 改为**遍历前先把全部卡片的过渡一律摘掉**, 静止档断言前把指针停到非卡片角落复位, 并新增 `SettleShadow` 用 `AvaloniaHeadlessPlatform.ForceRenderTimerTick` 逐帧结算到期望终点态 (过渡 120ms ≈ 8 帧, 上限 40 帧) 作兜底与诊断。修后**连跑 3 次全量均 269/269 全绿** |
 | 2026-09-18 | 设置面板**页面改名** (纯文案层变更, 零数据/API/DB/route/protocol 变更): ① 原「总览」(导航 i18n `913`) 与页内 H1 (`939`) 统一改为**「使用指南」/ Guide** —— 该页实际渲染 `config_doc.md` 使用文档 + 底部自定义编辑区 + 回退引导, 「总览」名不副实, 且页内 H1 原本就叫「文档」; ② 原导航项「Settings」改为**「选项」/ Options** —— 整窗即「KeyFlux 设置面板」(窗口标题原 `Setting`), 页面再叫「Settings」导致同一层级「设置」指代两个范围, 「选项」不含「设置」二字且与之形成 *设置面板 > 选项* 的清晰层级 (Windows/Firefox 中文惯例)。**关键实现**: 导航 keymap `id=4` 的标题**改由 i18n 常量提供** (`MainViewModel.BuildNav` 特判 `km.Id == 4` 取 `I18n.T("2581")`), **不再读 config 的 `name`** —— 该字段会被 `config-server/internal/script/generators/generators.go:145` 写进生成的 AHK `NewKeymap(...)`, 改动将连带 golden/oracle 基线与用户 live config 迁移, 且 `id=4` 不在设置页「快捷键方案」列表内 (只列 `Id > 4`) 故无法在 UI 改名; 走 i18n 还顺带获得中英双语标题。窗口标题 `MainWindow.axaml` 由 `Setting` 改为 `KeyFlux Settings` (`OverviewEditWindow.axaml` 的 XAML 占位同步为 `Edit Guide`, 其运行时标题本就由 `I18n.T("2406")` 覆盖; 另 4 个对话框窗口仍为静态 `Title="Setting"`, 未纳入本次范围)。关联文案同步: i18n `931`/`936`/`2406`/`2407` 去「总览」化, `937` 的「设置」页引用改「选项」页; `site-assets/config_doc.md` 与 `config_doc.html`「点开 Settings 页」→「点开「选项」页」; 代码注释与 `readme.md` 全量去「总览」(31 处)。新增 i18n `2581` (选项/Options) ⇒ `I18nResourceTests.ExpectedKeyCount` 386→387 (**新增键自 2582 起**)。⚠ **踩坑**: 仅改 Go 侧注释 (`config-server/internal/script/model/types.go`) 即触发 `SettingsTestServer.AssertBackendNotStale` 前置守卫 (比较 exe 与 Go 源 mtime), 22 个端点测试全红 —— 必须 `make buildServer` 并把 `bin/settings.exe` 复制到 `%TEMP%\mk_settings_headless\` 才恢复。校验: C# 269/269, analyzers×2 exit 0, `make check` lint CLEAN / texttypes 315 次求值一致 / ORACLE PASS |
 | 2026-09-18 | 首个**真实可用**的第三方插件 `everything_search` + **声明式插件设置**落地 (纯增量, 既有 API/route/protocol 零改动): ① **命令框插件拦截点** `bin/lib/core/CommandInputHooks.ahk` (新增) —— 可插拔 provider 列表, 命令框输入期的 OnChar/OnKeyDown 先过 provider, 返回 true 即消费; `keyflux.tmpl` 的 capsHook 改绑 `CommandInputOnChar/OnKeyDown` 并为 `{Up}/{Down}/{Enter}` 加 `KeyOpt(...,"N")`(无 provider 消费时不投递字符, 与历史行为一致; 半角分号钩子不受影响 —— 它是缩写提示窗, 与命令框无关)。② **Everything 插件** `plugins/examples/everything_search/`(manifest + main.ahk + src/ 六层: Messages/Settings/Providers/Search/Dropdown/Session): 命令框内按下**前置触发键**(默认空格, 由设置面板配置)时取当前选中文字, 经 **es.exe 官方 CLI** 检索, 结果以不激活的浮层下拉列在命令框正下方, ↑↓ 选择 / 回车在资源管理器打开/定位; Everything 未运行时按配置的 everything.exe 路径自动拉起(轮询 6s); 通道选型见该目录 `EverythingProviders.ahk` 文件头(WM_COPYDATA IPC 在 Everything 1.5.0.1418 上回复不稳定, SDK DLL 路线官方只支持 1.4.x —— 与 Flow Launcher 文档一致, 故取 ES CLI; `everything.exe -search` 仅作降级)。③ **声明式设置**: `plugin.json` 新增 `settings[]`(key/type/label/labelEn/default/filter/hint/hintEn/min/max/maxLength), Go `ValidateManifest` 全量校验(key 命名空间 / type 词表 char|text|number|file / label 非空 / key 唯一 / 声明 settings 必须申请 settings 权限 / 默认值自身合法); 新增 `internal/plugins.SettingsStore`(与 AHK `ConfigProvider` 同一文件同一扁平格式, 关闭 HTML 转义 + 临时文件 rename 原子落盘) 与两个端点 `GET/PUT /api/plugins/:id/settings`(PUT 逐键按同一份声明校验、**整单拒绝**、空串=删除回落默认值); C# 侧 `PluginSetting`/`PluginSettingsResponse` DTO + `ISettingsApi` 两方法 + `PluginSettingsDialogWindow`(按 settings[] 渲染 char/file+浏览/number/text 四类编辑器) + `PluginsPageViewModel.CanConfigure` 放开到「有 settings 声明的用户插件」。④ **免重启生效**: 插件在每次会话开始时重读 plugin-settings.json (`EverythingSettings.Load` 仅在值真变时返回 true ⇒ 只在必要时让通道探测缓存失效, 避免每次会话白起一次 `es.exe -version` 子进程)。⑤ **部署链**: Makefile 新增 `sync-plugins`(robocopy plugins/examples → `$(OUT_DIR)/data/plugins`, 刻意不带 /MIR ⇒ 用户自装插件不被清掉), 并挂为 `check` 与 `sync-out` 的前置 —— 生成端只扫 `<config.json 同级>/plugins`, 插件不到位则 check 会在空目录上假绿; `make check` 现覆盖真实插件注入路径。i18n 新增 6 键(2582 浏览/2583 选择文件/2584 设置加载失败/2585 保存失败/2586 无可配置项/2587 当前为空格) ⇒ `ExpectedKeyCount` 387→393(**新增键自 2588 起**); 另改**值** 2421「运行时支持开发中」→「第三方插件」与 2425 运行时说明(插件运行时已随 2026-09-12 里程碑落地, 原文案失真; 仅改值不改键)。**闸门**: Go `go test ./...` 全过(新增 manifest 设置校验 15 例 + ValidateSettingValue 19 例 + SettingsStore 8 例 + 端点 5 例); golden 快照随模板的 Include/KeyOpt 变更刷新(`UPDATE_GOLDEN=1`, diff 仅该 6 行); C# 288/288(277→288, 新增 `PluginSettingsDialogTests` 11 例, 含**直读仓库真实 plugin.json** 的契约夹具 —— 该用例当场抓出 limit 未声明 min/max 与 hint 文案不一致); analyzers×2 exit 0; `make check` lint CLEAN / texttypes 315 求值一致 / `/Validate` exit 0 / ORACLE PASS; AHK 端到端探针 ALL PASS(热重载 changed 语义、新触发键即刻生效、零配置 SelfEsPath 自探测走 es-cli 并真实返回结果、会话状态机回归)。实机部署: es.exe(官方 CLI, voidtools 签名 Valid, v1.1.0.37, SHA256 3BE71857...) 置于部署树 `data/plugins/everything_search/bin/` (插件 `SelfEsPath` 的设计落点, **不入库** —— 第三方二进制不含在仓库) |
+| 2026-09-19 | 修复缺陷: **CommandInputHooks 的 provider 分发从未真正执行** ⇒ 命令框按前置触发键(空格)毫无反应 (拦截点引入于 2026-09-18, 自始未生效)。**根因**: `_Call` 写成 `fn := p.%name%` + `fn.Call(args*)`, 而 **AHK v2 的 `obj.Method` 取到的是未绑定 `this` 的函数对象**(`this` 只是普通首参, 取值前无值 —— 与 Python/JS 的 bound method 语义相反, 官方作者 lexikos 明示), 于是首个实参被顶替成 `this`、末位实参缺失, 每次回调在**调用边界**抛 `Missing a required parameter.`; 该异常被 `DispatchChar/DispatchKey/_Notify` 的 try/catch 吞掉并「视为未消费」⇒ provider 一次都没执行, 日志只剩一行被吞掉的噪声。**判据**: 插件 `OnSessionBegin()` 声明**零参**, 零实参 `.Call()` 仍报缺参 ⇒ 缺的只能是隐式 `this`。**修复**: 改用动态名直接调用 `p.%name%(args*)`(同仓先例 `bin/lib/Monitor.ahk:363`), 等价备选 `ObjBindMethod(p, name).Call(args*)`。**为何此前无闸门可拦**: `/Validate`(语法)与 `lint`(标识符遮蔽)均为静态检查, 查不出该纯运行时语义; 而外部症状「按键毫无反应」与「插件没注册」完全一致, 极易误判到插件侧。**新增守门人**: `tools/command_input_hooks_test.ahk` + `make check-hooks`(已挂入 `make check`), 23 项断言覆盖 this 绑定 / 实参位置 / 返回值透传 / HasProp 守卫 / 异常隔离且继续分发 / 短路 / 注册幂等 / 注销生效 / 无后台窗口; 探针**逐字 `#Include` 实现真身**而非另写桩(否则只验证自己的桩, 回归价值归零), 并把工作目录隔离到 `%TEMP%`(被测 `_log` 写相对路径, 不隔离会污染部署 `logs/`); **反转验证**: 旧写法 13 项红 / 新写法 23 项全绿。同批清理插件侧 5 处零引用死代码(`hint_continue` / `title_key_space` / `err_empty` / `EverythingMessages.F()` / `EverythingSettings.TriggerName()`), 插件文案表加「只保留有实调用点的键」纪律。**契约**: 新增 §3.10 冻结 `CommandInputHooks` provider 契约(方法签名 / 返回值语义 / `this` 绑定要求) |
