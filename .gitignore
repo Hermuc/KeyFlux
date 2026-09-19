@@ -26,5 +26,5 @@ CommandInputSkin.txt
 KeyFlux.Settings.Tests/TestResults/
 # 运行时生成的插件镜像与配置 (部署/启动产物, 不入库)
 data/plugins/
-# 孤儿文件: 无任何引用 (未入模板 include 链), 暂忽略不入库
-bin/lib/core/ime_messages.ahk
+# Python 工具字节码缓存 (lint_ident.py 等运行生成)
+__pycache__/
