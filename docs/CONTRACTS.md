@@ -484,7 +484,14 @@ class CommandDisplay {
 
 回归守门人: `tools/command_input_hooks_test.ahk` 第 11/12 组(白名单边界 12 项 + 抑制语义 9 项)。
 
-### 3.11.1 命令框字体 (2026-09-20 冻结)
+### 3.11.1 命令框字体 (2026-09-20 冻结, 同日改定 MiSans)
+
+**当前字体 = `MiSans-Bold.ttf`** (与配置界面 `config-ui-avalonia/Assets/Fonts/` 同源,
+SHA `250fb5c8…21be`, 7,804,780 B, 29093 字形, `usWeightClass=700` / `fsSelection=0x0120`
+/ `macStyle=0x01` / `italicAngle=0` —— **原生精确匹配 exe 请求, 无需任何元数据改造**)。
+选择理由: ①与软件 UI 视觉统一 (配置界面全局 `AppUiFont` = MiSans); ②正体非斜体;
+③字符覆盖优于得意黑 (213 字符抽样 **0 缺失**, 得意黑缺 `※■□◆◇○●` 7 个);
+④原生 Bold 免改造 ⇒ 无手工改元数据的校验和风险。
 
 **机制 (PE 静态解析结论, 无源码事实)**: 命令框文本字体**不来自系统字体, 也不由配置决定**。
 
@@ -521,29 +528,36 @@ windowWidth      windowShadowColor  windowShadowOpacity              windowShado
 
 1. 🔴 **文件名必须是 `font.ttf`** —— 路径是 exe 内烧录的字面量, 改不了。
 2. 🔴 **元数据须与请求匹配, 否则 DirectWrite 合成加粗** —— exe 请求
-   `WEIGHT_BOLD(700)` + `STYLE_NORMAL`, 而**得意黑原生是 `usWeightClass=400` +
-   `fsSelection ITALIC`**。私人字体集合中若只有这一个 face, DirectWrite 会施加
-   **合成加粗 (BOLDSIM, 笔画横向撑宽)** ⇒ 中文密集笔画糊成一团 (WPF 实测复现)。
-   修法 = 改造元数据使请求成为**精确匹配**:
+   `WEIGHT_BOLD(700)` + `STYLE_NORMAL`。**优先选原生 `usWeightClass=700` 的 Bold 静态字体**
+   (如当前 `MiSans-Bold.ttf`), 此时**零改造**。若目标字体原生非 700 (如**得意黑**
+   `usWeightClass=400` + `fsSelection ITALIC`), 私人字体集合中只有这一个 face 时,
+   DirectWrite 会施加**合成加粗 (BOLDSIM, 笔画横向撑宽)** ⇒ 中文密集笔画糊成一团
+   (WPF 实测复现)。修法 = 改造元数据使请求成为**精确匹配**:
    - `OS/2.usWeightClass`: `400 → 700`
    - `OS/2.fsSelection`: 清 `ITALIC(0x0001)`/`REGULAR(0x0040)`, 置 `BOLD(0x0020)`
    - `OS/2.panose.bWeight`: `0 → 8`
    - `head.macStyle`: 清 `italic(0x0002)`, 置 `bold(0x0001)`
-   - `post.italicAngle`: `-8.0 → 0`
+   - `post.italicAngle`: 归 0
    - **`name` 表不动**(保持族名, 因 `fontName` 取自文件名表, 改名有查不到的风险)
-   - **`glyf` 字形数据不动**(得意黑的倾斜在设计里, 不靠元数据)
+   - **`glyf` 字形数据不动**(⚠ 注意: 清元数据标记**改不掉斜体字形本身** ——
+     得意黑的倾斜画在 glyf 轮廓里, `italicAngle=-8.0` 时字形实测倾角 ≈8.7°,
+     故清标记后**渲染依旧斜**。要正体只能换原生正体字体)
    - ⚠ 改完必须用 **fontTools `save()` 重编译**重算校验和 —— 手工改字节会让
      `OS/2`/`head`/`post` 三表校验和失配 (fontTools 会报 `bad checksum`)。
 3. **字符覆盖须自足** —— 命令框要显示字母/数字/键名/中文, 且 exe 传 `L""` (**空 locale**)
    ⇒ 字体回退链不确定。原 Iosevka **不含中文字形**(204 字符抽样缺 109), 中文靠回退;
-   得意黑自带 **9497 字形**(同抽样 **0 缺失**, 含全部中文) ⇒ 换后不再依赖回退。
+   MiSans-Bold 自带 **29093 字形**(213 字符抽样 **0 缺失**) ⇒ 换后不再依赖回退。
 4. ⚠ **`sync-out` 不含 `*.ttf`** —— Makefile `sync-out` 的 robocopy 白名单是
    `'*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll'`, **`*.ttf` 不在其中** ⇒ `make out`/`deploy`
    **不会**把仓库字体同步到部署树, 也**不会**删除部署树字体。换字体后须**手动同步两处**
    (仓库 `bin/font/` + 部署树 `bin/font/`), 否则两侧不一致。
-5. **回滚**: 原 Iosevka 字体在 git 历史 (`HEAD:bin/font/font.ttf`, SHA `deebc76e…`)
-   + 部署树 `bin/font/font.ttf.bak-iosevka` (同 SHA) 各存一份;
-   `git checkout HEAD -- bin/font/font.ttf` 即还原。
+5. ⚠ **字体仅在进程启动时读取一次** —— 实测 `KeyFlux-CommandInput.exe` 运行期间
+   字体文件**未被锁定**(可写), 但换字体后**必须重启命令框进程**才会生效
+   (DirectWrite 私有字体集合在启动时构建并常驻)。
+6. **回滚**: 历史字体各存一份 —— 原 Iosevka (git 历史 SHA `deebc76e…`) 在
+   `bin/font/font.ttf.bak-iosevka`; 得意黑 (SHA `2e4ce734…`) 在
+   `bin/font/font.ttf.bak-smiley`; 均位于**部署树**。`git checkout HEAD -- bin/font/font.ttf`
+   可回滚到上一个已提交版本。
 
 **当前状态**: 已替换为**改造版得意黑 (Smiley Sans Oblique / 得意黑)**,
 SHA256 `2e4ce734…ba5bb` (**注意: 改动后 SHA 与上游 `SmileySans-Oblique.ttf` 的
@@ -842,3 +856,4 @@ action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经
 | 2026-09-20 | **调优: 命中收尾延迟 150ms→30ms** (承接同日「终止字符未被投递」修复; 用户反馈「输入命令后执行速度太慢, 要在看到最后一个字母的一瞬间执行」)。该延迟的唯一作用是让 `EchoTerminalChar` 投出的终止字符有 1~2 个绘制周期上屏 (60Hz 下 1 帧 ≈16.7ms), 首版 150ms 属过失保守。现值 `CommandInputHooks.FinishDelayMs := 30` ≈ 2 帧 —— 感知上等同上屏瞬间即执行, 同时保住字符可见性。**勿设 0 / ≤1 帧**: 投完立刻执行+隐藏会让该字符来不及绘制 (即用户本轮报的「最后一个字母不显示」)。回归守门: check-hooks 第 14 组延迟区间断言放宽为 5..500ms (原 50..500)。**契约**: §3.12 硬约束 9 同步, 变更记录本行 |
 | 2026-09-19 | **命令框搜索插件未运行时静默拉起** (修复 Everything 自动启动抢前台焦点): 用户报告进入搜索模式时插件拉起 Everything, 后者弹出主窗口并抢焦点, 打断命令框输入。**根因**: `EverythingSearch.EnsureRunning` 用裸命令 `Run('"exe"')` 启动 ⇒ Everything 显示主窗口。**修复**: 改用官方静默开关 **`-startup`** ("Run Everything in the background without showing any search windows"); **不用 `-minimize`** (只最小化, 窗口仍在且仍是焦点候选)。**兜底**: 新增 `HideMainWindowIfAny()` + `_HideVisibleMainWindow()` —— 探活后 1.2s 窗口期内 (250ms 步长) 枚举 Everything **可见**顶层窗并 `WinHide`; 筛选走**类名黑名单** (排除 `MSCTFIME UI`/`IME`/`Default IME`), **不以「标题非空」为主筛** (实测 `-startup` 下窗口标题可能为空, 用标题筛会漏掉真主窗口); 只在刚拉起后调用一次, 不影响用户此后手动开窗。**实测** (Everything 1.5.0.1418): 对照探针跑 bare/`-startup` 各 40s 逐秒采样 —— 存活性与 IPC 可用性完全等价 (恒 2 进程, `es -get-result-count` 恒 0 退出码); 唯一差异是 `-startup` **可见窗 0 个** (仅 2 个 `visible=0` 的 IME 辅助窗)、前台焦点不变; 双场景断言探针 9/9 PASS。**踩坑**: ① 探针 `Run()` 拉起的 Everything 在脚本退出后消失, 系 **Bash/PowerShell 工具调用结束会清理其子进程树** (非产品缺陷); ② **`plugins/examples/` 才是入库权威源**, `data/plugins/` 被 `.gitignore` 忽略 —— 改错位置会被 `make check` 的 sync-plugins (robocopy examples→部署树) 整体冲掉。**门禁**: make check 全绿 (check-hooks 75/75 / lint / check-texttypes / GenerateAHK / `/Validate` / ORACLE DIFF PASS), 三方 SHA 一致 (`EverythingSearch.ahk` `61c2073b`)。**契约**: 插件 README §1.1 记录修法, 变更记录本行 |
 | 2026-09-20 | **命令框字体替换为得意黑 (Smiley Sans)** (纯资源替换, 零代码/API/DB/route/protocol 变更): 用户要求把命令框字体统一改为得意黑, 中英文数字与 placeholder 全由其渲染且不出现英文回退。**机制确认 (PE 静态解析)**: 命令框字体**不来自系统字体、也不由配置决定** —— exe 内 UTF-16 字面量 `font\font.ttf` 是唯一来源 (相对 exe 自身目录), 用它建 `IDWriteFontCollection` 后按该 ttf 的 `name` 表族名调 `CreateTextFormat`, 权重/字号硬编码 (`WEIGHT_BOLD(700)` / `44.0f`, 断言串 RVA `0x1ddf0`); `.rdata` 全量字符串**无任何字体族名** (`Iosevka` ASCII/UTF-16 均 0 命中)→ 族名只能取自文件本身; 皮肤配置 `CommandInputSkin.txt` 的 **19 键全是颜色/透明度/圆角/尺寸/动画, 无 font 键** (与 exe `.rdata` 配置键已全量比对一一对应); 渲染栈 DirectWrite/D2D/D3D11/DComp (非 GDI) ⇒ `WM_SETFONT` 类注入无效。**⇒ 换字体 = 替换 `bin/font/font.ttf`** (无需重编译 / 装系统字体 / 改配置)。**⚠ 关键改造 (否则中文糊成一团)**: exe 请求 `WEIGHT_BOLD(700)` 而得意黑原生 `usWeightClass=400` + `fsSelection ITALIC`, DirectWrite 在单 face 私有集合中会施加**合成加粗 (BOLDSIM)** —— WPF 实测复现中文笔画粘连。故用 fontTools 改造元数据使其成为**精确匹配**: `OS/2.usWeightClass 400→700`、`OS/2.fsSelection` 清 ITALIC/REGULAR 置 BOLD (`0x0001→0x0020`)、`OS/2.panose.bWeight 0→8`、`head.macStyle` 清 italic 置 bold (`0x0002→0x0001`)、`post.italicAngle -8.0→0`; **`name` 表与 `glyf` 字形不动** (族名保持 `得意黑`/`Smiley Sans Oblique`, 因族名取自文件且改名有查不到的风险; 倾斜在设计里不靠元数据)。⚠ 改完必须经 **fontTools `save()` 重编译**重算校验和 —— 手工改字节会让 `OS/2`/`head`/`post` 三表校验和失配 (fontTools 报 `bad checksum`)。**字符覆盖**: 原 Iosevka **不含中文字形** (204 字符抽样缺 109), 中文靠 DirectWrite 回退 (exe 传 `L""` 空 locale ⇒ 回退链不确定); 得意黑自带 **9497 字形** (同抽样 **0 缺失**, 含全部中文与 latin) ⇒ 换后中英文数字不再依赖回退。**落地**: `bin/font/font.ttf` 替换 (三方 SHA 一致 `2e4ce734…ba5bb`, **与上游原版 `b447d7e7…d25c4` 不同 —— 差异即上述元数据改造**), 仓库与部署树同时更新; 原 Iosevka 在 git 历史 (`HEAD:bin/font/font.ttf`, `deebc76e…`) + 部署树 `font.ttf.bak-iosevka` (同 SHA) 双备份, `git checkout` 即回滚。**⚠ 同步注意**: Makefile `sync-out` 的 robocopy 白名单为 `'*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll'` —— **不含 `*.ttf`** ⇒ 换字体后必须**手动同步两处**, `make out`/`deploy` 既不复制也不删除字体。**门禁**: make check 全绿 (check-hooks 75/75 / lint / check-texttypes / GenerateAHK / `/Validate` / ORACLE DIFF PASS), 字体 SHA 三方一致。**契约**: 新增 §3.11.1「命令框字体」(机制 + 19 键皮肤边界 + 5 条硬约束), §3.11 背景第 1 条订正 (原写「DirectWrite 系统字体回退」→ 改为私有字体集合 + 指向 §3.11.1), 变更记录本行 |
+| 2026-09-20 | **命令框字体改定 MiSans-Bold** (承接同日「替换为得意黑」, 纯资源替换, 零代码/API/DB/route/protocol 变更): 用户要求改为「软件使用的 MiSans」。**来源**: `config-ui-avalonia/Assets/Fonts/MiSans-Bold.ttf` —— 即配置界面全局 `AppUiFont` 的同一族字体 (族名 `MiSans`, 界面侧经 `avares://KeyFlux.Settings/Assets/Fonts/#MiSans` 引用, 见 `Styles/Skins/Claude.axaml` 与 `App.axaml`)。**选 Bold 字重的依据 (元数据实测)**: `usWeightClass=700` / `fsSelection=0x0120`(BOLD=1, ITALIC=0) / `macStyle=0x01`(bold=1, italic=0) / `italicAngle=0` / `panose.bWeight=8` —— 与 exe 硬编码请求 `WEIGHT_BOLD(700)` + `STYLE_NORMAL` **原生精确匹配** ⇒ **零元数据改造** (对比得意黑需 fontTools 改 5 处元数据且仍有校验和风险)。**附加收益**: ①**正体非斜体** (得意黑官方只有 `SmileySans-Oblique` 单字重, 倾斜画在 glyf 轮廓里, 清元数据标记也去不掉, 实测字形倾角 ≈8.7°); ②**字符覆盖更优** —— 213 字符抽样 MiSans-Bold **0 缺失**, 得意黑缺 `※■□◆◇○●` 共 7 个; ③与软件 UI 视觉统一。**落地**: `bin/font/font.ttf` 替换 (`250fb5c8…21be`, 7,804,780 B, 29093 字形), 仓库与部署树**手动同步** (因 `sync-out` 白名单不含 `*.ttf`), 三方 SHA 一致 (仓库 = 部署树 = `Assets/Fonts/MiSans-Bold.ttf`)。**备份**: 部署树新增 `bin/font/font.ttf.bak-smiley` (得意黑 `2e4ce734…ba5bb`), 与原 `font.ttf.bak-iosevka` (Iosevka `deebc76e…`) 并列作为回滚资产。**⚠ 生效条件**: 字体在 `KeyFlux-CommandInput.exe` **启动时读取一次** (运行期间文件未被锁定, 实测可写) ⇒ **必须重启引擎/命令框进程**才可见新字体。**门禁**: make check 全绿 (check-hooks 75/75 / lint / check-texttypes / GenerateAHK / `/Validate` / ORACLE DIFF PASS), 字体未被 `make check` 覆盖 (SHA 复核不变)。**契约**: §3.11.1 标题与开头改写为「当前字体 = MiSans-Bold」+ 选择理由, 硬约束第 2 条改为「优先选原生 700 的 Bold 静态字体 ⇒ 零改造」并补充「清元数据标记改不掉斜体字形」的实证警示, 硬约束第 5 条补充「字体仅启动时读取一次, 须重启进程」, 第 6 条回滚资产补充 `.bak-smiley` |
