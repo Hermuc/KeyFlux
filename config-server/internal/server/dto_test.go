@@ -212,3 +212,61 @@ func TestPluginsRegistryRoundTrip(t *testing.T) {
 		t.Fatalf("空 plugins.disabled 应为 [], 实际 %v", emptyPlugins["disabled"])
 	}
 }
+
+// TestCommandFontRoundTrip 验证 options.commandFont (命令框字体配置段) 的
+// PUT 反序列化 + DTOToConfig → ConfigToDTO 往返 (CONTRACTS §5.2 双侧同步;
+// 漏 DTO 分支会静默抹字段 —— G1 教训)。
+func TestCommandFontRoundTrip(t *testing.T) {
+	input := `{"keymaps":[],"options":{"commandFont":{"sourcePath":"D:\\fonts\\My.ttf","weight":"semibold"}}}`
+	var dto ConfigDTO
+	if err := json.Unmarshal([]byte(input), &dto); err != nil {
+		t.Fatalf("反序列化 DTO 失败: %v", err)
+	}
+	if dto.Options.CommandFont.SourcePath != `D:\fonts\My.ttf` ||
+		dto.Options.CommandFont.Weight != "semibold" {
+		t.Fatalf("PUT commandFont 往返丢失: %+v", dto.Options.CommandFont)
+	}
+
+	cfg := DTOToConfig(&dto)
+	if cfg.Options.CommandFont.SourcePath != `D:\fonts\My.ttf` ||
+		cfg.Options.CommandFont.Weight != "semibold" {
+		t.Fatalf("DTOToConfig commandFont 往返丢失: %+v", cfg.Options.CommandFont)
+	}
+
+	out, err := json.Marshal(ConfigToDTO(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var check map[string]interface{}
+	if err := json.Unmarshal(out, &check); err != nil {
+		t.Fatal(err)
+	}
+	cf, ok := check["options"].(map[string]interface{})["commandFont"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("wire JSON: options.commandFont 恒为对象, 实际 %v", check["options"])
+	}
+	if cf["sourcePath"] != `D:\fonts\My.ttf` || cf["weight"] != "semibold" {
+		t.Fatalf("wire commandFont 往返不一致: %v", cf)
+	}
+
+	// 空段恒对象恒键 (旧配置缺失该段 -> 零值 -> 输出空串而非缺键/null)
+	var emptyIn ConfigDTO
+	if err := json.Unmarshal([]byte(`{}`), &emptyIn); err != nil {
+		t.Fatal(err)
+	}
+	out2, err := json.Marshal(ConfigToDTO(DTOToConfig(&emptyIn)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var emptyCheck map[string]interface{}
+	if err := json.Unmarshal(out2, &emptyCheck); err != nil {
+		t.Fatal(err)
+	}
+	emptyCf, ok := emptyCheck["options"].(map[string]interface{})["commandFont"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("wire JSON: 空 commandFont 恒为对象, 实际 %v", emptyCheck["options"])
+	}
+	if _, has := emptyCf["sourcePath"]; !has {
+		t.Fatalf("空 commandFont 恒含 sourcePath 键, 实际 %v", emptyCf)
+	}
+}

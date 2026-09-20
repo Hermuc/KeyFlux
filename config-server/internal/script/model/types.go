@@ -164,6 +164,26 @@ type Options struct {
 	QuickSwitch      QuickSwitchOption `json:"quickSwitch"`
 	Plugins          PluginsOption     `json:"plugins"`
 	Acrylic          AcrylicOption     `json:"acrylic"`
+	CommandFont      CommandFontOption `json:"commandFont"`
+}
+
+// CommandFontOption 命令输入框的字体配置 (config.json 的 options.commandFont)。
+//
+// 语义边界 (重要, 决定本段被谁消费):
+//
+//   - SourcePath = 用户经系统文件弹窗选择的**字体文件路径** (.ttf/.otf/.ttc)。生成端
+//     (GenerateScripts) 读取它并复制到 bin/font/font.ttf —— 命令框 exe 内烧录的
+//     UTF-16 字面量 `font\font.ttf` 是**唯一**字体来源, 见 CONTRACTS §3.11.1。
+//     ⚠ 命令框只接受 glyf (TrueType) 轮廓; CFF/OTF 源须先经 tools/font_otf2ttf.py 转换。
+//   - Weight = 字重档位 ("regular"/"medium"/"semibold"/"bold"), **当前仅作记录**:
+//     exe 硬编码请求 DWRITE_FONT_WEIGHT_BOLD(700) 且不可改 ⇒ 该值不参与渲染,
+//     也不触发 DirectWrite 合成加粗 (元数据精确匹配后无 BOLDSIM)。想改笔画粗细
+//     只能在字形上做 (tools/font_embolden.py 轮廓膨胀), 详见 CONTRACTS §3.11.1 硬约束 4。
+//
+// 纯配置 + 生成期消费项: 引擎运行时 (AHK) 不读取本段。
+type CommandFontOption struct {
+	SourcePath string `json:"sourcePath"`
+	Weight     string `json:"weight"`
 }
 
 // AcrylicOption 设置面板窗口的亚克力(毛玻璃)材质配置 (config.json 的 options.acrylic)。

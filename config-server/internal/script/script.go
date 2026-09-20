@@ -18,6 +18,11 @@ func GenerateScripts(config *Config) {
 
 	Preprocess(config)
 
+	// 命令框字体: 按配置把用户选定的字体文件复制到 bin/font/font.ttf (见 font.go)。
+	// 运行时 cwd = bin, 故 baseDir = "" 让落点直接是相对路径 "font/font.ttf"。
+	// 失败静默跳过 (字体是纯表现层资源, 不该阻断生成); 详见 InstallCommandFont。
+	_ = InstallCommandFont(config.Options.CommandFont, "")
+
 	if err := SaveAHK(config, "./templates/KeyFlux.tmpl", "../bin/KeyFlux.ahk"); err != nil {
 		panic(err)
 	}

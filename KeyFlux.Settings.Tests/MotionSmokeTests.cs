@@ -53,7 +53,10 @@ public sealed class MotionSmokeTests
         {
             var bodies = view.GetVisualDescendants().OfType<StackPanel>()
                 .Where(p => p.Classes.Contains("sectionBody")).ToList();
-            Assert.Equal(8, bodies.Count);
+            // 9 = 语言/程序分组(无模板)/自定义热键/鼠标参数/键盘布局/触发延时/命令框皮肤
+            //     /窗口毛玻璃/命令框字体/路径变量 —— 「程序分组」卡是 Click 事件而非 sectionBody,
+            //     由 2026-09-20 新增「命令框字体」卡从 8 增至 9 (漏改会让本用例变红, 正是其价值)。
+            Assert.Equal(9, bodies.Count);
 
             // 手风琴展开: open 类与 IsVisible 必须绑定同一 Show* 源, 展开动画才有触发时机
             vm.ToggleSectionCommand.Execute("mouse");

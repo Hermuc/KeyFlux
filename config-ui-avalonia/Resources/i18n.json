@@ -1570,5 +1570,41 @@
   "2587": {
     "zh": "当前为空格",
     "en": "Current value: Space"
+  },
+  "2503": {
+    "zh": "命令框字体",
+    "en": "Command box font"
+  },
+  "2504": {
+    "zh": "字体文件",
+    "en": "Font file"
+  },
+  "2505": {
+    "zh": "选择本地字体文件 (.ttf / .otf / .ttc)",
+    "en": "Choose a local font file (.ttf / .otf / .ttc)"
+  },
+  "2506": {
+    "zh": "未选择（沿用当前字体）",
+    "en": "Not set (keep the current font)"
+  },
+  "2507": {
+    "zh": "恢复默认",
+    "en": "Reset"
+  },
+  "2508": {
+    "zh": "字重",
+    "en": "Weight"
+  },
+  "2509": {
+    "zh": "常规",
+    "en": "Regular"
+  },
+  "2510": {
+    "zh": "中等",
+    "en": "Medium"
+  },
+  "2511": {
+    "zh": "半粗",
+    "en": "Semibold"
   }
 }

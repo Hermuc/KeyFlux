@@ -201,11 +201,18 @@ public sealed class SettingsCardEffectTests
                 b => b.Classes.Contains("pluginCard"));
             AssertHoverShowsHalo(pwin, pluginCard, rest, hover);
 
-            // 只悬停**可见且已布局**的组件框: 折叠分区内的卡 Bounds=0/IsVisible=False, 本就无法悬停
-            // (其静止配方仍由 Settings_Cards_Match_Plugins_Card_Border_Recipe 用全集守护)
+            // 只悬停**可见且已布局、且完整落在窗口视口内**的组件框:
+            //   - 折叠分区内的卡 Bounds=0/IsVisible=False, 本就无法悬停;
+            //   - IsEffectivelyVisible 为真但被 ScrollViewer 滚出视口的卡 (Bounds 在页坐标里
+            //     纵向超出窗口高), 其"中心"换算到窗口坐标会落到视口外 ⇒ 悬停必然不命中。
+            // 2026-09-20 新增「命令框字体」卡后, 末尾的「路径变量」卡被推到 y=820 (窗口 950 高
+            // 减去页头后已在视口外), 实测踩到 —— 故补视口包含性判定 (并非放松断言: 其静止配方
+            // 仍由 Settings_Cards_Match_Plugins_Card_Border_Recipe 用全集守护;
+            // 悬停配方对每张"可见可悬停"的卡仍是逐张断言)。
             var settingsCards = sview.GetVisualDescendants().OfType<Border>()
                 .Where(b => (b.Classes.Contains("settingsCard") || b.Classes.Contains("leftPanel"))
-                            && b.IsEffectivelyVisible && b.Bounds.Width > 0 && b.Bounds.Height > 0)
+                            && b.IsEffectivelyVisible && b.Bounds.Width > 0 && b.Bounds.Height > 0
+                            && IsFullyInsideViewport(swin, b))
                 .ToList();
             Assert.True(settingsCards.Count > 0, "未找到可见的 Settings 页组件框");
             foreach (var c in settingsCards)
@@ -387,12 +394,18 @@ public sealed class SettingsCardEffectTests
     private static void DetachShadowTransition(Border card) => card.Transitions = new Transitions();
 
     /// <summary>悬停某卡片: 命中后断言描边色不变 (无灰线) 且 BoxShadow == 悬停光圈档; 随后移出复位。</summary>
+    /// <remarks>
+    /// 悬停点**不能无脑取卡片中心**: 那可能正好落在卡内的交互子控件 (TextBox/ComboBox 等) 上 ——
+    /// 指针被子控件接住, 卡片自身的 <c>:pointerover</c> 不触发, 断言随卡片内容布局而抖。
+    /// 2026-09-20 新增「命令框字体」卡 (中心是只读 TextBox) 时实测踩到。
+    /// 故改为: 优先取卡片**内衬空白区**的候选点 (左上 padding 内 / 左缘垂直中点 / 右上角内衬),
+    /// 命中非交互区域; 三个候选都落空才退回中心 (保持旧行为, 不放松断言强度)。
+    /// </remarks>
     private static void AssertHoverShowsHalo(Window win, Border card, BoxShadows rest, BoxShadows hover)
     {
         DetachShadowTransition(card);
         var restBrush = ((ISolidColorBrush)card.BorderBrush!).Color;
-        var p = Avalonia.VisualExtensions.TranslatePoint(
-            card, new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), win)!.Value;
+        var p = Avalonia.VisualExtensions.TranslatePoint(card, HoverPointFor(card), win)!.Value;
         win.MouseMove(p);
         Dispatcher.UIThread.RunJobs();
 
@@ -408,5 +421,54 @@ public sealed class SettingsCardEffectTests
 
         win.MouseMove(new Point(1, 1));
         Dispatcher.UIThread.RunJobs();
+    }
+
+    /// <summary>
+    /// 为卡片挑一个「落在卡上但不落在交互子控件上」的悬停点 (卡片局部坐标)。
+    /// <para>
+    /// 默认仍是<b>卡片中心</b> (历史行为, 悬停中心的判据已被历代卡验证); 仅当中心被一个
+    /// **可聚焦子控件** (TextBox/ComboBox/ToggleSwitch 等, 排除卡 Border 自身) 接住时才退到
+    /// 内衬候选点。为什么需要这层: 2026-09-20 新增「命令框字体」卡, 中心恰是只读 TextBox,
+    /// 指针被子控件接住 ⇒ 卡片自身 <c>:pointerover</c> 不触发。
+    /// 注意卡 Border 自身就是 <c>Focusable=True</c> (点非交互区 = 选中该卡), 故判据必须
+    /// 排除卡自身, 否则永远"命中可聚焦元素"而误退点。
+    /// </para>
+    /// </summary>
+    private static Point HoverPointFor(Border card)
+    {
+        var w = card.Bounds.Width;
+        var h = card.Bounds.Height;
+        var center = new Point(w / 2, h / 2);
+        if (!HitsInteractiveChild(card, center)) return center;
+
+        foreach (var pt in new[] { new Point(4, h / 2), new Point(4, 4), new Point(w - 4, 6) })
+        {
+            if (!HitsInteractiveChild(card, pt)) return pt;
+        }
+        return center;
+    }
+
+    /// <summary>该点是否落在卡内的可聚焦子控件上 (卡 Border 自身不算)。</summary>
+    private static bool HitsInteractiveChild(Border card, Point pt)
+        => card.InputHitTest(pt) is InputElement { Focusable: true } hit
+           && !ReferenceEquals(hit, card);
+
+    /// <summary>
+    /// 卡片是否完整落在**滚动视口**内 (换算到 ScrollViewer 坐标后比对 ScrollViewer 自身 Bounds)。
+    /// 被 ScrollViewer 滚出/裁掉的卡其"中心"在窗口坐标里仍可能落在窗口矩形内 (页头与视图盒缩放
+    /// 让两者不等), 但实际不可见、悬停必然不命中 —— 不是缺陷, 是测量前提。
+    /// 找不到祖先 ScrollViewer 时退回窗口矩形判定。
+    /// </summary>
+    private static bool IsFullyInsideViewport(Visual root, Border card)
+    {
+        var scroller = card.GetVisualAncestors().OfType<ScrollViewer>().FirstOrDefault();
+        var reference = (Visual?)scroller ?? root;
+        var topLeft = Avalonia.VisualExtensions.TranslatePoint(card, new Point(0, 0), reference);
+        var bottomRight = Avalonia.VisualExtensions.TranslatePoint(
+            card, new Point(card.Bounds.Width, card.Bounds.Height), reference);
+        if (topLeft is null || bottomRight is null) return false;
+        var bounds = reference.Bounds;
+        return topLeft.Value.Y >= 0 && bottomRight.Value.Y <= bounds.Height
+               && topLeft.Value.X >= 0 && bottomRight.Value.X <= bounds.Width;
     }
 }

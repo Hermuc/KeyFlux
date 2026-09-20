@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using KeyFlux.Settings.Services;
 using KeyFlux.Settings.ViewModels;
@@ -114,6 +115,41 @@ public partial class SettingsPageView : UserControl
                 vm.Main.RecreateKeymapPages();
             }
         }
+    }
+
+    // ----------------------------------------------------- 命令框字体分区
+
+    /// <summary>
+    /// 选择自定义字体文件: 弹系统文件选择器 -> 把路径写回 VM (落 config.options.commandFont.sourcePath)。
+    /// <para>
+    /// 文件选择属视图职责 (需 <see cref="Avalonia.Platform.Storage.IStorageProvider"/>, 见
+    /// PluginsPageView.OnImportClick 同款先例), 逻辑仍在 VM。
+    /// </para>
+    /// <para>
+    /// 过滤器只列字体扩展名 (与 Go 侧 <c>InstallCommandFont</c> 的 sfnt 签名嗅探互补:
+    /// 这里防误选, 那里防伪造/改名的非字体文件)。取消选择时**不改动**已选路径。
+    /// </para>
+    /// </summary>
+    private async void OnPickCommandFont(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not SettingsPageViewModel vm
+            || TopLevel.GetTopLevel(this) is not Window owner)
+        {
+            return;
+        }
+        var options = new FilePickerOpenOptions
+        {
+            Title = I18n.T("2505"),
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType(I18n.T("2504")) { Patterns = ["*.ttf", "*.otf", "*.ttc"] },
+            ],
+        };
+        var files = await owner.StorageProvider.OpenFilePickerAsync(options);
+        if (files.Count == 0) return;
+        // Path.LocalPath: file:// URI -> Windows 本地路径 (Go 生成端按此读源文件)
+        vm.SetCommandFontPath(files[0].Path.LocalPath);
     }
 
     // ----------------------------------------------------- 自定义热键分区 (原 Custom Hotkeys 页迁入)

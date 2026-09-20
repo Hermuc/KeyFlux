@@ -237,6 +237,16 @@
         </Animation>
       </Style.Animations>
     </Style>
+    <!-- 命令框字体卡 (第 12 张, 2026-09-20 新增)。原级联只覆盖 2..11 共 10 档; 新卡若漏此档
+         则**无动画** —— 其余卡逐张淡入时它突兀直出 (缩放比/布局不变, 仅观感断裂)。 -->
+    <Style Selector="UserControl.motion Border.settingsCard:nth-child(12)">
+      <Style.Animations>
+        <Animation Duration="{x:Static vm:ClaudeMotion.Enter}" Delay="0:0:0.3" Easing="CubicEaseOut" FillMode="Backward">
+          <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
     <!-- ③ 分区展开入场: Classes.open 随 ShowX 绑定同步翻转 (手风琴), 展开淡入 + 8px 上滑收位
          (从标题下方"展开"的读感)。收起 = IsVisible 立即 false, 无退场 —— IsVisible 不可动画,
          做退场需常驻占位, 违背手风琴布局语义, 保留瞬时收起 -->
@@ -668,6 +678,60 @@
               <Slider Minimum="0" Maximum="100" Value="{Binding AcrylicTransparency}"
                       TickFrequency="5" IsSnapToTickEnabled="True" />
             </StackPanel>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- 🔤 命令框字体: 字体文件选择 (系统弹窗) + 字重档位
+             落 config.options.commandFont { sourcePath, weight }; 生成端按 sourcePath
+             复制到 bin/font/font.ttf (exe 内烧录的字面量, 唯一字体来源, 契约 §3.11.1)。
+             ⚠ 字重当前仅作记录 —— exe 恒定请求 BOLD(700) 且元数据已精确匹配, 实际笔画
+             粗细由字体文件的字形决定; 界面上用说明文字明确告知, 不做"能改粗细"的误导。
+             ⚠ 换字体后须重启命令框进程 (字体只在启动时读取一次)。 -->
+        <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
+          <StackPanel Spacing="10">
+            <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="commandfont">
+              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2503}"
+                         FontWeight="SemiBold" />
+            </Button>
+            <StackPanel Classes="sectionBody" Classes.open="{Binding ShowCommandFont}"
+                        IsVisible="{Binding ShowCommandFont}" Spacing="10">
+              <!-- 字体文件: 只读文本框显示当前路径 + 「选择…」弹系统文件选择器 -->
+              <StackPanel Spacing="4">
+                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2504}"
+                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <TextBox Text="{Binding CommandFontDisplay, Mode=OneWay}" IsReadOnly="True"
+                           Padding="6,4" ToolTip.Tip="{Binding CommandFontPath}" />
+                  <Button Grid.Column="1" Margin="6,0,0,0" Padding="10,5"
+                          Click="OnPickCommandFont"
+                          Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}"
+                          BorderThickness="1" Foreground="{StaticResource ClaudeTerracottaBrush}"
+                          CornerRadius="{StaticResource ClaudeRadiusMd}">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2582}" />
+                  </Button>
+                  <Button Grid.Column="2" Margin="6,0,0,0" Padding="10,5"
+                          Command="{Binding ResetCommandFontCommand}"
+                          Background="Transparent" BorderBrush="{StaticResource ClaudeBorderCreamBrush}"
+                          BorderThickness="1" Foreground="{StaticResource ClaudeStoneGrayBrush}"
+                          CornerRadius="{StaticResource ClaudeRadiusMd}">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2507}" />
+                  </Button>
+                </Grid>
+              </StackPanel>
+              <!-- 字重档位: 仅记录 (exe 恒定 BOLD 请求, 见卡片头注释) -->
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2508}"
+                           VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" MinWidth="140"
+                          ItemsSource="{Binding FontWeights}" SelectedItem="{Binding SelectedFontWeight}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FontWeightOption">
+                      <TextBlock Text="{Binding Title}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </Grid>
             </StackPanel>
           </StackPanel>
         </Border>

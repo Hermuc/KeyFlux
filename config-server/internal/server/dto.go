@@ -112,6 +112,13 @@ type OptionsDTO struct {
 	KeyboardLayout   string               `json:"keyboardLayout"`
 	QuickSwitch      QuickSwitchOptionDTO `json:"quickSwitch"`
 	Plugins          PluginsOptionDTO     `json:"plugins"`
+	CommandFont      CommandFontOptionDTO `json:"commandFont"`
+}
+
+// CommandFontOptionDTO 对应 model.CommandFontOption, 与 OptionsDTO 成对 (CONTRACTS §5.2 双侧同步)。
+type CommandFontOptionDTO struct {
+	SourcePath string `json:"sourcePath"`
+	Weight     string `json:"weight"`
 }
 
 // PluginsOptionDTO 对应 model.PluginsOption, 与 OptionsDTO 成对 (CONTRACTS §5.2 双侧同步)。
@@ -386,6 +393,10 @@ func optionsToDTO(o model.Options) OptionsDTO {
 			OverlayRows:        o.QuickSwitch.OverlayRows,
 			OverlayRowsCompact: o.QuickSwitch.OverlayRowsCompact,
 		},
+		CommandFont: CommandFontOptionDTO{
+			SourcePath: o.CommandFont.SourcePath,
+			Weight:     o.CommandFont.Weight,
+		},
 	}
 	if o.QuickSwitch.ExcludedPrefixes != nil {
 		dto.QuickSwitch.ExcludedPrefixes = make([]string, len(o.QuickSwitch.ExcludedPrefixes))
@@ -606,6 +617,10 @@ func dtoToOptions(o OptionsDTO) model.Options {
 			MaxHistory:         o.QuickSwitch.MaxHistory,
 			OverlayRows:        o.QuickSwitch.OverlayRows,
 			OverlayRowsCompact: o.QuickSwitch.OverlayRowsCompact,
+		},
+		CommandFont: model.CommandFontOption{
+			SourcePath: o.CommandFont.SourcePath,
+			Weight:     o.CommandFont.Weight,
 		},
 	}
 	if o.QuickSwitch.ExcludedPrefixes != nil {

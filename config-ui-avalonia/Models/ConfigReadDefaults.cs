@@ -142,10 +142,34 @@ public static class ConfigReadDefaults
         // 会被覆盖掉。故仅在整段缺失 (null) 时补默认。
         options.Acrylic ??= new AcrylicOption { Enabled = true, Transparency = 30 };
 
+        // 命令框字体: 缺段时补默认 —— 空路径 (沿用现有 bin/font/font.ttf) + 常规字重。
+        // 同 Acrylic, 只在整段缺失 (null) 时补, 不逐字段覆盖 (用户清空路径是显式选择)。
+        options.CommandFont ??= new CommandFontOption
+        {
+            SourcePath = "",
+            Weight = DefaultCommandFontWeight,
+        };
+
         config.SelectedAction ??= new SelectedAction();
 
         return config;
     }
+
+    /// <summary>命令框字体字重的出厂默认档位 (常规)。</summary>
+    public const string DefaultCommandFontWeight = "regular";
+
+    /// <summary>
+    /// 字重档位全量白名单 (与 UI 下拉项一一对应)。取值非法时回退
+    /// <see cref="DefaultCommandFontWeight"/> —— 见 <see cref="NormalizeFontWeight"/>。
+    /// </summary>
+    public static readonly string[] CommandFontWeights = ["regular", "medium", "semibold", "bold"];
+
+    /// <summary>
+    /// 字重取值规范化: 空/未知值一律回退 <see cref="DefaultCommandFontWeight"/>。
+    /// 供 UI 载入配置时兜底 (配置文件被手工改坏 / 旧版本写入未知档位时不留脏值)。
+    /// </summary>
+    public static string NormalizeFontWeight(string? weight)
+        => Array.IndexOf(CommandFontWeights, weight) >= 0 ? weight! : DefaultCommandFontWeight;
 
     /// <summary>设计 §3.1 默认值 (autoShow/autoJumpOpen=true、autoJumpSave=false、poll=800、maxHistory=200、rows=8、compact=4)。</summary>
     public static QuickSwitchOption QuickSwitchDefaults() => new()

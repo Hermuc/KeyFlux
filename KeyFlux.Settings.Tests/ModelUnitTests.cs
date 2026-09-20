@@ -95,8 +95,12 @@ public sealed class ModelSerializationTests
                 "commandInputSkin", "pathVariables", "startup", "language", "keyMapping", "keyboardLayout",
                 "quickSwitch", "plugins",
                 "acrylic", // 纯 UI 呈现项 (窗口亚克力材质), 与 Go struct AcrylicOption 同名
+                "commandFont", // 命令框字体 (生成端按 sourcePath 复制到 bin/font/font.ttf)
             },
             keys);
+
+        var cfKeys = doc.RootElement.GetProperty("commandFont").EnumerateObject().Select(p => p.Name).ToHashSet();
+        Assert.Equal(new HashSet<string> { "sourcePath", "weight" }, cfKeys);
 
         var qsKeys = doc.RootElement.GetProperty("quickSwitch").EnumerateObject().Select(p => p.Name).ToHashSet();
         Assert.Equal(

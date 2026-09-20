@@ -354,6 +354,39 @@ public sealed class Options
 
     [JsonPropertyName("acrylic")]
     public AcrylicOption? Acrylic { get; set; } = new();
+
+    [JsonPropertyName("commandFont")]
+    public CommandFontOption? CommandFont { get; set; } = new();
+}
+
+/// <summary>
+/// 对应 Go struct CommandFontOption。命令输入框的字体配置段。
+/// <para>
+/// <b>SourcePath</b> = 用户经系统文件弹窗选择的字体文件路径 (.ttf/.otf/.ttc)。生成端
+/// (Go <c>GenerateScripts</c>) 读取它并复制到 <c>bin/font/font.ttf</c> —— 命令框 exe 内
+/// 烧录的 UTF-16 字面量 <c>font\font.ttf</c> 是唯一字体来源 (CONTRACTS §3.11.1)。
+/// 注意命令框只接受 glyf (TrueType) 轮廓, CFF/OTF 源须先转换。
+/// </para>
+/// <para>
+/// <b>Weight</b> = 字重档位 ("regular"/"medium"/"semibold"/"bold"), <b>当前仅作记录</b>:
+/// exe 硬编码请求 <c>DWRITE_FONT_WEIGHT_BOLD(700)</c> 且不可改, 该值不参与渲染, 也
+/// 不触发 DirectWrite 合成加粗。改笔画粗细只能在字形上做 (轮廓膨胀)。详见 §3.11.1 硬约束 4。
+/// </para>
+/// <para>
+/// 纯配置 + 生成期消费项: 引擎运行时 (AHK) 不读取本段。之所以仍放 config.json 而不是
+/// UI 私有文件: 与 <see cref="AcrylicOption"/> / <see cref="CommandInputSkin"/> 等既有
+/// 风格项保持一致, 且 config.json 位于部署目录 data/ 下, 不会被 sync-out 的 /MIR 镜像清掉。
+/// </para>
+/// </summary>
+public sealed class CommandFontOption
+{
+    /// <summary>用户选择的字体文件绝对路径 (空 = 未自定义, 沿用现有 bin/font/font.ttf)。</summary>
+    [JsonPropertyName("sourcePath")]
+    public string SourcePath { get; set; } = "";
+
+    /// <summary>字重档位 ("regular"/"medium"/"semibold"/"bold")。当前仅作记录, 不参与渲染。</summary>
+    [JsonPropertyName("weight")]
+    public string Weight { get; set; } = "";
 }
 
 /// <summary>

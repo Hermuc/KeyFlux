@@ -41,6 +41,13 @@ func GenerateAHK(args ...string) {
 	generators.SetPluginsDir(filepath.Join(filepath.Dir(configFile), "plugins"))
 	script.Preprocess(config)
 
+	// 命令框字体: 落点跟随**输出文件目录** (部署树的 bin/), 而非 cwd —— CLI 的 cwd 是
+	// 仓库根, 若直接算 "font/font.ttf" 会把字体写到 ../data/font 之类错误位置。
+	// 注意: make check 会跑本命令, 故校验流程同样会把字体刷到部署树 (与运行时同口径)。
+	if outDir := filepath.Dir(outputFile); outDir != "" && outDir != "." {
+		_ = script.InstallCommandFont(config.Options.CommandFont, outDir)
+	}
+
 	if err := script.SaveAHK(config, templateFile, outputFile); err != nil {
 		logger.Fatal(err)
 	}

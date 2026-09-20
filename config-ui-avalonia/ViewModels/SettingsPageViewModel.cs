@@ -11,6 +11,31 @@ namespace KeyFlux.Settings.ViewModels;
 public sealed record LanguageOption(string Title, string Value);
 
 /// <summary>
+/// 字重下拉条目: 值 = 落 config 的档位标识, 标签 = i18n 键 (语言变化时重算)。
+/// 命令框 exe 硬编码请求 BOLD(700), 当前该值<b>仅作记录</b>, 不参与渲染 —— 见
+/// CONTRACTS §3.11.1 硬约束 4。
+/// </summary>
+public sealed class FontWeightOption : ObservableObject
+{
+    private readonly string _labelKey;
+
+    public FontWeightOption(string value, string labelKey)
+    {
+        Value = value;
+        _labelKey = labelKey;
+    }
+
+    /// <summary>落配置的值 ("regular"/"medium"/"semibold"/"bold")。</summary>
+    public string Value { get; }
+
+    /// <summary>下拉显示名 (跟随语言刷新)。</summary>
+    public string Title => I18n.T(_labelKey);
+
+    /// <summary>语言变化后通知标题重算。</summary>
+    public void RefreshLabel() => OnPropertyChanged(nameof(Title));
+}
+
+/// <summary>
 /// 命令框皮肤字段条目 (数据驱动渲染 18 个字段; 标签预翻译, 语言变化时刷新)。
 /// </summary>
 public sealed class SkinFieldViewModel : ObservableObject
@@ -137,6 +162,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
         if (customKeymap is not null) CustomHotkeys = new CustomHotkeyPageViewModel(main, customKeymap);
         BuildSkinFields();
         LoadAcrylic();
+        LoadCommandFont();
         foreach (var pv in Options.PathVariables) PathVariables.Add(pv);
         RefreshKeymapSection();
     }
@@ -171,6 +197,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     [ObservableProperty] private bool _showPathVariables;
     [ObservableProperty] private bool _showCustomHotkeys;
     [ObservableProperty] private bool _showAcrylic;
+    [ObservableProperty] private bool _showCommandFont;
 
     [RelayCommand]
     private void ToggleSection(string? which)
@@ -185,11 +212,12 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             "pathvars" => ShowPathVariables,
             "customhotkeys" => ShowCustomHotkeys,
             "acrylic" => ShowAcrylic,
+            "commandfont" => ShowCommandFont,
             _ => false,
         };
         ShowMouseOption = ShowLanguageOption = ShowKeyboardLayout = false;
         ShowKeymapDelay = ShowSkin = ShowPathVariables = ShowCustomHotkeys = false;
-        ShowAcrylic = false;
+        ShowAcrylic = ShowCommandFont = false;
         if (wasOpen) return;
         switch (which)
         {
@@ -201,6 +229,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             case "pathvars": ShowPathVariables = true; break;
             case "customhotkeys": ShowCustomHotkeys = true; break;
             case "acrylic": ShowAcrylic = true; break;
+            case "commandfont": ShowCommandFont = true; break;
         }
     }
 
@@ -300,6 +329,103 @@ public sealed partial class SettingsPageViewModel : ObservableObject
 
     partial void OnAcrylicEnabledChanged(bool value) => ApplyAcrylicChange();
     partial void OnAcrylicTransparencyChanged(int value) => ApplyAcrylicChange();
+
+    // ------------------------------------------------------------- 命令框字体
+
+    /// <summary>
+    /// 字重下拉候选 (值固定, 标签走 i18n)。
+    /// ⚠ <b>当前字重不参与渲染</b>: 命令框 exe 硬编码请求 <c>DWRITE_FONT_WEIGHT_BOLD(700)</c>
+    /// 且不可改; 元数据已与请求精确匹配 (无 BOLDSIM 合成加粗) ⇒ 无论选哪档,
+    /// 实际笔画粗细都由 <c>bin/font/font.ttf</c> 的<b>字形轮廓</b>决定, 与本次选择无关。
+    /// 故该控件目前是「显式记录 + 未来扩展落点」(见 CONTRACTS §3.11.1 硬约束 4)。
+    /// </summary>
+    public IReadOnlyList<FontWeightOption> FontWeights { get; } =
+    [
+        new FontWeightOption("regular", "2509"),
+        new FontWeightOption("medium", "2510"),
+        new FontWeightOption("semibold", "2511"),
+        new FontWeightOption("bold", "741"),
+    ];
+
+    /// <summary>
+    /// 用户选定的字体文件绝对路径 (空 = 未自定义, 沿用现有 <c>bin/font/font.ttf</c>)。
+    /// 写入 config 后由**生成端**复制到 <c>bin/font/font.ttf</c>; 命令框进程只在启动时
+    /// 读一次该文件 ⇒ 需重启命令框才生效 (契约 §3.11.1 硬约束 7)。
+    /// </summary>
+    [ObservableProperty] private string _commandFontPath = "";
+
+    /// <summary>显示用: 未选择时给占位文案 (i18n 2506), 否则显示完整路径。</summary>
+    public string CommandFontDisplay =>
+        string.IsNullOrWhiteSpace(CommandFontPath) ? I18n.T("2506") : CommandFontPath;
+
+    /// <summary>当前选中的字重条目 (对象形式供 ComboBox 双向绑定)。</summary>
+    public FontWeightOption? SelectedFontWeight
+    {
+        get => FontWeights.FirstOrDefault(w => w.Value == Options.CommandFont?.Weight)
+               ?? FontWeights[0];
+        set
+        {
+            if (value is null) return;
+            var opt = CurrentCommandFont();
+            if (opt.Weight == value.Value) return;
+            opt.Weight = value.Value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>从配置载入字体段 (构造期调用一次), 非法字重值回退默认档位。</summary>
+    private void LoadCommandFont()
+    {
+        var f = Options.CommandFont;
+        CommandFontPath = f?.SourcePath ?? "";
+        if (f is not null)
+        {
+            // 就地规范化: 配置被手改坏 / 旧版本写入未知档位时不留脏值 (与读取默认值同口径)
+            f.Weight = ConfigReadDefaults.NormalizeFontWeight(f.Weight);
+        }
+    }
+
+    /// <summary>把 UI 上的字体段写回配置 (缺段时按需新建)。</summary>
+    private CommandFontOption CurrentCommandFont()
+    {
+        var f = Options.CommandFont;
+        if (f is null)
+        {
+            f = new CommandFontOption();
+            Options.CommandFont = f;
+        }
+        f.SourcePath = CommandFontPath;
+        f.Weight = ConfigReadDefaults.NormalizeFontWeight(f.Weight);
+        return f;
+    }
+
+    /// <summary>路径变更后同步配置并刷新显示文本。</summary>
+    partial void OnCommandFontPathChanged(string value)
+    {
+        CurrentCommandFont().SourcePath = value;
+        OnPropertyChanged(nameof(CommandFontDisplay));
+    }
+
+    /// <summary>「恢复默认」: 清空自定义路径 (沿用现有字体) 并把字重归位默认档。</summary>
+    [RelayCommand]
+    private void ResetCommandFont()
+    {
+        CommandFontPath = "";
+        var opt = CurrentCommandFont();
+        opt.SourcePath = "";
+        opt.Weight = ConfigReadDefaults.DefaultCommandFontWeight;
+        OnPropertyChanged(nameof(SelectedFontWeight));
+    }
+
+    /// <summary>
+    /// 弹窗回调: 由视图层的系统文件选择器在用户选定字体文件后调用 (文件选择属视图职责,
+    /// 需 StorageProvider; 逻辑仍在 VM)。取消选择时传 null, 保持原值不变。
+    /// </summary>
+    public void SetCommandFontPath(string? path)
+    {
+        if (path is null) return;
+        CommandFontPath = path;
+    }
 
     // ------------------------------------------------------------- 命令框皮肤
 
@@ -495,7 +621,10 @@ public sealed partial class SettingsPageViewModel : ObservableObject
         LanguageTick++;
         CustomHotkeys?.OnLanguageChanged();
         foreach (var f in SkinFields) f.RefreshLabel();
+        foreach (var w in FontWeights) w.RefreshLabel();
         foreach (var r in KeymapRows) r.RefreshComputed();
         OnPropertyChanged(nameof(SelectedLanguage));
+        OnPropertyChanged(nameof(SelectedFontWeight));
+        OnPropertyChanged(nameof(CommandFontDisplay));
     }
 }
