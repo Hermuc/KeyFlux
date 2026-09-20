@@ -37,8 +37,12 @@ try {
 ; 第 11/12 组会经 CommandDisplay.EchoChar / CommandInputOnChar 触发到它们 —— 桩只做
 ; Rec 记录不跑真逻辑, 借此断言「抑制态不投递 / Fuzzy 旁路 / 历史形态照常」。
 ; 被测的 _Call / DispatchChar / DispatchKey / ShouldEcho 仍是逐字引入的真身, 同源性未受影响。
-PostCharToCaspAbbr(ih, char) {
-    Rec.Add("PostChar", [ih, char])
+; 桩的签名必须与真身逐字一致 (`AbbrInput.ahk` 的 `PostCharToCaspAbbr(ih?, char?)`): 首参是
+; 历史遗留参数 (真身并不消费它), 且**允许不传** —— Match 分支的历史写法就是 `EchoChar(, char)`。
+; 🔴 2026-09-20 教训: 该桩曾写成两参必填, 于是把「省略首参」误报成异常 (真身并不会), 被第 15 组
+; 抓出 —— 桩与真身签名不一致, 探针就会把产品之外的东西当成缺陷。只记录 char (断言只数次数)。
+PostCharToCaspAbbr(ih?, char?) {
+    Rec.Add("PostChar", [char])
 }
 FuzzySuffixFire(ih, char, scope) {
     Rec.Add("FuzzySuffixFire", [ih, char, scope])
@@ -375,6 +379,46 @@ catch
 Check(!threw, "ActivateCommandWindow 在无命令框窗口时不抛异常")
 Check(retActivate = false, "ActivateCommandWindow 无窗口返回 false (调用方降级依据)")
 Check(CommandDisplay.SuppressKeycap = skBefore, "ActivateCommandWindow 不触碰 SuppressKeycap (单一职责)")
+
+; --- 14) 命中「待收尾」状态 (§3.12 硬约束 9, 2026-09-20) ---
+; 命中后不当场执行/隐藏, 而是把命中记成「待收尾」由编排层延后消费 —— 这样命令框能先把
+; 终止字符画出来 (旧行为当场执行+隐藏 ⇒ 该字符永远看不见)。本组守 TakePending 的一次性
+; 消费语义与 BeginSession 的复位 (延后回调可能跨会话返回, 泄漏会误执行上一会话的命令)。
+CommandInputHooks.PendingAbbr := ""
+CommandInputHooks.PendingScope := ""
+Check(CommandInputHooks.TakePending() = "", "无待收尾时 TakePending 返回空串 (非数组)")
+CommandInputHooks.PendingScope := "capslock"
+CommandInputHooks.PendingAbbr := "se"
+p := CommandInputHooks.TakePending()
+Check(IsObject(p) && p[1] = "capslock" && p[2] = "se", "TakePending 取出 (scope, abbr)")
+Check(CommandInputHooks.PendingAbbr = "" && CommandInputHooks.PendingScope = "", "TakePending 取出即清空 (一次性消费)")
+Check(CommandInputHooks.TakePending() = "", "二次 TakePending 仍为空 (不会重复执行同一命令)")
+CommandInputHooks.PendingAbbr := "le"
+CommandInputHooks.BeginSession()
+Check(CommandInputHooks.PendingAbbr = "" && CommandInputHooks.PendingScope = "", "BeginSession 复位待收尾状态 (会话间不泄漏)")
+CommandInputHooks.EndSession()
+Check(CommandInputHooks.FinishDelayMs >= 50 && CommandInputHooks.FinishDelayMs <= 500, "FinishDelayMs 在 50..500ms (够一帧绘制, 又不显迟滞)")
+
+; --- 15) 终止字符强制投递 EchoTerminalChar (§3.12 硬约束 9, 2026-09-20) ---
+; 命中那一击的字符**不会被原生显示** (会话就在这一击结束), 而透传模式下 ShouldEcho 恒 false
+; ⇒ 必须有**唯一**一条绕过总开关的收口把该字符投出去, 否则用户看到「最后一个字母不显示」
+; (v4.2 实测缺陷: Match 分支既走被兑停的 EchoChar, 调用实参又是错的, 双重失效)。
+; 本组钉死: ① 历史形态投递一次; ② 透传模式下**仍**投递 (而 EchoChar 不投) —— 这条是修复核心;
+; ③ 空串不投。
+CommandDisplay.Reset()
+Rec.Reset()
+Check(CommandDisplay.EchoTerminalChar("e") = true, "EchoTerminalChar 历史形态返回已投递")
+Check(Rec.Count("PostChar") = 1, "EchoTerminalChar 历史形态确实投递一次")
+CommandDisplay.SuppressKeycap := true
+Rec.Reset()
+Check(CommandDisplay.EchoTerminalChar("e") = true, "透传模式下 EchoTerminalChar 仍返回已投递 (绕过总开关)")
+Check(Rec.Count("PostChar") = 1, "透传模式下 EchoTerminalChar 确实投递 (终止字符唯一显示来源)")
+Check(CommandDisplay.EchoChar(ih, "e") = false, "对照: 同状态下 EchoChar 被 ShouldEcho 兑停 (不投递)")
+Check(Rec.Count("PostChar") = 1, "对照: EchoChar 未额外投递 (计数仍为 1, 无双重显示)")
+Rec.Reset()
+Check(CommandDisplay.EchoTerminalChar("") = false, "EchoTerminalChar 空串不投递 (防御性)")
+Check(Rec.Count("PostChar") = 0, "空串确实未触发投递")
+CommandDisplay.Reset()
 
 ; ============================================================
 ; 收尾

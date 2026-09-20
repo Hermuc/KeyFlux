@@ -35,6 +35,8 @@
  * 契约:
  *   ShouldEcho(c)     -> bool   该字符是否应投递给命令框窗口
  *   EchoChar(ih, c)   -> bool   投递字符 (内部已过 ShouldEcho; 返回 true = 确实投递了)
+ *   EchoTerminalChar(c) -> bool 强制投递「终止字符」—— **唯一**允许绕过 ShouldEcho 的通道
+ *                               (命中那一击不会被原生显示, 见 §3.12 硬约束 9)
  *   EchoBackspace(ih) -> void   投递退格 (IME 会话中不投递 —— 物理退格已透传给 IME)
  *
  * 快路径红线不适用: 本模块只在命令框输入期被调用, 不在重映射/发键/鼠标快路径上。
@@ -79,12 +81,39 @@ class CommandDisplay {
 
   /**
    * 投递字符到命令框 (已过 ShouldEcho 判定)。
+   *
+   * 🔴 **必须两个参数都传** (2026-09-20 事故记录): 全串命中分支曾按历史写法写成
+   *   `EchoChar(, char)` (首参 ih 是历史遗留参数, 只转发给 PostCharToCaspAbbr 且不被消费),
+   *   而本函数首参是必填 ⇒ 每次命中都在调用边界抛 `Missing a required parameter.`, 被
+   *   紧随的 try/catch 吞掉 ⇒ **字符从未被投递** (用户实测「最后一个字母不显示」; 铁证 =
+   *   部署树 `logs\command_input_hooks.log` 连发 `EchoChar(Match) 异常`)。
+   *   ⇒ **终止字符不走本函数, 走 `EchoTerminalChar`** (它才是唯一允许绕过 ShouldEcho 的
+   *   收口点, 见其注释); 本函数的调用处一律显式传两个实参。
    * @returns {boolean} true = 确实投递了; false = 透传模式被抑制跳过 (no-op)
    */
   static EchoChar(ih, c) {
     if (!this.ShouldEcho(c))
       return false
     PostCharToCaspAbbr(ih, c)
+    return true
+  }
+
+  /**
+   * 强制投递「终止字符」—— **唯一允许绕过 ShouldEcho 的回显通道** (§3.12 硬约束 9)。
+   *
+   * 🔴 为什么必须绕过总开关: 命中缩写的那一击就结束了会话, 该字符**不会被原生显示**
+   * (透传模式下所有字符靠物理键原生直显, 唯独这一击没有 —— 它触发的是会话终止);
+   * 而 ShouldEcho 在透传模式下恒 false ⇒ 若走 EchoChar 就永远不会投递 ⇒ 用户看到
+   * 「最后一个字母不显示」(2026-09-20 用户实测 + 引擎日志坐实)。
+   * 两个命中路径都经本函数补投: 全串命中 (EnterCapslockAbbr Match 分支, 无条件补) 与
+   * 模糊命中 (FuzzySuffixFire, 仅透传模式补 —— 历史形态那边已由 OnChar 的 EchoChar 投过,
+   * 再补会双显)。命令框对投递的 WM_CHAR 与物理键一视同仁 (同一收口, §3.11 硬约束 1)。
+   * @returns {boolean} true = 已投递; false = 空串 (防御性, 不投)
+   */
+  static EchoTerminalChar(c) {
+    if (c = "" || StrLen(c) < 1)
+      return false
+    PostCharToCaspAbbr("", c)
     return true
   }
 

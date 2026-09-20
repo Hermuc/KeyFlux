@@ -26,6 +26,20 @@ class CommandInputHooks {
   ; 当前是否处于命令框输入会话
   static SessionActive := false
 
+  ; 命中命令的「待收尾」状态 (2026-09-20): 模糊命中路径 (FuzzySuffixFire) 只记录命中并停钩,
+  ; 执行与隐藏由 EnterCapslockAbbr 延后做 (见 FinishDelayMs)。全串命中 (MatchList) 路径
+  ; 不写这里 —— 它的命中文本由 capsHook.Match 提供。
+  static PendingAbbr := ""
+  static PendingScope := ""
+
+  ; 命中后的收尾延迟 (ms)。
+  ; 🔴 依据 (2026-09-20 用户真机实测): 命中这一击的字符 (终止字符) 是随物理键抵达命令框
+  ; 窗口的 (探针实测其 WM_KEYDOWN/KEYUP 与无钩形态完全一致 —— 键**没有**被 InputHook 拦下),
+  ; 但命令框需要一次绘制周期才会把它显示出来。旧行为在同线程里立即「执行命令 + 隐藏命令框」
+  ; ⇒ 绘制还没发生窗口就没了, 用户看到「最后一个字母不显示, 命令被立即直接执行」。
+  ; 延后这么久让字符先显示; 命令仍无需用户确认即执行 (不改「打完即执行」语义)。
+  static FinishDelayMs := 150
+
   /**
    * 注册 provider。provider 为对象/类实例, 可实现以下方法 (全部可选, 缺失即视为不处理):
    *   OnSessionBegin()                       命令框显示前
@@ -63,6 +77,9 @@ class CommandInputHooks {
   static BeginSession() {
     this.BackendWindow := 0
     try this.BackendWindow := WinExist("A")
+    ; 复位上一会话的待收尾状态: 延后收尾的回调可能跨越会话边界返回, 会话间不泄漏
+    this.PendingAbbr := ""
+    this.PendingScope := ""
     this.SessionActive := true
     this._Notify("OnSessionBegin")
   }
@@ -71,6 +88,19 @@ class CommandInputHooks {
   static EndSession() {
     this.SessionActive := false
     this._Notify("OnSessionEnd")
+  }
+
+  /**
+   * 取走模糊命中的待收尾命令 (一次性消费: 取出即清空, 防重复执行)。
+   * @returns {Array|string} [scope, abbr]; 空串 = 无待收尾
+   */
+  static TakePending() {
+    if (this.PendingAbbr = "")
+      return ""
+    out := [this.PendingScope, this.PendingAbbr]
+    this.PendingScope := ""
+    this.PendingAbbr := ""
+    return out
   }
 
   /**
@@ -181,6 +211,10 @@ class CommandInputHooks {
  * "报错弹窗 + 命令框卡死, 无法关闭也无法输入")。实测 PostMessage 到已消失的命令框
  * 窗口会抛 TargetError (kf_diag2: "PostMessage 抛出: TargetError: Target window not
  * found."), 正是此路径。provider 派发已有逐个 try (DispatchChar), 这里补齐剩余两段。
+ *
+ * 🔴 命中后的收尾是**延后**的 (2026-09-20): 见 CommandInputHooks.FinishDelayMs ——
+ * Match 与模糊命中都不再当场执行/隐藏, 先让命令框把终止字符画出来 (旧行为当场执行+隐藏
+ * 会让该字符永远显示不出来)。模糊命中在本函数里只写 Pending* 并停钩, 执行交给编排层。
  */
 CommandInputOnChar(ih, char, scope) {
   if (CommandInputHooks.DispatchChar(ih, char, scope))

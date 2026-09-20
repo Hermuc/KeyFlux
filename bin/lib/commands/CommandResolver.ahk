@@ -145,11 +145,16 @@ class CommandResolver {
 /**
  * 命令模糊输入 —— 逐字符实时后缀校验 (契约 §6 第 1 条落地, 模板接在 InputHook.OnChar)。
  * 每键入一个字符: 取当前缓冲 (ih.Input) 的尾部连续片段, 从最长后缀向最短逐个查表,
- * 首个命中即为结果 (最长优先, 保证 dfc→fc 不误取更短的 c): 立即停止输入钩子并执行该命令;
+ * 首个命中即为结果 (最长优先, 保证 dfc→fc 不误取更短的 c): **立即停止输入钩子**, 并把命中
+ * 记为「待收尾」交给 EnterCapslockAbbr 延后执行 (见 CommandInputHooks.FinishDelayMs)。
  * 全部未命中则忽略本次输入, 继续等待后续字符累积。
  *
- * 与原生精确匹配的关系: 全串命中由 InputHook MatchList 在 OnChar 之前先行终止输入,
- * 故本函数只会遇到"带多余前缀"的缓冲, 精确匹配命令的行为与时机完全不变。
+ * 🔴 为什么不在本函数里直接执行 (2026-09-20): 命中这一击的字符 (终止字符) 刚随物理键抵达
+ * 命令框窗口, 命令框需要一次绘制周期才把它显示出来; 当场 Resolve 会让命令的窗口抢在前头、
+ * 旧实现还会紧接隐藏命令框 ⇒ 该字符永远显示不出来 (用户真机实测「最后一个字母不显示」)。
+ *
+ * 与原生精确匹配的关系: 全串命中由 InputHook MatchList 在 OnChar 之前先行终止输入, 故本函数
+ * 只会遇到"带多余前缀"的缓冲 (精确命中走 Match 分支, 同样经延后收尾)。
  * 快路径红线: 缩写命令属输入后查表的慢路径, 与重映射/发键/鼠标无关。
  */
 FuzzySuffixFire(ih, char, scope) {
@@ -161,8 +166,22 @@ FuzzySuffixFire(ih, char, scope) {
   Loop len {
     suffix := SubStr(input, A_Index)
     if (CommandResolver.Table.Has(scope ":" suffix)) {
-      ih.Stop()  ; EndReason="Stopped", EnterCapslockAbbr 走 HIDE 分支, 无视觉异常
-      CommandResolver.Resolve(scope, suffix, , true)
+      ; 只记录 + 停钩 (EndReason="Stopped" -> EnterCapslockAbbr 走「待收尾」分支);
+      ; 不在回调里执行命令 —— 见函数头注释 (终止字符需要绘制时间)
+      ;
+      ; 🔴 终止字符补投 (2026-09-20): 命中这一击就结束了会话, 该字符**不会被原生显示**
+      ; (与 Match 分支同理, 那一路同样靠显式补投; 用户实测「最后一个字母不显示」)。
+      ; 透传模式下 CommandInputOnChar 的 EchoChar 被 ShouldEcho 兑停, 故走唯一允许绕过
+      ; 总开关的收口 CommandDisplay.EchoTerminalChar; 历史形态那边已由 EchoChar 投过,
+      ; 再补会双显 —— 故只在透传模式下补。
+      if (CommandDisplay.SuppressKeycap) {
+        try CommandDisplay.EchoTerminalChar(char)
+        catch as e
+          CommandInputHooks._log("Fuzzy 终止字符补投异常: " e.Message)
+      }
+      CommandInputHooks.PendingScope := scope
+      CommandInputHooks.PendingAbbr := suffix
+      ih.Stop()
       return
     }
   }
