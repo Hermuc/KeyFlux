@@ -417,7 +417,12 @@ provider 为实现以下方法的对象(类实例), **全部可选, 缺失即视
 `.pdata` 函数表定位 `SampleWindow::DrawKeys`, 确认:
 
 1. **只有 `a-zA-Z0-9` 会套八角 keycap** —— 白名单为 exe 内 UTF-16 字面量(VA `0x1daa0`);
-   中文/全角/其他符号**不套**, 以普通字形直绘(DirectWrite 系统字体回退)。
+   中文/全角/其他符号**不套**, 以普通字形直绘。
+   **字体来源 = `bin/font/font.ttf` 私有字体集合**(非系统回退): exe 用相对路径
+   `font\font.ttf` 建 `IDWriteFontCollection`, 再按该 ttf 的 `name` 表族名
+   `CreateTextFormat(..., DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL,
+   DWRITE_FONT_STRETCH_NORMAL, 44.0f, L"", ...)` —— 权重/字号/斜体**硬编码**,
+   族名/字形**由字体文件决定**。详见 §3.11.1。
 2. **描边与字符由同一支画刷绘制** —— RTTI 签名 `SampleWindow::DrawKeys(ComPtr<ID2D1DeviceContext>&,
    D2D_RECT_F&, ComPtr<ID2D1SolidColorBrush>& brush, D2D1::Matrix3x2F&)` 只收**一支**
    `ID2D1SolidColorBrush`; exe 内**不存在**独立的边框绘制函数(仅 `DrawKeys` + `DrawInputVisual`)。
@@ -478,6 +483,71 @@ class CommandDisplay {
    patch (脚本: `%TEMP%\kf_patch_whitelist.py`, 前置校验 + 回读复核内置)。
 
 回归守门人: `tools/command_input_hooks_test.ahk` 第 11/12 组(白名单边界 12 项 + 抑制语义 9 项)。
+
+### 3.11.1 命令框字体 (2026-09-20 冻结)
+
+**机制 (PE 静态解析结论, 无源码事实)**: 命令框文本字体**不来自系统字体, 也不由配置决定**。
+
+- exe 内 UTF-16 字面量 `font\font.ttf` (RVA `0x1ddc8`) 是**唯一**字体来源: 相对 exe 自身
+  目录解析 ⇒ 实际文件 = `bin/font/font.ttf`。
+- exe 用 `GetModuleFileNameW` 定位自身目录后拼该相对路径, 建 `IDWriteFontCollection`
+  (`IDWriteFont3`/DWrite.dll 是唯一被导入的字体相关 DLL, 且**只导入 `DWriteCreateFactory`**
+  —— 其余接口全走 COM 虚表)。
+- 创建文本格式的实参由 exe 内断言串直接给出:
+  `dwriteFactory->CreateTextFormat( fontName.c_str(), fontCollection.Get(),
+  DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+  44.0f, L"", textFormat.GetAddressOf() )` (RVA `0x1ddf0`)。
+- `fontName` 是**局部变量, 取自该 ttf 的 `name` 表** —— `.rdata` 全量字符串里
+  **不存在任何字体族名**(`Iosevka` 的 ASCII 与 UTF-16 形态均 0 命中), 也**不存在**
+  `fontName` 配置键。
+- 渲染栈 = **DirectWrite + Direct2D + D3D11 + DComp** (导入表: `DWrite.dll` / `d2d1.dll` /
+  `d3d11.dll` / `dcomp.dll`), **非 GDI** ⇒ `WM_SETFONT` / `AddFontResource` 类注入无效。
+
+**⇒ 换字体 = 替换 `bin/font/font.ttf`**(无需重编译 / 装系统字体 / 改配置)。
+
+**皮肤配置 `bin/CommandInputSkin.txt` 的边界**: KeyFlux 新增的外置皮肤配置, **恰好 19 键**,
+与 exe `.rdata` 中的配置键**一一对应**(已全量比对):
+
+```
+backgroundColor  backgroundOpacity  borderWidth     borderColor      borderOpacity
+borderRadius     cornerColor        cornerOpacity   gridlineColor    gridlineOpacity
+keyColor         keyOpacity         hideAnimationDuration            windowYPos
+windowWidth      windowShadowColor  windowShadowOpacity              windowShadowSize
+```
+
+⚠ **19 键全是颜色/透明度/圆角/尺寸/动画时长, 无任何 font 键** ⇒ 字体**不经配置调整**。
+
+**硬约束 (替换 font.ttf 时)**:
+
+1. 🔴 **文件名必须是 `font.ttf`** —— 路径是 exe 内烧录的字面量, 改不了。
+2. 🔴 **元数据须与请求匹配, 否则 DirectWrite 合成加粗** —— exe 请求
+   `WEIGHT_BOLD(700)` + `STYLE_NORMAL`, 而**得意黑原生是 `usWeightClass=400` +
+   `fsSelection ITALIC`**。私人字体集合中若只有这一个 face, DirectWrite 会施加
+   **合成加粗 (BOLDSIM, 笔画横向撑宽)** ⇒ 中文密集笔画糊成一团 (WPF 实测复现)。
+   修法 = 改造元数据使请求成为**精确匹配**:
+   - `OS/2.usWeightClass`: `400 → 700`
+   - `OS/2.fsSelection`: 清 `ITALIC(0x0001)`/`REGULAR(0x0040)`, 置 `BOLD(0x0020)`
+   - `OS/2.panose.bWeight`: `0 → 8`
+   - `head.macStyle`: 清 `italic(0x0002)`, 置 `bold(0x0001)`
+   - `post.italicAngle`: `-8.0 → 0`
+   - **`name` 表不动**(保持族名, 因 `fontName` 取自文件名表, 改名有查不到的风险)
+   - **`glyf` 字形数据不动**(得意黑的倾斜在设计里, 不靠元数据)
+   - ⚠ 改完必须用 **fontTools `save()` 重编译**重算校验和 —— 手工改字节会让
+     `OS/2`/`head`/`post` 三表校验和失配 (fontTools 会报 `bad checksum`)。
+3. **字符覆盖须自足** —— 命令框要显示字母/数字/键名/中文, 且 exe 传 `L""` (**空 locale**)
+   ⇒ 字体回退链不确定。原 Iosevka **不含中文字形**(204 字符抽样缺 109), 中文靠回退;
+   得意黑自带 **9497 字形**(同抽样 **0 缺失**, 含全部中文) ⇒ 换后不再依赖回退。
+4. ⚠ **`sync-out` 不含 `*.ttf`** —— Makefile `sync-out` 的 robocopy 白名单是
+   `'*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll'`, **`*.ttf` 不在其中** ⇒ `make out`/`deploy`
+   **不会**把仓库字体同步到部署树, 也**不会**删除部署树字体。换字体后须**手动同步两处**
+   (仓库 `bin/font/` + 部署树 `bin/font/`), 否则两侧不一致。
+5. **回滚**: 原 Iosevka 字体在 git 历史 (`HEAD:bin/font/font.ttf`, SHA `deebc76e…`)
+   + 部署树 `bin/font/font.ttf.bak-iosevka` (同 SHA) 各存一份;
+   `git checkout HEAD -- bin/font/font.ttf` 即还原。
+
+**当前状态**: 已替换为**改造版得意黑 (Smiley Sans Oblique / 得意黑)**,
+SHA256 `2e4ce734…ba5bb` (**注意: 改动后 SHA 与上游 `SmileySans-Oblique.ttf` 的
+`b447d7e7…d25c4` 不同** —— 差异即上述元数据改造), 三方一致 (仓库 = 部署树 = 构建源)。
 
 ### 3.12 ImeInputHost —— 命令框透传模式开关 / 恒可见 hook (2026-09-19 v4.2 冻结, 焦点修复 + 缩写执行恢复)
 
@@ -770,3 +840,5 @@ action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经
 | 2026-09-19 | **命令框 v4.2: 缩写执行恢复 (打完即执行)** (承接同日 v4/v4.1; 用户实测反馈「输入 `se` 不再打开设置面板」; 未提交)。**根因**: v4 为防「拼音误触发缩写」清空 hook 词表 + 单点旁路 `FuzzySuffixFire` ⇒ 透传会话里缩写匹配双通道全灭 (`se` 等全部缩写不再执行)。**用户裁决**: 设置面板命令全部由英文字母组成, 唯一需要输入中文的场景是前置键 (如空格) 之后 —— 那时字符已被插件消费、到不了匹配层 ⇒ 「拼音误触发」场景不存在 ⇒ 恢复「打完即执行」。**落地**: ① `CommandInputOnChar` 撤旁路, `FuzzySuffixFire` 恒跑 (与历史形态一致); ② 两份模板 `keyflux.tmpl` 词表恢复 (`InputHook(SuppressKeycap ? "V" : "", …, CapslockAbbrKeys)`, bin 与 config-server 副本 SHA 一致); ③ `CommandDisplay`/`ImeInputHost` 注释 v4.2 化; ④ check-hooks 第 12 组断言反转 (「透传恒跑」=1) + 新增「插件消费后 Fuzzy 不跑」=0 (双保险)。**搜索期不误触发双保险**: 词表 MatchList 全串精确匹配被空格前缀挡住 (检索词 `" se"` ≠ `"se"`); 插件消费字符后 DispatchChar 提前 return。**门禁**: check-hooks 60→**61/61** + make check 全量复跑 + 部署树 robocopy /E 同步 (避开 exe) + SHA 校验。**契约**: §3.11 硬约束 3 与 §3.12 现行方案/硬约束 2/3/7 重写为恢复语义, 回归守门人 61 项, 变更记录本行 |
 | 2026-09-20 | **修复缺陷: 命令框「最后一个字母不显示 + 命令被立即执行」** (v4.2 回归; 用户实测: 逐字输入 `se`, 键入最后一个 `e` 时该字母不显示、命令立刻执行)。**真实根因 = 两层叠加 (引擎日志坐实)**: ① `EchoChar(ih, c)` 两参必填, 而 Match 分支按历史写法省成 `EchoChar(, char)` ⇒ **每次命中都在调用边界抛 `Missing a required parameter.`**, 被紧随的 try/catch 吞掉 (铁证 = 部署树 `logs\command_input_hooks.log` 连发 `EchoChar(Match) 异常: Missing a required parameter.`: 09-19 23:19 与 09-20 09:29 共 5 次, 与用户每次复测一一对应); ② 即便参数写对, 透传模式下 `ShouldEcho` 恒 false ⇒ `EchoChar` 仍是 no-op —— 而**该字符不会被原生显示** (命中这一击就结束了会话) ⇒ 它彻底失去显示来源。v4.0/v4.1 未暴露的原因: 那时词表空、缩写不命中, 该行永不执行。**修复**: 新增 `CommandDisplay.EchoTerminalChar(c)` = **唯一允许绕过 ShouldEcho 的回显通道**, 两条命中路径都改走它 (Match 分支**无条件**投; `FuzzySuffixFire` **仅透传模式**投, 防历史形态双显); `EchoChar` 恢复严格双参签名并在注释记下该陷阱; 命中后的执行/隐藏**延后** `CommandInputHooks.FinishDelayMs` (150ms) (新增 `FinishCapslockAbbr` + `Pending*`/`TakePending`, `BeginSession` 复位) 让刚投递的字符先被绘制, 旧行为同线程「立即执行 + 隐藏」会把它吃掉。**语义不变**: 命令仍无需用户确认即执行。**排查教训 (重要)**: 第一轮判定 (「探针实测该键 WM_KEYDOWN 已送达 ⇒ 缺的只是绘制时间」) **是错的** —— 探针在 KeyFlux 运行期间**仪器无效** (连「无钩」对照例都收不到 WM_CHAR: 注入键被外部键盘钩子吃掉翻译步骤, 却仍送达 WM_KEYDOWN ⇒ KEYDOWN ≠ CHAR); 决定性证据在**引擎自己的日志**里 (教训已入技能 `ahk-v2-probe-harness` §14)。另修掉探针自身两处不忠实: `PostCharToCaspAbbr` 桩曾写成两参必填 (与真身 `(ih?, char?)` 不符, 会把「省略首参」误报成产品缺陷)、`EchoChar(ih?, c)` 曾触发 AHK v2「可选参数之后必须全部可选」的 `Parameter default required. Specifically: c` 载入错。**门禁**: check-hooks 61→**75/75** (第 14 组待收尾状态 6 项 + 第 15 组终止字符强制投递 8 项), lint CLEAN, GenerateAHK + `/Validate` + ORACLE DIFF PASS, 部署树 SHA 校验。**契约**: §3.12 硬约束 9 重写 (终止字符强制投递 + EchoChar 双参纪律 + 延后收尾), 守门人 75 项, 变更记录本行 |
 | 2026-09-20 | **调优: 命中收尾延迟 150ms→30ms** (承接同日「终止字符未被投递」修复; 用户反馈「输入命令后执行速度太慢, 要在看到最后一个字母的一瞬间执行」)。该延迟的唯一作用是让 `EchoTerminalChar` 投出的终止字符有 1~2 个绘制周期上屏 (60Hz 下 1 帧 ≈16.7ms), 首版 150ms 属过失保守。现值 `CommandInputHooks.FinishDelayMs := 30` ≈ 2 帧 —— 感知上等同上屏瞬间即执行, 同时保住字符可见性。**勿设 0 / ≤1 帧**: 投完立刻执行+隐藏会让该字符来不及绘制 (即用户本轮报的「最后一个字母不显示」)。回归守门: check-hooks 第 14 组延迟区间断言放宽为 5..500ms (原 50..500)。**契约**: §3.12 硬约束 9 同步, 变更记录本行 |
+| 2026-09-19 | **命令框搜索插件未运行时静默拉起** (修复 Everything 自动启动抢前台焦点): 用户报告进入搜索模式时插件拉起 Everything, 后者弹出主窗口并抢焦点, 打断命令框输入。**根因**: `EverythingSearch.EnsureRunning` 用裸命令 `Run('"exe"')` 启动 ⇒ Everything 显示主窗口。**修复**: 改用官方静默开关 **`-startup`** ("Run Everything in the background without showing any search windows"); **不用 `-minimize`** (只最小化, 窗口仍在且仍是焦点候选)。**兜底**: 新增 `HideMainWindowIfAny()` + `_HideVisibleMainWindow()` —— 探活后 1.2s 窗口期内 (250ms 步长) 枚举 Everything **可见**顶层窗并 `WinHide`; 筛选走**类名黑名单** (排除 `MSCTFIME UI`/`IME`/`Default IME`), **不以「标题非空」为主筛** (实测 `-startup` 下窗口标题可能为空, 用标题筛会漏掉真主窗口); 只在刚拉起后调用一次, 不影响用户此后手动开窗。**实测** (Everything 1.5.0.1418): 对照探针跑 bare/`-startup` 各 40s 逐秒采样 —— 存活性与 IPC 可用性完全等价 (恒 2 进程, `es -get-result-count` 恒 0 退出码); 唯一差异是 `-startup` **可见窗 0 个** (仅 2 个 `visible=0` 的 IME 辅助窗)、前台焦点不变; 双场景断言探针 9/9 PASS。**踩坑**: ① 探针 `Run()` 拉起的 Everything 在脚本退出后消失, 系 **Bash/PowerShell 工具调用结束会清理其子进程树** (非产品缺陷); ② **`plugins/examples/` 才是入库权威源**, `data/plugins/` 被 `.gitignore` 忽略 —— 改错位置会被 `make check` 的 sync-plugins (robocopy examples→部署树) 整体冲掉。**门禁**: make check 全绿 (check-hooks 75/75 / lint / check-texttypes / GenerateAHK / `/Validate` / ORACLE DIFF PASS), 三方 SHA 一致 (`EverythingSearch.ahk` `61c2073b`)。**契约**: 插件 README §1.1 记录修法, 变更记录本行 |
+| 2026-09-20 | **命令框字体替换为得意黑 (Smiley Sans)** (纯资源替换, 零代码/API/DB/route/protocol 变更): 用户要求把命令框字体统一改为得意黑, 中英文数字与 placeholder 全由其渲染且不出现英文回退。**机制确认 (PE 静态解析)**: 命令框字体**不来自系统字体、也不由配置决定** —— exe 内 UTF-16 字面量 `font\font.ttf` 是唯一来源 (相对 exe 自身目录), 用它建 `IDWriteFontCollection` 后按该 ttf 的 `name` 表族名调 `CreateTextFormat`, 权重/字号硬编码 (`WEIGHT_BOLD(700)` / `44.0f`, 断言串 RVA `0x1ddf0`); `.rdata` 全量字符串**无任何字体族名** (`Iosevka` ASCII/UTF-16 均 0 命中)→ 族名只能取自文件本身; 皮肤配置 `CommandInputSkin.txt` 的 **19 键全是颜色/透明度/圆角/尺寸/动画, 无 font 键** (与 exe `.rdata` 配置键已全量比对一一对应); 渲染栈 DirectWrite/D2D/D3D11/DComp (非 GDI) ⇒ `WM_SETFONT` 类注入无效。**⇒ 换字体 = 替换 `bin/font/font.ttf`** (无需重编译 / 装系统字体 / 改配置)。**⚠ 关键改造 (否则中文糊成一团)**: exe 请求 `WEIGHT_BOLD(700)` 而得意黑原生 `usWeightClass=400` + `fsSelection ITALIC`, DirectWrite 在单 face 私有集合中会施加**合成加粗 (BOLDSIM)** —— WPF 实测复现中文笔画粘连。故用 fontTools 改造元数据使其成为**精确匹配**: `OS/2.usWeightClass 400→700`、`OS/2.fsSelection` 清 ITALIC/REGULAR 置 BOLD (`0x0001→0x0020`)、`OS/2.panose.bWeight 0→8`、`head.macStyle` 清 italic 置 bold (`0x0002→0x0001`)、`post.italicAngle -8.0→0`; **`name` 表与 `glyf` 字形不动** (族名保持 `得意黑`/`Smiley Sans Oblique`, 因族名取自文件且改名有查不到的风险; 倾斜在设计里不靠元数据)。⚠ 改完必须经 **fontTools `save()` 重编译**重算校验和 —— 手工改字节会让 `OS/2`/`head`/`post` 三表校验和失配 (fontTools 报 `bad checksum`)。**字符覆盖**: 原 Iosevka **不含中文字形** (204 字符抽样缺 109), 中文靠 DirectWrite 回退 (exe 传 `L""` 空 locale ⇒ 回退链不确定); 得意黑自带 **9497 字形** (同抽样 **0 缺失**, 含全部中文与 latin) ⇒ 换后中英文数字不再依赖回退。**落地**: `bin/font/font.ttf` 替换 (三方 SHA 一致 `2e4ce734…ba5bb`, **与上游原版 `b447d7e7…d25c4` 不同 —— 差异即上述元数据改造**), 仓库与部署树同时更新; 原 Iosevka 在 git 历史 (`HEAD:bin/font/font.ttf`, `deebc76e…`) + 部署树 `font.ttf.bak-iosevka` (同 SHA) 双备份, `git checkout` 即回滚。**⚠ 同步注意**: Makefile `sync-out` 的 robocopy 白名单为 `'*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll'` —— **不含 `*.ttf`** ⇒ 换字体后必须**手动同步两处**, `make out`/`deploy` 既不复制也不删除字体。**门禁**: make check 全绿 (check-hooks 75/75 / lint / check-texttypes / GenerateAHK / `/Validate` / ORACLE DIFF PASS), 字体 SHA 三方一致。**契约**: 新增 §3.11.1「命令框字体」(机制 + 19 键皮肤边界 + 5 条硬约束), §3.11 背景第 1 条订正 (原写「DirectWrite 系统字体回退」→ 改为私有字体集合 + 指向 §3.11.1), 变更记录本行 |
