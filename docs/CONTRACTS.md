@@ -486,9 +486,10 @@ class CommandDisplay {
 
 ### 3.11.1 命令框字体 (2026-09-20 冻结, 同日数次改定)
 
-**当前字体 = `Sthginkra`** (源 `D:\UserData\Downloads\Sthginkra.otf`, SHA `d758c7b4…9a61`,
-10,511,648 B, 33072 字形)。源文件为 **CFF/OTF**, 此处经 **`otf2ttf` 转换为 glyf 真 TrueType**
-并做**元数据改造**后部署, 详见下方硬约束 2/3。
+**当前字体 = `Sthginkra` 加粗版 (轮廓膨胀 r=12)** —— SHA `b6f98778…289c`, 21,174,484 B,
+33072 字形。由源 `D:\UserData\Downloads\Sthginkra.otf` (CFF/OTF) 经 **`otf2ttf` 转为 glyf
+真 TrueType** + **元数据改造对齐 BOLD(700)** + **几何加粗 (轮廓膨胀)** 三步生成,
+详见下方硬约束 2/3/4。生成脚本已固化: `tools/font_otf2ttf.py`、`tools/font_embolden.py`。
 
 历代字体重录 (均为当日决策, 供追溯):
 
@@ -497,11 +498,12 @@ class CommandDisplay {
 | — | Iosevka Bold 2.3.3 | 上游仓库自带 | `deebc76e…` | 无中文字形 (靠回退) |
 | 1 | 得意黑 Smiley Sans Oblique | 用户下载 | `2e4ce734…` | 斜体设计; 需改元数据 |
 | 2 | MiSans-Bold | 仓库 `Assets/Fonts/` | `250fb5c8…` | 原生精确匹配, 零改造 |
-| 3 | **Sthginkra (当前)** | 用户下载 `.otf` | `d758c7b4…` | CFF 需转 glyf; 需改元数据 |
+| 3 | Sthginkra (CFF→glyf) | 用户下载 `.otf` | `d758c7b4…` | 笔画偏细 (竖干 80 单位) |
+| 4 | **Sthginkra 膨胀 r=12 (当前)** | 由 3 加粗 | `b6f98778…` | 竖干 80→104; 2.01x 体积 |
 
 选择理由 (历代): ①与软件 UI 视觉统一 (配置界面全局 `AppUiFont` = MiSans);
 ②正体非斜体; ③字符覆盖; ④优先原生 `usWeightClass=700` ⇒ 免改造。
-**判据优先级: 原生 700 精确匹配 > 字符覆盖 > 视觉风格**。
+**判据优先级: 原生 700 精确匹配 > 字符覆盖 > 笔画粗细合适 > 视觉风格**。
 
 **机制 (PE 静态解析结论, 无源码事实)**: 命令框文本字体**不来自系统字体, 也不由配置决定**。
 
@@ -575,30 +577,55 @@ windowWidth      windowShadowColor  windowShadowOpacity              windowShado
    - **保真度实测**: OTF vs 转换 TTF 二值掩膜 IoU 随字号收敛 `0.79 (56px) → 0.91 (200px)
      → 0.9896 (400px)`, 400px 下墨迹像素仅差 0.05% ⇒ **差异纯为小字号渲染量化 (CFF 提示丢失),
      形状无损**。
-4. **字符覆盖须自足** —— 命令框要显示字母/数字/键名/中文, 且 exe 传 `L""` (**空 locale**)
+4. **笔画粗细可调, 用几何加粗 (轮廓膨胀) 而非 DirectWrite 合成加粗** —— exe 请求的
+   `BOLD(700)` 只是**元数据权重**, 若字体设计本身偏细, 元数据匹配 700 后
+   **DirectWrite 不会再加粗** (精确匹配 ⇒ 无 BOLDSIM) ⇒ 想变粗只能在字形上做。
+   两条路:
+   - ✅ **几何加粗 (推荐, 可控)** = 轮廓膨胀: `dilate(path, r) = path ∪ stroke(path, 2r)`,
+     即与半径 r 的圆盘做 Minkowski 和。**笔画宽度精确增加 2r 单位**;
+     `upem=1000` 时 44px 下增加约 `2r × 0.044` px。工具: `tools/font_embolden.py`。
+     - 实测基准: 本字体竖干 80 单位 (44px 下 3.52px)。
+       `r=8→96 (4.22px)`, `r=12→104 (4.58px)`, `r=16→112 (4.93px)`, `r=20→120 (5.28px)`。
+     - 🔴 **半径上限 = CJK 字腔**: 本字体设计紧凑, **`r ≥ 16` 起封闭白区 (字腔) 开始被
+       填死** —— 「保存 加载 重置」会糊成实心块且不可逆 (原文轮廓信息丢失)。
+       故 **推荐 r=12**; 需更粗时应换更粗的字体, 而非继续加大半径。
+     - 🔴 **必须用 `pathops.op(..., PathOp.UNION)` 做真布尔并集**: **不可用**
+       `pathops.union([a, b], pen)` —— 后者只是把轮廓丢进同一 Path 再 `simplify()`,
+       当原字形 (TrueType 顺时针外轮廓) 与 stroke 产出的环 (绕向不同) 混合时会误判,
+       **把重叠区当空洞 ⇒ 笔画渲染成空心轮廓**。实测 (`加`, r=16): 真 UNION 面积
+       `280700 → 403497` (3 段轮廓); concat+simplify 只得 `285886` (碎成 12 段)。
+     - ⚠ 副作用: **文件体积翻倍** (10.5MB → 21.2MB, 圆角 join 引入大量曲线点);
+       `maxp` 的 `maxPoints`/`maxContours` 必须 `recalc()` (337→722 / 40→34)。
+     - ⚠ 复合字形 (`numberOfContours < 0`) 须跳过, 否则子字形会被重复加粗。
+   - ⚠ **备选: DirectWrite 合成加粗 (BOLDSIM)** —— 把 `usWeightClass` 压回 `400`
+     (即让请求 700 变成"不匹配") 让 DirectWrite 自动合成加粗。**零体积增长**,
+     但**加粗量不可控**且质量低于几何加粗。仅在不想改字形时使用。
+5. **字符覆盖须自足** —— 命令框要显示字母/数字/键名/中文, 且 exe 传 `L""` (**空 locale**)
    ⇒ 字体回退链不确定。原 Iosevka **不含中文字形**(204 字符抽样缺 109), 中文靠回退;
    Sthginkra 自带 **33072 字形 / 33288 cmap 项**(191 字符抽样 **0 缺失**; CJK 常用区
    20976/20992 = 99.9%) ⇒ 不依赖回退。
-5. ⚠ **`sync-out` 不含 `*.ttf`** —— Makefile `sync-out` 的 robocopy 白名单是
+6. ⚠ **`sync-out` 不含 `*.ttf`** —— Makefile `sync-out` 的 robocopy 白名单是
    `'*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll'`, **`*.ttf` 不在其中** ⇒ `make out`/`deploy`
    **不会**把仓库字体同步到部署树, 也**不会**删除部署树字体。换字体后须**手动同步两处**
    (仓库 `bin/font/` + 部署树 `bin/font/`), 否则两侧不一致。
-6. ⚠ **字体仅在进程启动时读取一次** —— 实测 `KeyFlux-CommandInput.exe` 运行期间
+7. ⚠ **字体仅在进程启动时读取一次** —— 实测 `KeyFlux-CommandInput.exe` 运行期间
    字体文件**未被锁定**(可写), 但换字体后**必须重启命令框进程**才会生效
    (DirectWrite 私有字体集合在启动时构建并常驻)。进程**懒加载**: 杀掉后引擎不自动拉起,
    待下次唤起命令框时重建。
-7. **回滚**: 历史字体各存一份, **均在部署树** `bin/font/`:
+8. **回滚**: 历史字体各存一份, **均在部署树** `bin/font/`:
    - `font.ttf.bak-iosevka` —— 原始 Iosevka Bold 2.3.3 (`deebc76e…`, 539,832 B)
    - `font.ttf.bak-smiley` —— 得意黑 (`2e4ce734…`, 2,629,764 B)
    - `font.ttf.bak-misans` —— MiSans-Bold (`250fb5c8…`, 7,804,780 B)
+   - `font.ttf.bak-sthginkra-thin` —— Sthginkra 细体 (`d758c7b4…`, 10,511,648 B)
    另有 `git checkout HEAD~ -- bin/font/font.ttf` 回到上一个已提交版本。
 
-**当前状态**: `bin/font/font.ttf` = **Sthginkra** (CFF→glyf 转换 + 元数据改造版),
-SHA256 `d758c7b4…9a61`, 10,511,648 B, 33072 字形, 族名 `Sthginkra`,
+**当前状态**: `bin/font/font.ttf` = **Sthginkra 加粗版 (膨胀 r=12)**,
+SHA256 `b6f98778…289c`, 21,174,484 B, 33072 字形, 族名 `Sthginkra`,
 `usWeightClass=700` / `fsSelection=0x01A0` / `macStyle=0x01` / `italicAngle=0`,
-`sfntVersion=0x00010000` (真 TrueType)。三方一致 (仓库 = 部署树 = 构建产物)。
+`sfntVersion=0x00010000` (真 TrueType), `maxp maxPoints=722 maxContours=34`。
+三方一致 (仓库 = 部署树 = 构建产物)。
 **注意**: 该 SHA 与源文件 `D:\UserData\Downloads\Sthginkra.otf` **不同** —— 差异即
-CFF→glyf 转换 + 元数据改造。
+CFF→glyf 转换 + 元数据改造 + 轮廓膨胀三步。
 
 ### 3.12 ImeInputHost —— 命令框透传模式开关 / 恒可见 hook (2026-09-19 v4.2 冻结, 焦点修复 + 缩写执行恢复)
 
@@ -895,3 +922,4 @@ action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经
 | 2026-09-20 | **命令框字体替换为得意黑 (Smiley Sans)** (纯资源替换, 零代码/API/DB/route/protocol 变更): 用户要求把命令框字体统一改为得意黑, 中英文数字与 placeholder 全由其渲染且不出现英文回退。**机制确认 (PE 静态解析)**: 命令框字体**不来自系统字体、也不由配置决定** —— exe 内 UTF-16 字面量 `font\font.ttf` 是唯一来源 (相对 exe 自身目录), 用它建 `IDWriteFontCollection` 后按该 ttf 的 `name` 表族名调 `CreateTextFormat`, 权重/字号硬编码 (`WEIGHT_BOLD(700)` / `44.0f`, 断言串 RVA `0x1ddf0`); `.rdata` 全量字符串**无任何字体族名** (`Iosevka` ASCII/UTF-16 均 0 命中)→ 族名只能取自文件本身; 皮肤配置 `CommandInputSkin.txt` 的 **19 键全是颜色/透明度/圆角/尺寸/动画, 无 font 键** (与 exe `.rdata` 配置键已全量比对一一对应); 渲染栈 DirectWrite/D2D/D3D11/DComp (非 GDI) ⇒ `WM_SETFONT` 类注入无效。**⇒ 换字体 = 替换 `bin/font/font.ttf`** (无需重编译 / 装系统字体 / 改配置)。**⚠ 关键改造 (否则中文糊成一团)**: exe 请求 `WEIGHT_BOLD(700)` 而得意黑原生 `usWeightClass=400` + `fsSelection ITALIC`, DirectWrite 在单 face 私有集合中会施加**合成加粗 (BOLDSIM)** —— WPF 实测复现中文笔画粘连。故用 fontTools 改造元数据使其成为**精确匹配**: `OS/2.usWeightClass 400→700`、`OS/2.fsSelection` 清 ITALIC/REGULAR 置 BOLD (`0x0001→0x0020`)、`OS/2.panose.bWeight 0→8`、`head.macStyle` 清 italic 置 bold (`0x0002→0x0001`)、`post.italicAngle -8.0→0`; **`name` 表与 `glyf` 字形不动** (族名保持 `得意黑`/`Smiley Sans Oblique`, 因族名取自文件且改名有查不到的风险; 倾斜在设计里不靠元数据)。⚠ 改完必须经 **fontTools `save()` 重编译**重算校验和 —— 手工改字节会让 `OS/2`/`head`/`post` 三表校验和失配 (fontTools 报 `bad checksum`)。**字符覆盖**: 原 Iosevka **不含中文字形** (204 字符抽样缺 109), 中文靠 DirectWrite 回退 (exe 传 `L""` 空 locale ⇒ 回退链不确定); 得意黑自带 **9497 字形** (同抽样 **0 缺失**, 含全部中文与 latin) ⇒ 换后中英文数字不再依赖回退。**落地**: `bin/font/font.ttf` 替换 (三方 SHA 一致 `2e4ce734…ba5bb`, **与上游原版 `b447d7e7…d25c4` 不同 —— 差异即上述元数据改造**), 仓库与部署树同时更新; 原 Iosevka 在 git 历史 (`HEAD:bin/font/font.ttf`, `deebc76e…`) + 部署树 `font.ttf.bak-iosevka` (同 SHA) 双备份, `git checkout` 即回滚。**⚠ 同步注意**: Makefile `sync-out` 的 robocopy 白名单为 `'*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll'` —— **不含 `*.ttf`** ⇒ 换字体后必须**手动同步两处**, `make out`/`deploy` 既不复制也不删除字体。**门禁**: make check 全绿 (check-hooks 75/75 / lint / check-texttypes / GenerateAHK / `/Validate` / ORACLE DIFF PASS), 字体 SHA 三方一致。**契约**: 新增 §3.11.1「命令框字体」(机制 + 19 键皮肤边界 + 5 条硬约束), §3.11 背景第 1 条订正 (原写「DirectWrite 系统字体回退」→ 改为私有字体集合 + 指向 §3.11.1), 变更记录本行 |
 | 2026-09-20 | **命令框字体改定 MiSans-Bold** (承接同日「替换为得意黑」, 纯资源替换, 零代码/API/DB/route/protocol 变更): 用户要求改为「软件使用的 MiSans」。**来源**: `config-ui-avalonia/Assets/Fonts/MiSans-Bold.ttf` —— 即配置界面全局 `AppUiFont` 的同一族字体 (族名 `MiSans`, 界面侧经 `avares://KeyFlux.Settings/Assets/Fonts/#MiSans` 引用, 见 `Styles/Skins/Claude.axaml` 与 `App.axaml`)。**选 Bold 字重的依据 (元数据实测)**: `usWeightClass=700` / `fsSelection=0x0120`(BOLD=1, ITALIC=0) / `macStyle=0x01`(bold=1, italic=0) / `italicAngle=0` / `panose.bWeight=8` —— 与 exe 硬编码请求 `WEIGHT_BOLD(700)` + `STYLE_NORMAL` **原生精确匹配** ⇒ **零元数据改造** (对比得意黑需 fontTools 改 5 处元数据且仍有校验和风险)。**附加收益**: ①**正体非斜体** (得意黑官方只有 `SmileySans-Oblique` 单字重, 倾斜画在 glyf 轮廓里, 清元数据标记也去不掉, 实测字形倾角 ≈8.7°); ②**字符覆盖更优** —— 213 字符抽样 MiSans-Bold **0 缺失**, 得意黑缺 `※■□◆◇○●` 共 7 个; ③与软件 UI 视觉统一。**落地**: `bin/font/font.ttf` 替换 (`250fb5c8…21be`, 7,804,780 B, 29093 字形), 仓库与部署树**手动同步** (因 `sync-out` 白名单不含 `*.ttf`), 三方 SHA 一致 (仓库 = 部署树 = `Assets/Fonts/MiSans-Bold.ttf`)。**备份**: 部署树新增 `bin/font/font.ttf.bak-smiley` (得意黑 `2e4ce734…ba5bb`), 与原 `font.ttf.bak-iosevka` (Iosevka `deebc76e…`) 并列作为回滚资产。**⚠ 生效条件**: 字体在 `KeyFlux-CommandInput.exe` **启动时读取一次** (运行期间文件未被锁定, 实测可写) ⇒ **必须重启引擎/命令框进程**才可见新字体。**门禁**: make check 全绿 (check-hooks 75/75 / lint / check-texttypes / GenerateAHK / `/Validate` / ORACLE DIFF PASS), 字体未被 `make check` 覆盖 (SHA 复核不变)。**契约**: §3.11.1 标题与开头改写为「当前字体 = MiSans-Bold」+ 选择理由, 硬约束第 2 条改为「优先选原生 700 的 Bold 静态字体 ⇒ 零改造」并补充「清元数据标记改不掉斜体字形」的实证警示, 硬约束第 5 条补充「字体仅启动时读取一次, 须重启进程」, 第 6 条回滚资产补充 `.bak-smiley` |
 | 2026-09-20 | **命令框字体改定 Sthginkra (CFF→glyf 转换 + 元数据改造)** (承接同日 MiSans-Bold / 得意黑, 纯资源替换, 零代码/API/DB/route/protocol 变更): 用户指定 `D:\UserData\Downloads\Sthginkra.otf`。**源体检 (实测)**: `usWeightClass=400` / `fsSelection=0x01C0`(REGULAR=1) / `macStyle=0x00` / `italicAngle=0`, **CFF 轮廓** (表: `CFF `/`GDEF`/`GPOS`/`GSUB`/`vhea`/`vmtx`, 无 `glyf`/`loca`), 33072 字形 / 33288 cmap 项, upem 1000。**两项必修**: ①**非 700 ⇒ 必须改元数据**, 否则 DirectWrite 施加 BOLDSIM 合成加粗 (笔画糊); ②**CFF ⇒ 必须转 glyf** —— 已知可用历代字体 (Iosevka / MiSans-Bold / 得意黑 ttf) 全是 glyf, exe 对 CFF 加载路径**无验证先例** (自定义字体集合若硬编码 `DWRITE_FONT_FACE_TYPE_TRUETYPE` 会直接失败), 故按已知可用格式对齐。**转换 (fontTools, 14s)**: 逐字形 `Cu2QuPen(TTGlyphPen(), max_err=1.0, reverse_direction=True)`; **5 处实测踩坑**: ①`sfntVersion` 必须 `OTTO`→TrueType 签名 (否则 FreeType 报 `SFNT font table missing`); ②必须显式 `newTable("loca")` (fontTools 不随 glyf 自动建, 否则 `loca table missing`); ③`maxp` 需 `tableVersion=0x00010000`+`recalc()` 并补齐 7 个 glyf 专有字段 (CFF 源是 v0.5 无此键, 否则 `KeyError: 'maxZones'`); ④`recalc()` 前须逐字形 `recalcBounds(glyf)` (否则 `'Glyph' object has no attribute 'xMin'`); ⑤`f.getGlyphSet()` 而非 `f["CFF "].getGlyphSet()` (新版 fontTools 后者已移除)。删 `CFF `/`VORG`, 弃失效 `DSIG`, `post.formatType=3.0`; **`name`/`cmap`/`hmtx`/`GPOS`/`GSUB` 原样保留**。**元数据改造**: `usWeightClass 400→700`、`fsSelection 0x01C0→0x01A0` (清 REGULAR, 置 BOLD, 保留 WWS+USE_TYPO_METRICS)、`panose.bWeight 5→8`、`macStyle 0x00→0x01`、`italicAngle` 已 0。**保真度实测**: OTF vs 转换 TTF 二值掩膜 IoU 随字号收敛 **0.7932 (56px) → 0.9100 (200px) → 0.9896 (400px)**, 400px 墨迹像素 632588 vs 632285 (**差 0.05%**) ⇒ 差异纯为小字号渲染量化 (CFF 提示丢失), **形状无损**。**字符覆盖**: 191 字符抽样 **0 缺失** (CJK 常用区 20976/20992 = 99.9%, ASCII 95/95, 平/片假名 96.9%/100%, 拉丁扩展 336/336; 缺 `■□◆◇○●` 6 个几何符号 — 与得意黑同)。**正体性**: 逐行扫描 `I`/`口`/`1` 墨迹垂直笔画边界恒定 ⇒ 零倾斜。**落地**: `bin/font/font.ttf` 替换 (`d758c7b4…9a61`, 10,511,648 B, 33072 字形, `sfntVersion=0x00010000` 真 TrueType), 仓库与部署树**手动同步** (sync-out 白名单不含 `*.ttf`), 三方 SHA 一致。**备份**: 部署树新增 `font.ttf.bak-misans` (MiSans-Bold `250fb5c8…`), 与 `.bak-smiley`/`.bak-iosevka` 并列, **三条回滚资产齐全**。**生效条件**: 字体在 exe 启动时读取一次 ⇒ 已 `Stop-Process` 旧命令框进程 (懒加载, 引擎不自动拉起)。**门禁**: make check 全绿 (check-hooks 75/75 / lint / check-texttypes / GenerateAHK / `/Validate` / ORACLE DIFF PASS), 字体未被覆盖 (SHA 复核不变)。**契约**: §3.11.1 标题/开头改写为「当前字体 = Sthginkra」+ **历代字体重录表** (Iosevka→得意黑→MiSans-Bold→Sthginkra 含 SHA/结论); **新增硬约束 3「轮廓格式须为 glyf, 不接受 CFF/OTF」** (含 5 条转换踩坑 + 保真度实测数据), 原 3~6 顺延为 4~7; 硬约束 2 的 fsSelection 说明补「保留 WWS/USE_TYPO_METRICS 位」; 硬约束 7 回滚资产补 `.bak-misans`; 「当前状态」段同步更新 |
+| 2026-09-20 | **命令框字体加粗 (几何轮廓膨胀 r=12) + 固化字体预处理工具** (承接同日 Sthginkra 转换; 纯资源替换 + 新增 dev 工具, 零代码/API/DB/route/protocol 变更): 用户反馈「字体太细了, 再粗一点」。**关键认知**: exe 请求的 `BOLD(700)` 只是**元数据权重** —— 元数据对齐 700 后 DirectWrite 认为**精确匹配** ⇒ **不会再加粗** (无 BOLDSIM) ⇒ 想变粗**只能在字形上做**。**两条路对比**: ①**几何加粗 (采用, 可控)** = 轮廓膨胀 `dilate(path, r) = path ∪ stroke(path, 2r)` (与半径 r 圆盘做 Minkowski 和, ROUND_CAP/ROUND_JOIN), 笔画宽度**精确增加 2r 单位**; ②DirectWrite 合成加粗 (把 `usWeightClass` 压回 400 制造"不匹配"触发 BOLDSIM) —— 零体积增长但**加粗量不可控**且质量低, 仅作备选。**基准与选档 (实测竖干宽度, upem=1000)**: 原始 80 单位 (44px 下 3.52px); `r=8→96 (4.22px)`、**`r=12→104 (4.58px)`**、`r=16→112 (4.93px)`、`r=20→120 (5.28px)`。对照参考: 上游原 Iosevka Bold 竖干 118 单位、MiSans-Bold 175 单位。**🔴 选 r=12 的理由**: 本字体设计紧凑, **`r ≥ 16` 起 CJK 字腔 (封闭白区) 开始被填死** —— 「保存 加载 重置」在 88px 下已糊成实心块且**不可逆** (原轮廓信息丢失); r=12 在 44px (命令框实际字号) 与 88px 下均笔画实心、字腔张开、CJK 可读。**🔴 最大踩坑: 轮廓绕向导致"空心轮廓"**: 最初用 `pathops.union([fill, stroke], pen)` —— 该函数**并非布尔并集**, 只是把轮廓丢进同一 Path 再 `simplify()`, 当原字形 (TrueType 顺时针外轮廓) 与 stroke 产出的环 (绕向不同) 混合时 `simplify` **把重叠区判成空洞** ⇒ 笔画渲染成空心轮廓。实测 (`加`, r=16): 错误做法面积 `280700→285886` (轮廓碎成 12 段); **改用 `pathops.op(fill, line, PathOp.UNION)` 真布尔并集**得 `280700→403497` (3 段)。**其它实测细节**: ①Skia `stroke()` 产出 **CONIC 段, 布尔运算不接受** ⇒ 必须先 `convertConicsToQuads()`; ②`Path.stroke()` 是**原地修改且返回 None**; ③膨胀会**跳过错字形** (`numberOfContours<0` 的复合字形会重复加粗子字形), 实测 dilated=33060 / skipped=12; ④`maxp` 的 `maxPoints`/`maxContours` 必须 `recalc()` (**337→722 / 40→34**, 圆角 join 引入大量曲线点); ⑤**文件体积翻倍** 10,511,648 → 21,174,484 B (**2.01x**); ⑥逐字形 `recalcBounds(glyf)` 后 `maxp.recalc(f)`; ⑦全量 33072 字形耗时 **87s** (不含 save)。**渲染验证**: 「IoU 随字号收敛」用在 OTF→TTF 转换上得 0.79→0.91→0.9896; 本次加粗核对 44px/88px 双档预览, 笔画实心无空心轮廓, 字符覆盖 191 抽样 **0 缺失** 不变。**落地**: 加粗版替换 `bin/font/font.ttf` (**`b6f98778…289c`**, 21,174,484 B, 33072 字形, 元数据仍 `700/0x01A0/0x01/0`), 仓库与部署树**手动同步** (sync-out 白名单不含 `*.ttf`), 三方 SHA 一致。**备份**: 部署树新增 `font.ttf.bak-sthginkra-thin` (细体 Sthginkra `d758c7b4…`), **四条回滚资产齐全**。**生效条件**: 已 `Stop-Process` 旧命令框进程 (懒加载)。**🆕 固化工具 (新增 2 个 dev 脚本, 非运行时)**: `tools/font_otf2ttf.py` (CFF→glyf 转换 + 元数据权重对齐, 含 5 处转换踩坑) 与 `tools/font_embolden.py` (轮廓膨胀加粗, 含真布尔并集踩坑与半径选择建议) —— 因命令框字体当日已更换 4 次, 把两次踩坑固化为可复用脚本。**门禁**: make check 全绿 (check-hooks 75/75 / lint / check-texttypes / GenerateAHK / `/Validate` / ORACLE DIFF PASS), 字体未被覆盖 (SHA 复核不变)。**契约**: §3.11.1 开头与历代字体重录表加第 4 行 (Sthginkra 膨胀 r=12), 判据优先级插入「笔画粗细合适」; **新增硬约束 4「笔画粗细可调, 用几何加粗」** (含两条路线对比 / 实测档位表 / CJK 字腔上限 / 真布尔并集踩坑 / 体积与 maxp 副作用), 原 4~7 顺延为 5~8; 硬约束 8 回滚资产补 `.bak-sthginkra-thin`; 「当前状态」段同步更新 |
