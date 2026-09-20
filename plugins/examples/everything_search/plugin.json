@@ -25,8 +25,8 @@
       "labelEn": "Everything path",
       "default": "",
       "filter": "everything.exe",
-      "hint": "everything.exe 的完整路径; 未运行时插件会自动拉起它。",
-      "hintEn": "Full path to everything.exe; the plugin launches it automatically if it is not running."
+      "hint": "everything.exe 的完整路径; 未运行时插件会在后台静默拉起它 (不弹主窗口)。",
+      "hintEn": "Full path to everything.exe; the plugin launches it silently in the background if it is not running."
     },
     {
       "key": "esPath",

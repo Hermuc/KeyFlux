@@ -5,7 +5,7 @@
 ;   - 取当前选中文字作为检索词 (SelectionContext, 即引擎的选中文本通道);
 ;   - 调用 Everything 检索本机文件名/文件夹名包含该文字的项目 (官方命令行 es.exe);
 ;   - 结果以不激活的下拉浮层展示在命令框正下方, ↑↓ 选择、回车在资源管理器中打开;
-;   - Everything 未运行时按配置路径自动拉起。
+;   - Everything 未运行时按配置路径**静默**拉起 (`-startup`, 后台托盘, 不弹主窗口、不抢焦点)。
 ;
 ; 分层 (每层只依赖下一层, 便于替换与测试):
 ;   main.ahk                 入口: 读设置 -> 建控制器 -> 注册到命令框拦截点
@@ -18,7 +18,7 @@
 ;
 ; 设置 (manifest.settings, 在设置面板点插件卡编辑):
 ;   triggerKey     前置触发键 (默认空格), 在命令框里按它触发搜索
-;   everythingPath everything.exe 路径, 未运行时插件用它拉起
+;   everythingPath everything.exe 路径, 未运行时插件用它静默拉起 (-startup)
 ;   esPath         es.exe 路径 (可选), 留空则按 everything.exe 同目录/插件 bin/PATH 依次探测
 ;   limit          下拉列表条数上限 (1-100, 默认 20)
 ;   ↑ 四个值存 data/plugin-settings.json, **每次命令框会话开始时重读**, 故设置面板保存后

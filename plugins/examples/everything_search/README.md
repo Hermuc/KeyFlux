@@ -2,7 +2,7 @@
 
 在**命令框**里按下**前置触发键**（默认空格，可在设置面板点插件卡改），用本机 Everything
 搜索**当前选中的文字**；结果以**不激活的下拉浮层**列在命令框正下方，`↑` `↓` 选择、`回车`
-在资源管理器里打开/定位。Everything 没在运行时按配置路径自动拉起。
+在资源管理器里打开/定位。Everything 没在运行时按配置路径**静默拉起**（后台托盘，不弹主窗口、不抢焦点，见 §1.1）。
 
 本文件是该插件唯一的开发文档（其余说明散落在各源文件头部注释里，按「谁负责什么」就近放置）。
 
@@ -15,7 +15,7 @@
 | **触发键配置** | `plugin.json` 的 `settings[triggerKey]`（`char` 类型，默认 `" "`）→ 设置面板对话框渲染成单字符输入框；值存 `data/plugin-settings.json` | 值由 `EverythingSettings.NormKey` 归一（只接受可打印 ASCII 单字符，否则回落空格）；`EverythingSession.OnChar` 用它判定「本次会话的第一个字符是不是触发键」 |
 | **选中文字获取** | `EverythingSession.SeedFromSelection` → `SelectionContext.Get(true)` | 触发键被消费**之后**才取词；取词要发 `Ctrl+C`，而活动 InputHook 看得见脚本自身 Send 的按键，故用 `capturing` 捕获锁把注入的字符全部吞掉（见 §4.1）。取到文件时只取首个文件的主名（资源管理器里选中文件时用户意图通常是「找同名/同类」） |
 | **结果下拉展示** | `EverythingDropdown`（自建 AHK Gui + ListView，`-Caption +ToolWindow +E0x08000000` 且 `Show("NA")`） | 锚点取命令框窗口（`ahk_class MyKeymap_Command_Input`）的实时几何，贴合其正下方；**为什么不能直接塞进命令框**：命令框本体是上游预编译二进制 `bin/KeyFlux-CommandInput.exe`（无源码、无 ListView 资源、与引擎只有单向 `PostMessage WM_CHAR` 通道），没有任何「投递候选列表」接口 —— 视觉上仍是「command 下方的下拉列表」。`↑`/`↓`/`回车` 由命令框的 `capsHook` 以 `KeyOpt(...,"N")` 通知给引擎侧（见 §3） |
-| **未启动时自动拉起** | `EverythingSearch.EnsureRunning` | 先 `ProcessExist("Everything.exe")` 探活（不依赖 IPC 窗口，避开版本差异）；未运行则按设置里的 `everythingPath` 拉起并轮询等待（250ms × 最多 6s，冷启动要读 db）；拉不起来时区分「没配路径」与「配了但拉不起来」两种提示 |
+| **未启动时静默拉起** | `EverythingSearch.EnsureRunning`（+ 兜底 `HideMainWindowIfAny`） | 先 `ProcessExist("Everything.exe")` 探活（不依赖 IPC 窗口，避开版本差异）；**未运行**时按设置里的 `everythingPath` 以 `-startup` 开关拉起并轮询等待（250ms × 最多 6s，冷启动要读 db）；**已运行**时不做任何额外处理（不重启、不动已有窗口）。`-startup` = 官方「后台运行、不显示任何搜索窗口」开关（见 §1.1）；拉不起来时区分「没配路径」与「配了但拉不起来」两种提示 |
 | **路径配置** | `settings[everythingPath]` / `settings[esPath]`（`file` 类型 + `filter`）| 对话框里给「浏览」按钮（文件选择器）；`esPath` 留空时 `EverythingProviders.ResolveEs` 按优先级自动探测：显式 `esPath` → `everything.exe` 同目录 → 插件自带 `bin/es.exe` → 系统 `PATH`（用 `es.exe -version` 实测一次，避免把「不存在」拖到查询期）。全不可用时降级为 `everything.exe -search` 打开 Everything 界面，并明确告知结果不在本插件下拉里 |
 
 **一次完整时序**：
@@ -30,6 +30,60 @@
        OnKey(回车)   → 打开当前项 → 收浮层 → ih.Stop()（引擎走 HIDE 分支隐藏命令框）
   → CommandInputHooks.EndSession()        收浮层（Esc 等未走回车的退出路径）
 ```
+
+---
+
+## 1.1 未启动时的静默拉起（2026-09-20）
+
+### 问题
+
+原实现是 `Run('"' exe '"')` —— 裸跑 `everything.exe`。Everything 默认启动即**弹出主窗口**，
+并由 `bring_into_view` / `maximized` 等配置决定是否抢前台焦点。后果：用户在命令框里
+按触发键去搜文件，Everything 主窗突然盖上来并夺走键盘焦点，**当前输入被直接打断**。
+
+### 修法
+
+启动命令加官方开关 **`-startup`**（`EverythingSearch.StartupSwitch`）：
+
+```
+everything.exe -startup
+```
+
+> 官方文档（Everything.exe 命令行选项 · General）：
+> `-startup` — *"Run Everything in the background without showing any search windows."*
+
+即：进程照常启动并加载索引、常驻托盘，但**不创建/不显示任何搜索窗口**。
+
+**为什么不用 `-minimize`**：`-minimize` 只是把窗口最小化，窗口仍然存在且仍是前台候选，
+任务栏/Alt+Tab 仍会出现，焦点抢夺问题没有真正解决；`-startup` 是从根本上不建窗口。
+
+### 兜底（降级方案）
+
+`-startup` 作用于**启动瞬间的窗口策略**，若 `Everything.ini` 里有强制显示类配置
+（如 `maximized=1` + `bring_into_view=1`）或用户装的是会弹窗的魔改版，主窗口仍可能出现。
+故 `EnsureRunning` 在探活成功后调一次 `HideMainWindowIfAny()`：在 1.2s 窗口期内
+（250ms 步长）枚举 Everything 进程的**可见**顶层窗口，主动 `WinHide`。
+
+- 筛选规则：以**类名黑名单**排除 IME 辅助窗（`MSCTFIME UI` / `IME` / `Default IME`），
+  其余可见顶层窗一律视为主窗口。**不以「标题非空」为主筛** —— 实测 `-startup` 下
+  Everything 创建的窗口标题可能为空，用标题筛选会漏掉真正的主窗口。
+- **不影响用户手动开窗**：本方法只在「刚拉起后的 1.2s 窗口期」调用一次；
+  此后用户自己点托盘图标开主窗时，`EnsureRunning` 早已因「已在运行」直接返回，
+  不会再走到隐藏逻辑。
+
+### 实测证据（2026-09-20，本机 Everything 1.5.0.1418）
+
+| 观测项 | 裸启动 | `-startup` |
+|---|---|---|
+| 可见顶层窗口 | **主窗口弹出 + 抢焦点** | **0 个**（仅 2 个 `visible=0` 的 IME 辅助窗） |
+| 进程存活（40s 采样） | 稳定 2 进程 | 稳定 2 进程 |
+| `es.exe -get-result-count` 退出码 | 0 | **0（全程）** |
+| 前台焦点变化 | 被抢 | **不变**（`PiliPlus` → `PiliPlus`） |
+
+对照探针 `es_compare_test.ahk` 跑 `bare` / `startup` 两模式各 40 秒，逐秒采样
+进程数与 IPC 退出码 —— 两者**完全等价**，唯一差异就是窗口是否出现。
+另有 `es_silent_launch_test.ahk` 双场景断言 9/9 通过（未运行 → 静默拉起且不抢焦点；
+已运行 → 不重启且 PID 不变）。
 
 ---
 
@@ -138,7 +192,7 @@ Everything 有四条可编程通道，可用性与可移植性差异很大：
 | key | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `triggerKey` | char | `" "` | 前置触发键，单个可打印字符 |
-| `everythingPath` | file | 空 | `everything.exe` 完整路径，未运行时用它拉起 |
+| `everythingPath` | file | 空 | `everything.exe` 完整路径，未运行时用它**静默**拉起 |
 | `esPath` | file | 空 | `es.exe` 路径（可选，留空走 §1 的探测链） |
 | `limit` | number | `20` | 下拉条数上限（1–100） |
 
