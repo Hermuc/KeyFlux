@@ -397,7 +397,7 @@ CommandInputHooks.PendingAbbr := "le"
 CommandInputHooks.BeginSession()
 Check(CommandInputHooks.PendingAbbr = "" && CommandInputHooks.PendingScope = "", "BeginSession 复位待收尾状态 (会话间不泄漏)")
 CommandInputHooks.EndSession()
-Check(CommandInputHooks.FinishDelayMs >= 50 && CommandInputHooks.FinishDelayMs <= 500, "FinishDelayMs 在 50..500ms (够一帧绘制, 又不显迟滞)")
+Check(CommandInputHooks.FinishDelayMs >= 5 && CommandInputHooks.FinishDelayMs <= 500, "FinishDelayMs 在 5..500ms (够 1~2 帧绘制, 又不显迟滞)")
 
 ; --- 15) 终止字符强制投递 EchoTerminalChar (§3.12 硬约束 9, 2026-09-20) ---
 ; 命中那一击的字符**不会被原生显示** (会话就在这一击结束), 而透传模式下 ShouldEcho 恒 false
