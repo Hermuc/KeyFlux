@@ -31,6 +31,15 @@ ActivateOrRun(winTitle := "", target := "", args := "", workingDir := "", admin 
   if (winTitle) {
     processName := GetTargetProcessName(target)
     if (processName && ProcessExist(processName)) {
+      ; 🔴 按**进程名**再匹配一次窗口 (2026-09-21)。
+      ; 动机: winTitle 常与真实窗口标题不一致 —— 实测微信 4.0 主窗口标题是**用户昵称**
+      ;   (如「安和壹」), 而配置里写的是 winTitle="微信" ⇒ 永远匹配不上。此时窗口其实就
+      ;   开着, 但按标题找不到 ⇒ 白白走一趟托盘导航, 用户体感"点了要等好几秒"。
+      ; 位置: 放在托盘导航**之前** —— 窗口已开则直接激活并返回, 整趟托盘往返都省掉。
+      ; 边界: 仅在标题匹配失败之后执行, 不改变"标题优先"的原语义。
+      if (activateWindow("ahk_exe " processName, isHide))
+        return
+
       ; 进程在但窗口未出现：极短等待窗口出现。托盘驻留时窗口不会自行出现，空等无意义；
       ; 启动中的窗口由 TryTrayRestoreByNav 的轮询验证（v10）与下方最终兜底捕获（WinWait 超时单位是秒）
       if (WinWait(winTitle, , 0.3)) {
@@ -38,16 +47,17 @@ ActivateOrRun(winTitle := "", target := "", args := "", workingDir := "", admin 
         return
       }
       ; 窗口仍不出现：通过托盘图标自动唤出（tray_nav.ps1 v10 轮询验证，窗口出现即 DONE 退出），
-      ; 等效用户手动点击托盘图标，不会触发重复启动
-      if (TryTrayRestoreByNav(processName, winTitle)) {
-        if (WinWait(winTitle, , 1.5)) {
-          WinActivate(winTitle)
-          return
-        }
-      }
-      ; 最终兜底：程序可能仍在启动中（托盘图标尚未注册导致唤起失败），再等窗口出现
-      if (WinWait(winTitle, , 2)) {
-        WinActivate(winTitle)
+      ; 等效用户手动点击托盘图标，不会触发重复启动。
+      ; 🔴 成功即**立即返回** (2026-09-21): 脚本内部已按 MainWindowHandle != 0 轮询验证窗口
+      ;   确实出现, 且 UIA Invoke 已把窗口激活 ⇒ 此处再按 winTitle 空等 1.5s 不仅无意义,
+      ;   还会在"标题与 winTitle 不一致"时被判为失败 ⇒ 白等 + 误报「程序在后台运行」。
+      if (TryTrayRestoreByNav(processName, winTitle))
+        return
+      ; 最终兜底：程序可能仍在启动中（托盘图标尚未注册导致唤起失败），再等窗口出现。
+      ; 🔴 判据用**进程名**而非 winTitle: 同上的标题不一致问题会让 winTitle 在此处恒判失败,
+      ;   把"其实已经开出来了"误报成"唤不出窗口"(实测现象)。
+      if (WinWait("ahk_exe " processName, , 2)) {
+        WinActivate("ahk_exe " processName)
         return
       }
       ; 程序在后台运行但唤不出窗口，提示用户手动唤出，绝不重启新实例
