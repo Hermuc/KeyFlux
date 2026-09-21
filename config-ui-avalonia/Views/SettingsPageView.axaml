@@ -267,6 +267,20 @@
     <Style Selector="Border.keymapRow:pointerover">
       <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
     </Style>
+    <!-- ⑤ 字体校验提示条: 中性态 (提醒) 为默认值, .err 覆盖为问题态。
+         为什么用两态而非一态: ".ttc 只用第一个 face" 是**可用但需知情**的提醒, 与
+         "超限/格式不支持"这种**不可用**的硬错误混为一色会让用户误判严重性。 -->
+    <Style Selector="Border.noticeBanner">
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+      <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
+    </Style>
+    <Style Selector="Border.noticeBanner.err">
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeErrorBrush}" />
+      <Setter Property="Background" Value="{StaticResource ClaudeTerracottaSoftBrush}" />
+    </Style>
+    <Style Selector="Border.noticeBanner.err TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource ClaudeErrorBrush}" />
+    </Style>
   </UserControl.Styles>
 
   <!-- 整页内容包 Viewbox Uniform 等比缩放 (2026-09-12 重构: 移除外层 ScrollViewer):
@@ -652,9 +666,24 @@
                          FontWeight="SemiBold" FontSize="12"
                          Foreground="{StaticResource ClaudeStoneGrayBrush}" />
 
+              <!-- ── 字重档位 (置于字体文件之前: 2026-09-21 起它真实生效, 是主要的粗细控制) ──
+                   exe 恒定请求 BOLD(700) 且元数据已精确匹配 ⇒ 无合成加粗, 笔画粗细 100% 由
+                   落地字形决定 ⇒ 换档 = 换一个预烘焙的变体文件 (见 §3.11.1「字重档位机制」)。
+                   出厂默认 = 半粗 (ConfigReadDefaults.DefaultCommandFontWeight)。 -->
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2508}"
+                           VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" MinWidth="140"
+                          ItemsSource="{Binding FontWeights}" SelectedItem="{Binding SelectedFontWeight}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FontWeightOption">
+                      <TextBlock Text="{Binding Title}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </Grid>
+
               <!-- 字体文件: 只读文本框显示当前路径 + 「选择…」弹系统文件选择器 -->
-              <!-- ⚠ 字重当前仅作记录 —— exe 恒定请求 BOLD(700) 且元数据已精确匹配,
-                   实际笔画粗细由字体文件的字形决定; 不做"能改粗细"的误导。 -->
               <StackPanel Spacing="4">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2504}"
                            Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
@@ -676,21 +705,20 @@
                     <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2507}" />
                   </Button>
                 </Grid>
-              </StackPanel>
 
-              <!-- 字重档位: 仅记录 (exe 恒定 BOLD 请求, 见上方注释) -->
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2508}"
-                           VerticalAlignment="Center" />
-                <ComboBox Grid.Column="1" MinWidth="140"
-                          ItemsSource="{Binding FontWeights}" SelectedItem="{Binding SelectedFontWeight}">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:FontWeightOption">
-                      <TextBlock Text="{Binding Title}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </Grid>
+                <!-- 即时校验提示条: 只在用户主动选择字体后出现。
+                     存在意义 = 把生成端的"静默跳过"前移到选择时刻 —— 用户选中超限/不支持
+                     的文件时当场看到原因, 而不是"选了没反应"。
+                     Classes.err 随 CommandFontNoticeIsError 翻转 (同 sectionBody 的 Classes.open
+                     写法), 错误态用暖红描边, 提醒态用中性米色。 -->
+                <Border IsVisible="{Binding HasCommandFontNotice}"
+                        Classes="noticeBanner" Classes.err="{Binding CommandFontNoticeIsError}"
+                        CornerRadius="{StaticResource ClaudeRadiusMd}"
+                        Padding="8,6" BorderThickness="1">
+                  <TextBlock Text="{Binding CommandFontNotice}" TextWrapping="Wrap" FontSize="12"
+                             Foreground="{StaticResource ClaudeStoneGrayBrush}" />
+                </Border>
+              </StackPanel>
             </StackPanel>
           </StackPanel>
         </Border>

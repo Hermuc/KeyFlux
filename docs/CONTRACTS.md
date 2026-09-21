@@ -497,6 +497,10 @@ class CommandDisplay {
 真 TrueType** + **元数据改造对齐 BOLD(700)** + **几何加粗 (轮廓膨胀)** 三步生成,
 详见下方硬约束 2/3/4。生成脚本已固化: `tools/font_otf2ttf.py`、`tools/font_embolden.py`。
 
+> ⚠ **本节描述的"当前字体"是仓库基线**。用户在自己的部署树里可通过设置页选择任意
+> 字体 + 5 档字重 (见下方「配置写入端」与硬约束 7), 此时部署树 `bin/font/font.ttf`
+> 与本节基线**必然不同** —— 属预期行为, 不是漂移。
+
 历代字体重录 (均为当日决策, 供追溯):
 
 | 次序 | 字体 | 来源 | SHA256 | 结果 |
@@ -568,11 +572,110 @@ windowWidth      windowShadowColor  windowShadowOpacity              windowShado
 
 | 键 | 类型 | 语义 |
 |---|---|---|
-| `sourcePath` | string | 用户经设置页「选项 → 命令框字体」选择的字体文件**绝对路径** (空 = 未自定义, 沿用现有 `font.ttf`) |
-| `weight` | string | 字重档位 `regular`/`medium`/`semibold`/`bold`。**当前仅作记录, 不参与渲染** (见硬约束 4) |
+| `sourcePath` | string | 用户经设置页「选项 → 命令框皮肤」卡内字体小节选择的字体文件**绝对路径** (空 = 未自定义, 沿用现有 `font.ttf`) |
+| `weight` | string | 字重档位 `thin`/`light`/`regular`/`semibold`/`bold`。**自 2026-09-21 起真实生效** —— 见下「字重档位机制」 |
+
+**字重档位机制 (2026-09-21 起真实生效)**:
+
+exe 硬编码请求 `BOLD(700)` 且不可改, 故"调字重"只能在**字形**上做 —— 即按档位对
+轮廓做**几何变换**: 变粗用**膨胀** (半径 r, 笔画宽度精确 +2r 字体单位), 变细用**腐蚀**
+(对偶运算, 宽度精确 −2r)。生成端是 Go 程序, 没有也无法引入轮廓布尔运算库 (离线环境取不到
+依赖), 调外部 Python 又会把部署树绑死在「目标机器须装有 Python+fontTools+skia-pathops」上
+⇒ **破坏可移植性**。
+
+故采用 **构建期预烘焙 + 运行期选文件**:
+
+| 档位 | 运算 | 半径 (upem 1000) | 变体文件 | 落地来源 |
+|---|---|---|---|---|
+| `thin` | 腐蚀 | −20 | `<源去扩展名>.thin.ttf` | 变体 |
+| `light` | 腐蚀 | −10 | `<源去扩展名>.light.ttf` | 变体 |
+| `regular` | — | 0 | (无) | **源字体本体** (不落冗余副本) |
+| `semibold` | 膨胀 | 14 | `<源去扩展名>.semibold.ttf` | 变体 |
+| `bold` | 膨胀 | 28 | `<源去扩展名>.bold.ttf` | 变体 |
+
+- 🔴 **为什么需要 `thin`/`light` (腐蚀)**: 命令框 exe 请求 `BOLD(700)`, 用户常直接选一份
+  **已是粗体**的字体作源 (如 inpin 鸿蒙体 w700)。对这类源, "不做膨胀"只是**回到源字体**,
+  无法得到比源字体更细的效果 ⇒ 必须靠**腐蚀**主动减细。
+- 🔴 **档位间距按"实测墨迹"定, 不按半径等分**: 膨胀的墨迹增长是**次线性**的 (r=6→10 只
+  +3.0%, 而 0→6 有 +7.3%), 因为膨胀同时填窄字腔; 腐蚀则近线性 (−6.7%/6 单位)。
+  旧 4 档 (0/6/10/14) 实测首尾总差仅 +15.8%、中→半粗只有 +3.0% (低于 ~3.5% 肉眼可辨阈值),
+  故用户报障"看不出区别"。新 5 档实测相邻增幅 9.7%~15.8%、首尾 +27.1%, 每档可辨。
+- **选文件逻辑** (`script.FontWeightVariants` / `VariantPath` / `InstallCommandFont`):
+  按 `weight` 推出变体路径, 变体**存在且自身通过格式闸门**才采用, 否则**回落源字体本体**。
+  回落而非报错 —— 用户可能直接从别处拷来字体而未烘焙变体, "显示原样字体"远好于"整条链路失败"。
+- 🔴 **未知/空字重一律回落 `regular`** (中性档)。**不可猜更粗的档位** —— 猜粗会在部分字体上
+  把 CJK 字腔 (封闭白区) 永久填死 (不可逆)。已移除的旧档名 (`medium`) 同样按未知处理。
+- 🔴 **变体命名必须与生成端约定一致** (`<源去扩展名>.<档位><扩展名>`, 与源字体**同目录**)。
+  名字对不上 ⇒ 静默回落源字体 ⇒ 表现为"选了字重没变化"。
+- **烘焙工具**: `tools/font_weight_prebake.py <src.ttf>` (默认写入源字体同目录)。
+  依赖 fontTools + skia-pathops + Pillow (Pillow 仅用于安全校验), 复用
+  `tools/font_embolden.py` 的真布尔并集/差集原语 (单一算法真源)。
+- 🔴 **退化字形必须"失败保原样"而不是中止整档**: skia-pathops 的布尔并集对**退化轮廓**
+  (零面积自交 / 重复点堆叠) 会抛 `PathOpsError`。实测 Sarasa 系统字体在 r=+28 时**仅
+  `uni57F3` 一个字形**触发 (r=+14 全通过)。若因此中止, 整档 `bold` 都拿不到 ——
+  代价与收益完全不成比例。`bake_one` 现逐个字形捕获异常并**保留原轮廓** (该字形只是
+  不加粗, 与邻居差 1 档以内), 同时计数回报; 占比超过 `UNSAFE_RATIO_MAX = 1%` 才判定
+  该档不可用 (防"大面积退化却仍落盘")。
+- **字体集合抽取 + 裁剪工具 (2026-09-21 新增)**:
+  - `tools/font_ttc_extract.py --list <x.ttc>` 列出全部 face; `--family "Sarasa Gothic SC"`
+    或 `--index N` 抽取单个 face 为独立 `.ttf`。**用途**: 命令框 exe 只用 `.ttc` 的
+    **第一个 face**, 而 Sarasa 这类字体把 6 风格 × 8 语言区共 48 个 face 打进一个文件
+    (~80 MB/字重), face[0] 常是 CL (古典拉丁) 而非用户想要的 SC ⇒ 必须显式抽出。
+  - `tools/font_subset.py <src> <dst>` 按 Unicode 区段裁剪。默认保留 Basic Latin→
+    Fullwidth Forms + CJK 统一汉字基本区 (U+4E00-9FFF), 排除 Ext-A/Ext-B+/CJK 兼容区。
+    **用途**: Sarasa SC 单 face 44.9 MB, 超出 `FontMaxBytes` (32 MiB) ⇒ 裁剪至
+    **6.9 MB** (24362 字形) 才可用; 这是让"选大字体"从不可用变为可用的关键一步。
+    ⚠ 裁剪会丢弃 Ext-A/B 等**生僻字**字形 —— 只保简体常用区, 生僻字回退系统字体。
+- 🔴 **可复现构建 (2026-09-21 修)**: fontTools 的 `head.compile` 内有
+  `if ttFont.recalcTimestamp: self.modified = timestampNow()` —— 默认 `True` 会用**保存时刻**
+  覆盖 `head.modified`, 使**同一输入产出不同 SHA** (实测仅差 6 字节, 全在 `head` 表):
+  变体无法用 SHA 断言/门禁校验, 部署也不可复现。三个字体工具现已统一: 置
+  `f.recalcTimestamp = False` + 用**源字体的 `modified` 原值**填回 ⇒ 输出纯粹是输入的函数。
+  实测: 两次独立烘焙 4 档变体 **SHA 全同**; 与旧产物的差异**逐表比对仅 `head` 一处**
+  (其余 13 表字节全同) ⇒ 修复不改字形, 只归一化时间戳。
+  ⚠ `head.checkSumAdjustment` 由 `save()` 末尾按新内容自动重算, 无需手工维护。
+- 🔴 **两个方向的半径上限不同, 且都不可逆**:
+  - **膨胀上限 = CJK 字腔**。膨胀会蚕食封闭白区, 过大即糊成实心块。实测 inpin 鸿蒙体
+    最大字腔面积保留率 r=14→0.89 / r=24→0.80 / r=28→0.75 / r=32→0.72 (**无突变拐点**),
+    故取 r=28 (保留 3/4) 留足余量。
+  - **腐蚀上限 = 该字体最细笔画的半宽**。过大则细笔画先锯齿、后断裂 (整段消失)。
+  - 换字体后必须**重新出预览确认**, 不要盲目沿用。
+  - ⚠ **半径值不可跨字体照抄**: 同一组 r 在**粗细不同的源**上会得到**相反**的档位顺序。
+    实测 (Sarasa XLight 源): r=−10 只剩 46.9% 墨迹 (细于 r=−20 的 68.0%) —— 腐蚀过猛
+    已毁笔画。故从**常规粗细 (wght=400)** 的源出发时, 默认半径 (−20/−10/14/28) 才成立:
+    实测 44px 下 `thin 0.45x / light 0.71x / regular 1.00x / semibold 1.43x / bold 1.85x`,
+    **严格单调递增**, 相邻增幅 29~58%, 总跨度 +312%。
+- 🔴 **安全判据必须用"字腔面积", 不可用"字腔个数"**: 膨胀会在相邻笔画间**新生成**小的
+  封闭白口袋, 使个数**先升后降** (实测本字体 r=14 时 15→16, r=20 时 18, 之后才回落)。
+  按个数设阈值会误报 —— 本实现初版即因此把一个其实可用的档位判成失败。
+- **烘焙自带安全校验**: 膨胀档查**最大字腔面积**保留率 (下限 0.55); 腐蚀档查**最细笔画**
+  墨迹保留率 (下限 0.30) 且不得断成多段。**不合规即删除该变体并跳过该档** ——
+  生成端因此回落源字体, 不会拿到坏文件。
+- **可移植性收益**: 部署树零外部依赖 (纯数据文件), 运行时零计算, 无超时/无失败面,
+  不执行任何外部脚本。
 
 - **写入端**: 设置页「选项 → 命令框皮肤」卡内的**字体小节** (2026-09-21 由独立卡片并入;
   系统文件弹窗 → `StorageProvider.OpenFilePickerAsync`, 过滤器 `*.ttf;*.otf;*.ttc`)。
+- 🔴 **选择时的即时校验提示 (2026-09-21 新增, 修"选了没反应"缺陷)**: 生成端的失败
+  **一律静默跳过** (字体是表现层资源, 不阻断脚本生成) —— 这让用户选中 83 MB 的 `.ttc`
+  或 CFF 的 `.otf` 后**界面毫无反馈**, 命令框字体也没变, 表现为"选了跟没选一样",
+  且无从得知原因。故新增 **`Models/CommandFontValidator.cs`** 把同一套判据前移到 UI
+  **选择时刻**: 体积 (>32 MiB) / sfnt 签名 (`0x00010000`·`true` 通过; `OTTO` 拒绝;
+  `ttcf` 看首 face) / 文件可读性 ⇒ 结论 + 原因**当场显示**在字体小节下方的提示条
+  (`HasCommandFontNotice` / `CommandFontNoticeIsError`, AXAML `Border.noticeBanner`
+  两态样式: `.err` 暖红 = 不可用, 默认米色 = 可用但有注意点)。
+  ⚠ **判据必须与 Go 侧同口径** —— 漂移会双向出错: UI 说可用而生成端跳过 (用户又被坑),
+  或 UI 拦住而生成端其实接受 (合法字体用不了)。守门人 `CommandFontValidatorTests` 逐字节
+  固定签名判定, 并把 32 MiB 限值与 Go 常量绑成一条断言。
+  📌 **启动时不做复检** —— 配置里的路径很可能指向已删除/超限的文件 (正是上次踩的坑),
+  若载入即弹错误提示, 用户每次打开设置都看到一条无法消除的告警 (噪声)。只在**用户主动
+  选择**时给结论, 那才是需要解释"为什么没变化"的时刻。
+  ⚠ 本校验**只做能当场断言**的检查; 判定"可用"**不等于已生效** —— 仍需重启命令框进程。
+- **`.ttc` 只用第一个 face (用户最易误解点)**: 命令框 exe 建 `IDWriteFontCollection` 时
+  只取首个 face, 而 Sarasa 等字体把多语言版本打进同一文件 ⇒ 用户以为选了"简体中文版",
+  实际落地的是集合里的**第一个** face (常为拉丁版)。`CollectionFirstFaceOnly` 专门给出
+  这条提醒 (中性色, 非错误态 —— 否则用户会以为自己选错了)。
+  正确做法: 先用 `tools/font_ttc_extract.py --family "<想要的族名>"` 抽出目标 face。
 - **消费端**: 生成端 `InstallCommandFont()` (`internal/script/font.go`), 在 `GenerateScripts`
   (运行时) 与 `GenerateAHK` (CLI/校验) 中调用, 把 `sourcePath` 指向的文件**复制到**
   `bin/font/font.ttf`。CLI 路径下复制目标 = **输出文件所在目录**的 `font/font.ttf`
@@ -583,6 +686,15 @@ windowWidth      windowShadowColor  windowShadowOpacity              windowShado
   `font.ttf`。
 - **链路三处同步**: C# `ConfigModels.Options.CommandFont` ⇄ Go `model.Options.CommandFont`
   ⇄ Go `OptionsDTO.CommandFont` (CONTRACTS §5.2 双轨 DTO, 漏改任一处会静默抹字段)。
+- 🔴 **UI 文案键必须查证为空闲 — 不可凭"看起来像空洞"就用** (2026-09-21 踩坑):
+  字重 5 档的标签键曾误用 `2517`/`2518`, 而这两个键**早已被
+  `SelectedActionPageView.axaml` 占用** (自定义文本类型的留桩提示条文案 / 「创建专属行为」按钮)。
+  因 JSON **后定义覆盖前定义**, 那两处 UI 文案被**静默**改成了「极细」/「细」, 且键数虚增
+  (405 个定义但解析后仅 403 个有效键)。现已迁到经查证的空洞 `2526`/`2549`。
+  **加键前必做两查**: ① 在 `Resources/i18n.json` 里确认**该键不存在**(并 grep 全仓引用);
+  ② 用「行内正则计数 vs JSON 解析计数」比对是否相等 —— **不等即有重复键**。
+  `I18nResourceTests.Json_Is_Loaded_Completely_Without_Duplicate_Keys` 已硬断言
+  `去重键数 == ExpectedKeyCount`, 是这道工序的守门人。
 - 🔴 **本条不推翻「换字体 = 替换 `bin/font/font.ttf`」**: 配置只是让**生成端**替用户做那次替换。
   字体族**依旧无法通过配置改变** —— 命令框 exe 的 `CreateTextFormat` 实参是局部变量, 取自
   该 ttf 的 `name` 表 (见下「机制」第 4 条)。
@@ -1026,3 +1138,6 @@ action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经
 | 2026-09-21 | **修复「字母周围又有八角框」回归 + 命令框字体格式闸门 (拒绝 CFF)** (用户报障; **两个独立缺陷叠加**, 均已根治并加守门人)。**① 八角框回归 (用户所报症状)**: 根因是 `make deploy` 的 `sync-out` 里 `robocopy bin ... '*.exe'` 用仓库侧**未 patch** 的 `KeyFlux-CommandInput.exe` 覆盖了部署树 —— 实测部署树 exe SHA 退回 `f14bba71…` (= 与 `KeyFlux-CommandInput.orig.exe` **逐字节相同**) ⇒ `.rdata` 偏移 `0x1cca0` 的 keycap 白名单 (`a-zA-Z0-9` 共 62 字符 UTF-16LE) 被还原 ⇒ 字母/数字重新被套上八角框。这正是 §3.11 硬约束 4 早已警告、但此前**只靠人工纪律**执行的坑 (09-19 那次就踩过)。**根治 (自动化收口)**: 把原先的临时脚本 (`%TEMP%\kf_patch_whitelist.py`, 已随 09-20 的临时文件清理一并回收) 固化为 **`tools/patch_command_input.py`** —— 幂等 (三态判定 `patched`/`original`/`unknown`)、**前置哨兵校验** (偏移 `0x1CC80` = `'ace->EndD'`、`0x1CD1C` = `\0\0dwrite`, 一律用**显式 hex 常量**表达以免转义 NUL 数错字节; 防 exe 版本漂移)、**写盘后回读复核**、`--check`/`--revert` 子模式; 并新增 Makefile 目标 **`patch-commandinput`**, **挂在 `sync-out` 配方末尾自动执行** (先 `Stop-Process KeyFlux-CommandInput` 解锁 —— 运行中的 exe 自锁不可写; 该进程**懒加载**, 下次唤起命令框时由引擎重建, 且 `deploy` 末步本就重启实例), 另加只读诊断目标 `check-commandinput-patch`。**接线实测有效**: `make buildServer sync-out` 输出显示 robocopy 后 `状态 = original` → patch 自动重施 → `patched`。patch 后 exe SHA = **`2aed3232…5fbe`** (与工作记忆记录的历次 patch 值一致), 与原版差异**恰好 62 字节** (范围 `0x1cca0–0x1cd1a`), 文件长度不变 (580096 B)。**② 字体格式闸门 (上一轮新增功能的缺陷)**: 用户在设置面板选了 `D:\UserData\Downloads\Sthginkra.otf` (CFF), 而 `InstallCommandFont` 把 `OTTO` 当作合法 sfnt 签名**放行并原样复制** ⇒ 部署树 `bin/font/font.ttf` 变成 `sfntVersion=4f54544f` (OTTO) 的 CFF 文件 (8,688,388 B) —— 直接违背 §3.11.1 硬约束 3 (exe 只接受 glyf), 且因错误被刻意忽略而**全程静默**, 用户只看到「选了没效果」。**修法**: 把 `looksLikeFont` 换成语义更强的 `classifyFontKinds` —— 只接受 glyf (`0x00010000` / `'true'`; 遇 `'ttcf'` 则递归校验**首个 face** 的实际轮廓标签), **`OTTO` 一律拒绝**并返回可读原因 (含转换指引); 同步订正函数头边界注释第 4 条。**恢复**: 部署树 `font.ttf` 回滚为仓库已知良好版 (`b6f98778…289c`, glyf, 21,174,484 B, 两侧 SHA MATCH)。**测试**: 新增 `font_test.go::TestInstallCommandFont_FormatGate` 4 例 (CFF 拒绝且不落盘 / glyf 集合接受 / CFF face 集合拒绝 / `'true'` 接受), 连同原 7 例共 **11/11 全绿**。**门禁**: `go build ./...` 与 `go vet ./...` clean; `go test ./internal/script/... ./internal/server/...` 除 `TestGoldenKeyFluxAHK` 外全过 —— 该用例已用 `git stash` 基线复跑确认**同样失败** (`CommandImeGuard.ahk` include 顺序差异, **既有基线红**, 非本改动引入); `gofmt -l` 对全仓 54 个 Go 文件标记 10 个 (含 `dto.go`/`config.go`/`command.go` 等**与本改动无关的既有文件**), 把新增文件 LF 归一后 `FORMAT OK` ⇒ 纯 CRLF 假阳性, 非格式缺陷。产物校验: `bin/settings.exe` `a16008e3…`、`bin/font/font.ttf` `b6f98778…`、patched exe `2aed3232…` 两侧一致。**契约**: §3.11 硬约束 4 重写 (记录本次复现 + 自动化收口 + 诊断目标 + patch 后 SHA 与差异范围), §3.11.1 硬约束 3 补「该约束已由代码强制」段 (含 CFF 放行缺陷的回归背景与守门人), 变更记录本行。**⚠ 待用户验证**: 重启引擎/唤起命令框后确认 ① 字母数字**无八角框**; ② 字体为加粗 Sthginkra。**⚠ 遗留 (待决策)**: `config.json` 的 `options.commandFont.sourcePath` 仍指向那份 `.otf` (现被闸门拒绝 ⇒ 静默跳过, 字体保持现状), UI 仍显示该路径; 另「选了就立刻生效」尚未达成 —— 字体在 exe 启动时**只读一次**, 换字体后仍须重启命令框进程。 |
 | 2026-09-21 | **命令框字体「保存即生效」+ 提供可直接选用的 .ttf 字体** (承接同日报障修复; 用户要求「转成 .ttf, 另一个也要做」)。**① 转换 `.otf` → `.ttf`**: 用已固化的 `tools/font_otf2ttf.py` 把 `D:\UserData\Downloads\Sthginkra.otf` (CFF) 转为 `D:\UserData\Downloads\Sthginkra.ttf` (10,511,648 B, 33072 字形, `sfntVersion` `OTTO`→`00010000`, glyf 轮廓, 元数据 `usWeightClass 400→700` / `fsSelection 0x01C0→0x01A0`, 丢弃失效 `DSIG`, 耗时 19s, 工具自报 `reload OK`); 另把仓库当前生效的加粗版复制为 `D:\UserData\Downloads\Sthginkra-Bold.ttf` (`b6f98778…`, 21,174,484 B) 供用户按喜好选用。**转换可复现性实测**: 与部署树的历史细体备份 `font.ttf.bak-sthginkra-thin` 逐表比对 —— **15 个表集合完全相同, 仅 `head` 表校验和不同** (该表含修改时间戳: `head.modified` 3872795517 vs 3872753866; `head.created` 两者相同), 文件大小一致 ⇒ **内容逐表一致, 差异纯为构建时间戳**; 故新文件 SHA (`38c723db…`) 与历史记录 (`d758c7b4…`) 不同属**预期**, 非缺陷。**② 字体「保存即生效」自动化**: 此前保存配置只重启引擎 (`proc.ExecCmd("./KeyFlux.exe")`), 而 `KeyFlux-CommandInput.exe` 是**独立进程且仅在启动时读一次 `font.ttf`** ⇒ 新字体不生效 —— 这是用户「选了没效果 / 区别不大」的根因之一。**落地**: ① 新增 `proc.StopProcessByName(name)` —— 按镜像名 `taskkill /F /IM` 结束进程, **进程不存在 (退出码 128) 视作成功** (幂等, 覆盖"用户从未唤起过命令框"这一正常情形); ② 新增 `script.CommandFontFromConfigFile(path)` —— 读已落盘 config.json 的 `options.commandFont` 段, 任何读取/解析失败一律返回**零值** (零值 ≠ 用户的非空选择 ⇒ "读不到旧配置"被判为"字体变了", 走保守分支: 宁可多重建一次, 不可漏生效); ③ 把 `script.ConfigRelPath` 抽为配置落点的**单一真源** (`SaveConfigFile` 与读取端共用 —— 两处各自硬编码一旦分叉, 会产生「读错文件 ⇒ 恒判未变 ⇒ 新字体永不生效」的静默缺陷); ④ `server.SaveConfigHandler` 在**覆盖写之前**记下旧字体段, 落盘后若与新的**不相等**则结束命令框进程 —— 引擎随后本就重启并重新生成脚本 (新字体已落到 `bin/font/font.ttf`), 命令框在用户下次唤起时用新字体重建。**关键取舍**: 只判「字体段是否变化」而**非每次保存都杀** —— 避免让用户无谓付出重建 DirectWrite 私有字体集合的代价。**测试**: 新增 `font_test.go::TestCommandFontFromConfigFile` 5 例 (正常读出 / 文件缺失退化 / JSON 非法退化 / 缺 options 段退化 / 零值≠用户选择) ⇒ 字体相关用例共 **16/16 全绿**。**门禁**: `go build ./...` 与 `go vet ./...` clean; `make check sync-out` 全绿 (check-hooks **75/75** / lint CLEAN / check-texttypes / GenerateAHK + `/Validate` / ORACLE DIFF PASS), patch 步骤在 robocopy 后自动重施 (`original` → `patched`)。**格式闸门在真实流程中生效的旁证**: 本次 `check` 用**部署树的 config.json** (其中 `commandFont.sourcePath` 仍指向那份 `.otf`) 跑 GenerateAHK ⇒ CFF 被拒绝、字体未被污染, 部署树 `font.ttf` 复核仍为 `b6f98778…` (glyf, 21,174,484 B)。产物: `bin/settings.exe` `4708a7bc…`、`bin/font/font.ttf` `b6f98778…`、patched exe `2aed3232…`, **两侧 SHA 一致**。**契约**: §3.11.1 硬约束 7 补「✅ 已自动化」段 (机制 + 幂等口径 + 保守分支依据 + 单一真源 + 守门人), 变更记录本行。 |
 | 2026-09-21 | **「命令框字体」卡并入「命令框皮肤」卡 + 皮肤纳入「保存即生效」** (承接同日两条; 用户要求「按你的建议修改, 并把命令框字体选项框整合进该选项框中」)。**① 皮肤纳入保存即生效**: 把上一轮为字体加的自动重启触发条件由「仅 `options.commandFont` 变化」扩展为「`options.commandFont` **或** `options.commandInputSkin` 变化」。实现上把 `script.CommandFontFromConfigFile` 升级为 `script.CommandBoxAppearanceFromConfigFile`, 返回 `CommandBoxAppearance{Font, Skin}` **一次读取的快照** (避免两次读取撕裂, 且两段生效条件本就一致); `SaveConfigHandler` 落盘前记快照、落盘后**任一段**不等即 `proc.StopProcessByName("KeyFlux-CommandInput.exe")`。**依据 (皮肤读取时机的动态实证)**: 用 Windows 托管的最后访问时间 (`fsutil behavior query disablelastaccess` = `2`) 做无侵入实验 —— 单独启动命令框 exe 后 `CommandInputSkin.txt` 的 `LastAccessTime` **在启动后 0.1s 前进, 之后 10s 观察窗内不再变化**, 进程全程存活 ⇒ **exe 只在启动时读一次皮肤, 与 `font.ttf` 完全同源** ⇒ 改皮肤同样必须重启命令框进程 (此前保存只重启引擎, 故改皮肤看不到效果, 用户据此提问「皮肤卡是否还有用」)。**② 卡片合并**: 删除「选项」页右列原有的独立「命令框字体」卡, 把其控件 (只读路径框 + 「选择…」+「恢复默认」+ 字重 `ComboBox`) 移入「命令框皮肤」卡的 `sectionBody`, 以 1px `ClaudeBorderCreamBrush` 细分隔线分组, **共用 `ShowSkin` 分区开关**; VM 侧删除 `ShowCommandFont` 字段与 `ToggleSection` 的 `"commandfont"` 分支 (wasOpen/重置/case 三处), AXAML 删除为该卡添加的 `nth-child(12)` 入场级联档 (卡片数 11→10, 回到 `nth-child(2..11)` 十档)。**合并理由**: 两者同属「命令框外观」且**生效条件完全相同**, 分成两张卡会让用户误以为生效时机不同。**③ 顺带订正文档笔误**: §3.11.1 原写皮肤「恰好 19 键」**实为 18** (键名清单 / `DefaultCommandInputSkin()` / `OptionsDTO.CommandInputSkin` / `CommandInputSkin.tmpl` 四处一致, 且 `skin_defaults_test.go` 硬断言字段数), 已订正并写明依据。**④ 记录一个新发现的既有风险 (本次不修)**: `sync-out` 的 robocopy 会用仓库侧旧默认覆盖部署树的 `CommandInputSkin.txt` —— 隔离目录实测: 源比目标旧时 robocopy 把源标为「较旧的」**却仍然复制** (复制 1 / 跳过 0)。**但影响是暂时性的**: 该文件是**派生产物**, 引擎每次启动都由 `GenerateScripts` 从 config.json 重新渲染, 下次引擎重启即自愈 (与 exe patch 的永久覆盖不同, 那个没有自愈路径)。**测试**: Go 侧 `TestCommandBoxAppearanceFromConfigFile` 扩为 **6 例** (新增「皮肤改动可被检出」—— 若两快照相等则皮肤改动永远不会触发结束命令框进程, 正是本改动的核心守门点); `go build` / `go vet` clean; C# 侧 `MotionSmokeTests` 的 `sectionBody` 计数 **9→8** (并注明 09-20 增卡 / 09-21 并卡的历史)。**门禁**: `dotnet build` 0 错误; `dotnet test` **303 总 / 281 通过 / 22 失败** —— 22 条为既有的 endpoint 契约用例 (缺 `%TEMP%\mk_settings_headless\settings.exe` 前置产物), 与基线逐条一致, **无回归**。**契约**: §3.11.1 皮肤段补「读取时机实证 + 并卡理由 + robocopy 覆盖风险」，字体段「写入端」由「独立字体卡」改为「皮肤卡内的字体小节」, 硬约束 7 扩展为「字体与皮肤都只在进程启动时读取一次」+ 外观合并判定 + 守门人 6 例, 键数笔误订正, 变更记录本行。 |
+| 2026-09-21 | **修复 i18n 键 2517/2518 被误复用 (真实 UI 文案回归) + 字重变体可复现构建** (承接同日「字重档位真实生效」; 用户报障「字重下拉显示命令框皮肤」暴露的第一类问题的**同类残留**, 本次自查发现)。**① i18n 键撞车 (静默覆盖, 已在破坏 UI 文案)**: 字重 5 档的标签键首版用了 **2517/2518**, 而这两个键**早已被 `Views/SelectedActionPageView.axaml` 占用** —— 2517 = 自定义文本类型留桩提示条文案「该类型暂无专属行为，当前可用行为来自通用文本类型」, 2518 = 其跳转按钮「创建专属行为」。因 JSON **后定义覆盖前定义**, 加入字重键后这两处 UI 文案被**静默**改成了「极细」/「细」, 且键数虚增 (文件里 405 个定义, 但 `json.load` 解析后仅 **403** 个有效键)。根因是我把"看似空闲"的键号当成了空洞 —— 它们实际位于 `2500/2501/2502` 之后、`2519/2520` 之前, 与字重段**交错**。**修法**: 字重 thin/light 迁到经查证的真实空洞 **`2526`** (极细/Thin) 与 **`2549`** (细/Light); 删掉尾部覆盖性的 `2517`/`2518` 重定义; `SettingsPageViewModel.FontWeights` 改用新键并在注释里写死"741/2517/2518 均属别的文案域, 不可复用"。**② 可复现构建 (工具缺陷)**: `tools/font_weight_prebake.py` 初版每次烘焙产出不同 SHA —— 根因是 fontTools 的 `head.compile` 内有 `if ttFont.recalcTimestamp: self.modified = timestampNow()`, 默认 `True` 会用**保存时刻**覆盖 `head.modified` (实测两次独立烘焙仅差 **6 字节**, 全在 `head` 表)。这使变体无法用 SHA 断言/**门禁校验**, 部署也不可复现。**修法 (三工具同口径)**: `font_weight_prebake.py` / `font_embolden.py` / `font_weight_meta.py` 统一置 `f.recalcTimestamp = False` + 用**源字体的 `modified` 原值**填回 (`_source_modified()` 助手, 源异常回落 0) ⇒ 输出纯粹是输入的函数。**验证**: ① 两次独立烘焙 4 档变体 **SHA 全同**; ② 新产物与旧产物**逐表比对——除 `head` 外 13 表字节全同**, 证实修复不改字形, 只归一化时间戳。**③ 变体重烘焙 (用户批准)**: 用可复现方式重新生成 Downloads 下 4 个变体 (`c0e46bfd…` / `8112f389…` / `f805eff0…` / `40f4c4ba…`), 旧文件已备份至 `%TEMP%\kf_font_bak_20260921`。**④ 端到端复验 (真实字体 5 档全过)**: 临时 Go 用例 `TestE2E_RealFontAllTiers` 调 `InstallCommandFont` 真链路, 5 档落地 SHA 逐一对应 (thin `c0e46bfd…` / light `8112f389…` / regular `598f6226…`= 源本体 / semibold `f805eff0…` / bold `40f4c4ba…`), sfnt 签名均为 `0x00010000` 真 TrueType; 用后即删。**⑤ 门禁与部署**: Go `build`/`vet` clean, `gofmt` 无输出; `make buildServer` 重建后端 (13553664 B) 并补齐 `%TEMP%\mk_settings_headless\settings.exe` 前置产物后 **C# `dotnet test` 305/305 全绿** (303→305, 新增 2 例即本轮的重复键守卫生效), `dotnet build` 0 报错, `make analyzers` 双项目 exit 0; `make check` 全绿 (check-hooks 75/75 / lint CLEAN / check-texttypes / GenerateAHK + `/Validate` / ORACLE DIFF PASS); `make buildClientAvalonia` 后 `make sync-out` 完成 (patch 自动重施 `original`→`patched`)。**四产物 SHA 两侧全 MATCH**: `settings.exe 320986aa…` / `KeyFlux.Settings.dll a053c8a3…` / `i18n.json 4b670df9…` / `KeyFlux.ahk 279715a4…`; 部署树 i18n 复核 **405 键、零重复**, 2517/2518 **已恢复原意**, 下拉 5 档标签解析为「极细/细/常规/半粗/粗体」。**字节级验证**: DLL 内搜得新键 `2526`×11 / `2549`×4 (旧 `2517`×5 / `2518`×4 亦在, 因留桩提示条仍用它们)。**契约**: §3.11.1「写入端」段新增「UI 文案键必须查证为空闲」硬警示 (含**加键前必做两查**: 键是否已存在 + 行内计数 vs JSON 解析计数比对), 「烘焙工具」段补「可复现构建」条目 (附 `recalcTimestamp` 根因与逐表比对结论); 变更记录本行。**⚠ 待用户验证**: 需手动启动部署树 `KeyFlux.exe` (UAC 限制), 确认 ① 设置页「选项 → 命令框皮肤」卡内字重下拉显示「极细/细/常规/半粗/粗体」而非「命令框皮肤」; ② 切换到不同档位并保存后, 命令框笔画粗细**真的变化**; ③ 选「自定义文本类型」时留桩提示条文案正常 (不再显示「极细」)。 |
+| 2026-09-21 | **命令框字体改定 Sarasa Gothic SC (抽 face + 激进裁剪 + 5 档重烘焙) + 字体选择即时校验提示** (承接同日「字重档位真实生效」; 用户报障「我选中了其他字体，可是感觉还是没什么区别啊。而且粗细的变化也跟没有一样」)。**① 根因确认 (用户的选择被静默跳过)**: 部署树 `data/config.json` 里 `commandFont` = `{sourcePath: "D:\\UserData\\Downloads\\更纱黑体_SC-v1.0.40\\Sarasa-ExtraLight.ttc", weight: "thin"}`, 但部署树 `bin/font/font.ttf` 复核仍是上一轮烘焙的 inpin 变体 —— 原因是 `.ttc` 为 **83 MB** > `FontMaxBytes` (32 MiB), `InstallCommandFont` 返回描述性错误后**被两处调用点刻意丢弃** (`_ =`), 于是全程静默 ⇒ 用户「选了跟没选一样」。**这条链路上没有任何一个环节会告诉用户为什么** —— 是本轮要根治的**设计缺陷**。**② 抽 face (用户批准「抽出 Sarasa Gothic SC」)**: Sarasa 把 6 风格 × 8 语言区共 **48 个 face** 打进单个 ~80 MB 文件, 而命令框 exe 只用 **第一个 face** —— 实测 face[0] = `Sarasa Gothic CL` (古典拉丁, **无简体中文字形**) ⇒ 直接选 `.ttc` 即使不超限也拿不到中文字。新增 **`tools/font_ttc_extract.py`** (`--list` 列全部 face / `--family "Sarasa Gothic SC"` 或 `--index N` 抽单 face), 抽出 face[1] = `Sarasa Gothic SC` (44,954,636 B, upem 1000, 48741 字形, 20992 CJK 统一汉字, glyf 轮廓)。**③ 激进裁剪 (用户批准「只保留简体中文常用区」)**: 44.9 MB 仍超限, 新增 **`tools/font_subset.py`** (Basic Latin→Fullwidth Forms + CJK 统一汉字基本区 U+4E00-9FFF; 排除 Ext-A/Ext-B+/CJK 兼容区) ⇒ **7,211,968 B (6.9 MiB)**, 24362 字形, 关键字符抽样全命中。**④ 源字体从 XLight 改用 Regular (关键决策)**: 首次用 XLight 源烘焙 5 档后**光栅化实测定序失败** —— r=−10 只剩 **46.9%** 墨迹, 反而比 r=−20 的 68.0% **更细** (腐蚀过猛已毁笔画, `令` 字 32px vs 96px)。改用 `Sarasa-Regular.ttc` 的 face[1] (45,149,496 B → 裁剪 7,146,908 B) 并做元数据对齐 (`usWeightClass 400→700` / `fsSelection 0xc0→0xa0` / `macStyle 0x0→0x1`) ⇒ `SarasaGothicSC-Reg.w700.ttf`。**⑤ 修 `PathOpsError` (工具健壮性)**: r=+28 时 skia-pathops 布尔并集对**退化轮廓**失败, 逐字形扫描定位到**仅 `uni57F3` 一个字形** (r=+14 全通过)。若因此中止则整档 `bold` 都拿不到 —— 代价与收益完全不成比例。`bake_one` 改为逐个字形捕获异常并**保留原轮廓** (该字形不加粗, 与邻居差 1 档以内), 计数回报; 新增 `UNSAFE_RATIO_MAX = 1%` 闸门 (超限才丢弃该档, 防「大面积退化却仍落盘」)。**⑥ 5 档烘焙 + 单调性实证**: thin −20 / light −10 / regular 0 / semibold +14 / bold +28 ⇒ 44px 实测 `thin 0.45x / light 0.71x / regular 1.00x / semibold 1.43x / bold 1.85x`, **严格单调递增**, 相邻增幅 29~58%, 总跨度 **+312%** ⇒ 每档肉眼可辨 (对比旧 4 档中→半粗仅 +3.0%)。**⑦ 端到端链路复验 (真实字体走真 Go 路径)**: 临时 Go 探针逐档调 `InstallCommandFont`, 5 档落地 SHA 与源变体**逐一对应** (thin `f4b7a3a3…` / light `917e03cc…` / regular `f8215778…` / semibold `6ce7cc18…` / bold `65c9d59c…`), 未知字重回落 regular 亦验证; 用后即删。5 档元数据复核全部 `glyf` + `usWeightClass=700` + `fsSelection=0xa0` + `macStyle=0x1` + 族名 `Sarasa Gothic SC` 保留 (⇒ **无 BOLDSIM 合成加粗**, 中文不糊)。**⑧ 新增「选择即时校验提示」(根治无反馈缺陷)**: 新增 `Models/CommandFontValidator.cs` 把生成端判据**前移到 UI 选择时刻** —— 体积 (>32 MiB) / sfnt 签名 (`0x00010000`·`true` 通过, `OTTO` 拒绝, `ttcf` 看首 face) / 可读性, 结论 + 原因**当场显示**在字体小节下方提示条 (AXAML `Border.noticeBanner` 两态: `.err` 暖红 = 不可用, 默认米色 = 可用但有注意点)。新增 i18n **5 键** (2588 超 32MB / 2589 轮廓不支持 / **2590 字体集合只用首个 face (唯一带占位符 `{0}`)** / 2591 已选定重启生效 / 2592 无法读取), `I18n.T` 增 `params object[]` 重载 (格式化失败**回退模板不抛异常**, 防界面崩溃), `ExpectedKeyCount` 405→**410**。🔴 **启动时不做复检** —— 配置里的路径很可能指向已删除/超限的文件 (正是用户上次踩的坑), 载入即弹告警会让用户每次打开设置都看到无法消除的提示 (噪声); 只在**用户主动选择**时给结论。**⑨ 落地**: `bin/font/` 同步 5 文件 (`font.ttf` + `.thin/.light/.semibold/.bold`), 部署树⇄源 **SHA 全 MATCH**; 原 `font.ttf` 备份为 `font.ttf.bak-prev-sarasa`; `data/config.json` 的 `commandFont` 更新为 `{sourcePath: "…\\SarasaGothicSC-Reg.w700.ttf", weight: "regular"}`。**门禁**: Go `build`/`vet` clean, `go test ./internal/script/` 字体用例 **18/18 全绿** (唯一红为既有基线 `TestGoldenKeyFluxAHK` 的 `CommandImeGuard.ahk` include 顺序); `make buildServer` 重建后端 (13553664 B) 并补齐 `%TEMP%\mk_settings_headless\settings.exe` 后 C# `dotnet test` **324/324 全绿** (305→324, 新增 19 例 = `CommandFontValidatorTests` 逐字节固定签名判定 + 32 MiB 限值与 Go 常量绑定 + 畸形 ttc 不越界读), `dotnet build` 0 错误。**契约**: §3.11.1「字重档位机制」补 4 条硬条目 (退化字形失败保原样 + `UNSAFE_RATIO_MAX` / 两个新工具 + 用途 / **半径不可跨字体照抄** (XLight 反例) / 精确墨迹实测数据), 「写入端」补「选择即时校验提示」段 (含判据同口径警示 + 启动不复检理由) 与「`.ttc` 只用第一个 face」条; 标题补「当前字体是仓库基线」提示 (用户部署树字体必然不同属预期); 变更记录本行。**⚠ 待用户验证**: 手动启动部署树 `KeyFlux.exe` (UAC 限制) 后确认 ① 命令框中文显示 Sarasa 且字形正常; ② 切换字重档位 + 保存后笔画**真的变化**; ③ 在设置里再选一个 `.ttc`/超大文件时**能看到**提示条与原因。**⚠ 未清临时目录 (待批准)**: `D:\tmp\kf_prebake_verify` / `D:\tmp\kf_r1` / `D:\tmp\kf_r2`。 |
+| 2026-09-21 | **半粗设为默认字重 + 固化进「恢复默认」按钮 + 字体卡排版调整** (承接同日「命令框字体改定 Sarasa Gothic SC」; 用户要求「把当前设置的字体设置为默认字体，粗细要确保一致」)。**① 默认值口径订正 (`ConfigReadDefaults.DefaultCommandFontWeight`)**: 由 `regular` 改为 **`semibold`**。依据 = 用户实际在用的档位就是半粗 (部署树 `data/config.json` 实测 `weight:"semibold"`), 而原默认值 `regular` 会让「配置缺段」与「显式选了半粗」落到**不同笔画** —— 用户无法预期「为什么删了配置段字体就变细了」。新口径 = **默认值必须与用户实际在用的档位一致**。该常量**一处定义、三处生效** (刻意的单真源): ① 配置缺段时的读取默认值; ② `NormalizeFontWeight` 对非法值的回落; ③ `ResetCommandFont` 的落点。**② 与 Go 侧刻意"不同口径"(非缺陷, 已在两侧注释互相点名)**: Go `script.NormalizeFontWeight` 的回落**仍为 `regular`**。职责不同 —— C# 常量是「UI 层默认值」(用户在界面上看到并保存的就是它), Go 回落是「最后兜底」(仅在配置出现**未知档位名**时生效, 正常路径 UI 不可能写出这种值 ⇒ **正常路径两侧表现一致**: UI 写 `semibold` ⇒ Go 读到已知档位直接透传)。且 Go 侧**不知道用户选了什么源字体**, 回落中性档才不会在某些字体上把 CJK 字腔填死 (实测 Sarasa r=+28 把「令」的字腔压到 32px)。**③ 排版调整 (`SettingsPageView.axaml`)**: 字重 `ComboBox` 由「字体文件」行**下方**移到**上方** —— 字重是日常调节项 (5 档可点), 而字体文件路径是低频设置项 (选完基本不动), 且默认字重既已固定为半粗, 把「最可能需要动的控件」放在最上更符合操作频次。**④ 清掉 3 处过时注释**: 卡片注释与 VM 两处仍写「字重仅作记录 / 不参与渲染」—— 该说法在「字重档位真实生效」那一轮就已失效 (5 档为**独立预烘焙变体文件**, 通过 `VariantPath` 真实替换), 留着会误导后续维护者; 统一改写为「5 档为预烘焙变体, 默认 = 半粗」。**⑤ 测试**: `CommandFontContractTests` 新增 **`DefaultWeight_IsSemibold`** 钉死用例 (同时断言常量、缺段默认值、`NormalizeFontWeight(null)` 三处均为 `semibold`) + `NormalizeFontWeight_FallsBackToDefault_OnInvalid` 的 Theory 数据由 `regular` 改 `semibold` (null / "" / "REGULAR" / "ultra-black" / "medium")。**⑥ 验证 (端到端)**: ① 5 档变体文件解析实测 —— `semibold` → `SarasaGothicSC-Reg.w700.semibold.ttf` (SHA `6ce7cc18…`), 与部署树现行 `font.ttf` **同 SHA**; thin/light/bold 各自命中, `regular`/未知/空 → 源字体本体; ② 5 档元数据复核全部 `usWeightClass=700` + `fsSelection=0xa0` (WWS 置位, italic/regular 清零) + `panose.bWeight=8` + `macStyle.bold=1` + 24362 字形 ⇒ **无 BOLDSIM 合成加粗**; ③ **真实光栅化 44px 定序** (样本「命令框字重键盘映射」): `thin 0.38x / light 0.69x / regular 1.00x / semibold 1.36x / bold 1.77x`, **严格单调递增**, 相邻步进 +80.7% / +45.0% / +36.3% / +29.9%, 总跨度 **+363.6%**。**⑦ 门禁**: Go `gofmt` 修掉一处 `font.go` 注释缩进被 gofmt 判为代码块的**真实**格式问题 (CRLF 假阳性已用 `tr -d '\r'` 到真实路径复核区分), `go test ./internal/script/` 字体用例 **18/18 全绿**; `make buildServer` 重建后端 (`73b9b505…`) 并同步 `%TEMP%\mk_settings_headless\` 与部署树**三处同 SHA** ⇒ C# `dotnet test` **325/325 全绿** (324→325, 新增本轮的默认字重钉死例), `dotnet build` 0 错误, `make analyzers` 双项目 exit 0, `make check` 全绿 (check-hooks 75/75 / lint CLEAN / check-texttypes / GenerateAHK + `/Validate` / **ORACLE DIFF PASS**)。**⑧ 部署树同步 (发现并修正一处漂移)**: 仓库 `bin/font/` 居然只有一枚 **Sep 20 的陈旧 21MB `font.ttf`**, 4 个 Sarasa 变体**只存在于部署树** —— 正是 §3.11.1 早已记录的硬约束 (`sync-out` 的 robocopy 白名单**不含 `*.ttf`** ⇒ 换字体必须**手动同步两侧**)在上一轮只做了一半的后果。本轮补齐: 把部署树 5 文件复制回仓库 `bin/font/`, 双侧 **5 产物 SHA 全 MATCH** (`font.ttf` `6ce7cc18…` / thin `f4b7a3a3…` / light `917e03cc…` / semibold `6ce7cc18…` / bold `65c9d59c…`)。**⑨ 顺带修掉一个 sync-out 卡死**: `make sync-out` 在 `bin/` 那一趟 robocopy 上**挂死 37 分钟** (RSS 冻结在 6,400 K 达 60s 不动, 非机械硬盘慢)。放弃等待后改为**逐产物定向复制** (`settings.exe` / 5 字体 / `KeyFlux.ahk`), 并重跑 `make check-commandinput-patch` 确认 keycap patch 仍在位 (`0x1cca0` = `patched`, 部署树 exe SHA `2aed3232…` 未被 robocopy 冲掉)。**四产物两侧 SHA**: `settings.exe 73b9b505…` / `KeyFlux.Settings.dll 3519a608…` / `i18n.json ac9b6359…` / `KeyFlux.ahk 279715a4…`。**⚠ 待用户验证**: 手动启动部署树 `KeyFlux.exe` (UAC 限制) 后确认 ① 设置页「命令框皮肤」卡内**字重下拉在最上**、显示「半粗」; ② 点「恢复默认」后字重**回到半粗** (而非常规); ③ 切换档位并保存后命令框笔画**真的变化**。 |

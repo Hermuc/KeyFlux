@@ -368,9 +368,10 @@ public sealed class Options
 /// 注意命令框只接受 glyf (TrueType) 轮廓, CFF/OTF 源须先转换。
 /// </para>
 /// <para>
-/// <b>Weight</b> = 字重档位 ("regular"/"medium"/"semibold"/"bold"), <b>当前仅作记录</b>:
-/// exe 硬编码请求 <c>DWRITE_FONT_WEIGHT_BOLD(700)</c> 且不可改, 该值不参与渲染, 也
-/// 不触发 DirectWrite 合成加粗。改笔画粗细只能在字形上做 (轮廓膨胀)。详见 §3.11.1 硬约束 4。
+/// <b>Weight</b> = 字重档位 ("thin"/"light"/"regular"/"semibold"/"bold")。生成端据此从源
+/// 字体同目录挑一个预烘焙变体 (<c>tools/font_weight_prebake.py</c> 产出) 再复制成
+/// <c>bin/font/font.ttf</c>。exe 硬编码请求 <c>DWRITE_FONT_WEIGHT_BOLD(700)</c> 且不可改,
+/// 档位差异只能体现在字形轮廓上。详见 §3.11.1。
 /// </para>
 /// <para>
 /// 纯配置 + 生成期消费项: 引擎运行时 (AHK) 不读取本段。之所以仍放 config.json 而不是
@@ -384,7 +385,7 @@ public sealed class CommandFontOption
     [JsonPropertyName("sourcePath")]
     public string SourcePath { get; set; } = "";
 
-    /// <summary>字重档位 ("regular"/"medium"/"semibold"/"bold")。当前仅作记录, 不参与渲染。</summary>
+    /// <summary>字重档位 ("thin"/"light"/"regular"/"semibold"/"bold")。决定生成端选用哪个预烘焙变体。</summary>
     [JsonPropertyName("weight")]
     public string Weight { get; set; } = "";
 }

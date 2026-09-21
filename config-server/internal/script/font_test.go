@@ -289,3 +289,256 @@ func TestCommandBoxAppearanceFromConfigFile(t *testing.T) {
 		}
 	})
 }
+
+// TestNormalizeFontWeight 覆盖字重档位规范化: 已知档位直通, 未知/空值回落 regular。
+//
+// 回落口径必须是**中性档**而非更粗的档位 —— 猜粗会在部分字体上把 CJK 字腔填死
+// (不可逆), 而 regular 只是"不膨胀", 永远安全。
+func TestNormalizeFontWeight(t *testing.T) {
+	for _, w := range []string{"thin", "light", "regular", "semibold", "bold"} {
+		if got := NormalizeFontWeight(w); got != w {
+			t.Fatalf("已知档位应直通: %q -> %q", w, got)
+		}
+	}
+	// 未知值 / 空串 / 大小写不符 / 历史遗留值一律回落 regular
+	// ⚠ "medium" 是已移除的旧档名, 必须回落而不是直通 (否则会去找不存在的变体)
+	for _, bad := range []string{"", "Bold", "BOLD", "medium", "heavy", "black", "700", "超粗"} {
+		if got := NormalizeFontWeight(bad); got != "regular" {
+			t.Fatalf("未知档位 %q 应回落 regular, 实得 %q", bad, got)
+		}
+	}
+}
+
+// TestVariantPath 覆盖变体路径推导: 命名约定, 去扩展名, regular 无变体。
+func TestVariantPath(t *testing.T) {
+	cases := []struct {
+		src, weight, want string
+	}{
+		{`D:\f\A.ttf`, "regular", ""},                               // regular 无变体
+		{`D:\f\A.ttf`, "thin", `D:\f\A.thin.ttf`},                   // 腐蚀细档
+		{`D:\f\A.ttf`, "light", `D:\f\A.light.ttf`},                 //
+		{`D:\f\A.ttf`, "semibold", `D:\f\A.semibold.ttf`},           //
+		{`D:\f\A.ttf`, "bold", `D:\f\A.bold.ttf`},                   //
+		{`D:\f\A.ttf`, "bogus", ""},                                 // 未知档位 -> regular -> 无变体
+		{`D:\f\A.ttf`, "medium", ""},                                // 旧档名 -> regular -> 无变体
+		{`/home/u/My Font.ttf`, "bold", `/home/u/My Font.bold.ttf`}, // 含空格
+		{`D:\f\noext`, "bold", `D:\f\noext.bold`},                   // 无扩展名
+	}
+	for _, c := range cases {
+		if got := VariantPath(c.src, c.weight); got != c.want {
+			t.Fatalf("VariantPath(%q,%q) = %q, 期望 %q", c.src, c.weight, got, c.want)
+		}
+	}
+}
+
+// TestInstallCommandFont_WeightVariant 覆盖字重档位对实际落地字体的选择:
+// 有变体用变体 / 变体缺失回落源字体 / regular 用源字体本体。
+func TestInstallCommandFont_WeightVariant(t *testing.T) {
+	sig := make([]byte, 4)
+	binary.BigEndian.PutUint32(sig, 0x00010000)
+
+	readTarget := func(base string) []byte {
+		b, err := os.ReadFile(filepath.Join(base, FontTargetRel))
+		if err != nil {
+			t.Fatalf("读取落点失败: %v", err)
+		}
+		return b
+	}
+	// 造一份内容可区分的"字体": 首 4 字节合法签名 + 填充字节标识来源
+	mk := func(t *testing.T, path string, tag byte) {
+		t.Helper()
+		writeFakeFont(t, path, sig, 64)
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := 4; i < len(b); i++ {
+			b[i] = tag
+		}
+		if err := os.WriteFile(path, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Run("有预烘焙变体时用变体", func(t *testing.T) {
+		base := t.TempDir()
+		src := filepath.Join(base, "A.ttf")
+		mk(t, src, 0xAA)                               // 源字体
+		mk(t, filepath.Join(base, "A.bold.ttf"), 0xBB) // 预烘焙的粗体变体
+
+		if err := InstallCommandFont(CommandFontOption{SourcePath: src, Weight: "bold"}, base); err != nil {
+			t.Fatalf("应成功, err=%v", err)
+		}
+		got := readTarget(base)
+		if got[4] != 0xBB {
+			t.Fatalf("应落地粗体变体 (tag 0xBB), 实得 0x%02X", got[4])
+		}
+	})
+
+	t.Run("变体缺失时回落源字体本体", func(t *testing.T) {
+		base := t.TempDir()
+		src := filepath.Join(base, "A.ttf")
+		mk(t, src, 0xAA) // 只有源字体, 没有 A.bold.ttf
+
+		if err := InstallCommandFont(CommandFontOption{SourcePath: src, Weight: "bold"}, base); err != nil {
+			t.Fatalf("应回落成功, err=%v", err)
+		}
+		got := readTarget(base)
+		if got[4] != 0xAA {
+			t.Fatalf("变体缺失应回落源字体 (tag 0xAA), 实得 0x%02X", got[4])
+		}
+	})
+
+	t.Run("regular 档用源字体本体", func(t *testing.T) {
+		base := t.TempDir()
+		src := filepath.Join(base, "A.ttf")
+		mk(t, src, 0xAA)
+		mk(t, filepath.Join(base, "A.semibold.ttf"), 0xCC) // 存在其它档变体, 但 regular 不该用它
+
+		if err := InstallCommandFont(CommandFontOption{SourcePath: src, Weight: "regular"}, base); err != nil {
+			t.Fatalf("应成功, err=%v", err)
+		}
+		got := readTarget(base)
+		if got[4] != 0xAA {
+			t.Fatalf("regular 应落地源字体 (tag 0xAA), 实得 0x%02X", got[4])
+		}
+	})
+
+	t.Run("腐蚀细档 thin/light 也走变体选择", func(t *testing.T) {
+		base := t.TempDir()
+		src := filepath.Join(base, "A.ttf")
+		mk(t, src, 0xAA)
+		mk(t, filepath.Join(base, "A.thin.ttf"), 0xDD)  // 腐蚀产出的极细变体
+		mk(t, filepath.Join(base, "A.light.ttf"), 0xEE) // 腐蚀产出的细变体
+
+		if err := InstallCommandFont(CommandFontOption{SourcePath: src, Weight: "thin"}, base); err != nil {
+			t.Fatalf("thin 应成功, err=%v", err)
+		}
+		if got := readTarget(base); got[4] != 0xDD {
+			t.Fatalf("thin 应落地 A.thin.ttf (tag 0xDD), 实得 0x%02X", got[4])
+		}
+
+		if err := InstallCommandFont(CommandFontOption{SourcePath: src, Weight: "light"}, base); err != nil {
+			t.Fatalf("light 应成功, err=%v", err)
+		}
+		if got := readTarget(base); got[4] != 0xEE {
+			t.Fatalf("light 应落地 A.light.ttf (tag 0xEE), 实得 0x%02X", got[4])
+		}
+	})
+
+	t.Run("未知字重回落 regular (源字体)", func(t *testing.T) {
+		base := t.TempDir()
+		src := filepath.Join(base, "A.ttf")
+		mk(t, src, 0xAA)
+		mk(t, filepath.Join(base, "A.bold.ttf"), 0xBB)
+
+		if err := InstallCommandFont(CommandFontOption{SourcePath: src, Weight: "超粗"}, base); err != nil {
+			t.Fatalf("应成功, err=%v", err)
+		}
+		got := readTarget(base)
+		if got[4] != 0xAA {
+			t.Fatalf("未知档位应回落 regular/源字体 (tag 0xAA), 实得 0x%02X", got[4])
+		}
+	})
+
+	t.Run("变体不是有效字体时回落源字体", func(t *testing.T) {
+		base := t.TempDir()
+		src := filepath.Join(base, "A.ttf")
+		mk(t, src, 0xAA)
+		// 变体存在但是垃圾内容 (无 sfnt 签名) —— 极易出现在用户手工替换文件后
+		if err := os.WriteFile(filepath.Join(base, "A.bold.ttf"),
+			[]byte("not a font at all"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := InstallCommandFont(CommandFontOption{SourcePath: src, Weight: "bold"}, base); err != nil {
+			t.Fatalf("应成功, err=%v", err)
+		}
+		got := readTarget(base)
+		if got[4] != 0xAA {
+			t.Fatalf("变体非法时应回落源字体 (tag 0xAA), 实得 0x%02X", got[4])
+		}
+	})
+}
+
+// TestInstallCommandFont_CollectionGuards 覆盖 .ttc 集合的两条"防损坏"判据。
+//
+// 为什么必须有: 这两条判据在 C# 侧 CommandFontValidator 里也有一份, 两边**必须同口径** ——
+// UI 说"可用"而生成端拒绝 (或反之) 会给出自相矛盾的反馈, 是最难排查的一类问题。
+// 回归背景 (2026-09-21): Go 侧原先只拒绝 numFonts==0, 且越界 offset 依赖 ReadAt 报错
+// 冒泡 (会被上层报成"读取失败"而非"格式不受支持"); C# 侧的 offset 判据又比必要值严
+// 1 字节。现两侧统一为: numFonts ∈ [1, 4096], offset ∈ (0, size-4]。
+func TestInstallCommandFont_CollectionGuards(t *testing.T) {
+	// 局部构造器: 声明偏移与实际文件尺寸**解耦** —— 既有 writeFakeTTC 把两者绑死,
+	// 造不出"声明越界"的样本。
+	write := func(t *testing.T, path string, numFonts uint32, declaredOff int) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("建测试目录失败: %v", err)
+		}
+		const realFaceOff = 28 // 12 字节头 + 4 字节偏移表 + 留白 (共 32 字节文件)
+		data := make([]byte, realFaceOff+4)
+		copy(data[0:4], "ttcf")
+		binary.BigEndian.PutUint32(data[4:8], 0x00010000) // version 1.0
+		binary.BigEndian.PutUint32(data[8:12], numFonts)
+		binary.BigEndian.PutUint32(data[12:16], uint32(declaredOff)) // 只改"声明", 不动文件尺寸
+		copy(data[realFaceOff:realFaceOff+4], "\x00\x01\x00\x00")
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatalf("写入测试字体集合失败: %v", err)
+		}
+	}
+
+	target := func(base string) string { return filepath.Join(base, FontTargetRel) }
+
+	reject := []struct {
+		name     string
+		numFonts uint32
+		off      int
+		wantMsg  string
+	}{
+		{"face 数超上限 (4097) 拒绝", 4097, 28, "face 数"},
+		{"声明偏移远超文件末尾拒绝", 1, 1 << 20, "越界"},
+		{"声明偏移为 0 拒绝", 1, 0, "越界"},
+	}
+	for _, c := range reject {
+		t.Run(c.name, func(t *testing.T) {
+			base := t.TempDir()
+			src := filepath.Join(base, "src.ttc")
+			write(t, src, c.numFonts, c.off)
+
+			err := InstallCommandFont(CommandFontOption{SourcePath: src}, base)
+			if err == nil {
+				t.Fatal("应被拒绝, 实得 nil")
+			}
+			if !strings.Contains(err.Error(), c.wantMsg) {
+				t.Fatalf("错误信息应含 %q: %v", c.wantMsg, err)
+			}
+			if _, err := os.Stat(target(base)); err == nil {
+				t.Fatal("被拒绝的集合不应产生目标文件")
+			}
+		})
+	}
+
+	accept := []struct {
+		name     string
+		numFonts uint32
+		off      int
+	}{
+		{"face 数上限边界 (4096) 接受", 4096, 28},
+		{"偏移恰好留 4 字节接受 (判据用 > 而非 >=)", 1, 28},
+	}
+	for _, c := range accept {
+		t.Run(c.name, func(t *testing.T) {
+			base := t.TempDir()
+			src := filepath.Join(base, "src.ttc")
+			write(t, src, c.numFonts, c.off)
+
+			if err := InstallCommandFont(CommandFontOption{SourcePath: src}, base); err != nil {
+				t.Fatalf("应被接受, err=%v", err)
+			}
+			if _, err := os.Stat(target(base)); err != nil {
+				t.Fatalf("应产生目标文件: %v", err)
+			}
+		})
+	}
+}

@@ -82,14 +82,39 @@ public sealed class CommandFontContractTests
         Assert.Equal(original.Weight, back.Weight);
     }
 
+    /// <summary>
+    /// 出厂默认字重 = **半粗** (2026-09-21 由 regular 改定, 用户要求「把当前设置的字体设置为
+    /// 默认字体, 粗细要确保一致」)。
+    ///
+    /// 🔴 这个值把三处行为绑在一起, 漏改一处即产生"默认值漂移": ① 配置缺段时的读取默认值;
+    /// ② <see cref="ConfigReadDefaults.NormalizeFontWeight"/> 的回落; ③ 「恢复默认」按钮落点。
+    /// 用户若从 UI 换档, 本断言会立刻红 —— 那是**提醒**去同步默认值, 而不是测试过时。
+    /// </summary>
+    [Fact]
+    public void DefaultWeight_IsSemibold()
+    {
+        Assert.Equal("semibold", ConfigReadDefaults.DefaultCommandFontWeight);
+
+        // ① 缺段补齐走同一常量
+        var config = new Config();
+        config.Options.CommandFont = null;
+        Assert.Equal("semibold", ConfigReadDefaults.Apply(config).Options.CommandFont!.Weight);
+
+        // ② 规范化回落走同一常量
+        Assert.Equal("semibold", ConfigReadDefaults.NormalizeFontWeight(null));
+        Assert.Equal("semibold", ConfigReadDefaults.NormalizeFontWeight("不存在的档位"));
+    }
+
     /// <summary>字重规范化: 空/未知值一律回退默认档, 合法档位原样保留 (边界情况)。</summary>
     [Theory]
-    [InlineData(null, "regular")]
-    [InlineData("", "regular")]
-    [InlineData("REGULAR", "regular")] // 大小写敏感 (值域是小写标识)
-    [InlineData("ultra-black", "regular")]
+    [InlineData(null, "semibold")]
+    [InlineData("", "semibold")]
+    [InlineData("REGULAR", "semibold")] // 大小写敏感 (值域是小写标识)
+    [InlineData("ultra-black", "semibold")]
+    [InlineData("medium", "semibold")] // 旧档名已移除, 必须回落而不是留脏值
+    [InlineData("thin", "thin")]
+    [InlineData("light", "light")]
     [InlineData("regular", "regular")]
-    [InlineData("medium", "medium")]
     [InlineData("semibold", "semibold")]
     [InlineData("bold", "bold")]
     public void NormalizeFontWeight_FallsBackToDefault_OnInvalid(string? input, string expected)
@@ -100,7 +125,7 @@ public sealed class CommandFontContractTests
     public void CommandFontWeights_Whitelist_MatchesUiOptions()
     {
         Assert.Equal(
-            new[] { "regular", "medium", "semibold", "bold" },
+            new[] { "thin", "light", "regular", "semibold", "bold" },
             ConfigReadDefaults.CommandFontWeights);
         Assert.Contains(ConfigReadDefaults.DefaultCommandFontWeight, ConfigReadDefaults.CommandFontWeights);
     }

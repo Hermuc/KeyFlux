@@ -12,8 +12,10 @@ public sealed record LanguageOption(string Title, string Value);
 
 /// <summary>
 /// 字重下拉条目: 值 = 落 config 的档位标识, 标签 = i18n 键 (语言变化时重算)。
-/// 命令框 exe 硬编码请求 BOLD(700), 当前该值<b>仅作记录</b>, 不参与渲染 —— 见
-/// CONTRACTS §3.11.1 硬约束 4。
+/// 该档位**真实生效** (2026-09-21 起): 生成端据此从源字体同目录挑一个预烘焙变体
+/// (<c>tools/font_weight_prebake.py</c> 产出) 再复制成 <c>bin/font/font.ttf</c>;
+/// exe 恒定请求 BOLD(700) 且元数据已精确匹配 ⇒ 无合成加粗, 笔画粗细 100% 由落地字形决定。
+/// 见 CONTRACTS §3.11.1「字重档位机制」。
 /// </summary>
 public sealed class FontWeightOption : ObservableObject
 {
@@ -25,7 +27,7 @@ public sealed class FontWeightOption : ObservableObject
         _labelKey = labelKey;
     }
 
-    /// <summary>落配置的值 ("regular"/"medium"/"semibold"/"bold")。</summary>
+    /// <summary>落配置的值 ("thin"/"light"/"regular"/"semibold"/"bold")。</summary>
     public string Value { get; }
 
     /// <summary>下拉显示名 (跟随语言刷新)。</summary>
@@ -333,17 +335,27 @@ public sealed partial class SettingsPageViewModel : ObservableObject
 
     /// <summary>
     /// 字重下拉候选 (值固定, 标签走 i18n)。
-    /// ⚠ <b>当前字重不参与渲染</b>: 命令框 exe 硬编码请求 <c>DWRITE_FONT_WEIGHT_BOLD(700)</c>
-    /// 且不可改; 元数据已与请求精确匹配 (无 BOLDSIM 合成加粗) ⇒ 无论选哪档,
-    /// 实际笔画粗细都由 <c>bin/font/font.ttf</c> 的<b>字形轮廓</b>决定, 与本次选择无关。
-    /// 故该控件目前是「显式记录 + 未来扩展落点」(见 CONTRACTS §3.11.1 硬约束 4)。
+    /// 档位**真实生效**: 生成端按所选档位挑一个预烘焙变体复制成 <c>bin/font/font.ttf</c>。
+    /// exe 硬编码请求 <c>DWRITE_FONT_WEIGHT_BOLD(700)</c> 且不可改, 但元数据已与请求精确匹配
+    /// (无 BOLDSIM 合成加粗) ⇒ 笔画粗细 100% 由落地的**字形轮廓**决定 ⇒ 换档即真实换粗细。
+    /// 出厂默认档 = <see cref="ConfigReadDefaults.DefaultCommandFontWeight"/> (半粗)。
     /// </summary>
     public IReadOnlyList<FontWeightOption> FontWeights { get; } =
     [
+        // 顺序即下拉顺序 (由细到粗)。落配置的 Value 必须与 Go 侧 script.FontWeightVariants
+        // 的 key 完全一致, 否则生成端认不出档位 -> 静默回落源字体。
+        // 🔴 键号必须用**真实空洞**。历史上这里误用过 "741"(实为「命令框皮肤」卡片标题)
+        // 和 "2517"/"2518"(实为 SelectedActionPage 的留桩提示条文案与「创建专属行为」按钮,
+        // 且因 JSON 后定义覆盖前定义, 直接把那两处文案改成了「极细」/「细」)。
+        // thin/light 现用空键 2526/2549 —— 查证方法见 I18nResourceTests 注释。
+        new FontWeightOption("thin", "2526"),
+        new FontWeightOption("light", "2549"),
         new FontWeightOption("regular", "2509"),
-        new FontWeightOption("medium", "2510"),
         new FontWeightOption("semibold", "2511"),
-        new FontWeightOption("bold", "741"),
+        // 🔴 key 必须用 2516「粗体 / Bold」。历史上这里误用过 "741" —— 那个键的真实
+        // 内容是「命令框皮肤 / Command Window」(卡片标题), 于是下拉显示成了
+        // 隔壁卡片的标题 (用户报障截图)。741 属别的文案域, 不可复用。
+        new FontWeightOption("bold", "2516"),
     ];
 
     /// <summary>
@@ -356,6 +368,15 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     /// <summary>显示用: 未选择时给占位文案 (i18n 2506), 否则显示完整路径。</summary>
     public string CommandFontDisplay =>
         string.IsNullOrWhiteSpace(CommandFontPath) ? I18n.T("2506") : CommandFontPath;
+
+    /// <summary>选定字体的即时校验提示 (空 = 无提示)。</summary>
+    [ObservableProperty] private string _commandFontNotice = "";
+
+    /// <summary>提示是否为**问题态** (决定 UI 用警示色还是中性色)。</summary>
+    [ObservableProperty] private bool _commandFontNoticeIsError;
+
+    /// <summary>是否有提示可显示 (供 AXAML 控制提示条可见性)。</summary>
+    public bool HasCommandFontNotice => !string.IsNullOrEmpty(CommandFontNotice);
 
     /// <summary>当前选中的字重条目 (对象形式供 ComboBox 双向绑定)。</summary>
     public FontWeightOption? SelectedFontWeight
@@ -382,6 +403,13 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             // 就地规范化: 配置被手改坏 / 旧版本写入未知档位时不留脏值 (与读取默认值同口径)
             f.Weight = ConfigReadDefaults.NormalizeFontWeight(f.Weight);
         }
+        // 🔴 启动时**不**复检已存路径。理由: 配置里的路径很可能指向一个已经不存在或
+        // 超限的文件 (正是用户上次踩的坑), 生成端会静默回落、命令框显示的是既有字体。
+        // 若在载入时就弹错误提示, 用户每次打开设置都会看到一条无法消除的告警 —— 噪声。
+        // 改为**只在用户主动选择时**给出结论 (见 OnCommandFontPathChanged), 那才是
+        // 需要解释"为什么没变化"的时刻。
+        CommandFontNotice = "";
+        CommandFontNoticeIsError = false;
     }
 
     /// <summary>把 UI 上的字体段写回配置 (缺段时按需新建)。</summary>
@@ -398,21 +426,53 @@ public sealed partial class SettingsPageViewModel : ObservableObject
         return f;
     }
 
-    /// <summary>路径变更后同步配置并刷新显示文本。</summary>
+    /// <summary>路径变更后同步配置并刷新显示文本与校验提示。</summary>
     partial void OnCommandFontPathChanged(string value)
     {
         CurrentCommandFont().SourcePath = value;
         OnPropertyChanged(nameof(CommandFontDisplay));
+        RefreshCommandFontNotice();
     }
 
-    /// <summary>「恢复默认」: 清空自定义路径 (沿用现有字体) 并把字重归位默认档。</summary>
+    /// <summary>重新评估当前所选字体, 更新提示条。空路径 = 未自定义, 清除提示。</summary>
+    private void RefreshCommandFontNotice()
+    {
+        if (string.IsNullOrWhiteSpace(CommandFontPath))
+        {
+            // 未自定义 -> 清除提示 (既不报错也不提示"已选")
+            CommandFontNotice = "";
+            CommandFontNoticeIsError = false;
+            return;
+        }
+
+        var r = CommandFontValidator.Validate(CommandFontPath);
+        CommandFontNotice = r.Message;
+        // 只有真正不可用 (超限/格式不支持/读不了) 才算错误态; "集合只用首 face" 是提醒,
+        // 用中性色 —— 否则用户会以为自己选错了。
+        CommandFontNoticeIsError = !r.Usable;
+    }
+
+    /// <summary>提示文本变化后同步可见性绑定。</summary>
+    partial void OnCommandFontNoticeChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasCommandFontNotice));
+    }
+
+    /// <summary>
+    /// 「恢复默认」: 清空自定义路径 (沿用现有 <c>bin/font/font.ttf</c>) 并把字重归位默认档
+    /// (<see cref="ConfigReadDefaults.DefaultCommandFontWeight"/> = 半粗)。
+    /// 注意"沿用现有字体"是指**不替换文件** —— 生成端因 sourcePath 为空而不动部署树的
+    /// <c>font.ttf</c>, 但字重仍会按默认档去源字体同目录找变体, 找不到就保持原样。
+    /// </summary>
     [RelayCommand]
     private void ResetCommandFont()
     {
-        CommandFontPath = "";
+        CommandFontPath = "";   // 触发 OnCommandFontPathChanged -> 清空提示
         var opt = CurrentCommandFont();
         opt.SourcePath = "";
         opt.Weight = ConfigReadDefaults.DefaultCommandFontWeight;
+        CommandFontNotice = "";
+        CommandFontNoticeIsError = false;
         OnPropertyChanged(nameof(SelectedFontWeight));
     }
 

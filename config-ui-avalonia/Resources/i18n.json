@@ -1571,6 +1571,26 @@
     "zh": "当前为空格",
     "en": "Current value: Space"
   },
+  "2588": {
+    "zh": "该文件超过 32 MB，命令框会忽略它并沿用当前字体。请改用体积更小的字体文件。",
+    "en": "This file exceeds 32 MB; the command box ignores it and keeps the current font. Please use a smaller font file."
+  },
+  "2589": {
+    "zh": "该文件的字形格式不受支持（仅接受 TrueType 轮廓）。.otf 等 CFF 轮廓字体无法用于命令框。",
+    "en": "This file's outline format is unsupported (only TrueType outlines are accepted). CFF-based fonts such as .otf cannot be used in the command box."
+  },
+  "2590": {
+    "zh": "已选择「{0}」，该字体集合同时包含多个语言版本；命令框只会使用其中的第一个版本。",
+    "en": "Selected \"{0}\". This font collection bundles several language variants; only the first one is used by the command box."
+  },
+  "2591": {
+    "zh": "字体已选定，重启命令框后生效。",
+    "en": "Font selected. Restart the command box to apply."
+  },
+  "2592": {
+    "zh": "无法读取该文件，可能已损坏或不是字体文件。",
+    "en": "Cannot read this file; it may be corrupted or not a font file."
+  },
   "2503": {
     "zh": "命令框字体",
     "en": "Command box font"
@@ -1599,12 +1619,20 @@
     "zh": "常规",
     "en": "Regular"
   },
-  "2510": {
-    "zh": "中等",
-    "en": "Medium"
-  },
   "2511": {
     "zh": "半粗",
     "en": "Semibold"
+  },
+  "2516": {
+    "zh": "粗体",
+    "en": "Bold"
+  },
+  "2526": {
+    "zh": "极细",
+    "en": "Thin"
+  },
+  "2549": {
+    "zh": "细",
+    "en": "Light"
   }
 }

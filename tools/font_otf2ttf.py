@@ -78,7 +78,11 @@ def convert(src, dst, weight=700):
 
 
 def fix_weight(f, weight):
-    """元数据对齐 exe 的 BOLD(700) 请求, 否则 DirectWrite 施加 BOLDSIM 合成加粗。"""
+    """元数据对齐 exe 的 BOLD(700) 请求, 否则 DirectWrite 施加 BOLDSIM 合成加粗。
+
+    本函数被 tools/font_weight_meta.py (纯元数据对齐工具) 复用 —— 保持"只改元数据,
+    不碰字形"的语义, 且不依赖本模块的 CLI 状态。改签名前先看那边的调用点。
+    """
     os2, head, post = f["OS/2"], f["head"], f["post"]
     print("weight: usWeightClass %d -> %d, fsSelection 0x%04X -> " % (
         os2.usWeightClass, weight, os2.fsSelection), end="")

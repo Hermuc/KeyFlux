@@ -142,7 +142,7 @@ public static class ConfigReadDefaults
         // 会被覆盖掉。故仅在整段缺失 (null) 时补默认。
         options.Acrylic ??= new AcrylicOption { Enabled = true, Transparency = 30 };
 
-        // 命令框字体: 缺段时补默认 —— 空路径 (沿用现有 bin/font/font.ttf) + 常规字重。
+        // 命令框字体: 缺段时补默认 —— 空路径 (沿用现有 bin/font/font.ttf) + 半粗字重。
         // 同 Acrylic, 只在整段缺失 (null) 时补, 不逐字段覆盖 (用户清空路径是显式选择)。
         options.CommandFont ??= new CommandFontOption
         {
@@ -155,17 +155,35 @@ public static class ConfigReadDefaults
         return config;
     }
 
-    /// <summary>命令框字体字重的出厂默认档位 (常规)。</summary>
-    public const string DefaultCommandFontWeight = "regular";
+    /// <summary>
+    /// 命令框字体字重的出厂默认档位 (**半粗**)。
+    ///
+    /// <para>
+    /// 2026-09-21 由 <c>regular</c> 改为 <c>semibold</c> (用户要求「把当前设置的字体设置为默认字体,
+    /// 粗细要确保一致」)。口径 = **默认值必须与用户实际在用的档位一致**, 否则「配置缺段」
+    /// 与「显式选了该档」会落到**不同的实际笔画**, 用户无法预期。
+    /// </para>
+    /// <para>
+    /// 该常量同时决定三处行为 (改一处即三处同步, 这是刻意的):
+    /// ① 配置缺段时的读取默认值; ② <see cref="NormalizeFontWeight"/> 对非法值的回落;
+    /// ③ 「恢复默认」按钮的落点。
+    /// </para>
+    /// <para>
+    /// ⚠ 与 Go 侧 <c>script.NormalizeFontWeight</c> 的回落值 (`regular`) **刻意不同口径**:
+    /// 那边只服务于「配置文件被手工改坏」的兜底, 不承担"出厂默认"语义, 且 Go 侧不知道
+    /// 用户选了什么源字体 —— 回落中性档才不会在某些字体上把 CJK 字腔填死。
+    /// </para>
+    /// </summary>
+    public const string DefaultCommandFontWeight = "semibold";
 
     /// <summary>
     /// 字重档位全量白名单 (与 UI 下拉项一一对应)。取值非法时回退
     /// <see cref="DefaultCommandFontWeight"/> —— 见 <see cref="NormalizeFontWeight"/>。
     /// </summary>
-    public static readonly string[] CommandFontWeights = ["regular", "medium", "semibold", "bold"];
+    public static readonly string[] CommandFontWeights = ["thin", "light", "regular", "semibold", "bold"];
 
     /// <summary>
-    /// 字重取值规范化: 空/未知值一律回退 <see cref="DefaultCommandFontWeight"/>。
+    /// 字重取值规范化: 空/未知值一律回退 <see cref="DefaultCommandFontWeight"/> (= 半粗)。
     /// 供 UI 载入配置时兜底 (配置文件被手工改坏 / 旧版本写入未知档位时不留脏值)。
     /// </summary>
     public static string NormalizeFontWeight(string? weight)

@@ -121,6 +121,29 @@ public static class I18n
         return k;
     }
 
+    /// <summary>
+    /// 翻译 + 占位符填充 (<c>{0}</c> <c>{1}</c> …)。
+    /// <para>
+    /// 用于"文案里嵌可变内容"的场景 (如提示"已选择「{0}」，该字体集合…")。占位符缺失或
+    /// 数量不匹配时**不抛异常** —— 直接回退到未填充的模板, 保证界面不因文案问题崩溃。
+    /// </para>
+    /// </summary>
+    public static string T(string? key, params object?[] args)
+    {
+        var template = T(key);
+        if (args.Length == 0) return template;
+        try
+        {
+            return string.Format(template, args);
+        }
+        catch (FormatException)
+        {
+            // 模板里的 {} 与参数不匹配 (译者误改 / 参数给错): 宁可显示带 {0} 的原文,
+            // 也不能让设置界面在切语言或选字体时崩掉。
+            return template;
+        }
+    }
+
     /// <summary>把 <see cref="Language"/> 设为 config 里的 language 字段值 (不触发 UI 时可直接调)。</summary>
     public static void ApplyConfigLanguage(string? configLanguage)
     {

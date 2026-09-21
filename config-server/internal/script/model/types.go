@@ -175,10 +175,10 @@ type Options struct {
 //     (GenerateScripts) 读取它并复制到 bin/font/font.ttf —— 命令框 exe 内烧录的
 //     UTF-16 字面量 `font\font.ttf` 是**唯一**字体来源, 见 CONTRACTS §3.11.1。
 //     ⚠ 命令框只接受 glyf (TrueType) 轮廓; CFF/OTF 源须先经 tools/font_otf2ttf.py 转换。
-//   - Weight = 字重档位 ("regular"/"medium"/"semibold"/"bold"), **当前仅作记录**:
-//     exe 硬编码请求 DWRITE_FONT_WEIGHT_BOLD(700) 且不可改 ⇒ 该值不参与渲染,
-//     也不触发 DirectWrite 合成加粗 (元数据精确匹配后无 BOLDSIM)。想改笔画粗细
-//     只能在字形上做 (tools/font_embolden.py 轮廓膨胀), 详见 CONTRACTS §3.11.1 硬约束 4。
+//   - Weight = 字重档位 ("thin"/"light"/"regular"/"semibold"/"bold")。生成端据此从源
+//     字体同目录挑一个**预烘焙变体** (见 script.FontWeightVariants / VariantPath) 再复制
+//     成 bin/font/font.ttf。exe 硬编码请求 DWRITE_FONT_WEIGHT_BOLD(700) 且不可改 ⇒
+//     档位差异只能体现在**字形轮廓**上 (构建期膨胀/腐蚀烘焙), 详见 CONTRACTS §3.11.1。
 //
 // 纯配置 + 生成期消费项: 引擎运行时 (AHK) 不读取本段。
 type CommandFontOption struct {
