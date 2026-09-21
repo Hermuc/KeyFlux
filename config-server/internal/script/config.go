@@ -135,6 +135,13 @@ func isQuickSwitchZero(q QuickSwitchOption) bool {
 		len(q.ExcludedPrefixes) == 0
 }
 
+// ConfigRelPath 运行时配置文件的落点 (相对进程 cwd, 即部署树的 bin/)。
+//
+// 单一真源: SaveConfigFile 写它, 保存处理器读它 (用于对比保存前后的命令框字体段,
+// 判定是否需要结束命令框进程让新字体生效)。两处若各自硬编码, 一旦分叉会导致
+// "读旧值读错文件 ⇒ 恒判为未变 ⇒ 新字体永不生效" 这类静默缺陷。
+const ConfigRelPath = "../data/config.json"
+
 func SaveConfigFile(config *Config) {
 	// 先写到缓冲区,  如果直接写文件的话, 当编码过程遇到错误时, 会导致文件损坏
 	buf := new(bytes.Buffer)
@@ -145,7 +152,7 @@ func SaveConfigFile(config *Config) {
 		panic(err)
 	}
 
-	if err := os.WriteFile("../data/config.json", buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(ConfigRelPath, buf.Bytes(), 0644); err != nil {
 		panic(err)
 	}
 }

@@ -197,7 +197,6 @@ public sealed partial class SettingsPageViewModel : ObservableObject
     [ObservableProperty] private bool _showPathVariables;
     [ObservableProperty] private bool _showCustomHotkeys;
     [ObservableProperty] private bool _showAcrylic;
-    [ObservableProperty] private bool _showCommandFont;
 
     [RelayCommand]
     private void ToggleSection(string? which)
@@ -212,12 +211,11 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             "pathvars" => ShowPathVariables,
             "customhotkeys" => ShowCustomHotkeys,
             "acrylic" => ShowAcrylic,
-            "commandfont" => ShowCommandFont,
             _ => false,
         };
         ShowMouseOption = ShowLanguageOption = ShowKeyboardLayout = false;
         ShowKeymapDelay = ShowSkin = ShowPathVariables = ShowCustomHotkeys = false;
-        ShowAcrylic = ShowCommandFont = false;
+        ShowAcrylic = false;
         if (wasOpen) return;
         switch (which)
         {
@@ -225,11 +223,12 @@ public sealed partial class SettingsPageViewModel : ObservableObject
             case "language": ShowLanguageOption = true; break;
             case "layout": ShowKeyboardLayout = true; break;
             case "delay": ShowKeymapDelay = true; break;
+            // 「命令框皮肤」卡同时承载皮肤 18 键与命令框字体小节 (2026-09-21 合并):
+            // 两者生效条件一致 (都需重启命令框进程), 故共用一个分区开关。
             case "skin": ShowSkin = true; break;
             case "pathvars": ShowPathVariables = true; break;
             case "customhotkeys": ShowCustomHotkeys = true; break;
             case "acrylic": ShowAcrylic = true; break;
-            case "commandfont": ShowCommandFont = true; break;
         }
     }
 

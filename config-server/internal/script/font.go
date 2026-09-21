@@ -2,6 +2,7 @@ package script
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -99,6 +100,45 @@ func InstallCommandFont(opt CommandFontOption, baseDir string) error {
 		return fmt.Errorf("命令框字体写入失败: %v", err)
 	}
 	return nil
+}
+
+// CommandBoxAppearance 命令框外观的两段配置 —— 字体 (options.commandFont) 与
+// 皮肤 (options.commandInputSkin)。
+//
+// 为何把两者并成一个快照: 它们的**生效条件完全相同** —— 命令框 exe 只在进程启动时
+// 读一次 `bin/font/font.ttf` 与 `bin/CommandInputSkin.txt` (DirectWrite 私有字体集合
+// 与皮肤参数在进程内常驻; 皮肤读取时机已于 2026-09-21 用文件最后访问时间实证:
+// 启动后 0.1s 读一次, 之后不再读)。故任一段变化后都必须结束命令框进程才能让新值可见
+// (契约 §3.11.1 硬约束 7)。一次读取也保证两段来自同一文件快照, 不会撕裂。
+type CommandBoxAppearance struct {
+	Font CommandFontOption
+	Skin CommandInputSkin
+}
+
+// CommandBoxAppearanceFromConfigFile 从**已落盘**的 config.json 读出命令框外观两段。
+//
+// 用途: 保存配置的处理器据此判断「外观是否真的变了」, 决定要不要结束命令框进程。
+//
+// 容错口径: 任何读取/解析失败一律返回**零值**。零值 (字体 SourcePath 为空 + 皮肤 18 键
+// 全空) 与用户的实际选择必然不等 ⇒ 「读不到旧配置」会被判成「变了」, 走保守分支
+// (结束命令框让其重建) —— 宁可多重建一次, 也不能漏掉生效。
+//
+// 与调用方约定: 必须在覆盖写 config.json **之前**调用, 否则读到的是新值。
+func CommandBoxAppearanceFromConfigFile(configPath string) CommandBoxAppearance {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return CommandBoxAppearance{}
+	}
+	var probe struct {
+		Options struct {
+			CommandFont      CommandFontOption `json:"commandFont"`
+			CommandInputSkin CommandInputSkin  `json:"commandInputSkin"`
+		} `json:"options"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return CommandBoxAppearance{}
+	}
+	return CommandBoxAppearance{Font: probe.Options.CommandFont, Skin: probe.Options.CommandInputSkin}
 }
 
 // samePath 判断两个路径是否指向同一个文件 (先做路径归一, 再比对 FileInfo 身份)。

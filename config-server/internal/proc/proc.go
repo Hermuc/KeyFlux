@@ -4,6 +4,7 @@
 package proc
 
 import (
+	"errors"
 	"log"
 	"os/exec"
 	"path/filepath"
@@ -58,4 +59,26 @@ func FallbackExecCmd(dir, exe string, args []string) bool {
 		return false
 	}
 	return true
+}
+
+// StopProcessByName 按镜像名强制结束进程 (Windows: `taskkill /F /IM <name>`)。
+//
+// 用途: 命令框 (`KeyFlux-CommandInput.exe`) 在**启动时只读一次** `bin/font/font.ttf`
+// (DirectWrite 私有字体集合在进程内常驻), 故换字体后必须结束旧进程才能让新字体生效。
+// 该进程**懒加载** —— 引擎只在用户下次唤起命令框时重建它, 因此结束它不会影响引擎
+// 或其他功能, 也无需立即重启。
+//
+// 进程不存在时视为成功 (幂等): taskkill 在找不到镜像时返回退出码 128, 这里显式放行,
+// 避免"用户从未唤起过命令框"这类正常情形被当成失败。
+func StopProcessByName(name string) bool {
+	err := exec.Command("taskkill", "/F", "/IM", name).Run()
+	if err == nil {
+		return true
+	}
+	var ee *exec.ExitError
+	if errors.As(err, &ee) && ee.ExitCode() == 128 {
+		return true // 无此进程, 幂等成功
+	}
+	log.Println("StopProcessByName:", name, "结束失败:", err)
+	return false
 }

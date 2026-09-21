@@ -217,3 +217,75 @@ func TestInstallCommandFont_FormatGate(t *testing.T) {
 		}
 	})
 }
+
+// TestCommandBoxAppearanceFromConfigFile 覆盖「读取旧配置的命令框外观两段 (字体+皮肤)」
+// 的容错口径 —— 该函数供保存处理器判定「外观是否真的变了」(决定是否结束命令框进程让
+// 新值生效), 故任何异常都必须安全退化为零值 (零值 ≠ 用户的实际选择 ⇒ 走保守分支,
+// 不会漏生效)。
+func TestCommandBoxAppearanceFromConfigFile(t *testing.T) {
+	write := func(t *testing.T, content string) string {
+		t.Helper()
+		p := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	t.Run("正常读出字体与皮肤两段", func(t *testing.T) {
+		p := write(t, `{"options":{`+
+			`"commandFont":{"sourcePath":"D:\\fonts\\A.ttf","weight":"bold"},`+
+			`"commandInputSkin":{"backgroundColor":"#123456","windowWidth":"480"}}}`)
+		got := CommandBoxAppearanceFromConfigFile(p)
+		if got.Font != (CommandFontOption{SourcePath: `D:\fonts\A.ttf`, Weight: "bold"}) {
+			t.Fatalf("字体段不符: %+v", got.Font)
+		}
+		if got.Skin.BackgroundColor != "#123456" || got.Skin.WindowWidth != "480" {
+			t.Fatalf("皮肤段不符: %+v", got.Skin)
+		}
+	})
+
+	t.Run("皮肤改动可被检出", func(t *testing.T) {
+		// 这条是「皮肤也保存即生效」的核心依据: 若两快照相等, 皮肤改动将永远
+		// 不会触发结束命令框进程 ⇒ 用户改皮肤永远看不到效果。
+		old := CommandBoxAppearanceFromConfigFile(
+			write(t, `{"options":{"commandInputSkin":{"borderRadius":"10"}}}`))
+		neu := CommandBoxAppearanceFromConfigFile(
+			write(t, `{"options":{"commandInputSkin":{"borderRadius":"20"}}}`))
+		if old.Skin == neu.Skin {
+			t.Fatal("皮肤变化后两快照不应相等")
+		}
+		if old.Font != neu.Font {
+			t.Fatal("仅皮肤变化时字体段应保持不变")
+		}
+	})
+
+	t.Run("文件不存在时退化为零值", func(t *testing.T) {
+		got := CommandBoxAppearanceFromConfigFile(filepath.Join(t.TempDir(), "nope.json"))
+		if got != (CommandBoxAppearance{}) {
+			t.Fatalf("应为零值, 实得 %+v", got)
+		}
+	})
+
+	t.Run("JSON 非法时退化为零值", func(t *testing.T) {
+		if got := CommandBoxAppearanceFromConfigFile(write(t, "{ not json")); got != (CommandBoxAppearance{}) {
+			t.Fatalf("应为零值, 实得 %+v", got)
+		}
+	})
+
+	t.Run("缺 options 段时退化为零值", func(t *testing.T) {
+		if got := CommandBoxAppearanceFromConfigFile(write(t, `{"behaviors":[]}`)); got != (CommandBoxAppearance{}) {
+			t.Fatalf("应为零值, 实得 %+v", got)
+		}
+	})
+
+	t.Run("零值与用户选择必然不等 (保守分支的依据)", func(t *testing.T) {
+		got := CommandBoxAppearanceFromConfigFile(write(t, `{"options":{}}`))
+		if got.Font == (CommandFontOption{SourcePath: `D:\fonts\A.ttf`}) {
+			t.Fatal("零值不应等于用户的非空字体选择")
+		}
+		if got.Skin == (CommandInputSkin{WindowWidth: "700"}) {
+			t.Fatal("零值不应等于用户改过的皮肤")
+		}
+	})
+}

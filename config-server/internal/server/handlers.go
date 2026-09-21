@@ -161,8 +161,22 @@ func SaveConfigHandler(debug bool) gin.HandlerFunc {
 			return
 		}
 
+		// 命令框外观「保存即生效」: 必须在**覆盖写之前**记下旧值才能对比。
+		// 命令框 (KeyFlux-CommandInput.exe) 只在**启动时**读一次 bin/font/font.ttf 与
+		// bin/CommandInputSkin.txt (DirectWrite 私有字体集合与皮肤参数在进程内常驻;
+		// 两者的读取时机已分别实证), 故外观变了却只重启引擎时, 用户看到的仍是旧外观
+		// (表现为"改了没效果")。这里在外观确实变化时结束旧命令框进程 —— 它**懒加载**,
+		// 引擎会在用户下次唤起命令框时用新外观重建, 不影响引擎与其他功能。
+		// 字体与皮肤**合并判断**: 二者生效条件一致, 且同一张设置卡承载 (2026-09-21 合并)。
+		prevAppearance := script.CommandBoxAppearanceFromConfigFile(script.ConfigRelPath)
+
 		script.SaveConfigFile(config) // 保存配置文件
 		invalidateStartupCache()      // 配置已变 (含开机自启), 显示态缓存失效待重查
+
+		if config.Options.CommandFont != prevAppearance.Font ||
+			config.Options.CommandInputSkin != prevAppearance.Skin {
+			proc.StopProcessByName("KeyFlux-CommandInput.exe")
+		}
 
 		if debug {
 			script.GenerateScripts(config) // 生成脚本文件
