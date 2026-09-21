@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -126,6 +127,93 @@ func TestInstallCommandFont(t *testing.T) {
 		}
 		if got, ok := readTarget(base); !ok || len(got) != 2048 {
 			t.Fatalf("相对路径复制结果不符: len=%d ok=%v", len(got), ok)
+		}
+	})
+}
+
+// writeFakeTTC 构造一个最小字体集合 (ttcf) 文件: 头部 12 字节 + 偏移表,
+// 首个 face 的表头写在 offsetTable[0] 指向的位置。
+func writeFakeTTC(t *testing.T, path string, faceTag string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("建测试目录失败: %v", err)
+	}
+	const faceOff = 28 // 12 字节头 + 4 字节偏移表 + 留白, 保证不重叠
+	data := make([]byte, faceOff+4)
+	copy(data[0:4], "ttcf")
+	binary.BigEndian.PutUint32(data[4:8], 0x00010000) // version 1.0
+	binary.BigEndian.PutUint32(data[8:12], 1)         // numFonts
+	binary.BigEndian.PutUint32(data[12:16], faceOff)  // offsetTable[0]
+	copy(data[faceOff:faceOff+4], faceTag)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("写入测试字体集合失败: %v", err)
+	}
+}
+
+// TestInstallCommandFont_FormatGate 覆盖轮廓格式闸门:
+// 命令框 exe 硬编码 TrueType face 类型, 故只接受 glyf, 必须拒绝 CFF(OTTO)。
+// 回归背景 (2026-09-21): 原实现把 'OTTO' 当合法签名放行 ⇒ 用户选 .otf 后文件被原样
+// 复制为 font.ttf ⇒ 下游加载失败且**静默** (用户只看到"选了没效果")。
+func TestInstallCommandFont_FormatGate(t *testing.T) {
+	// 与 TestInstallCommandFont 同款局部读取器 (该处是同函数内闭包, 不跨函数可见)。
+	readTarget := func(base string) ([]byte, bool) {
+		b, err := os.ReadFile(filepath.Join(base, FontTargetRel))
+		if err != nil {
+			return nil, false
+		}
+		return b, true
+	}
+
+	t.Run("CFF/OpenType(OTTO) 必须被拒绝且不落盘", func(t *testing.T) {
+		base := t.TempDir()
+		writeFakeFont(t, filepath.Join(base, "src.otf"), []byte("OTTO"), 4096)
+
+		err := InstallCommandFont(CommandFontOption{SourcePath: filepath.Join(base, "src.otf")}, base)
+		if err == nil {
+			t.Fatal("CFF/OTTO 应被拒绝, 实得 nil")
+		}
+		if _, ok := readTarget(base); ok {
+			t.Fatal("被拒绝的源不应产生目标文件")
+		}
+		if !strings.Contains(err.Error(), "OTTO") {
+			t.Fatalf("错误信息应点明 OTTO 轮廓: %v", err)
+		}
+	})
+
+	t.Run("字体集合首 face 为 glyf 时接受", func(t *testing.T) {
+		base := t.TempDir()
+		writeFakeTTC(t, filepath.Join(base, "src.ttc"), "\x00\x01\x00\x00")
+
+		if err := InstallCommandFont(CommandFontOption{SourcePath: filepath.Join(base, "src.ttc")}, base); err != nil {
+			t.Fatalf("glyf 集合应被接受: %v", err)
+		}
+		if _, ok := readTarget(base); !ok {
+			t.Fatal("glyf 集合应产生目标文件")
+		}
+	})
+
+	t.Run("字体集合首 face 为 CFF 时拒绝", func(t *testing.T) {
+		base := t.TempDir()
+		writeFakeTTC(t, filepath.Join(base, "src.ttc"), "OTTO")
+
+		err := InstallCommandFont(CommandFontOption{SourcePath: filepath.Join(base, "src.ttc")}, base)
+		if err == nil {
+			t.Fatal("CFF face 的集合应被拒绝, 实得 nil")
+		}
+		if _, ok := readTarget(base); ok {
+			t.Fatal("被拒绝的集合不应产生目标文件")
+		}
+	})
+
+	t.Run("Apple TrueType('true') 接受", func(t *testing.T) {
+		base := t.TempDir()
+		writeFakeFont(t, filepath.Join(base, "src.ttf"), []byte("true"), 4096)
+
+		if err := InstallCommandFont(CommandFontOption{SourcePath: filepath.Join(base, "src.ttf")}, base); err != nil {
+			t.Fatalf("'true' 签名应被接受: %v", err)
+		}
+		if _, ok := readTarget(base); !ok {
+			t.Fatal("'true' 签名应产生目标文件")
 		}
 	})
 }

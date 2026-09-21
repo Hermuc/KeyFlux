@@ -34,7 +34,9 @@ const FontMaxBytes = 32 * 1024 * 1024
 //  1. SourcePath 为空      -> 未自定义, 不动部署目录的 font.ttf (沿用现状/人工放置)。
 //  2. 源文件不存在/不可读   -> 跳过。
 //  3. 源文件体积 > 上限     -> 跳过 (疑似误选非字体文件)。
-//  4. 源文件头不是字体签名   -> 跳过 (TrueType 0x00010000 / 'true' / 'OTTO' / 'ttcf')。
+//  4. 源轮廓格式不受支持 -> 跳过 (仅接受 glyf: TrueType 0x00010000 / 'true' /
+//     集合 'ttcf' 且首 face 为 glyf; **CFF 'OTTO' 一律拒绝** —— exe 硬编码
+//     TrueType face 类型, CFF 会在下游静默加载失败)。
 //  5. 源已就位于目标路径     -> 跳过 (避免自复制把文件截断为 0 字节)。
 //  6. 目标目录不存在         -> 先建目录再复制 (老部署树可能没有 bin/font/)。
 //
@@ -73,13 +75,14 @@ func InstallCommandFont(opt CommandFontOption, baseDir string) error {
 		return nil
 	}
 
-	// 4. 字体签名嗅探 (同时挡住复制自身这类边界)。
-	ok, err := looksLikeFont(src)
+	// 4. 字体格式校验: 必须是命令框 exe 能加载的 glyf 轮廓。
+	//    (同时挡住复制自身这类边界。)
+	ok, reason, err := classifyFontKinds(src, 0)
 	if err != nil {
 		return fmt.Errorf("命令框字体源读取失败, 沿用现有字体: %s: %v", src, err)
 	}
 	if !ok {
-		return fmt.Errorf("命令框字体源不是字体文件 (未知 sfnt 签名), 沿用现有字体: %s", src)
+		return fmt.Errorf("命令框字体源不被接受, 沿用现有字体: %s: %s", src, reason)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil { // 6.
@@ -114,25 +117,58 @@ func samePath(a, b string) (bool, error) {
 	return os.SameFile(ai, bi), nil
 }
 
-// looksLikeFont 读文件头 4 字节判定是否为可识别的字体容器。
-// 接受: TrueType (0x00010000)、Apple TrueType ('true')、CFF/OTF ('OTTO')、
-// 字体集合 ('ttcf')。这四种覆盖了系统文件弹窗里可能选到的全部字体格式。
-func looksLikeFont(path string) (bool, error) {
+// classifyFontKinds 返回 (是否可用, 拒绝原因, IO 错误)。
+//
+// depth 用于 `ttcf` 集合的递归解包 (上限 1 层, 集合套集合无实际意义)。
+func classifyFontKinds(path string, depth int) (bool, string, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 	defer f.Close()
 
 	var head [4]byte
 	if _, err := f.Read(head[:]); err != nil {
-		return false, err
+		return false, "", err
 	}
+
 	switch {
 	case binary.BigEndian.Uint32(head[:]) == 0x00010000:
-		return true, nil
-	case string(head[:]) == "true", string(head[:]) == "OTTO", string(head[:]) == "ttcf":
-		return true, nil
+		return true, "", nil
+	case string(head[:]) == "true":
+		return true, "", nil
+	case string(head[:]) == "OTTO":
+		return false, "CFF/OpenType(OTTO) 轮廓不受支持, 命令框只接受 TrueType glyf " +
+			"(可用 tools/font_otf2ttf.py 转换)", nil
+	case string(head[:]) == "ttcf":
+		if depth > 0 {
+			return false, "字体集合嵌套过深, 无法判定轮廓格式", nil
+		}
+		// TTC 头: tag(4) + version(4) + numFonts(4) + offsetTable[numFonts](4 each)
+		hdr := make([]byte, 12)
+		if _, err := f.ReadAt(hdr, 0); err != nil {
+			return false, "", err
+		}
+		numFonts := binary.BigEndian.Uint32(hdr[8:12])
+		if numFonts == 0 {
+			return false, "字体集合为空 (numFonts=0)", nil
+		}
+		var off [4]byte
+		if _, err := f.ReadAt(off[:], 12); err != nil {
+			return false, "", err
+		}
+		faceOff := int64(binary.BigEndian.Uint32(off[:]))
+		var faceTag [4]byte
+		if _, err := f.ReadAt(faceTag[:], faceOff); err != nil {
+			return false, "", err
+		}
+		switch {
+		case binary.BigEndian.Uint32(faceTag[:]) == 0x00010000, string(faceTag[:]) == "true":
+			return true, "", nil
+		case string(faceTag[:]) == "OTTO":
+			return false, "字体集合的首个 face 是 CFF/OpenType(OTTO) 轮廓, 不受支持", nil
+		}
+		return false, "字体集合的 face 轮廓格式无法识别", nil
 	}
-	return false, nil
+	return false, "不是可识别的字体文件 (未知 sfnt 签名)", nil
 }

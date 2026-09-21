@@ -187,6 +187,22 @@ sync-out: sync-plugins | $(OUT_DIR)
 	# 文件模式必须加引号: 否则在 make 工作目录(仓库根)被 shell 展开, *.exe 会变成根目录下的 KeyFlux.exe,
 	# 导致 bin/settings.exe 等永远同步不到部署目录 (历史遗留缺陷)
 	MSYS_NO_PATHCONV=1 robocopy bin $(OUT_DIR)/bin '*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll' /XF KeyFlux.ahk /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
+	@$(MAKE) --no-print-directory patch-commandinput
+
+# patch-commandinput: 重新施加命令框 exe 的「抑制八角 keycap」数据 patch。
+# 🔴 为什么必须放在 sync-out **之后**: 上面那条 robocopy 的白名单含 '*.exe', 会用仓库侧
+#    **未 patch** 的 KeyFlux-CommandInput.exe 覆盖部署树 ⇒ keycap patch 每次都被冲掉,
+#    症状是命令框里 a-zA-Z0-9 又被套上八角框 (2026-09-21 实测复现: sync-out 后部署树 exe
+#    SHA 退回 f14bba71… = 官方原版。契约 §3.11 硬约束 4 早已警告, 但此前只靠人工纪律执行)。
+# 🔴 运行中的 exe 自锁不可写 ⇒ 先结束命令框进程 (懒加载, 引擎会在下次唤起时重建;
+#    deploy 末步本就 Stop-Process 重启实例, 此处提前结束不引入新的状态破坏)。
+patch-commandinput: | $(OUT_DIR)
+	@pwsh -NoProfile -Command 'Stop-Process -Name KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 400'
+	python tools/patch_command_input.py "$(OUT_DIR)/bin/KeyFlux-CommandInput.exe"
+
+# check-commandinput-patch: 断言部署树 exe 的 keycap patch 在位 (只读, 供诊断/CI 用)。
+check-commandinput-patch:
+	python tools/patch_command_input.py "$(OUT_DIR)/bin/KeyFlux-CommandInput.exe" --check
 
 # out: 只编译并把产物落到 OUT_DIR (不跑回归、不重启实例, 便于验证输出目录配置)
 # ⚠️ 配方里的 echo 串必须带引号: 裸写的 `-> $(OUT_DIR)` 会被 sh 解析成**重定向**
@@ -205,4 +221,4 @@ out: buildServer buildClientAvalonia sync-out
 deploy: check buildClientAvalonia sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-texttypes check-cs check-hooks check-ime analyzers lint sync-out sync-plugins out deploy
+.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-texttypes check-cs check-hooks check-ime analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch out deploy
