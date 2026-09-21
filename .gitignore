@@ -28,3 +28,9 @@ KeyFlux.Settings.Tests/TestResults/
 data/plugins/
 # Python 工具字节码缓存 (lint_ident.py 等运行生成)
 __pycache__/
+# 命令框字重的 5 档变体副本 (font.thin/light/semibold/bold.ttf), 不入库 (4 个约 59MB)。
+# 理由: 生成端**只**读写 bin/font/font.ttf (命令框 exe 内烧录的唯一样式源); 档位变体由
+#   Go VariantPath 从**源字体所在目录**推导 (<源名>.<档位>.ttf, 见 script/font.go), 从不
+#   读 bin/font/。故这些副本对流水线毫无作用, 提交它们只会让仓库虚胖。
+# 需要重建时: python tools/font_weight_prebake.py <源字体> (烘焙到源字体同目录)。
+bin/font/font.*.ttf
