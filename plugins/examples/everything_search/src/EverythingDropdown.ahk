@@ -286,21 +286,31 @@ class EverythingDropdown {
       DllCall("gdi32.dll\BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", pw, "int", ph
             , "ptr", hdcScr, "int", px, "int", py, "uint", 0x00CC0020)
 
-      ; 多行采样 (垂直 30%~70%, 步长 ph/16) 后取中位数 —— 文字/图标会造成局部误判
+      ; 多行采样 (垂直 30%~70%, 步长 ph/16) 后取中位数 —— 文字/图标会造成局部误判。
+      ; 🔴 扫描深度必须覆盖真实阴影边距 (2026-09-21 二次修复): 首版硬编码只扫 20px,
+      ;   实测命令框阴影单侧 **42px** ⇒ 从两侧扫 20px 根本够不到白框边缘, 全部返回 -1
+      ;   ⇒ 回落到窗口矩形 ⇒ 浮层仍然比白框宽 (用户二次报障「还是不一样宽」)。
+      ;   改为扫「最多 1/4 窗口宽」, 足以覆盖任何合理阴影, 又不会把整窗扫完 (防误判)。
+      maxScan := pw // 4
+      if (maxScan < 8)
+        maxScan := 8
       lefts := [], rights := []
       fy := Round(ph * 0.30)
       while (fy <= Round(ph * 0.70)) {
         L := -1
-        for xx in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20] {
+        xx := 1
+        while (xx <= maxScan) {
           c := DllCall("gdi32.dll\GetPixel", "ptr", hdcMem, "int", xx, "int", fy, "uint")
           r := c & 0xFF, g := (c >> 8) & 0xFF, b := (c >> 16) & 0xFF
           if (r >= 200 && g >= 200 && b >= 200) {
             L := xx
             break
           }
+          xx += 1
         }
         R := -1
-        for xx in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20] {
+        xx := 1
+        while (xx <= maxScan) {
           xr := pw - 1 - xx
           if (xr < 1)
             break
@@ -310,6 +320,7 @@ class EverythingDropdown {
             R := xr
             break
           }
+          xx += 1
         }
         if (L >= 0 && R > L) {
           lefts.Push(L)
