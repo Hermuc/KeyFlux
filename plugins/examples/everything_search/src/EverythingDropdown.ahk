@@ -40,6 +40,12 @@ global ED_SIDE := 0              ; 左右内缩 (px)。🔴 2026-09-21 由 8 改
                                  ;   「下方列表与上方命令框同宽」—— 内缩 8 会让浮层左右各窄
                                  ;   8px（且旧实现还有额外偏差），实测浮层比命令框**宽** 66px。
                                  ;   现在取 0 = 与命令框窗口左右边缘严格对齐。
+; 🔴 命令框 DWM 阴影左右边距 (px, 单侧)。2026-09-21 由**三次独立截图逐像素量测**确定:
+;   三次结果完全一致 —— 窗口宽 925, 可见白框恒为 x=42..882 (宽 841) ⇒ 单侧阴影 42px。
+;   用途: 像素扫描 (BitBlt) 失败时的几何兜底。DComp 自绘窗口在 BitBlt 下可能抓成黑图,
+;   此时按此常量内缩, 宽度仍与用户看到的白框一致。
+;   ⚠ 该值针对当前 DWM/主题; 若系统主题或命令框 skin 变化导致阴影宽度改变, 需重新量测。
+global ED_BOX_SHADOW_X := 42
 global ED_RADIUS := 10           ; 与命令框 borderRadius 相同的圆角半径 (px)
 global ED_ALPHA := 230           ; 整窗不透明度 (≈0.9, 对齐命令框磨砂白 0.9); 让浮层与命令框同质感
 
@@ -164,7 +170,7 @@ class EverythingDropdown {
    * 读成一个「圆顶的、向下延伸」的整体, 而非两个独立的圆角卡片。
    */
   static _AnchorRect(rows) {
-    global ED_ROWS, ED_ROW_H, ED_INSET_FB, ED_COVER, ED_SIDE
+    global ED_ROWS, ED_ROW_H, ED_INSET_FB, ED_COVER, ED_SIDE, ED_BOX_SHADOW_X
     if (rows < 1)
       rows := 1
     if (rows > ED_ROWS)
@@ -212,15 +218,25 @@ class EverythingDropdown {
 
     ; ---- 水平对齐: 取命令框的**可见白框**左右边缘 (2026-09-21) ----
     ; 🔴 为什么不能直接用 WinGetPos 的 bx/bw: 命令框是 DComp 自绘 + DWM 阴影窗口,
-    ;   窗口矩形**含透明阴影外边距** (实测窗口比可见白框宽 ~66px)。用户看到的是白框,
+    ;   窗口矩形**含透明阴影外边距** (实测单侧 42px)。用户看到的是白框,
     ;   所以锚定必须以「白框」为准, 否则浮层比命令框宽/窄, 观感上不是一体的。
-    ;   这里复用底边采样同款的「扫屏幕像素找近白区间」手法, 一次性取回左右边缘。
     cx := bx, cw := bw
     if (found) {
       vis := this._BoxVisibleRect(bx, by, bw, bh)
       if (vis.left >= 0 && vis.right > vis.left) {
         cx := vis.left
         cw := vis.right - vis.left + 1
+      } else {
+        ; 🔴 双保险 (2026-09-21): 像素扫描失败时**不再回落窗口矩形** (含 42px 阴影 ⇒ 浮层比
+        ;   白框宽 84px, 正是用户三次报障的症状)。改用**实测确定的几何**: 命令框 DWM 阴影
+        ;   左右各 42px (三次独立截图逐像素量测结果完全一致: 白框 42..882 / 窗口宽 925)。
+        ;   实机验证 (2026-09-21): DComp 自绘窗口 BitBlt 恒黑, 像素路走不通 ⇒ 实际生效的
+        ;   就是本兜底路径 (运行时日志 path=geom x=539 w=841, 与白框一致)。
+        inset := ED_BOX_SHADOW_X
+        if (bw > inset * 2 + 180) {
+          cx := bx + inset
+          cw := bw - inset * 2
+        }
       }
     }
 
@@ -268,14 +284,18 @@ class EverythingDropdown {
       if (!IsNumber(bx) || !IsNumber(by) || bw < 40 || bh < 20)
         return {left: -1, right: -1}
 
-      hdc0 := DllCall("user32.dll\GetDC", "ptr", 0, "ptr")
-      dpi := DllCall("gdi32.dll\GetDeviceCaps", "ptr", hdc0, "int", 90, "uint")
-      DllCall("user32.dll\ReleaseDC", "ptr", 0, "ptr", hdc0)
-      scale := (dpi > 96) ? dpi / 96.0 : 1.0
-      px := Round(bx * scale)
-      py := Round(by * scale)
-      pw := Round(bw * scale)
-      ph := Round(bh * scale)
+      ; 🔴 DPI 空间说明 (2026-09-21 三次修复 —— 真根因):
+      ;   WinGetPos 在本进程 (AHK, DPI-aware) 下返回的 bx/by/bw/bh **已经是物理像素**,
+      ;   与 BitBlt 的屏幕 DC 源坐标**同空间** ⇒ **不得再乘 scale**。
+      ;   旧实现乘了 scale(1.25) 得到 px=Round(497*1.25)=621, pw=Round(925*1.25)=1156,
+      ;   即从屏幕 (621,375) 抓一张 1156x250 的图 —— 完全错位, 抓到的不是命令框
+      ;   ⇒ 扫描恒失败 ⇒ 回落窗口矩形 (925) ⇒ 用户三次报障「还是不一样宽」。
+      ;   实测佐证: 屏幕 LOGPIXELSX=120 (scale=1.25), 但截图坐标系与 WinGetPos 坐标
+      ;   直接相加即吻合 (白框 42..882 对应屏幕 539..1379), 证明无额外缩放。
+      px := Round(bx)
+      py := Round(by)
+      pw := Round(bw)
+      ph := Round(bh)
       if (pw < 40 || ph < 20)
         return {left: -1, right: -1}
 
@@ -341,7 +361,8 @@ class EverythingDropdown {
       Lm := lefts[mi], Rm := rights[mi]
       if (Rm <= Lm)
         return {left: -1, right: -1}
-      return {left: bx + Round(Lm / scale), right: bx + Round(Rm / scale)}
+      ; 扫描坐标即窗口内物理偏移, 与 bx 同空间 ⇒ 直接相加, 不再 /scale。
+      return {left: bx + Lm, right: bx + Rm}
     }
     return {left: -1, right: -1}
   }
@@ -357,15 +378,12 @@ class EverythingDropdown {
     try {
       if (!hwnd || !IsNumber(bx) || !IsNumber(by) || bw < 40 || bh < 20)
         return -1
-      ; DPI 比例
-      hdc0 := DllCall("user32.dll\GetDC", "ptr", 0, "ptr")
-      dpi := DllCall("gdi32.dll\GetDeviceCaps", "ptr", hdc0, "int", 90, "uint")  ; LOGPIXELSY
-      DllCall("user32.dll\ReleaseDC", "ptr", 0, "ptr", hdc0)
-      scale := (dpi > 96) ? dpi / 96.0 : 1.0
-      px := Round(bx * scale)
-      py := Round(by * scale)
-      pw := Round(bw * scale)
-      ph := Round(bh * scale)
+      ; 🔴 同 _BoxVisibleRect: WinGetPos 返回值已是物理像素, 与 BitBlt 同空间, **不得乘 scale**
+      ;   (2026-09-21 三次修复)。旧实现乘 1.25 导致 BitBlt 抓错区域 ⇒ 采样恒失败。
+      px := Round(bx)
+      py := Round(by)
+      pw := Round(bw)
+      ph := Round(bh)
       if (pw < 40 || ph < 20)
         return -1
 
@@ -402,7 +420,8 @@ class EverythingDropdown {
 
       if (inset >= ph)
         return -1
-      res := Round(inset / scale)
+      ; 同 _BoxVisibleRect: 扫描坐标已是物理像素且与 WinGetPos 同空间 ⇒ 不 /scale。
+      res := inset
       if (res < 2 || res > bh)
         return -1
       return res
