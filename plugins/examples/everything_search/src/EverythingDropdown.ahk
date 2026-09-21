@@ -27,7 +27,13 @@ global ED_GUI := 0
 global ED_LV := 0
 global ED_BUILT := false
 global ED_ONPICK := 0
-global ED_ROWS := 16              ; 可见行数上限 (不滚动, 与锚点高度共同决定)
+global ED_ROWS := 30              ; 可见行数上限 (不滚动, 与锚点高度共同决定)。
+                                  ; 🔴 2026-09-21 由 16 提到 30: 用户要求「默认能展示的列表
+                                  ;   太少, 再拉长一点」。30 行高 = 30*22+14 = 674px, 命令框
+                                  ;   底边 (y≈500) + 674 = 1174 < 1200 (主屏高, 125% 缩放),
+                                  ;   且 _AnchorRect 末尾还有「不越屏幕」夹取, 极端情况自动裁。
+                                  ;   实际显示行数 = min(搜索返回条数, ED_ROWS) —— 搜索条数
+                                  ;   由插件设置 limit (默认 20, 上限 100) 独立控制。
 global ED_ROW_H := 22            ; 行高 (像素; 由 s10 字体近似, 与 ListView 实际行高接近)
 ; 连体策略: 下拉面板顶部要「伸进」命令框的可见白色内部, 把命令框自身的底部圆角 + 阴影
 ; 整段盖住, 于是视觉上只剩一个「圆顶的、向下延伸」的整体, 而不是两个独立的圆角卡片。
@@ -152,6 +158,12 @@ class EverythingDropdown {
     if (index > n)
       index := n
     try ED_LV.Modify(index, "Select Focus")
+    ; 🔴 高亮行必须滚进可视区 (2026-09-21): Modify 只改选态**不滚动** —— 结果条数多于
+    ;   可视行时 (插件 limit 上限 100 > ED_ROWS 30; 且 LV 实际行高 ≥ ED_ROW_H 的估算值,
+    ;   可视行更少) 控件出现滚动条, 上下键把高亮移到视野外用户却看不见, 只能手动拖
+    ;   滚动条 (用户报障)。LVM_ENSUREVISIBLE (0x1013) 让控件把该行滚入可视区
+    ;   (wParam = 0 基行号, lParam = 1 完全对齐而非贴边)。
+    try SendMessage(0x1013, index - 1, 1, , "ahk_id " ED_LV.Hwnd)
   }
 
   /** 隐藏浮层 (不销毁, 供复用)。 */
