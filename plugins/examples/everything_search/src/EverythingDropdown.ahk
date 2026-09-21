@@ -36,7 +36,10 @@ global ED_ROW_H := 22            ; 行高 (像素; 由 s10 字体近似, 与 Lis
 ;   * 有真机采样时用 ED_INSET_FB 兜底, 采样成功则用实测值。
 global ED_INSET_FB := 24         ; 透明底边估算 (px)
 global ED_COVER := 16            ; 额外向上盖住圆角/边框/阴影 (半径10+边框3+余量≈16, px)
-global ED_SIDE := 8              ; 左右各收到的内边距 (让下拉比命令框左右更内缩, 形成悬浮错落, px)
+global ED_SIDE := 0              ; 左右内缩 (px)。🔴 2026-09-21 由 8 改 **0**: 用户要求
+                                 ;   「下方列表与上方命令框同宽」—— 内缩 8 会让浮层左右各窄
+                                 ;   8px（且旧实现还有额外偏差），实测浮层比命令框**宽** 66px。
+                                 ;   现在取 0 = 与命令框窗口左右边缘严格对齐。
 global ED_RADIUS := 10           ; 与命令框 borderRadius 相同的圆角半径 (px)
 global ED_ALPHA := 230           ; 整窗不透明度 (≈0.9, 对齐命令框磨砂白 0.9); 让浮层与命令框同质感
 
@@ -66,7 +69,11 @@ class EverythingDropdown {
     try g.SetFont(ED_FSIZE, ED_FONT)
     ; ListView 默认自带 WS_BORDER + WS_EX_CLIENTEDGE (灰框/3D 内陷), 会立刻破坏"连为一体"的观感,
     ; 创建后统一在下面移除。
-    lv := g.Add("ListView", "x0 y0 w360 h200 -Multi -Hdr -Grid", [""])
+    ; 🔴 宽度占位须给足 (2026-09-21): ListView 建好后由 Show/ShowHint 的 `Move(0,0,rect.w,...)`
+    ; 统一改成实际宽度, 这里的 w360 只是创建时的占位 —— 但**建得太小会让首次显示前
+    ; 的窗口按小尺寸算**, 故直接给到「比任何真实命令框都宽」的安全值 (1920 屏下命令框
+    ; 实测 ~841)。真正生效的宽度完全来自 Move。
+    lv := g.Add("ListView", "x0 y0 w1400 h200 -Multi -Hdr -Grid", [""])
     ; 关掉 Explorer 主题, 才能让下面的背景/文字颜色真正生效 (否则 Win10/11 会强填系统色)
     try lv.SetExplorerTheme(0)
     try lv.SetBkColor(ED_BACK)
@@ -203,8 +210,22 @@ class EverythingDropdown {
       insetLog := 0
     }
 
-    x := bx + ED_SIDE
-    w := bw - ED_SIDE * 2
+    ; ---- 水平对齐: 取命令框的**可见白框**左右边缘 (2026-09-21) ----
+    ; 🔴 为什么不能直接用 WinGetPos 的 bx/bw: 命令框是 DComp 自绘 + DWM 阴影窗口,
+    ;   窗口矩形**含透明阴影外边距** (实测窗口比可见白框宽 ~66px)。用户看到的是白框,
+    ;   所以锚定必须以「白框」为准, 否则浮层比命令框宽/窄, 观感上不是一体的。
+    ;   这里复用底边采样同款的「扫屏幕像素找近白区间」手法, 一次性取回左右边缘。
+    cx := bx, cw := bw
+    if (found) {
+      vis := this._BoxVisibleRect(bx, by, bw, bh)
+      if (vis.left >= 0 && vis.right > vis.left) {
+        cx := vis.left
+        cw := vis.right - vis.left + 1
+      }
+    }
+
+    x := cx + ED_SIDE
+    w := cw - ED_SIDE * 2
     if (w < 180)
       w := 180
     ; 伸进 (insetLog + ED_COVER), 盖住命令框的透明底边 + 圆角 + 阴影。
@@ -227,6 +248,91 @@ class EverythingDropdown {
     if (h < ED_ROW_H)
       h := ED_ROW_H
     return {x: x, y: y, w: w, h: h}
+  }
+
+  /**
+   * 实测命令框**可见白框**的左右边缘 (逻辑像素), 供浮层水平对齐使用。
+   *
+   * 🔴 为什么需要 (2026-09-21): 命令框窗口矩形含 DWM 阴影 + DComp 自绘的**透明外边距**
+   *   (实测窗口 bw 比可见白框宽约 66px)。用户视觉上的"命令框"是那块白框, 所以浮层要
+   *   与白框同宽同 x, 不能直接用 WinGetPos 的 bx/bw, 否则浮层明显比命令框宽。
+   *
+   * 方法: 在窗口垂直中部取一行, 从两侧向中间扫, 找第一个「近白」像素 —— 即白框边缘。
+   * 取多行采样后取中位数抗噪 (抗文字/图标干扰)。DPI 安全: BitBlt 按物理坐标采样,
+   * 结果按比例换算回逻辑像素 (与 WinGetPos 同空间)。
+   *
+   * @returns {object} {left, right}; 任一边测不到时 left = -1 (调用方回落到窗口矩形)。
+   */
+  static _BoxVisibleRect(bx, by, bw, bh) {
+    try {
+      if (!IsNumber(bx) || !IsNumber(by) || bw < 40 || bh < 20)
+        return {left: -1, right: -1}
+
+      hdc0 := DllCall("user32.dll\GetDC", "ptr", 0, "ptr")
+      dpi := DllCall("gdi32.dll\GetDeviceCaps", "ptr", hdc0, "int", 90, "uint")
+      DllCall("user32.dll\ReleaseDC", "ptr", 0, "ptr", hdc0)
+      scale := (dpi > 96) ? dpi / 96.0 : 1.0
+      px := Round(bx * scale)
+      py := Round(by * scale)
+      pw := Round(bw * scale)
+      ph := Round(bh * scale)
+      if (pw < 40 || ph < 20)
+        return {left: -1, right: -1}
+
+      hdcScr := DllCall("user32.dll\GetDC", "ptr", 0, "ptr")
+      hdcMem := DllCall("gdi32.dll\CreateCompatibleDC", "ptr", hdcScr, "ptr")
+      hbmp := DllCall("gdi32.dll\CreateCompatibleBitmap", "ptr", hdcScr, "int", pw, "int", ph, "ptr")
+      DllCall("gdi32.dll\SelectObject", "ptr", hdcMem, "ptr", hbmp)
+      DllCall("gdi32.dll\BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", pw, "int", ph
+            , "ptr", hdcScr, "int", px, "int", py, "uint", 0x00CC0020)
+
+      ; 多行采样 (垂直 30%~70%, 步长 ph/16) 后取中位数 —— 文字/图标会造成局部误判
+      lefts := [], rights := []
+      fy := Round(ph * 0.30)
+      while (fy <= Round(ph * 0.70)) {
+        L := -1
+        for xx in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20] {
+          c := DllCall("gdi32.dll\GetPixel", "ptr", hdcMem, "int", xx, "int", fy, "uint")
+          r := c & 0xFF, g := (c >> 8) & 0xFF, b := (c >> 16) & 0xFF
+          if (r >= 200 && g >= 200 && b >= 200) {
+            L := xx
+            break
+          }
+        }
+        R := -1
+        for xx in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20] {
+          xr := pw - 1 - xx
+          if (xr < 1)
+            break
+          c := DllCall("gdi32.dll\GetPixel", "ptr", hdcMem, "int", xr, "int", fy, "uint")
+          r := c & 0xFF, g := (c >> 8) & 0xFF, b := (c >> 16) & 0xFF
+          if (r >= 200 && g >= 200 && b >= 200) {
+            R := xr
+            break
+          }
+        }
+        if (L >= 0 && R > L) {
+          lefts.Push(L)
+          rights.Push(R)
+        }
+        fy += (ph // 16 > 0) ? (ph // 16) : 4
+      }
+
+      DllCall("gdi32.dll\DeleteObject", "ptr", hbmp)
+      DllCall("gdi32.dll\DeleteDC", "ptr", hdcMem)
+      DllCall("user32.dll\ReleaseDC", "ptr", 0, "ptr", hdcScr)
+
+      if (lefts.Length = 0)
+        return {left: -1, right: -1}
+      lefts.Sort()
+      rights.Sort()
+      mi := (lefts.Length + 1) // 2
+      Lm := lefts[mi], Rm := rights[mi]
+      if (Rm <= Lm)
+        return {left: -1, right: -1}
+      return {left: bx + Round(Lm / scale), right: bx + Round(Rm / scale)}
+    }
+    return {left: -1, right: -1}
   }
 
   /**
