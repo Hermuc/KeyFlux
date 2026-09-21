@@ -234,10 +234,15 @@ CommandInputOnChar(ih, char, scope) {
 /**
  * 命令框 OnKeyDown 入口 (模板 keyflux.tmpl 绑定)。
  * v4 起无整体守卫: providers 派发照常 (透传模式下插件导航/触发仍是有效功能);
- * 退格投递由 CommandDisplay.EchoBackspace 自身守卫兑停 —— 物理退格已随 V hook 透传
- * (IME 组合期删组合串 / 其余时刻命令框原生删除), 再投递即二次删除 (§3.12 v4)。
+ * 退格投递**恒开** (CommandDisplay.EchoBackspace 已去掉 SuppressKeycap 分支)。
  *
- * 先给 provider 机会消费, 未消费则仅对退格保持原语义。历史实现是无条件调
+ * 🔴 2026-09-21 订正 (原注释称「物理退格已随 V hook 透传并原生删除, 投递即二次删除」,
+ *   该前提经静态反汇编证伪): 命令框 exe 全二进制只有一处 WM_CHAR(0x0102) 比较点
+ *   (`81 fa 02 01 00 00` @ 0x9687), 退格分支 (`66 83 fe 08`, wParam 0x08) 嵌套其中;
+ *   WM_KEYDOWN(0x0100) 比较点为 0。⇒ 物理退格不产生删除, 投递是**唯一**删除来源,
+ *   拦停即「文字已删但命令框还显示」。用户真机报障即此因。
+ *
+ * 先给 provider 机会消费, 未消费则由本处补投退格。历史实现是无条件调
  * PostBackspaceToCaspAbbr, 但当时只有 {Backspace} 被 KeyOpt("{Backspace}", "N") 通知到,
  * 等价于「只有退格会走到这里」; 现在 Up/Down/Enter 也参与通知 (供插件下拉列表导航),
  * 故必须按 vk 分流, 避免方向键被当成退格投递。

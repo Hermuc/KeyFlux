@@ -38,8 +38,12 @@ class CommandImeGuard {
   static SearchMode := false     ; 是否进入搜索模式
 
   ; ---- 需要放开中文的文本键 (字母/数字/空格; 拼音组合 + 候选确认所需) ----
-  ; 含 {Backspace}: 搜索模式透传退格键, 命令框原生删除与 query 逻辑删除保持一致
-  ; (否则物理退格被吞, 命令框显示不删, 只剩 query 删 —— 出现"字删了但命令框还显示"脱节)。
+  ; 含 {Backspace}: 搜索模式下退格既要删插件检索词、又要删命令框显示文本。
+  ; 🔴 2026-09-21 订正: 命令框 exe 全二进制只有一处 WM_CHAR(0x0102) 比较点, 退格分支
+  ;   (wParam 0x08) 嵌套其中; WM_KEYDOWN 比较点为 0 ⇒ 物理退格**不会**删除命令框文字。
+  ;   故「删显示」只能靠引擎投递 WM_CHAR(0x08), 投递必须恒开 (见 CommandDisplay.
+  ;   EchoBackspace 的注释)。本行的 {Backspace} 只决定物理键是否透传给窗口 (供 IME
+  ;   组合期用), 与显示删除无关 —— 别再据此推断「投递可省」。
   static TEXT_KEYS := "a b c d e f g h i j k l m n o p q r s t u v w x y z" 
                    . " 0 1 2 3 4 5 6 7 8 9 {Space} {Backspace}"
 

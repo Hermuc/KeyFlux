@@ -329,6 +329,32 @@ Check(CommandDisplay.SuppressKeycap = false, "Reset 后抑制关闭 (会话间�
 Check(CommandDisplay.EchoChar(ih, "中") = true, "未抑制: EchoChar 正常投递")
 Check(Rec.Count("PostChar") = 1, "未抑制投递确实到达 PostChar 桩 (镜像显示通道)")
 
+; --- 11b) EchoBackspace **恒投** (2026-09-21 修复守门人) ---
+; 🔴 缺陷: 搜索模式 (SuppressKeycap=true) 下退格被整体拦停 ⇒ 用户看到「检索词已删
+;   (插件逻辑删了) 但命令框仍显示原文字」。根因 (静态反汇编坐实): 命令框 exe 全二进制
+;   **只有一处** WM_CHAR(0x0102) 比较点 (`81 fa 02 01 00 00` @ 0x9687), 其退格分支
+;   (`66 83 fe 08`, wParam 0x08) 嵌套其中; WM_KEYDOWN(0x0100) 比较点为 **0** ⇒ 物理退格
+;   不产生任何删除, 投递是删除的**唯一**来源。故本组钉死「抑制态也必须投递」——旧实现下必红。
+; 与字符的不对称是刻意的: 字符走物理原生直显 (投递会双显 ⇒ ShouldEcho 拦), 删除无物理
+; 路径 (不投递就永不删除 ⇒ 恒投)。
+CommandDisplay.Reset()
+Rec.Reset()
+CommandDisplay.EchoBackspace(ih, 0x08, 0)
+Check(Rec.Count("PostBackspace") = 1, "历史形态: EchoBackspace 投递一次 (基线)")
+
+CommandDisplay.SuppressKeycap := true
+Rec.Reset()
+CommandDisplay.EchoBackspace(ih, 0x08, 0)
+Check(Rec.Count("PostBackspace") = 1,
+    "🔴 搜索模式(抑制态): EchoBackspace **仍投递** (唯一删除来源, 拦停=显示不删)",
+    "投递次数=" Rec.Count("PostBackspace") " (期望 1; 旧实现为 0 ⇒ 用户报障 '文字已删但仍显示')")
+
+; 对照: 同状态下字符投递确实被拦 (证明抑制开关本身仍生效, 不是整体失效)
+Rec.Reset()
+Check(CommandDisplay.EchoChar(ih, "a") = false, "对照: 同抑制态下 EchoChar 仍被拦 (字符走物理直显)")
+Check(Rec.Count("PostChar") = 0, "对照: EchoChar 未投递 (无双重显示)")
+CommandDisplay.Reset()
+
 ; --- 12) 入口函数 CommandInputOnChar 的透传守卫语义 (§3.12 v4.2) ---
 ; 抑制态: DispatchChar 照跑 (providers 派发保留), EchoChar 被兑停 (ShouldEcho 全停),
 ;         FuzzySuffixFire 恒跑 (v4.2 恢复: 缩写全英文字母, 中文意图仅在前置键之后,

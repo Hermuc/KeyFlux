@@ -172,12 +172,32 @@ class EverythingDropdown {
         m := this._BoxBottomInset(hwnd, bx, by, bw, bh)
         if (m >= 0)
           insetLog := m
+      } else {
+        ; 🔴 命令框「存在但隐藏」是**常态而非异常** (2026-09-21): 按前置键搜索时,
+        ;   SeedFromSelection 会先 ActivateBackend() 把前台切回原窗口, 命令框可能因此隐藏;
+        ;   而 WinExist 默认忽略隐藏窗口 ⇒ 返回 0。
+        ;   旧实现在这时走「屏幕居中兜底」(屏宽-700)/2, 屏高/3 —— 实测 1920x1200 下即
+        ;   (610,404), **恰好落在命令框矩形 (497..1422, 300..500) 正中** ⇒ 浮层直接盖住
+        ;   命令框 (用户报障「搜索结果不在命令框下, 而是覆盖了命令框」)。
+        ;   改为: 开隐藏检测再查一次。命令框窗口其实一直都在, 拿得到真实矩形 ⇒ 仍按命令框
+        ;   正常锚定, 只是**不做底边像素采样** —— 隐藏态的屏幕像素不是命令框本体,
+        ;   采了只会得到错误的伸进量, 直接用兜底值 (ED_INSET_FB) 更稳。
+        hwndH := 0
+        DetectHiddenWindows true
+        try hwndH := WinExist("ahk_class MyKeymap_Command_Input ahk_exe KeyFlux-CommandInput.exe")
+        DetectHiddenWindows false
+        if (hwndH) {
+          WinGetPos(&bx, &by, &bw, &bh, hwndH)
+          found := true
+          insetLog := ED_INSET_FB
+        }
       }
     }
     if (!found) {
-      ; 命令框窗口不可用 (刚启动/被隐藏): 居中兜底, 仍保持可见
+      ; 连隐藏窗口也查不到 (命令框进程未起): 仍保持浮层可见, 但**不要放到屏心** ——
+      ; 那正是命令框的常驻区域。改放屏幕下方, 与命令框常规位置错开。
       bx := (A_ScreenWidth - 700) // 2
-      by := A_ScreenHeight // 3
+      by := A_ScreenHeight - (ED_ROWS * ED_ROW_H + 40)
       bw := 700
       bh := 0
       insetLog := 0
@@ -187,8 +207,14 @@ class EverythingDropdown {
     w := bw - ED_SIDE * 2
     if (w < 180)
       w := 180
-    ; 伸进 (insetLog + ED_COVER), 盖住命令框的透明底边 + 圆角 + 阴影
+    ; 伸进 (insetLog + ED_COVER), 盖住命令框的透明底边 + 圆角 + 阴影。
+    ; 🔴 封顶 (2026-09-21): 伸进量再大也不得越过命令框下半部 —— 否则浮层会盖住框体本身。
+    ;   上限取设计基准 ED_INSET_FB + ED_COVER (=40)。底边采样是「读屏幕像素找近白行」的
+    ;   启发式, 在深色背景/半透明框体上可能给出偏大的值; 封顶后即使采样异常, 浮层顶边
+    ;   也不会进入框体上半部 (配合下方 `if (y < by+4)` 的夹取双保险)。
     over := insetLog + ED_COVER
+    if (over > ED_INSET_FB + ED_COVER)
+      over := ED_INSET_FB + ED_COVER
     y := by + bh - over
     ; 极短窗口时的安全兜底: 至少从窗口顶边之内 4px 起 (正常情况不会触发)
     if (y < by + 4)
