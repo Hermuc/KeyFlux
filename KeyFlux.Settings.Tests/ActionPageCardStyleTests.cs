@@ -72,7 +72,9 @@ public sealed class ActionPageCardStyleTests
         try
         {
             var cards = view.GetVisualDescendants().OfType<Border>()
-                .Where(b => b.Classes.Contains("actionCard") && !b.Classes.Contains("rowEditor")).ToList();
+                .Where(b => b.Classes.Contains("actionCard")
+                            && !b.Classes.Contains("rowEditor")
+                            && !b.Classes.Contains("row-card")).ToList();
             Assert.True(cards.Count >= 4,
                 $"应有 >=4 个组件框 (2 张聚合卡 + 主快捷键卡 + 模拟测试条), 实得 {cards.Count}");
 
@@ -91,13 +93,14 @@ public sealed class ActionPageCardStyleTests
                 Assert.Equal(ClaudeMotion.Micro, t.Duration);
             }
 
-            // 行内编辑器卡豁免统一配方 (2026-09-18 用户裁定): 它是卡内的嵌套面板,
-            // 双层投影与外层卡阴影叠加显脏 ⇒ 静止档必须零阴影, 只留 1px 奶油描边分层。
-            var editors = view.GetVisualDescendants().OfType<Border>()
-                .Where(b => b.Classes.Contains("rowEditor")).ToList();
-            Assert.NotEmpty(editors);
+            // 卡内嵌套子卡片豁免统一配方 (2026-09-18 rowEditor / 2026-09-22 row-card):
+            // 它们嵌在聚合卡内部, 双层投影与外层卡阴影叠加显脏 ⇒ 静止档必须零阴影,
+            // 只留 1px 奶油描边分层。
+            var innerCards = view.GetVisualDescendants().OfType<Border>()
+                .Where(b => b.Classes.Contains("rowEditor") || b.Classes.Contains("row-card")).ToList();
+            Assert.NotEmpty(innerCards);
             var zero = BoxShadows.Parse("0 0 0 0 Transparent");
-            foreach (var e in editors)
+            foreach (var e in innerCards)
             {
                 Assert.Equal(zero.ToString(), e.BoxShadow.ToString());
             }

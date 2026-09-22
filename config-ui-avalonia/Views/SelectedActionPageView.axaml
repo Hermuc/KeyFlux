@@ -230,6 +230,15 @@
     <Style Selector="Border.actionCard.rowEditor:pointerover">
       <Setter Property="BoxShadow" Value="0 0 0 0 Transparent" />
     </Style>
+    <!-- 卡内详情面板 (row-card) 去影 (2026-09-22 用户要求: 文本特征/文件后缀两张聚合卡
+         **内部的子卡片**不要阴影) —— 与 rowEditor 同因: 嵌套在聚合卡内, 双层投影显脏;
+         只保留 1px 奶油描边做分层. 悬停档同样归零, 避免悬停时突然冒影. -->
+    <Style Selector="Border.actionCard.row-card">
+      <Setter Property="BoxShadow" Value="0 0 0 0 Transparent" />
+    </Style>
+    <Style Selector="Border.actionCard.row-card:pointerover">
+      <Setter Property="BoxShadow" Value="0 0 0 0 Transparent" />
+    </Style>
     <Style Selector="Border.row-card.matched">
       <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
