@@ -521,13 +521,13 @@ public sealed class SkinContractTests
     /// <summary>
     /// accent 暖纱 GradientColor 映射契约 (2026-09-22 accent 通道回归锁)。
     /// AABBGGRR (Parchment #f5f4ed: B=0xED, G=0xF4, R=0xF5),
-    /// alpha = clamp(255 - T*255/100, 0x2E, 255)。
+    /// alpha = clamp(255 - T*255/100, 0, 255)。
     /// </summary>
     [AvaloniaFact]
     public void Accent_GradientColor_Maps_Transparency_To_AABBGGRR()
     {
-        // T=100 -> 夹到下限 0x2E (≈18% 暖纱, 磨砂最强)
-        Assert.Equal(0x2EEDF4F5u, WindowSurface.BuildAccentGradientColor(
+        // T=100 -> 0x00 (纯磨砂无暖纱)
+        Assert.Equal(0x00EDF4F5u, WindowSurface.BuildAccentGradientColor(
             new AcrylicOption { Enabled = true, Transparency = 100 }));
 
         // T=50 -> 255-127=128=0x80
@@ -541,10 +541,10 @@ public sealed class SkinContractTests
             new AcrylicOption { Enabled = false, Transparency = 80 }));
         Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(null));
 
-        // 越界值被夹紧: T<0 按 0 (实色), T>100 按 100 (下限)
+        // 越界值被夹紧: T<0 按 0 (实色), T>100 按 100 (纯磨砂)
         Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(
             new AcrylicOption { Enabled = true, Transparency = -50 }));
-        Assert.Equal(0x2EEDF4F5u, WindowSurface.BuildAccentGradientColor(
+        Assert.Equal(0x00EDF4F5u, WindowSurface.BuildAccentGradientColor(
             new AcrylicOption { Enabled = true, Transparency = 9999 }));
     }
 

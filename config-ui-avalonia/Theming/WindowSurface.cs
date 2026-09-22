@@ -163,11 +163,6 @@ public static class WindowSurface
     private const int AccentStateAcrylicBlurBehind = 4;  // ACCENT_ENABLE_ACRYLICBLURBEHIND
     private const int AccentFlagsProbe = 2;              // 与探针一致 (值 2)
 
-    /// <summary>
-    /// 非 solid 时暖纱 alpha 下限 (0x2E ≈ 18%): T=100 时磨砂最强, 仍留一丝暖色调。
-    /// </summary>
-    public const byte MinAccentAlpha = 0x2E;
-
     [StructLayout(LayoutKind.Sequential)]
     private struct AccentPolicy
     {
@@ -190,7 +185,7 @@ public static class WindowSurface
 
     /// <summary>
     /// 由配置算出 accent 暖纱 GradientColor (AABBGGRR, Parchment #f5f4ed)。
-    /// alpha = clamp(255 - T*255/100, 0x2E, 255): T=100 -> 0x2E (18%, 磨砂最强),
+    /// alpha = clamp(255 - T*255/100, 0, 255): T=100 -> 0x00 (纯磨砂无暖纱),
     /// T 越小越实。solid 输入 (null/未启用/T=0) 按 T=0 处理 -> 0xFF 实色
     /// (此时 AccentState=DISABLED, 该值不被消费, 返回确定值便于测试)。
     /// </summary>
@@ -198,7 +193,7 @@ public static class WindowSurface
     {
         var p = Color.Parse(ClaudePalette.Parchment);
         int t = option is { Enabled: true } ? Math.Clamp(option.Transparency, 0, 100) : 0;
-        int alpha = Math.Clamp(255 - t * 255 / 100, MinAccentAlpha, 255);
+        int alpha = Math.Clamp(255 - t * 255 / 100, 0, 255);
         return ((uint)alpha << 24) | ((uint)p.B << 16) | ((uint)p.G << 8) | p.R;
     }
 

@@ -171,8 +171,8 @@
          ① 内容层不随滑块变 ⇒ 透明度滑到 100 页面仍 ~90% 不透明, 滑块形同虚设;
          ② 36px 标题条露窗口层 (35%) 而内容区 85% ⇒ 顶部一条色缝。
          现内容区与标题条统一吃窗口层: 整窗均匀跟滑块 (2026-09-22 accent 通道: 非 solid
-         时窗口层画刷全透明, 暖纱浓度由 accent GradientColor 按 T 给出 —— T=100 即 18% 纱
-         + 强磨砂, 真 Terminal 观感), 文字浓度由用户拖滑块自调。8 个表单对话框仍用
+         时窗口层画刷全透明, 暖纱浓度由 accent GradientColor 按 T 给出 —— T=100 即完全
+         透明 (纯磨砂无暖纱), 真 Terminal 观感), 文字浓度由用户拖滑块自调。8 个表单对话框仍用
          ContentSurface (表单密集区保可读性), ContentSurface 的 T=0 实色联动不变。 -->
     <Grid Grid.Column="1" Grid.Row="1" Background="{DynamicResource ClaudeWindowSurfaceBrush}" controls:ModalBlur.IsHost="True">
       <!-- 页面切换 200ms 交叉淡入 (时长令牌 MotionStandard): 导航换页不再硬切。
