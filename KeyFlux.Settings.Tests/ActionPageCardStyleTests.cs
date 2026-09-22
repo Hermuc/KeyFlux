@@ -25,7 +25,7 @@ namespace KeyFlux.Settings.Tests;
 /// 本页"线条太粗/太重"。
 ///
 /// 重构后页面由两张聚合卡 (TypeCardVm: 文本特征 / 文件后缀) + 主快捷键卡 + 模拟测试条 组成,
-/// 卡内类型 toggle 的 ItemsControl 必须关裁剪 (小圆点微标不被切), 卡体在 ScrollViewer 内须留阴影余量。
+/// 卡内类型 toggle 的 ItemsControl 必须关裁剪 (toggle 的光圈/描边画在自身边界外), 卡体在 ScrollViewer 内须留阴影余量。
 /// </summary>
 [Collection("I18nSerial")]
 public sealed class ActionPageCardStyleTests
@@ -114,7 +114,8 @@ public sealed class ActionPageCardStyleTests
 
     /// <summary>
     /// ③ 承载类型 toggle 的 ItemsControl **必须关掉裁剪**。
-    /// 卡内小圆点微标 (config-dot) 画在 toggle 右上角, 若 ItemsControl 裁边界则被切掉。
+    /// toggle 的悬停/点亮光圈与描边画在自身边界之外, 若 ItemsControl 裁边界则被切掉。
+    /// (原「已配置小圆点微标」已于 2026-09-22 按用户要求移除, 该断言继续守护裁剪不变式。)
     /// </summary>
     [AvaloniaFact]
     public void Toggle_Lists_Must_Not_Clip_Card_Shadow()

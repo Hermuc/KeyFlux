@@ -10,7 +10,7 @@
   <!--
     聚合卡设计 (2026-09): 两张卡 = 文本特征 (textType) / 文件后缀 (fileExt)。
     卡内列出该分区全部类型 toggle (始终可见); 点亮 = 正在查看 (卡内唯一点亮);
-    小圆点 = 已配置; 点 toggle 切详情; 卡右侧红 ✕ = 删除当前点亮类型的配置 (确认+立即保存)。
+    点 toggle 切详情; 卡右侧红 ✕ = 删除当前点亮类型的配置 (确认+立即保存)。
     未配置类型点击进入「待配置」详情态 (不落盘), 用户添加行为后才创建 mapping。
   -->
 
@@ -136,7 +136,7 @@
             </StackPanel>
           </Grid>
 
-          <!-- 全部类型 toggle (始终可见): 点亮=正在查看; 小圆点=已配置 -->
+          <!-- 全部类型 toggle (始终可见): 点亮=正在查看 (已配置微标已于 2026-09-22 移除) -->
           <ItemsControl ItemsSource="{Binding Toggles}" ClipToBounds="False">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
@@ -145,15 +145,13 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:TypeToggleVm">
-                <Grid Margin="0,0,6,6">
-                  <ToggleButton Classes="type-toggle tone-terracotta"
-                                IsChecked="{Binding IsLit, Mode=OneWay}"
-                                Click="OnTypeToggleClicked"
-                                Content="{Binding Label}" />
-                  <Ellipse Classes="config-dot" IsVisible="{Binding IsConfigured}"
-                           Width="7" Height="7" HorizontalAlignment="Right" VerticalAlignment="Top"
-                           Margin="0,2,2,0" />
-                </Grid>
+                <!-- 2026-09-22 用户要求: 移除 toggle 右上角的「已配置」小圆点微标
+                     (原 Ellipse.config-dot + 其样式一并删除; 已配置状态仍由卡片内部的
+                     详情/行为列表体现, VM 侧 IsConfigured 保留为派生状态不再渲染) -->
+                <ToggleButton Classes="type-toggle tone-terracotta" Margin="0,0,6,6"
+                              IsChecked="{Binding IsLit, Mode=OneWay}"
+                              Click="OnTypeToggleClicked"
+                              Content="{Binding Label}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -213,11 +211,6 @@
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
-    <!-- 已配置小圆点微标 (红 ✕ 同色系) -->
-    <Style Selector="Ellipse.config-dot">
-      <Setter Property="Fill" Value="{StaticResource ClaudeTerracottaBrush}"/>
-    </Style>
-
     <!-- 组件框外观 (卡密集堆叠, 描边 1px 比其它处更细) -->
     <Style Selector="Border.actionCard">
       <Setter Property="BoxShadow" Value="{StaticResource SelectedActionCardShadow}" />
