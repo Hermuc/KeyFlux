@@ -144,4 +144,34 @@ public sealed class SelectedActionPageViewSmokeTests
             window.Close();
         }
     }
+
+    /// <summary>
+    /// 文件后缀卡详情区存在可编辑后缀 TextBox (恢复 c7b80dd 删除的能力):
+    /// 文件后缀类型 → 可见; 文本特征类型 → 不显示。
+    /// </summary>
+    [AvaloniaFact]
+    public void FileExt_Detail_Has_Visible_Ext_Editor_But_Text_Type_Does_Not()
+    {
+        var (page, view, window) = CreateHost();
+        try
+        {
+            page.FileCard.SelectType("group:image"); // 已配置文件后缀类型
+            Dispatcher.UIThread.RunJobs();
+
+            var fileExtVisible = view.GetVisualDescendants().OfType<TextBox>()
+                .Any(tb => tb.IsVisible && tb.DataContext is MappingRowVm vm && vm.ShowExtEditor);
+            Assert.True(fileExtVisible, "文件后缀卡详情区应渲染可见的后缀编辑 TextBox");
+
+            page.TextCard.SelectType("url"); // 文本特征类型
+            Dispatcher.UIThread.RunJobs();
+
+            var textTypeVisible = view.GetVisualDescendants().OfType<TextBox>()
+                .Any(tb => tb.IsVisible && tb.DataContext is MappingRowVm vm && vm.IsTextType && vm.ShowExtEditor);
+            Assert.False(textTypeVisible, "文本特征类型不应显示后缀编辑 TextBox");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
 }

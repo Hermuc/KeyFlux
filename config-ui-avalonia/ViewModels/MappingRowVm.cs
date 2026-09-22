@@ -19,10 +19,15 @@ public sealed partial class MappingRowVm : ObservableObject
 {
     private readonly SelectedActionPageViewModel _page;
 
-    public MappingRowVm(SelectedActionPageViewModel page, SelectedMapping mapping)
+    /// <summary>当前查看的类型标识 (卡级 toggle id): group:&lt;name&gt; / type:&lt;id&gt; / orphan:&lt;n&gt;。
+    /// 用于解析「条件值编辑器」的来源实体 (分组 / 自定义类型), null 表示未知 (纯 orphan 兼容)。</summary>
+    private readonly string? _typeId;
+
+    public MappingRowVm(SelectedActionPageViewModel page, SelectedMapping mapping, string? typeId = null)
     {
         _page = page;
         Mapping = mapping;
+        _typeId = typeId;
         RefreshChips();
     }
 
@@ -65,6 +70,77 @@ public sealed partial class MappingRowVm : ObservableObject
             OnPropertyChanged();
             OnPropertyChanged(nameof(MatchSummary));
         }
+    }
+
+    // ---- 文件后缀: 条件值 (后缀集) 可编辑框 (恢复被 c7b80dd 删除的能力) ----
+
+    /// <summary>后缀编辑器可见性: 仅文件后缀类型 (非文本特征)。文本卡不显示该输入框。</summary>
+    public bool ShowExtEditor => !IsTextType;
+
+    /// <summary>
+    /// 当前类型对应的后缀列表 (供详情区 TextBox 双向绑定):
+    ///   - group:&lt;name&gt; → 该 <see cref="FileGroup.Exts"/> 的逗号串 (来源实体为真源);
+    ///   - type:&lt;id&gt;(fileExt) → 该 <see cref="MatchType.Exts"/> 的逗号串;
+    ///   - orphan:* / 无 id → 直接 <see cref="SelectedMapping.MatchValue"/>。
+    /// 设值时规整为后缀列表后**双写**: 写回来源实体 + 同步本条 mapping 的 MatchValue
+    /// (group/orphan 写规整串; type:&lt;id&gt; 保持引用串不变), 保证 FindMapping 的 SameExts 认领不破。
+    /// </summary>
+    public string ExtsDisplay
+    {
+        get
+        {
+            var g = TryResolveFileGroup();
+            if (g is not null) return string.Join(", ", g.Exts);
+            var t = TryResolveFileExtType();
+            if (t is not null) return string.Join(", ", t.Exts);
+            return Mapping.MatchValue;
+        }
+        set
+        {
+            var normalized = ActionSchemeCatalog.NormalizeExts(value);
+            var joined = string.Join(",", normalized);
+
+            var g = TryResolveFileGroup();
+            if (g is not null)
+            {
+                g.Exts = normalized;            // a) 写回来源实体
+                Mapping.MatchValue = joined;    // b) 同步 mapping (FindMapping 认领依赖)
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(MatchSummary));
+                _page.OnCardMappingChanged();   // c) 卡片状态刷新
+                return;
+            }
+
+            var t = TryResolveFileExtType();
+            if (t is not null)
+            {
+                t.Exts = normalized;            // a) 写回来源实体
+                // b) type:<id> 保持 MatchValue 引用串不变 (认领按字面 "type:<id>")
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(MatchSummary));
+                _page.OnCardMappingChanged();   // c) 卡片状态刷新
+                return;
+            }
+
+            Mapping.MatchValue = joined;        // orphan/无 id: 直接写 mapping
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MatchSummary));
+            _page.OnCardMappingChanged();       // c) 卡片状态刷新
+        }
+    }
+
+    private FileGroup? TryResolveFileGroup()
+    {
+        if (_typeId is null || !_typeId.StartsWith("group:")) return null;
+        var name = _typeId["group:".Length..];
+        return _page.Config.FileGroups.FirstOrDefault(x => x.Name == name);
+    }
+
+    private Models.MatchType? TryResolveFileExtType()
+    {
+        if (_typeId is null || !_typeId.StartsWith("type:")) return null;
+        var id = _typeId["type:".Length..];
+        return _page.Config.MatchTypes.FirstOrDefault(x => x.Id == id);
     }
 
     // ---- chips 键位表 ----
@@ -204,6 +280,8 @@ public sealed partial class MappingRowVm : ObservableObject
         OnPropertyChanged(nameof(LanguageTick));
         OnPropertyChanged(nameof(TypeBadgeText));
         OnPropertyChanged(nameof(MatchSummary));
+        OnPropertyChanged(nameof(ShowExtEditor));
+        OnPropertyChanged(nameof(ExtsDisplay));
         RefreshChips();
         foreach (var editor in Editors) editor.RefreshLanguage();
     }

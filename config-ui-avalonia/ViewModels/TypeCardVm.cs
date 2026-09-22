@@ -207,7 +207,7 @@ public sealed partial class TypeCardVm : ObservableObject
         var mapping = FindMappingForType(id);
         if (mapping is not null)
         {
-            var real = new MappingRowVm(_page, mapping);
+            var real = new MappingRowVm(_page, mapping, id);
             real.OpenEditor();
             Detail = real;
             return;
@@ -220,7 +220,7 @@ public sealed partial class TypeCardVm : ObservableObject
             MatchValue = BuildTransientMatchValue(id),
             Entries = [],
         };
-        var editor = new MappingRowVm(_page, transient) { IsTransient = true };
+        var editor = new MappingRowVm(_page, transient, id) { IsTransient = true };
         editor.EntriesChanged += OnEditorEntriesChanged;
         editor.OpenEditor();
         Detail = editor;

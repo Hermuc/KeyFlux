@@ -35,6 +35,10 @@
               Background="{DynamicResource ClaudeIvoryBrush}"
               CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="12" Margin="0,4,0,6">
         <StackPanel Spacing="8">
+          <!-- 文件后缀: 条件值 (后缀集) 可编辑框 (恢复被 c7b80dd 删除的能力; 仅文件后缀类型显示) -->
+          <TextBox IsVisible="{Binding ShowExtEditor}" Text="{Binding ExtsDisplay, Mode=TwoWay}"
+                   Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1034}" />
+
           <!-- chips 键位表 (序号即菜单数字键) -->
           <ItemsControl ItemsSource="{Binding Chips}">
             <ItemsControl.ItemsPanel>

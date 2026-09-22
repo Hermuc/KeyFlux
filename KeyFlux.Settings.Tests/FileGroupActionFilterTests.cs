@@ -148,4 +148,122 @@ public sealed class FileGroupActionFilterTests
         Assert.True(ActionSchemeCatalog.SameExts(new[] { ".jpg." }, new[] { "jpg" }));
         Assert.False(ActionSchemeCatalog.SameExts(new[] { "jpg" }, new[] { "png" }));
     }
+
+    // ------------------------------------------------------------- 后缀可编辑框 (恢复 c7b80dd 删除的能力)
+
+    private static SelectedMapping FileExtMapping(string matchValue, string behavior = "open")
+        => new()
+        {
+            MatchType = "fileExt",
+            MatchValue = matchValue,
+            Entries = [new SelectedEntry { Behavior = behavior, Options = new RuleOptions() }],
+        };
+
+    /// <summary>编辑分组类型后缀 → 写回 Config.FileGroups[name].Exts + 同步该 mapping 的 MatchValue
+    /// + FindMapping("group:&lt;name&gt;") 仍能认领 (同源关系不破)。</summary>
+    [Fact]
+    public void Edit_Group_Exts_Writes_Back_To_Group_And_Syncs_Mapping()
+    {
+        var config = new Config
+        {
+            FileGroups = [new FileGroup { Name = "image", Label = "图片", Exts = ["jpg", "png"] }],
+            SelectedAction = new SelectedAction { Mappings = [FileExtMapping("jpg,png")] },
+        };
+        var (page, cfg) = CreatePage(config);
+        page.FileCard.SelectType("group:image");
+        var detail = page.FileCard.Detail!;
+        Assert.True(detail.ShowExtEditor);
+        var mapping = detail.Mapping;
+
+        detail.ExtsDisplay = "jpg, png, gif, .WEBP"; // 混合分隔符/前导点/大小写
+
+        // a) 写回来源实体 (规整去点去重, 保留首个书写形式)
+        Assert.Equal(new[] { "jpg", "png", "gif", "WEBP" }, cfg.FileGroups[0].Exts);
+        // b) 同步 mapping.MatchValue 为新规整列表
+        Assert.Equal(new[] { "jpg", "png", "gif", "WEBP" }, ActionSchemeCatalog.NormalizeExts(mapping.MatchValue));
+        // 同源关系不破: 仍能认领
+        Assert.True(page.FileCard.IsTypeConfigured("group:image"));
+    }
+
+    /// <summary>编辑自定义 type:&lt;id&gt;(fileExt) 后缀 → 写回 MatchTypes[id].Exts, mapping 仍为引用串。</summary>
+    [Fact]
+    public void Edit_Custom_FileExt_Type_Exts_Writes_Back_And_Keeps_Reference()
+    {
+        var config = new Config
+        {
+            MatchTypes = [new MatchType { Id = "x1", Kind = "fileExt", Label = "压缩包", Exts = ["zip", "rar"] }],
+            SelectedAction = new SelectedAction { Mappings = [FileExtMapping("type:x1")] },
+        };
+        var (page, cfg) = CreatePage(config);
+        page.FileCard.SelectType("type:x1");
+        var detail = page.FileCard.Detail!;
+        Assert.True(detail.ShowExtEditor);
+        var mapping = detail.Mapping;
+
+        detail.ExtsDisplay = "7z, tar, gz";
+
+        Assert.Equal(new[] { "7z", "tar", "gz" }, cfg.MatchTypes[0].Exts); // a) 写回来源实体
+        Assert.Equal("type:x1", mapping.MatchValue);                       // b) 引用串不变
+        Assert.True(page.FileCard.IsTypeConfigured("type:x1"));
+    }
+
+    /// <summary>文本特征类型不显示该编辑器 (ShowExtEditor == false), ExtsDisplay 退化为 MatchValue。</summary>
+    [Fact]
+    public void Text_Feature_Type_Does_Not_Show_Ext_Editor()
+    {
+        var config = new Config
+        {
+            SelectedAction = new SelectedAction { Mappings = [new SelectedMapping
+            {
+                MatchType = "textType", MatchValue = "url",
+                Entries = [new SelectedEntry { Behavior = "open_url", Options = new RuleOptions() }],
+            }] },
+        };
+        var (page, _) = CreatePage(config);
+        page.TextCard.SelectType("url");
+        var detail = page.TextCard.Detail!;
+        Assert.False(detail.ShowExtEditor);
+        Assert.Equal("url", detail.ExtsDisplay); // 文本类型: 无来源实体, 直接读 MatchValue
+    }
+
+    /// <summary>清空输入不抛异常; 分组关联解除 (不再被该分组 toggle 覆盖)。</summary>
+    [Fact]
+    public void Clearing_Exts_Input_Does_Not_Throw()
+    {
+        var config = new Config
+        {
+            FileGroups = [new FileGroup { Name = "image", Label = "图片", Exts = ["jpg", "png"] }],
+            SelectedAction = new SelectedAction { Mappings = [FileExtMapping("jpg,png")] },
+        };
+        var (page, cfg) = CreatePage(config);
+        page.FileCard.SelectType("group:image");
+        var detail = page.FileCard.Detail!;
+
+        var ex = Record.Exception(() => detail.ExtsDisplay = "");
+        Assert.Null(ex);
+        // 清空 → 来源实体与 mapping 同步清空 (可后续再填); 空==空 仍被同源认领 (设计如此)
+        Assert.Empty(cfg.FileGroups[0].Exts);
+        Assert.Equal("", detail.Mapping.MatchValue);
+        Assert.True(page.FileCard.IsTypeConfigured("group:image"));
+    }
+
+    /// <summary>orphan 类型 (无 toggle 来源实体) 编辑直接写 mapping.MatchValue, 不崩溃。</summary>
+    [Fact]
+    public void Orphan_Type_Edits_Mapping_Directly()
+    {
+        var config = new Config
+        {
+            SelectedAction = new SelectedAction { Mappings = [FileExtMapping("mp3, wav")] },
+        };
+        var (page, _) = CreatePage(config);
+        page.RebuildCards();
+        // orphan:0 toggle 存在 (不被任何分组覆盖)
+        var orphanId = page.FileCard.Toggles.First(t => t.Id.StartsWith("orphan:")).Id;
+        page.FileCard.SelectType(orphanId);
+        var detail = page.FileCard.Detail!;
+        Assert.True(detail.ShowExtEditor);
+
+        detail.ExtsDisplay = "mp3, wav, flac";
+        Assert.Equal(new[] { "mp3", "wav", "flac" }, ActionSchemeCatalog.NormalizeExts(detail.Mapping.MatchValue));
+    }
 }
