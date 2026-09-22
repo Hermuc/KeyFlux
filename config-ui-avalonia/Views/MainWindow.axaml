@@ -13,16 +13,14 @@
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="NoChrome"
-        TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="Transparent">
+        Background="{StaticResource ClaudeParchmentBrush}">
 
-  <!-- 无边框 + 亚克力 (计划书 §九, A 档零新依赖):
-       · TransparencyLevelHint 是【提示列表】, 从最理想逐级降级; 全不可用时回落 None 不会崩。
-       · 窗口 Background 保持 Transparent, 真正的暖色底由下方根 Border 的
-         ClaudeWindowSurfaceBrush (带 alpha 的 Parchment) 承担, 模糊才能透出来。
+  <!-- 无边框 + 实色暖底 (计划书 §九, A 档零新依赖):
+       · 窗口 Background 与根 Border 同为实色 ClaudeParchmentBrush (双保险): 去掉
+         TransparencyLevelHint 后窗口不再需要透明承载层, 实色底杜绝任何驱动下的
+         黑闪/首帧异常。
        · 关于"柔和外阴影": BoxShadow 需要窗口边缘留出透明边距才可见, 而一旦该边距存在,
-         在亚克力不可用 (回落 None) 的机器上会显示为黑边 —— 故本期用 1px BorderWarm 细环
-         (DESIGN.md Level 2 ring) 替代外阴影, 等确认目标机器亚克力稳定后再补边距+Whisper。 -->
+         会显示为黑边 —— 故本期用 1px BorderWarm 细环 (DESIGN.md Level 2 ring) 替代外阴影。 -->
 
   <!-- Ctrl+S 保存 (复刻 App.vue 的全局 keydown 监听) -->
   <Window.KeyBindings>
@@ -105,14 +103,14 @@
     </Style>
   </Window.Styles>
 
-  <Border Background="{DynamicResource ClaudeWindowSurfaceBrush}"
+  <Border Background="{StaticResource ClaudeParchmentBrush}"
           BorderBrush="{StaticResource ClaudeBorderWarmBrush}"
           BorderThickness="1">
    <Grid RowDefinitions="36,*" ColumnDefinitions="264,*">
 
     <!-- ===================== 左侧导航 (复刻 NavigationDrawer.vue) ===================== -->
     <!-- RowSpan=2: 侧栏背景顶到窗口顶 (用户报: 上部有 36px 空隙); 头部 Margin 顶避让标题条 -->
-    <Border Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" Background="{StaticResource ClaudeSidebarSurfaceBrush}"
+    <Border Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" Background="{StaticResource ClaudeIvoryBrush}"
             BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="0,0,1,0">
       <DockPanel>
 
@@ -166,15 +164,9 @@
     </Border>
 
     <!-- ===================== 右侧内容区 ===================== -->
-    <!-- 🔴 Background = ClaudeWindowSurfaceBrush (2026-09-22 改回窗口层, 整窗均匀):
-         上版用固定 ClaudeContentSurfaceBrush (85%) 造成两个问题 (用户报):
-         ① 内容层不随滑块变 ⇒ 透明度滑到 100 页面仍 ~90% 不透明, 滑块形同虚设;
-         ② 36px 标题条露窗口层 (35%) 而内容区 85% ⇒ 顶部一条色缝。
-         现内容区与标题条统一吃窗口层: 整窗均匀跟滑块 (2026-09-22 accent 通道: 非 solid
-         时窗口层画刷全透明, 暖纱浓度由 accent GradientColor 按 T 给出 —— T=100 即完全
-         透明 (纯磨砂无暖纱), 真 Terminal 观感), 文字浓度由用户拖滑块自调。8 个表单对话框仍用
-         ContentSurface (表单密集区保可读性), ContentSurface 的 T=0 实色联动不变。 -->
-    <Grid Grid.Column="1" Grid.Row="1" Background="{DynamicResource ClaudeWindowSurfaceBrush}" controls:ModalBlur.IsHost="True">
+    <!-- 内容区 Background 保持 Transparent —— 暖色底已由外层根 Border
+         (ClaudeParchmentBrush, 实色) 承担, 此处无需再铺一层色。 -->
+    <Grid Grid.Column="1" Grid.Row="1" Background="Transparent" controls:ModalBlur.IsHost="True">
       <!-- 页面切换 200ms 交叉淡入 (时长令牌 MotionStandard): 导航换页不再硬切。
            CrossFade 只动 Opacity (两页各渲染一次后混合), 软件渲染管线开销可控;
            同一页面 VM 实例复用时 (keymap 页缓存) 引用不变不触发过渡 -->

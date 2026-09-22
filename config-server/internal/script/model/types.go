@@ -163,7 +163,6 @@ type Options struct {
 	KeyboardLayout   string            `json:"keyboardLayout"`
 	QuickSwitch      QuickSwitchOption `json:"quickSwitch"`
 	Plugins          PluginsOption     `json:"plugins"`
-	Acrylic          AcrylicOption     `json:"acrylic"`
 	CommandFont      CommandFontOption `json:"commandFont"`
 }
 
@@ -184,20 +183,6 @@ type Options struct {
 type CommandFontOption struct {
 	SourcePath string `json:"sourcePath"`
 	Weight     string `json:"weight"`
-}
-
-// AcrylicOption 设置面板窗口的亚克力(毛玻璃)材质配置 (config.json 的 options.acrylic)。
-// 纯 UI 呈现项: 引擎不消费, 仅供 config-ui-avalonia 读取后决定窗口底色。
-//
-// Transparency 语义 = "透明度", 取值 0..100:
-//
-//	0   -> 完全不透明, 窗口用实心 Parchment 背景 (背景色必须实, 否则会花屏/发灰)
-//	100 -> 尽量透明, 由平台模糊充当背景 (实际会夹一个最小不透明度以保文字可读)
-//
-// Enabled=false 时忽略 Transparency, 等同于 0 (实心)。
-type AcrylicOption struct {
-	Enabled      bool `json:"enabled"`
-	Transparency int  `json:"transparency"`
 }
 
 // PluginsOption 插件注册表 (第三方插件启用状态)。「disabled」= 已停用插件 ID 集,

@@ -1045,9 +1045,7 @@ v4.1 焦点降级语义 + 延后收尾状态 + 终止字符强制投递语义) +
 的 `Options` ② Go `model/types.go` 的 `Options` ③ Go `dto.go` 的
 `OptionsDTO` + `optionsToDTO()` + `dtoToOptions()` **五个落点** (DTO 结构体 + 两个转换函数各一处)。
 漏 `optionsToDTO` 会让 GET 少字段, 漏 `dtoToOptions` 会让 PUT 静默丢字段 (G1 教训)。
-⚠ 历史残留: `options.acrylic` **只在 model 与 C# 侧存在, dto.go 里没有对应分支** —— 属已知的历史缺口
-(该段纯 UI 呈现、引擎不消费, 故未暴露为故障); 新增段**不应**照抄这个缺口, 必须走全五处。
-现成参照实现: `options.commandFont` (2026-09-20)。
+新增段**必须**走全五处 (例: `options.commandFont`, 2026-09-20)。
 
 守护测试: C# 侧 `ModelUnitTests.Options_And_SubStructs_JsonNames_MatchGoTags` 锁键名集合;
 Go 侧 `server/dto_test.go` 的 `Test<X>RoundTrip` 锁 PUT→model→GET 往返与空段恒对象契约。

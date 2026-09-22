@@ -21,7 +21,7 @@
     <DataTemplate x:Key="MappingRowCard" x:DataType="vm:MappingRowVm">
 
         <Border Classes="row-card actionCard" Classes.matched="{Binding IsMatched}"
-                Background="{StaticResource ClaudeIvoryBrush}"
+                Background="{DynamicResource ClaudeIvoryBrush}"
                 CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="12" Margin="0,0,0,8"
                 Tapped="OnRowHeaderTapped">
         <StackPanel Spacing="8">
@@ -117,7 +117,7 @@
             <ItemsControl ItemsSource="{Binding Editors}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:EntryRowVm">
-                    <Border Classes="actionCard rowEditor" Background="{StaticResource ClaudeIvoryBrush}"
+                    <Border Classes="actionCard rowEditor" Background="{DynamicResource ClaudeIvoryBrush}"
                             CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="10" Margin="0,0,0,6">
                     <StackPanel Spacing="8">
                       <Grid ColumnDefinitions="Auto,*,Auto">
@@ -192,7 +192,7 @@
       <Setter Property="CornerRadius" Value="999"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeRingWarmBrush}"/>
-      <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}"/>
+      <Setter Property="Background" Value="{DynamicResource ClaudeIvoryBrush}"/>
       <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}"/>
       <Setter Property="FontSize" Value="13"/>
       <Setter Property="MinHeight" Value="30"/>
@@ -397,7 +397,7 @@
         </Border>
 
         <!-- 主快捷键 + 启用开关 -->
-          <Border Classes="actionCard" Background="{StaticResource ClaudeIvoryBrush}"
+          <Border Classes="actionCard" Background="{DynamicResource ClaudeIvoryBrush}"
                   CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="10">
             <Grid ColumnDefinitions="*,Auto,Auto">
@@ -452,7 +452,7 @@
         </StackPanel>
 
         <!-- ===================== 底部紧凑模拟测试条 ===================== -->
-          <Border Classes="actionCard" Background="{StaticResource ClaudeIvoryBrush}"
+          <Border Classes="actionCard" Background="{DynamicResource ClaudeIvoryBrush}"
                   CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="8">
             <TextBlock FontWeight="SemiBold"
@@ -525,7 +525,7 @@
         <ContentControl.DataTemplates>
           <DataTemplate x:DataType="vm:AddMappingVm">
             <Border MaxWidth="560" MinWidth="440" HorizontalAlignment="Left"
-                    Background="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="20" Margin="20"
+                    Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="20" Margin="20"
                     BoxShadow="0 8 24 rgba(0,0,0,0.25)">
               <StackPanel Spacing="12">
                 <!-- 标题 + 说明 -->
@@ -578,7 +578,7 @@
                   <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1005}" />
                   <TextBox Text="{Binding MatchValue}" IsReadOnly="True" Focusable="False"
-                           Background="{StaticResource ClaudeIvoryBrush}" />
+                           Background="{DynamicResource ClaudeIvoryBrush}" />
                 </StackPanel>
 
                 <!-- 步骤 3: 行为勾选 (勾选顺序 = 菜单键位; 最多 9) -->
@@ -615,7 +615,7 @@
                 <!-- 底部按钮 -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,4,0,0">
                   <Button Command="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).CloseAddPanelCommand}"
-                          Background="{StaticResource ClaudeIvoryBrush}" BorderThickness="1" BorderBrush="{StaticResource ClaudeBorderCreamBrush}"
+                          Background="{DynamicResource ClaudeIvoryBrush}" BorderThickness="1" BorderBrush="{StaticResource ClaudeBorderCreamBrush}"
                           CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="18,7"
                           Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=970}" />
                   <Button Command="{Binding ConfirmCommand}" IsEnabled="{Binding CanConfirm}"

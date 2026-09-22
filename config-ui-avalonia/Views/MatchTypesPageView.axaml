@@ -19,7 +19,7 @@
   <UserControl.Styles>
     <!-- 互斥选项胶囊 (编辑器内专用; 选中态 = 陶土描边 + 淡陶土底) -->
     <Style Selector="ToggleButton.opt">
-      <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ClaudeIvoryBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />

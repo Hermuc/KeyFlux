@@ -39,7 +39,7 @@
            (FocusManager 上溯聚焦卡片 ⇒ ComponentFocusRing 挂 .ring; Tab 不停靠) -->
       <Setter Property="Focusable" Value="True" />
       <Setter Property="IsTabStop" Value="False" />
-      <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ClaudeIvoryBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusCard}" />
@@ -248,7 +248,7 @@
                  IsVisible="{Binding IsLoadingPlugins}" />
 
       <!-- 目录加载失败 (含逐包告警): Ivory 面 + crimson 文字 -->
-      <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
+      <Border Background="{DynamicResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
               CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="14" IsVisible="{Binding ShowLoadError}">
         <TextBlock Text="{Binding PluginsLoadError}" TextWrapping="Wrap"
                    Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12" />

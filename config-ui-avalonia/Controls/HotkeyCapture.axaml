@@ -10,7 +10,7 @@
        Esc 单独按下或焦点丢失取消; 冲突时红字提示 (保守归一化比较)。 -->
   <StackPanel Spacing="3">
     <Border x:Name="BoxBorder"
-            Background="{StaticResource ClaudeIvoryBrush}"
+            Background="{DynamicResource ClaudeIvoryBrush}"
             BorderBrush="{StaticResource ClaudeRingWarmBrush}" BorderThickness="1"
             CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="8,6" Cursor="Hand">
       <Grid ColumnDefinitions="20,*,Auto">

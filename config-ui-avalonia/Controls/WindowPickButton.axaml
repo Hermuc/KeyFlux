@@ -50,7 +50,7 @@
            Focusable="False"
            IsLightDismissEnabled="False"
            IsOpen="{Binding $parent[controls:WindowPickButton].MessageText, Mode=OneWay, Converter={StaticResource NotEmpty}}">
-      <Border Background="{StaticResource ClaudeIvoryBrush}"
+      <Border Background="{DynamicResource ClaudeIvoryBrush}"
               BorderBrush="{StaticResource ClaudeErrorBrush}" BorderThickness="1"
               CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="10,6" MaxWidth="240" Focusable="False">
         <TextBlock Text="{Binding $parent[controls:WindowPickButton].MessageText}"

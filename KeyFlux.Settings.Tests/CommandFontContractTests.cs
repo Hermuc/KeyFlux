@@ -54,7 +54,7 @@ public sealed class CommandFontContractTests
 
     /// <summary>
     /// 已有段时**不覆盖用户数据**: 即使用户把路径清空、档位选了 bold, Apply 也必须原样保留
-    /// (同 Acrylic 的「只在整段缺失时补」口径, 不逐字段覆盖)。
+    /// (只在整段缺失时补, 不逐字段覆盖)。
     /// </summary>
     [Fact]
     public void Apply_ExistingSection_PreservesUserValues()

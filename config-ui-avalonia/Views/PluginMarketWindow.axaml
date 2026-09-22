@@ -4,8 +4,7 @@
         x:Class="KeyFlux.Settings.Views.PluginMarketWindow"
         x:Name="DlgRoot"
         x:DataType="vm:PluginMarketViewModel"
-        TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{DynamicResource ClaudeContentSurfaceBrush}"
+        Background="{StaticResource ClaudeParchmentBrush}"
         Title="Setting"
         Width="640" Height="560"
         WindowStartupLocation="CenterOwner">
@@ -32,7 +31,7 @@
       <!-- 点组件框非交互区 = 选中该框: 见 SelectedActionPageView actionCard 同款注释 -->
       <Setter Property="Focusable" Value="True" />
       <Setter Property="IsTabStop" Value="False" />
-      <Setter Property="Background" Value="{StaticResource ClaudeIvoryBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ClaudeIvoryBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusCard}" />
@@ -112,7 +111,7 @@
                        Foreground="{StaticResource ClaudeStoneGrayBrush}" IsVisible="{Binding IsLoading}" />
 
             <!-- 拉取失败: 原因 + 重试 (920) -->
-            <Border Background="{StaticResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
+            <Border Background="{DynamicResource ClaudeIvoryBrush}" BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
                     CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="14" IsVisible="{Binding ShowError}">
               <StackPanel Spacing="10">
                 <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2433}"

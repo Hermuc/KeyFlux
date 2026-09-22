@@ -13,14 +13,13 @@ namespace KeyFlux.Settings.Services.Win32;
 // 染成当前主题表面色, 原生关闭/最大化按钮与拖动行为原样保留。
 // 非 Win11 系统 DwmSetWindowAttribute 返回非零 HRESULT, 静默忽略无副作用。
 //
-// 颜色取当前 ClaudeWindowSurfaceBrush 的 RGB (跟随用户亚克力设置的基础色调;
-// DWM 标题栏不支持半透明, 故忽略 alpha —— 透明度 0 时与内容完全同色, 高透明度
-// 时标题栏为同色系实心, 可接受)。文字用 NearBlack。回退 Parchment。
+// 颜色取当前 ClaudeParchmentBrush 的 RGB (暖色表面基准色); DWM 标题栏不支持
+// 半透明, 取实色。文字用 NearBlack。
 // ============================================================================
 
 internal static class DialogChrome
 {
-    private const string SurfaceBrushKey = "ClaudeWindowSurfaceBrush";
+    private const string SurfaceBrushKey = "ClaudeParchmentBrush";
 
     /// <summary>
     /// 构造函数中调用。句柄在构造期尚不存在, 实际着色延迟到 Opened 事件 (Show 之后)。

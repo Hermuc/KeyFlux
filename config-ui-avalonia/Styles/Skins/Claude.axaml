@@ -113,15 +113,13 @@
         MappingRowVm / MarkdownRenderer / WindowPickerSession)。
 
   【必需令牌清单 —— 新皮肤必须提供同名同类型的全部键, 否则 SkinContractTests 会红】
-    画刷 (22): ClaudeParchmentBrush / ClaudeIvoryBrush / ClaudeWhiteBrush /
+    画刷 (20): ClaudeParchmentBrush / ClaudeIvoryBrush / ClaudeWhiteBrush /
               ClaudeSandBrush / ClaudeNearBlackBrush / ClaudeCharcoalWarmBrush /
               ClaudeOliveGrayBrush / ClaudeStoneGrayBrush / ClaudeDarkWarmBrush /
               ClaudeTerracottaBrush / ClaudeCoralBrush / ClaudeCoralLightBrush / ClaudeErrorBrush /
               ClaudeMutedGreenBrush / ClaudeMutedGreenSoftBrush / ClaudeTerracottaSoftBrush /
               ClaudeBorderCreamBrush / ClaudeBorderWarmBrush /
               ClaudeRingWarmBrush / ClaudeRingDeepBrush /
-              ClaudeWindowSurfaceBrush   ← 亚克力画布 (半透明 Parchment, 铺在窗口根)
-              ClaudeSidebarSurfaceBrush  ← 侧栏面 (半透明 Ivory)
               暗色桩 (定义但不接线): ClaudeDarkSurfaceBrush / ClaudeDeepDarkBrush /
               ClaudeWarmSilverBrush / ClaudeBorderDarkBrush
     阴影 (12): ClaudeShadowHoverRing / ClaudeShadowCtaRing /
@@ -148,16 +146,6 @@
     · 不得引入高饱和色 (仅允许品牌色做强调)
     · 互动态一律用 ring 阴影 (0 0 0 1) 而非投影; pressed 用 inset 环 (Level 4)
     · 标题用 serif, 字重上限 Medium; 正文行高 1.60
-
-  【★ 亚克力分层规则 (换肤必读, 踩过一次)】
-    窗口亚克力要真正可见, 必须三层各司其职, **任何一层放不透明底都会把磨砂彻底盖住**:
-      ① 窗口根 Border  → ClaudeWindowSurfaceBrush (半透明, 让底层模糊透出)
-      ② 侧栏 / 分栏面  → ClaudeSidebarSurfaceBrush (半透明 Ivory, 与画布形成层次)
-      ③ 页面根 / 内容区 → **Transparent** (绝对不要在这里再铺 Parchment!)
-    卡片 (Ivory/Sand) 保持**不透明** —— 半透明画布 + 实心卡片才是正确的视觉层次。
-    历史事故: 初版把页面根与内容区都设成不透明 ClaudeParchmentBrush, 又在画布上用
-    90% alpha, 结果磨砂从任何角度看都不可能显示 (被上层不透明面完全遮住)。
-    调磨砂强度只改 ClaudeWindowSurfaceBrush 的 alpha: 越小越透 (当前 0xB3≈70%)。
   ############################################################################
 -->
 <Styles xmlns="https://github.com/avaloniaui"
@@ -167,7 +155,12 @@
   <!-- ===================== 令牌 (Styles.Resources) ===================== -->
   <Styles.Resources>
 
-    <!-- 画刷: 浅色(18) -->
+    <!-- 画刷: 浅色(18)
+         ⚠ 消费方引用方式约定 (2026-09-22): 各 View 对画刷一律用 {DynamicResource}。
+         缘由: 毛玻璃期间为支持运行期覆写曾把 StaticResource 批量换成 DynamicResource;
+         2026-09-22 毛玻璃功能整体移除后经 QA 复核**保留未回退** —— 二者在无运行期改写时
+         完全等价, 回退 40+ 处属无谓 churn; 且 DynamicResource 为后续运行期换肤/主题切换
+         留了扩展口。新代码请沿用 DynamicResource。 -->
     <SolidColorBrush x:Key="ClaudeParchmentBrush"    Color="#f5f4ed" />
     <SolidColorBrush x:Key="ClaudeIvoryBrush"        Color="#faf9f5" />
     <SolidColorBrush x:Key="ClaudeWhiteBrush"        Color="#ffffff" />
@@ -311,23 +304,6 @@
          基线取生产率工具档 (design-motion-principles): 全部 ≤300ms;
          频率闸门 = 按压/悬停 (高频) 最短, 页面级 (低频) 最长。
          减少动效: 环境变量 KEYFLUX_NO_MOTION=1 时设置页整体跳过入场/展开 (MotionPreferences)。 -->
-
-    <!-- ── 窗口面 (亚克力用) ──
-         Parchment 带 alpha, 供无边框窗口的根 Border 作底色, 让底层模糊透出。
-         alpha 取 0xE6 (≈90%) 是刻意保守: TransparencyLevelHint 只是"提示",
-         平台不支持时 Avalonia 会回落到 None —— 此时若 alpha 过低, 暖底会明显发灰发脏。
-         90% 在 None 下与实心 Parchment 肉眼几乎无差, 在有模糊时能透出材质感。
-         若要更明显的磨砂效果, 只需下调这一个 alpha 值 (越小越透)。 -->
-    <SolidColorBrush x:Key="ClaudeWindowSurfaceBrush"   Color="#B3f5f4ed" />
-    <SolidColorBrush x:Key="ClaudeSidebarSurfaceBrush"  Color="#C4faf9f5" />
-    <!-- ClaudeContentSurfaceBrush: 内容层面 (2026-09-21 新增, 毛玻璃可读性分层)。
-         🔴 页面文字必须坐在这一层上, 不能直接坐在 ClaudeWindowSurfaceBrush 上 ——
-         窗口层随「背景透明度」滑块变透 (accent 亚克力直接顶到文字底下),
-         模糊壁纸的明暗纹理 + 亚克力噪点会在笔画周围形成噪点 (用户报「文字看不清」,
-         连提两次底色浓度治标不治本)。内容层固定 #D9 (≈85%), 文字对比度稳定,
-         毛玻璃只透在窗口边隙/标题条等无文字区 —— 与 Windows 自家面板同构。
-         值取 #D9: 内容区隐约透出模糊壁纸 (Terminal 质感), 文字仍有 ≥90% 有效底色兜住可读性。 -->
-    <SolidColorBrush x:Key="ClaudeContentSurfaceBrush"  Color="#D9f5f4ed" />
 
 
   <!-- ToolTip 无动画直显 (2026-09-13 用户报: 淡入动画结束才显示完整文字)。覆盖 Fluent

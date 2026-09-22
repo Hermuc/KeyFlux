@@ -32,7 +32,6 @@ type (
 	CommandInputSkin  = model.CommandInputSkin
 	QuickSwitchOption = model.QuickSwitchOption
 	PluginsOption     = model.PluginsOption
-	AcrylicOption     = model.AcrylicOption
 	CommandFontOption = model.CommandFontOption
 )
 

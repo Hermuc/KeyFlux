@@ -1,4 +1,3 @@
-using KeyFlux.Settings.Theming;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using KeyFlux.Settings.Services;
@@ -20,7 +19,6 @@ public partial class QuickSwitchDialogWindow : Window
     public QuickSwitchDialogWindow()
     {
         InitializeComponent();
-        WindowSurface.Attach(this, WindowSurface.ContentSurfaceResourceKey); // 真·毛玻璃: 窗口打开时挂 accent 亚克力磨砂 (迟开窗口经此补挂; ContentSurface 供 R3-1 退化恢复)
         Services.Win32.DialogChrome.Apply(this);
         TitleBarIconSuppressor.Attach(this);
         Title = I18n.T("2408");

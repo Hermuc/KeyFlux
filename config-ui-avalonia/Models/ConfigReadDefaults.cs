@@ -137,13 +137,8 @@ public static class ConfigReadDefaults
         options.Plugins ??= new();
         options.Plugins.Disabled ??= [];
 
-        // 亚克力材质: 缺段时给默认 —— 启用 + 透明度 30 (半透明可辨, 又不影响文字可读)。
-        // 与 QuickSwitch 不同这里【不】做"整段为零才补": Enabled=false 是用户显式选择,
-        // 会被覆盖掉。故仅在整段缺失 (null) 时补默认。
-        options.Acrylic ??= new AcrylicOption { Enabled = true, Transparency = 30 };
-
         // 命令框字体: 缺段时补默认 —— 空路径 (沿用现有 bin/font/font.ttf) + 半粗字重。
-        // 同 Acrylic, 只在整段缺失 (null) 时补, 不逐字段覆盖 (用户清空路径是显式选择)。
+        // 只在整段缺失 (null) 时补, 不逐字段覆盖 (用户清空路径是显式选择)。
         options.CommandFont ??= new CommandFontOption
         {
             SourcePath = "",

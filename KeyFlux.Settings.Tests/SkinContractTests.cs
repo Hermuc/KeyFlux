@@ -5,7 +5,6 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using KeyFlux.Settings.Models;
-using KeyFlux.Settings.Theming;
 using KeyFlux.Settings.Services;
 using KeyFlux.Settings.ViewModels;
 using KeyFlux.Settings.Views;
@@ -145,7 +144,7 @@ public sealed class SkinContractTests
 
     // ===================== 皮肤契约强制校验 =====================
 
-    /// <summary>画刷键 (含 4 个暗色桩与窗口亚克力面) —— 与 Styles/Skins/*.axaml 顶部契约清单一致。</summary>
+    /// <summary>画刷键 (含 4 个暗色桩) —— 与 Styles/Skins/*.axaml 顶部契约清单一致。</summary>
     private static readonly string[] BrushKeys =
     [
         "ClaudeParchmentBrush", "ClaudeIvoryBrush", "ClaudeWhiteBrush", "ClaudeSandBrush",
@@ -155,10 +154,6 @@ public sealed class SkinContractTests
         "ClaudeMutedGreenSoftBrush", "ClaudeBorderCreamBrush", "ClaudeBorderWarmBrush",
               "ClaudeRingWarmBrush", "ClaudeRingDeepBrush",
               "ClaudeTerracottaSoftBrush",
-        // 亚克力分层: 画布 (窗口根) + 侧栏面, 二者必须带 alpha 且存在于任何皮肤中
-        "ClaudeWindowSurfaceBrush", "ClaudeSidebarSurfaceBrush",
-        // 内容层面 (2026-09-21 毛玻璃可读性分层): 页面文字的承载层, 近实色
-        "ClaudeContentSurfaceBrush",
         // 暗色桩: 定义但不接线, 仍纳入契约以免新增皮肤时漏掉
         "ClaudeDarkSurfaceBrush", "ClaudeDeepDarkBrush", "ClaudeWarmSilverBrush",
         "ClaudeBorderDarkBrush",
@@ -468,190 +463,28 @@ public sealed class SkinContractTests
     }
 
     /// <summary>
-    /// 亚克力透明度的换算契约 —— 重点是用户明确要求的
-    /// **「透明度为零时必须设置好背景颜色」**: 透明度 0 表示"不要透明",
-    /// 此时底色 alpha 必须是 255 (实心 Parchment), 否则窗口会把画面叠在背后
-    /// 未知像素上, 表现为发灰/花屏/文字糊。
+    /// 契约 (2026-09-22 移除毛玻璃后): 窗口/页面全部不透明 —— 窗口底 Parchment
+    /// 与卡片面 Ivory 都必须实色 (alpha=255); 旧的三个半透明面令牌已删除,
+    /// 应用资源中不得再解析到它们 (防透明度回归)。
     /// </summary>
     [AvaloniaFact]
-    public void Acrylic_Transparency_Zero_Yields_Opaque_Background()
-    {
-        // 未启用 / 段缺失 -> 实心
-        Assert.Equal(1.0, WindowSurface.OpacityFor(null));
-        Assert.Equal(1.0, WindowSurface.OpacityFor(new AcrylicOption { Enabled = false, Transparency = 80 }));
-
-        // ★ 透明度 0 -> 完全不透明, 且画刷 alpha 必须是 255
-        var atZero = WindowSurface.CreateBrush(new AcrylicOption { Enabled = true, Transparency = 0 });
-        Assert.Equal(1.0, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 0 }));
-        Assert.Equal((byte)255, atZero.Color.A);
-
-        // 中间值按比例 (2026-09-21 MinOpacity 回落 0.35: 可读性改由内容层保证)
-        Assert.Equal(0.7, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 30 }), 5);
-
-        // 100 -> 夹到最小不透明度 (不能真的全透明, 否则文字不可读)
-        Assert.Equal(WindowSurface.MinOpacity, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 100 }), 5);
-
-        // 越界值被夹紧, 不产生非法 alpha
-        Assert.Equal(1.0, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = -50 }));
-        Assert.Equal(WindowSurface.MinOpacity, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 9999 }), 5);
-    }
-
-    /// <summary>
-    /// Apply() 应真的改写应用资源, 使所有以 DynamicResource 取底色的窗口跟随。
-    /// (2026-09-22 accent 通道: 非 solid 时窗口层画刷置**全透明** —— accent 的
-    /// GradientColor 暖纱充当唯一窗口色调, 画刷再叠 alpha 会双重变实。)
-    /// </summary>
-    [AvaloniaFact]
-    public void Acrylic_Apply_Updates_The_Shared_Surface_Resource()
+    public void Skin_Contract_Windows_And_Cards_Are_Fully_Opaque()
     {
         var app = Application.Current!;
 
-        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 0 });
-        Assert.True(app.TryFindResource(WindowSurface.SurfaceResourceKey, out var opaque));
-        Assert.Equal((byte)255, ((ISolidColorBrush)opaque!).Color.A);
+        Assert.True(app.TryFindResource("ClaudeParchmentBrush", out var parchment));
+        Assert.Equal((byte)255, ((ISolidColorBrush)parchment!).Color.A);
+        Assert.True(app.TryFindResource("ClaudeIvoryBrush", out var ivory));
+        Assert.Equal((byte)255, ((ISolidColorBrush)ivory!).Color.A);
 
-        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 60 });
-        Assert.True(app.TryFindResource(WindowSurface.SurfaceResourceKey, out var translucent));
-        Assert.Equal((byte)0, ((ISolidColorBrush)translucent!).Color.A);
-
-        // 复原, 避免影响同集合内其它用例
-        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 30 });
-    }
-
-    /// <summary>
-    /// accent 暖纱 GradientColor 映射契约 (2026-09-22 accent 通道回归锁)。
-    /// AABBGGRR (Parchment #f5f4ed: B=0xED, G=0xF4, R=0xF5),
-    /// alpha = clamp(255 - T*255/100, 0, 255)。
-    /// </summary>
-    [AvaloniaFact]
-    public void Accent_GradientColor_Maps_Transparency_To_AABBGGRR()
-    {
-        // T=100 -> 0x00 (纯磨砂无暖纱)
-        Assert.Equal(0x00EDF4F5u, WindowSurface.BuildAccentGradientColor(
-            new AcrylicOption { Enabled = true, Transparency = 100 }));
-
-        // T=50 -> 255-127=128=0x80
-        Assert.Equal(0x80EDF4F5u, WindowSurface.BuildAccentGradientColor(
-            new AcrylicOption { Enabled = true, Transparency = 50 }));
-
-        // T=0 / 未启用 / 段缺失 -> 实色 (AccentState=DISABLED, 值不被消费但须确定)
-        Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(
-            new AcrylicOption { Enabled = true, Transparency = 0 }));
-        Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(
-            new AcrylicOption { Enabled = false, Transparency = 80 }));
-        Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(null));
-
-        // 越界值被夹紧: T<0 按 0 (实色), T>100 按 100 (纯磨砂)
-        Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(
-            new AcrylicOption { Enabled = true, Transparency = -50 }));
-        Assert.Equal(0x00EDF4F5u, WindowSurface.BuildAccentGradientColor(
-            new AcrylicOption { Enabled = true, Transparency = 9999 }));
-    }
-
-    /// <summary>
-    /// ContentSurface 随 Apply() 联动的契约 (2026-09-22 R1 回归锁)。
-    /// 8 个对话框 Window.Background 固定消费 ClaudeContentSurfaceBrush,
-    /// 「透明度=0 / 毛玻璃关闭」时若不联动为实色, 对话框会以 85% 半透明
-    /// 直接叠在锐利桌面上 (DWMSBT_NONE 无模糊), 违反
-    /// 「透明度为零时必须设置好背景颜色」的需求。
-    /// </summary>
-    [AvaloniaFact]
-    public void Acrylic_Apply_Updates_The_Content_Surface_Resource()
-    {
-        var app = Application.Current!;
-
-        // solid 路径: 段缺失 / 未启用 / 透明度 0 -> 实色 (alpha=255)
-        WindowSurface.Apply(null);
-        Assert.True(app.TryFindResource(WindowSurface.ContentSurfaceResourceKey, out var missing));
-        Assert.Equal((byte)255, ((ISolidColorBrush)missing!).Color.A);
-
-        WindowSurface.Apply(new AcrylicOption { Enabled = false, Transparency = 50 });
-        Assert.True(app.TryFindResource(WindowSurface.ContentSurfaceResourceKey, out var disabled));
-        Assert.Equal((byte)255, ((ISolidColorBrush)disabled!).Color.A);
-
-        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 0 });
-        Assert.True(app.TryFindResource(WindowSurface.ContentSurfaceResourceKey, out var zero));
-        Assert.Equal((byte)255, ((ISolidColorBrush)zero!).Color.A);
-
-        // 非 solid 路径: 保持半透明, 与皮肤静态定义同值, 防止再漂移
-        // (T=10 -> OpacityFor=0.9, 但内容层是固定 85% 的独立画刷, 不随滑块缩放)
-        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 10 });
-        Assert.True(app.TryFindResource(WindowSurface.ContentSurfaceResourceKey, out var translucent));
-        var translucentColor = ((ISolidColorBrush)translucent!).Color;
-        Assert.Equal(Color.Parse("#D9f5f4ed"), translucentColor);
-        Assert.True(translucentColor.A >= 0xB0 && translucentColor.A < 0xFF,
-            $"ContentSurface alpha=0x{translucentColor.A:X2} 应落在 [0xB0, 0xFF) —— 过实无毛玻璃感, 过透文字不可读");
-
-        // 复原, 避免影响同集合内其它用例
-        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 30 });
-    }
-
-    /// <summary>
-    /// R3-1 回归锁: accent 失败兜底的恢复写法必须重建 DynamicResource 语义。
-    /// ApplyAccent 恢复分支用 <c>window[!Window.BackgroundProperty] = new
-    /// DynamicResourceExtension(key)</c> 撤销本地兜底画刷 —— 该路径只在 accent
-    /// 失败平台上才运行, 本机 (accent ok) 永不可达, 故用 headless 探针直接验证
-    /// 该写法的运行时语义: ① 属性上不得残留扩展对象本体; ② 必须随资源键的
-    /// 后续覆写联动 (与 XAML <c>{DynamicResource}</c> 一致), 否则 fail→solid
-    /// 的 T=0 实色契约在恢复后依然失灵。
-    /// </summary>
-    [AvaloniaFact]
-    public void Accent_Fallback_Restore_Rebinds_DynamicResource()
-    {
-        var app = Application.Current!;
-        var window = new Window();
-
-        try
+        // 旧半透明面令牌已随毛玻璃移除, 不得回归
+        foreach (var gone in new[]
+                 {
+                     "ClaudeWindowSurfaceBrush", "ClaudeSidebarSurfaceBrush",
+                     "ClaudeContentSurfaceBrush",
+                 })
         {
-            // 模拟兜底: 本地值接管 (与 ApplyAccent 失败分支同款写法)
-            window.Background = WindowSurface.CreateBrush(
-                new AcrylicOption { Enabled = true, Transparency = 30 });
-            Assert.Equal((byte)178, ((ISolidColorBrush)window.Background!).Color.A); // 0.70*255
-
-            // 恢复分支同款写法: indexer + DynamicResourceExtension
-            window[!Window.BackgroundProperty] =
-                new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension(
-                    WindowSurface.SurfaceResourceKey);
-
-            // ① 属性上不得是扩展对象本体 (否则渲染期 InvalidCastException)
-            Assert.IsNotType<Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension>(
-                window.Background);
-
-            // ② 动态联动必须活着: 挂树后解析, 资源键覆写即跟随
-            app.Resources[WindowSurface.SurfaceResourceKey] = WindowSurface.CreateBrush(
-                new AcrylicOption { Enabled = true, Transparency = 0 }); // solid → 实色
-            window.Show();
-            Dispatcher.UIThread.RunJobs();
-
-            var bg = Assert.IsAssignableFrom<ISolidColorBrush>(window.Background);
-            Assert.Equal((byte)255, bg.Color.A); // T=0 实色 Parchment → DR 已解析并跟随
+            Assert.False(app.TryFindResource(gone, out _), $"毛玻璃令牌应已删除: {gone}");
         }
-        finally
-        {
-            window.Close();
-            // 复原, 避免影响同集合内其它用例
-            WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 30 });
-        }
-    }
-
-    /// <summary>
-    /// 契约: 亚克力画布必须是**真的半透明**, 且透明度要够 (alpha ≤ 0xCC)。
-    /// 历史事故回归锁 —— 初版 alpha 取 0xE6 (90%) 且页面根另铺不透明 Parchment,
-    /// 磨砂从任何角度看都不可能显示。此处锁住 alpha 上限, 避免再被"保守化"回去。
-    /// </summary>
-    [AvaloniaFact]
-    public void Skin_Contract_Acrylic_Canvas_Is_Actually_Translucent()
-    {
-        var app = Application.Current!;
-
-        Assert.True(app.TryFindResource("ClaudeWindowSurfaceBrush", out var canvas));
-        var canvasColor = ((ISolidColorBrush)canvas!).Color;
-        Assert.True(canvasColor.A < 255, "亚克力画布不能完全不透明, 否则磨砂永远不可见");
-        Assert.True(canvasColor.A <= 0xCC,
-            $"亚克力画布 alpha=0x{canvasColor.A:X2} 过高 (>0xCC≈80%), 磨砂将几乎不可见");
-
-        // 侧栏同为半透明面
-        Assert.True(app.TryFindResource("ClaudeSidebarSurfaceBrush", out var sidebar));
-        Assert.True(((ISolidColorBrush)sidebar!).Color.A < 255);
     }
 }

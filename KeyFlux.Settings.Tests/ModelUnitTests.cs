@@ -94,7 +94,6 @@ public sealed class ModelSerializationTests
                 "hideMatrix", "keyfluxVersion", "windowGroups", "mouse", "scroll",
                 "commandInputSkin", "pathVariables", "startup", "language", "keyMapping", "keyboardLayout",
                 "quickSwitch", "plugins",
-                "acrylic", // 纯 UI 呈现项 (窗口亚克力材质), 与 Go struct AcrylicOption 同名
                 "commandFont", // 命令框字体 (生成端按 sourcePath 复制到 bin/font/font.ttf)
             },
             keys);
@@ -113,10 +112,6 @@ public sealed class ModelSerializationTests
 
         var pluginsKeys = doc.RootElement.GetProperty("plugins").EnumerateObject().Select(p => p.Name).ToHashSet();
         Assert.Equal(new HashSet<string> { "disabled" }, pluginsKeys);
-
-        // acrylic 段: 两个键齐备, 且字段名与 Go tag 一致
-        var acrylicKeys = doc.RootElement.GetProperty("acrylic").EnumerateObject().Select(p => p.Name).ToHashSet();
-        Assert.Equal(new HashSet<string> { "enabled", "transparency" }, acrylicKeys);
 
         var mouseKeys = doc.RootElement.GetProperty("mouse").EnumerateObject().Select(p => p.Name).ToHashSet();
         Assert.Equal(

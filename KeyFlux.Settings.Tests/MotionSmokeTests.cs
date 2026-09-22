@@ -17,7 +17,7 @@ namespace KeyFlux.Settings.Tests;
 /// 设置面板动效守护 (2026-09-13 动效批次):
 /// ① 设置页根类 .motion 与系统动效偏好一致 —— 用户关闭「动画效果」时入场级联/分区展开
 ///    整体跳过的唯一开关 (XAML 动画选择器均以 .motion 开头);
-/// ② 8 个分区体挂 sectionBody 类 (open 动画的锚点), 手风琴展开时 open 类与 IsVisible 同步;
+/// ② 7 个分区体挂 sectionBody 类 (open 动画的锚点), 手风琴展开时 open 类与 IsVisible 同步;
 /// ③ 主窗页面切换宿主 = TransitioningContentControl + 皮肤令牌时长的 CrossFade。
 /// 注: 动画本身不在此断言 (headless 时钟推进不确定), 只锁结构与接线; 观感由实机验证。
 /// </summary>
@@ -53,11 +53,12 @@ public sealed class MotionSmokeTests
         {
             var bodies = view.GetVisualDescendants().OfType<StackPanel>()
                 .Where(p => p.Classes.Contains("sectionBody")).ToList();
-            // 8 = 语言/自定义热键/鼠标参数/键盘布局/触发延时/命令框皮肤/窗口毛玻璃/路径变量
+            // 7 = 语言/自定义热键/鼠标参数/键盘布局/触发延时/命令框皮肤/路径变量
             //     —— 「程序分组」卡是 Click 事件而非 sectionBody。
             //     2026-09-20 曾因新增**独立**「命令框字体」卡增至 9; 2026-09-21 该卡并入
-            //     「命令框皮肤」卡 (共用同一 ShowSkin 分区体) ⇒ 回到 8。
-            Assert.Equal(8, bodies.Count);
+            //     「命令框皮肤」卡 (共用同一 ShowSkin 分区体) ⇒ 8;
+            //     2026-09-22 移除「窗口毛玻璃」卡 ⇒ 7。
+            Assert.Equal(7, bodies.Count);
 
             // 手风琴展开: open 类与 IsVisible 必须绑定同一 Show* 源, 展开动画才有触发时机
             vm.ToggleSectionCommand.Execute("mouse");
