@@ -498,6 +498,8 @@ public sealed class SkinContractTests
 
     /// <summary>
     /// Apply() 应真的改写应用资源, 使所有以 DynamicResource 取底色的窗口跟随。
+    /// (2026-09-22 accent 通道: 非 solid 时窗口层画刷置**全透明** —— accent 的
+    /// GradientColor 暖纱充当唯一窗口色调, 画刷再叠 alpha 会双重变实。)
     /// </summary>
     [AvaloniaFact]
     public void Acrylic_Apply_Updates_The_Shared_Surface_Resource()
@@ -510,10 +512,40 @@ public sealed class SkinContractTests
 
         WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 60 });
         Assert.True(app.TryFindResource(WindowSurface.SurfaceResourceKey, out var translucent));
-        Assert.True(((ISolidColorBrush)translucent!).Color.A < 255);
+        Assert.Equal((byte)0, ((ISolidColorBrush)translucent!).Color.A);
 
         // 复原, 避免影响同集合内其它用例
         WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 30 });
+    }
+
+    /// <summary>
+    /// accent 暖纱 GradientColor 映射契约 (2026-09-22 accent 通道回归锁)。
+    /// AABBGGRR (Parchment #f5f4ed: B=0xED, G=0xF4, R=0xF5),
+    /// alpha = clamp(255 - T*255/100, 0x2E, 255)。
+    /// </summary>
+    [AvaloniaFact]
+    public void Accent_GradientColor_Maps_Transparency_To_AABBGGRR()
+    {
+        // T=100 -> 夹到下限 0x2E (≈18% 暖纱, 磨砂最强)
+        Assert.Equal(0x2EEDF4F5u, WindowSurface.BuildAccentGradientColor(
+            new AcrylicOption { Enabled = true, Transparency = 100 }));
+
+        // T=50 -> 255-127=128=0x80
+        Assert.Equal(0x80EDF4F5u, WindowSurface.BuildAccentGradientColor(
+            new AcrylicOption { Enabled = true, Transparency = 50 }));
+
+        // T=0 / 未启用 / 段缺失 -> 实色 (AccentState=DISABLED, 值不被消费但须确定)
+        Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(
+            new AcrylicOption { Enabled = true, Transparency = 0 }));
+        Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(
+            new AcrylicOption { Enabled = false, Transparency = 80 }));
+        Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(null));
+
+        // 越界值被夹紧: T<0 按 0 (实色), T>100 按 100 (下限)
+        Assert.Equal(0xFFEDF4F5u, WindowSurface.BuildAccentGradientColor(
+            new AcrylicOption { Enabled = true, Transparency = -50 }));
+        Assert.Equal(0x2EEDF4F5u, WindowSurface.BuildAccentGradientColor(
+            new AcrylicOption { Enabled = true, Transparency = 9999 }));
     }
 
     /// <summary>
@@ -552,6 +584,54 @@ public sealed class SkinContractTests
 
         // 复原, 避免影响同集合内其它用例
         WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 30 });
+    }
+
+    /// <summary>
+    /// R3-1 回归锁: accent 失败兜底的恢复写法必须重建 DynamicResource 语义。
+    /// ApplyAccent 恢复分支用 <c>window[!Window.BackgroundProperty] = new
+    /// DynamicResourceExtension(key)</c> 撤销本地兜底画刷 —— 该路径只在 accent
+    /// 失败平台上才运行, 本机 (accent ok) 永不可达, 故用 headless 探针直接验证
+    /// 该写法的运行时语义: ① 属性上不得残留扩展对象本体; ② 必须随资源键的
+    /// 后续覆写联动 (与 XAML <c>{DynamicResource}</c> 一致), 否则 fail→solid
+    /// 的 T=0 实色契约在恢复后依然失灵。
+    /// </summary>
+    [AvaloniaFact]
+    public void Accent_Fallback_Restore_Rebinds_DynamicResource()
+    {
+        var app = Application.Current!;
+        var window = new Window();
+
+        try
+        {
+            // 模拟兜底: 本地值接管 (与 ApplyAccent 失败分支同款写法)
+            window.Background = WindowSurface.CreateBrush(
+                new AcrylicOption { Enabled = true, Transparency = 30 });
+            Assert.Equal((byte)178, ((ISolidColorBrush)window.Background!).Color.A); // 0.70*255
+
+            // 恢复分支同款写法: indexer + DynamicResourceExtension
+            window[!Window.BackgroundProperty] =
+                new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension(
+                    WindowSurface.SurfaceResourceKey);
+
+            // ① 属性上不得是扩展对象本体 (否则渲染期 InvalidCastException)
+            Assert.IsNotType<Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension>(
+                window.Background);
+
+            // ② 动态联动必须活着: 挂树后解析, 资源键覆写即跟随
+            app.Resources[WindowSurface.SurfaceResourceKey] = WindowSurface.CreateBrush(
+                new AcrylicOption { Enabled = true, Transparency = 0 }); // solid → 实色
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var bg = Assert.IsAssignableFrom<ISolidColorBrush>(window.Background);
+            Assert.Equal((byte)255, bg.Color.A); // T=0 实色 Parchment → DR 已解析并跟随
+        }
+        finally
+        {
+            window.Close();
+            // 复原, 避免影响同集合内其它用例
+            WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 30 });
+        }
     }
 
     /// <summary>

@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using KeyFlux.Settings.Models;
 
@@ -27,10 +29,17 @@ namespace KeyFlux.Settings.Theming;
 /// 故夹 <see cref="MinOpacity"/>。
 /// </para>
 /// <para>
+/// <b>磨砂通道 (2026-09-22 定案)</b>: <c>SetWindowCompositionAttribute(WCA_ACCENT_POLICY=19,
+/// ACCENT_ENABLE_ACRYLICBLURBEHIND)</c> —— 24H2 探针实测返回 True 且渲染出强磨砂
+/// (用户目视确认 Terminal 观感)。DWMSBT 路线在 Avalonia 窗口上返回成功但不渲染材质,
+/// 已废弃。非 solid 时窗口层画刷置**全透明**, accent 的 GradientColor 暖纱
+/// (Parchment, alpha 随滑块) 充当唯一窗口色调; solid 时 ACCENT_DISABLED + 实色画刷。
+/// </para>
+/// <para>
 /// <b>ContentSurface 随 Apply 联动</b>: 8 个对话框 Window.Background 固定消费
 /// ClaudeContentSurfaceBrush (皮肤静态默认 85% 半透明); solid 模式
 /// (透明度=0 / 未启用 / 段缺失) 时 Apply 同步把它覆写为实色 Parchment ——
-/// 否则毛玻璃关闭时 DWMSBT_NONE 无模糊, 对话框会以 85% 半透明直接叠在锐利桌面上。
+/// 否则毛玻璃关闭时无磨砂材质, 对话框会以 85% 半透明直接叠在锐利桌面上。
 /// </para>
 /// </summary>
 public static class WindowSurface
@@ -88,10 +97,16 @@ public static class WindowSurface
     {
         _lastOption = option;
         var resources = Application.Current!.Resources;
-        resources[SurfaceResourceKey] = CreateBrush(option);
+        bool solid = option is null || !option.Enabled || option.Transparency <= 0;
+
+        // 窗口层 (2026-09-22 accent 通道): 非 solid 时置**全透明** —— accent 的
+        // GradientColor 暖纱充当唯一的窗口色调, 画刷再叠 alpha 会双重变实。
+        // solid 时维持原契约: 实色 Parchment。
+        resources[SurfaceResourceKey] = solid
+            ? CreateBrush(option)
+            : new SolidColorBrush(Colors.Transparent);
 
         // 内容层联动 (2026-09-22 R1): solid 模式下对话框不能再坐在 85% 半透明上
-        bool solid = option is null || !option.Enabled || option.Transparency <= 0;
         resources[ContentSurfaceResourceKey] = solid
             ? CreateBrush(null)   // 实色 Parchment (alpha=255)
             : new SolidColorBrush(Color.Parse("#D9f5f4ed")); // 与皮肤静态定义同值
@@ -100,7 +115,7 @@ public static class WindowSurface
         if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             foreach (var window in desktop.Windows)
-                ApplyBackdrop(window, option);
+                ApplyAccent(window, option);
         }
     }
 
@@ -110,60 +125,154 @@ public static class WindowSurface
     /// <summary>
     /// 窗口打开时应用当前毛玻璃设置 (各窗口 ctor 调一次) —— 覆盖「在主窗口之后才打开」
     /// 的对话框: <see cref="Apply"/> 只遍历已打开窗口, 迟开者须经本入口补挂。
+    /// <para>
+    /// <paramref name="backgroundResourceKey"/>: 该窗口 Background 原本消费的资源键
+    /// (主窗 = <see cref="SurfaceResourceKey"/>, 8 对话框 = <see cref="ContentSurfaceResourceKey"/>)。
+    /// accent 失败退化会写**本地值**盖住动态绑定 (R3-1), 恢复时按此键还原。
+    /// </para>
     /// </summary>
-    public static void Attach(Window window)
+    public static void Attach(Window window, string backgroundResourceKey)
     {
-        window.Opened += (_, _) => ApplyBackdrop(window, _lastOption);
+        _backgroundKeys[window] = backgroundResourceKey;
+        // Closed 时移除注册, 防窗口关闭后字典泄漏
+        window.Closed += (_, _) =>
+        {
+            _backgroundKeys.Remove(window);
+            _fallbackActive.Remove(window);
+        };
+        window.Opened += (_, _) => ApplyAccent(window, _lastOption);
     }
 
-    // ---- 真·毛玻璃: Win11 22H2+ DWM 系统背景材质 ----
+    /// <summary>Attach 注册的窗口 -> 其 Background 消费的资源键 (退化恢复用, R3-1)。</summary>
+    private static readonly Dictionary<Window, string> _backgroundKeys = new();
 
-    private const int DwmwaSystembackdropType = 38;   // DWMWA_SYSTEMBACKDROP_TYPE
-    private const int DwmsbtNone = 1;                 // DWMSBT_NONE: 无材质
-    private const int DwmsbtTransientWindow = 3;      // DWMSBT_TRANSIENTWINDOW: 亚克力(毛玻璃)
+    /// <summary>当前处于「本地画刷兜底」状态的窗口 (Background 被本地值接管, R3-1)。</summary>
+    private static readonly HashSet<Window> _fallbackActive = new();
 
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+    // ---- 真·毛玻璃: SetWindowCompositionAttribute accent 通道 ----
+    //
+    // 🔴 2026-09-22 路线定案 (两轮探针实测):
+    //  · DWMSBT (DwmSetWindowAttribute/DWMWA_SYSTEMBACKDROP_TYPE) 在 Avalonia 窗口上
+    //    返回成功 (hr=0) 但**不渲染材质** —— 视觉是「锐利壁纸 + 轻纱」, 已废弃。
+    //  · SetWindowCompositionAttribute(WCA_ACCENT_POLICY=19, ACCENT_ENABLE_ACRYLICBLURBEHIND=4)
+    //    在本机 Win11 24H2 返回 True 且渲染出强磨砂 (用户截图确认 Terminal 观感)。
+    //    早期「24H2 accent 失效」的论断是探针自身枚举 bug (WCA 写成 1, 正确 19) 误导。
+    // ⚠ WCA_ACCENT_POLICY = 19 —— 写 1 (NCRENDERING_ENABLED) 必返回 err 87。
+    private const int WcaAccentPolicy = 19;              // WCA_ACCENT_POLICY
+    private const int AccentStateDisabled = 0;           // ACCENT_DISABLED
+    private const int AccentStateAcrylicBlurBehind = 4;  // ACCENT_ENABLE_ACRYLICBLURBEHIND
+    private const int AccentFlagsProbe = 2;              // 与探针一致 (值 2)
 
     /// <summary>
-    /// 给窗口挂/摘 DWM 系统毛玻璃材质。
+    /// 非 solid 时暖纱 alpha 下限 (0x2E ≈ 18%): T=100 时磨砂最强, 仍留一丝暖色调。
+    /// </summary>
+    public const byte MinAccentAlpha = 0x2E;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct AccentPolicy
+    {
+        public int AccentState;
+        public int AccentFlags;
+        public uint GradientColor;
+        public int AnimationId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowCompositionAttributeData
+    {
+        public int Attribute;
+        public IntPtr Data;
+        public int SizeOfData;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
+
+    /// <summary>
+    /// 由配置算出 accent 暖纱 GradientColor (AABBGGRR, Parchment #f5f4ed)。
+    /// alpha = clamp(255 - T*255/100, 0x2E, 255): T=100 -> 0x2E (18%, 磨砂最强),
+    /// T 越小越实。solid 输入 (null/未启用/T=0) 按 T=0 处理 -> 0xFF 实色
+    /// (此时 AccentState=DISABLED, 该值不被消费, 返回确定值便于测试)。
+    /// </summary>
+    internal static uint BuildAccentGradientColor(AcrylicOption? option)
+    {
+        var p = Color.Parse(ClaudePalette.Parchment);
+        int t = option is { Enabled: true } ? Math.Clamp(option.Transparency, 0, 100) : 0;
+        int alpha = Math.Clamp(255 - t * 255 / 100, MinAccentAlpha, 255);
+        return ((uint)alpha << 24) | ((uint)p.B << 16) | ((uint)p.G << 8) | p.R;
+    }
+
+    /// <summary>
+    /// 给窗口挂/摘 accent 亚克力磨砂。
     /// <para>
-    /// 🔴 为什么不走 TransparencyLevelHint 的 Blur/AcrylicBlur (2026-09-21):
-    /// Win11 24H2 上 SetWindowCompositionAttribute 的 ACCENT_ENABLE_BLURBEHIND /
-    /// ACCENT_ENABLE_ACRYLICBLURBEHIND 已被微软**静默失效** (实测: 窗口只透不糊,
-    /// 壁纸锐利可见) —— Avalonia 的这两个透明级别走的正是该旧 API, 提示列表
-    /// 「Blur,AcrylicBlur,Transparent」逐级尝试后实际停在 Transparent。
-    /// 系统官方替代 = DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE):
-    /// DWMSBT_TRANSIENTWINDOW (亚克力) / DWMSBT_NONE (无)。Win10 及更早调用失败
-    /// 返回非 0 且无副作用, 行为退化回「仅半透明」= 原状, 不会崩。
-    /// </para>
-    /// <para>
-    /// 材质分层: 系统毛玻璃在最底, 上面叠本类的半透明 Parchment 底色刷 ——
-    /// 透明度滑块照常控制暖色调浓度, 模糊由系统提供。
+    /// 毛玻璃开且 T>0 -> ACCENT_ENABLE_ACRYLICBLURBEHIND + Parchment 暖纱
+    /// (alpha 随「背景透明度」滑块); solid -> ACCENT_DISABLED。
+    /// 失败 (返回 False, 如 Win10 部分版本/远程会话) 且为毛玻璃模式时, 把该窗口
+    /// Background 直接覆写为半透明 Parchment 画刷 —— 退化为「仅半透明」的原画刷
+    /// 路径, 不至于全透看穿锐利桌面。
     /// </para>
     /// </summary>
-    public static void ApplyBackdrop(Window window, AcrylicOption? option)
+    public static void ApplyAccent(Window window, AcrylicOption? option)
     {
+        bool frost = option is { Enabled: true, Transparency: > 0 };
         try
         {
             var hwnd = window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
             if (hwnd == IntPtr.Zero)
                 return;
-            int backdrop = option is { Enabled: true, Transparency: > 0 }
-                ? DwmsbtTransientWindow
-                : DwmsbtNone;
-            int hr = DwmSetWindowAttribute(hwnd, DwmwaSystembackdropType, ref backdrop, sizeof(int));
 
-            // 诊断日志 (验证期暂留, 确认毛玻璃生效后移除): 记录挂载结果与提示的透明级别
+            var policy = new AccentPolicy
+            {
+                AccentState = frost ? AccentStateAcrylicBlurBehind : AccentStateDisabled,
+                AccentFlags = AccentFlagsProbe,
+                GradientColor = BuildAccentGradientColor(option),
+                AnimationId = 0,
+            };
+            int size = Marshal.SizeOf<AccentPolicy>();
+            IntPtr policyPtr = Marshal.AllocHGlobal(size);
             try
             {
-                File.AppendAllText(
-                    Path.Combine(Path.GetTempPath(), "kf_acrylic.log"),
-                    $"{DateTime.Now:HH:mm:ss} hwnd=0x{hwnd.ToInt64():X} title={window.Title} backdrop={backdrop} hr={hr} hint={string.Join(",", window.TransparencyLevelHint)}\n");
+                Marshal.StructureToPtr(policy, policyPtr, false);
+                var data = new WindowCompositionAttributeData
+                {
+                    Attribute = WcaAccentPolicy,
+                    Data = policyPtr,
+                    SizeOfData = size,
+                };
+                bool ok = SetWindowCompositionAttribute(hwnd, ref data);
+                int err = Marshal.GetLastWin32Error();
+
+                if (!ok && frost && _backgroundKeys.ContainsKey(window))
+                {
+                    // 退化: accent 挂不上 -> 该窗口直接坐回半透明 Parchment 画刷
+                    // (本地兜底; 仅限经 Attach 注册过资源键的窗口, 否则日后无法还原)
+                    window.Background = CreateBrush(option);
+                    _fallbackActive.Add(window);
+                }
+                else if (_fallbackActive.Remove(window))
+                {
+                    // 恢复 (accent ok / 切 solid): 撤销本地兜底, 还原 Background
+                    // 动态资源绑定 —— 本地值会永久盖住资源, 不还原则 T=0 实色契约
+                    // 和滑块联动双双失灵 (R3-1)
+                    if (_backgroundKeys.TryGetValue(window, out var restoreKey))
+                        window[!Window.BackgroundProperty] = new DynamicResourceExtension(restoreKey);
+                }
+
+                // 诊断日志 (验证期暂留, 确认毛玻璃生效后移除)
+                try
+                {
+                    File.AppendAllText(
+                        Path.Combine(Path.GetTempPath(), "kf_acrylic.log"),
+                        $"{DateTime.Now:HH:mm:ss} hwnd=0x{hwnd.ToInt64():X} title={window.Title} accent={(ok ? "ok" : "FAIL")} err={err} state={policy.AccentState} alpha=0x{(policy.GradientColor >> 24) & 0xFF:X2} hint={string.Join(",", window.TransparencyLevelHint)}\n");
+                }
+                catch
+                {
+                    // 日志失败不影响功能
+                }
             }
-            catch
+            finally
             {
-                // 日志失败不影响功能
+                Marshal.FreeHGlobal(policyPtr);
             }
         }
         catch

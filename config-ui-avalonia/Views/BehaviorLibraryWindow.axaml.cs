@@ -20,7 +20,7 @@ public partial class BehaviorLibraryWindow : Window
     public BehaviorLibraryWindow()
     {
         InitializeComponent();
-        WindowSurface.Attach(this); // 真·毛玻璃: 窗口打开时挂 DWM 系统背景材质 (迟开窗口经此补挂)
+        WindowSurface.Attach(this, WindowSurface.ContentSurfaceResourceKey); // 真·毛玻璃: 窗口打开时挂 accent 亚克力磨砂 (迟开窗口经此补挂; ContentSurface 供 R3-1 退化恢复)
         Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => (DataContext as BehaviorLibraryViewModel)?.UnsubscribeLanguage();
     }
