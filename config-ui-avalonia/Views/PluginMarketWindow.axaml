@@ -5,7 +5,7 @@
         x:Name="DlgRoot"
         x:DataType="vm:PluginMarketViewModel"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
+        Background="{DynamicResource ClaudeContentSurfaceBrush}"
         Title="Setting"
         Width="640" Height="560"
         WindowStartupLocation="CenterOwner">

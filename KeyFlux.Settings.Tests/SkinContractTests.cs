@@ -157,6 +157,8 @@ public sealed class SkinContractTests
               "ClaudeTerracottaSoftBrush",
         // 亚克力分层: 画布 (窗口根) + 侧栏面, 二者必须带 alpha 且存在于任何皮肤中
         "ClaudeWindowSurfaceBrush", "ClaudeSidebarSurfaceBrush",
+        // 内容层面 (2026-09-21 毛玻璃可读性分层): 页面文字的承载层, 近实色
+        "ClaudeContentSurfaceBrush",
         // 暗色桩: 定义但不接线, 仍纳入契约以免新增皮肤时漏掉
         "ClaudeDarkSurfaceBrush", "ClaudeDeepDarkBrush", "ClaudeWarmSilverBrush",
         "ClaudeBorderDarkBrush",
@@ -483,7 +485,7 @@ public sealed class SkinContractTests
         Assert.Equal(1.0, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 0 }));
         Assert.Equal((byte)255, atZero.Color.A);
 
-        // 中间值按比例
+        // 中间值按比例 (2026-09-21 MinOpacity 回落 0.35: 可读性改由内容层保证)
         Assert.Equal(0.7, WindowSurface.OpacityFor(new AcrylicOption { Enabled = true, Transparency = 30 }), 5);
 
         // 100 -> 夹到最小不透明度 (不能真的全透明, 否则文字不可读)
@@ -509,6 +511,44 @@ public sealed class SkinContractTests
         WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 60 });
         Assert.True(app.TryFindResource(WindowSurface.SurfaceResourceKey, out var translucent));
         Assert.True(((ISolidColorBrush)translucent!).Color.A < 255);
+
+        // 复原, 避免影响同集合内其它用例
+        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 30 });
+    }
+
+    /// <summary>
+    /// ContentSurface 随 Apply() 联动的契约 (2026-09-22 R1 回归锁)。
+    /// 8 个对话框 Window.Background 固定消费 ClaudeContentSurfaceBrush,
+    /// 「透明度=0 / 毛玻璃关闭」时若不联动为实色, 对话框会以 85% 半透明
+    /// 直接叠在锐利桌面上 (DWMSBT_NONE 无模糊), 违反
+    /// 「透明度为零时必须设置好背景颜色」的需求。
+    /// </summary>
+    [AvaloniaFact]
+    public void Acrylic_Apply_Updates_The_Content_Surface_Resource()
+    {
+        var app = Application.Current!;
+
+        // solid 路径: 段缺失 / 未启用 / 透明度 0 -> 实色 (alpha=255)
+        WindowSurface.Apply(null);
+        Assert.True(app.TryFindResource(WindowSurface.ContentSurfaceResourceKey, out var missing));
+        Assert.Equal((byte)255, ((ISolidColorBrush)missing!).Color.A);
+
+        WindowSurface.Apply(new AcrylicOption { Enabled = false, Transparency = 50 });
+        Assert.True(app.TryFindResource(WindowSurface.ContentSurfaceResourceKey, out var disabled));
+        Assert.Equal((byte)255, ((ISolidColorBrush)disabled!).Color.A);
+
+        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 0 });
+        Assert.True(app.TryFindResource(WindowSurface.ContentSurfaceResourceKey, out var zero));
+        Assert.Equal((byte)255, ((ISolidColorBrush)zero!).Color.A);
+
+        // 非 solid 路径: 保持半透明, 与皮肤静态定义同值, 防止再漂移
+        // (T=10 -> OpacityFor=0.9, 但内容层是固定 85% 的独立画刷, 不随滑块缩放)
+        WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 10 });
+        Assert.True(app.TryFindResource(WindowSurface.ContentSurfaceResourceKey, out var translucent));
+        var translucentColor = ((ISolidColorBrush)translucent!).Color;
+        Assert.Equal(Color.Parse("#D9f5f4ed"), translucentColor);
+        Assert.True(translucentColor.A >= 0xB0 && translucentColor.A < 0xFF,
+            $"ContentSurface alpha=0x{translucentColor.A:X2} 应落在 [0xB0, 0xFF) —— 过实无毛玻璃感, 过透文字不可读");
 
         // 复原, 避免影响同集合内其它用例
         WindowSurface.Apply(new AcrylicOption { Enabled = true, Transparency = 30 });

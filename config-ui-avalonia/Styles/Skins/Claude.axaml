@@ -320,6 +320,14 @@
          若要更明显的磨砂效果, 只需下调这一个 alpha 值 (越小越透)。 -->
     <SolidColorBrush x:Key="ClaudeWindowSurfaceBrush"   Color="#B3f5f4ed" />
     <SolidColorBrush x:Key="ClaudeSidebarSurfaceBrush"  Color="#C4faf9f5" />
+    <!-- ClaudeContentSurfaceBrush: 内容层面 (2026-09-21 新增, 毛玻璃可读性分层)。
+         🔴 页面文字必须坐在这一层上, 不能直接坐在 ClaudeWindowSurfaceBrush 上 ——
+         窗口层随「背景透明度」滑块变透 (SystemBackdrop 亚克力直接顶到文字底下),
+         模糊壁纸的明暗纹理 + 亚克力噪点会在笔画周围形成噪点 (用户报「文字看不清」,
+         连提两次底色浓度治标不治本)。内容层固定 #D9 (≈85%), 文字对比度稳定,
+         毛玻璃只透在窗口边隙/标题条等无文字区 —— 与 Windows 自家面板同构。
+         值取 #D9: 内容区隐约透出模糊壁纸 (Terminal 质感), 文字仍有 ≥90% 有效底色兜住可读性。 -->
+    <SolidColorBrush x:Key="ClaudeContentSurfaceBrush"  Color="#D9f5f4ed" />
 
 
   <!-- ToolTip 无动画直显 (2026-09-13 用户报: 淡入动画结束才显示完整文字)。覆盖 Fluent

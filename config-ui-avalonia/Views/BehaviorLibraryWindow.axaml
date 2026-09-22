@@ -5,7 +5,7 @@
         x:Class="KeyFlux.Settings.Views.BehaviorLibraryWindow"
         x:Name="LibRoot"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
+        Background="{DynamicResource ClaudeContentSurfaceBrush}"
         x:DataType="vm:BehaviorLibraryViewModel"
         Title="Setting"
         Width="1000" Height="680" MinWidth="840" MinHeight="560"

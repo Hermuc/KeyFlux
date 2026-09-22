@@ -1,3 +1,4 @@
+using KeyFlux.Settings.Theming;
 using Avalonia.Controls;
 using KeyFlux.Settings.Services;
 
@@ -15,6 +16,7 @@ public partial class MatchTypesDialogWindow : Window
     public MatchTypesDialogWindow()
     {
         InitializeComponent();
+        WindowSurface.Attach(this); // 真·毛玻璃: 窗口打开时挂 DWM 系统背景材质 (迟开窗口经此补挂)
         // 标题栏文案 (系统绘制; DialogChrome 只负责着色, 不改文字)
         Title = I18n.T("2519");
         // 弹窗必备: DWM 标题栏着色 + owner 背景模糊 (ModalBlur) 的统一入口。

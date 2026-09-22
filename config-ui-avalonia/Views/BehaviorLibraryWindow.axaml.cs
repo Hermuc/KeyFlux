@@ -1,3 +1,4 @@
+using KeyFlux.Settings.Theming;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -19,6 +20,7 @@ public partial class BehaviorLibraryWindow : Window
     public BehaviorLibraryWindow()
     {
         InitializeComponent();
+        WindowSurface.Attach(this); // 真·毛玻璃: 窗口打开时挂 DWM 系统背景材质 (迟开窗口经此补挂)
         Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => (DataContext as BehaviorLibraryViewModel)?.UnsubscribeLanguage();
     }

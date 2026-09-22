@@ -166,7 +166,11 @@
     </Border>
 
     <!-- ===================== 右侧内容区 ===================== -->
-    <Grid Grid.Column="1" Grid.Row="1" Background="Transparent" controls:ModalBlur.IsHost="True">
+    <!-- 🔴 Background = ClaudeContentSurfaceBrush (2026-09-21 毛玻璃可读性分层):
+         页面文字必须坐在近实色的内容层上, 不能 Transparent 直压窗口层 ——
+         窗口层随透明度滑块变透时, 亚克力噪点+壁纸纹理会让文字发虚 (用户三报)。
+         毛玻璃透出的区域 = 窗口边隙 + 右列顶部 36px 标题条 (无文字区)。 -->
+    <Grid Grid.Column="1" Grid.Row="1" Background="{DynamicResource ClaudeContentSurfaceBrush}" controls:ModalBlur.IsHost="True">
       <!-- 页面切换 200ms 交叉淡入 (时长令牌 MotionStandard): 导航换页不再硬切。
            CrossFade 只动 Opacity (两页各渲染一次后混合), 软件渲染管线开销可控;
            同一页面 VM 实例复用时 (keymap 页缓存) 引用不变不触发过渡 -->

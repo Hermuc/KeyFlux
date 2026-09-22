@@ -3,7 +3,7 @@
         xmlns:vm="using:KeyFlux.Settings.ViewModels"
         x:Class="KeyFlux.Settings.Views.PluginSettingsDialogWindow"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
+        Background="{DynamicResource ClaudeContentSurfaceBrush}"
         x:Name="DlgRoot"
         x:DataType="vm:PluginSettingsDialogViewModel"
         Title="Setting"

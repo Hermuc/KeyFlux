@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="KeyFlux.Settings.Views.OverviewEditWindow"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{DynamicResource ClaudeWindowSurfaceBrush}"
+        Background="{DynamicResource ClaudeContentSurfaceBrush}"
         Title="Edit Guide"
         Width="780" Height="600"
         MinWidth="560" MinHeight="400"

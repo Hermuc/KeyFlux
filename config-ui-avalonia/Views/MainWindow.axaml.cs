@@ -31,6 +31,7 @@ public partial class MainWindow : Window
 
         // 标题栏小图标透明化: 助手内部订阅 Opened(应用)/ScalingChanged(DPI 变化重放)/Closed(回收句柄)
         TitleBarIconSuppressor.Attach(this);
+        WindowSurface.Attach(this); // 真·毛玻璃: 窗口打开时挂 DWM 系统背景材质
 
         // 亚克力底色: 先用内存中已有的配置应用一次 (可能尚未加载 -> 退化为实心底,
         // 属安全的初始态); 配置异步加载完成后在 Opened 里再应用一次。

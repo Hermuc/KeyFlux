@@ -8,11 +8,12 @@
         Width="1000" Height="680" MinWidth="840" MinHeight="560"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         TransparencyLevelHint="Blur,AcrylicBlur,Transparent,None"
-        Background="{DynamicResource ClaudeWindowSurfaceBrush}">
+        Background="{DynamicResource ClaudeContentSurfaceBrush}">
 
   <!--
     匹配类型弹窗外壳 —— 与行为库等其余 7 个弹窗**同一套弹窗约定**:
-      · 窗口: TransparencyLevelHint + 半透明画布 ClaudeWindowSurfaceBrush (亚克力透出);
+      · 窗口: TransparencyLevelHint + 内容层画布 ClaudeContentSurfaceBrush
+        (毛玻璃开启时 ≈85% 半透明透出亚克力; 关闭时 WindowSurface.Apply 联动覆写为实色);
       · 构造期必须调 Services.Win32.DialogChrome.Apply(this) —— 它做两件事:
         ① 用 DWM 把系统标题栏染成暖色表面色 (否则冷白标题栏与暖色 UI 割裂);
         ② 在 Opened/Closed 上开关 owner 的 ModalBlur (即"弹窗背后的背景模糊")。

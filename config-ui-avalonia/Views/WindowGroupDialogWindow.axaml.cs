@@ -1,3 +1,4 @@
+using KeyFlux.Settings.Theming;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using KeyFlux.Settings.Services;
@@ -14,6 +15,7 @@ public partial class WindowGroupDialogWindow : Window
     public WindowGroupDialogWindow()
     {
         InitializeComponent();
+        WindowSurface.Attach(this); // 真·毛玻璃: 窗口打开时挂 DWM 系统背景材质 (迟开窗口经此补挂)
         Services.Win32.DialogChrome.Apply(this);
         // 标题栏小图标透明化 (与主窗口同一助手, 行为一致)
         TitleBarIconSuppressor.Attach(this);

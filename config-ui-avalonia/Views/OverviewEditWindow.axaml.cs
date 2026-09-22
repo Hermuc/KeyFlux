@@ -1,3 +1,4 @@
+using KeyFlux.Settings.Theming;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using KeyFlux.Settings.Services;
@@ -21,6 +22,7 @@ public partial class OverviewEditWindow : Window
     public OverviewEditWindow(MainViewModel main, string initialMd)
     {
         InitializeComponent();
+        WindowSurface.Attach(this); // 真·毛玻璃: 窗口打开时挂 DWM 系统背景材质 (迟开窗口经此补挂)
         Services.Win32.DialogChrome.Apply(this);
         _main = main;
 
