@@ -166,11 +166,14 @@
     </Border>
 
     <!-- ===================== 右侧内容区 ===================== -->
-    <!-- 🔴 Background = ClaudeContentSurfaceBrush (2026-09-21 毛玻璃可读性分层):
-         页面文字必须坐在近实色的内容层上, 不能 Transparent 直压窗口层 ——
-         窗口层随透明度滑块变透时, 亚克力噪点+壁纸纹理会让文字发虚 (用户三报)。
-         毛玻璃透出的区域 = 窗口边隙 + 右列顶部 36px 标题条 (无文字区)。 -->
-    <Grid Grid.Column="1" Grid.Row="1" Background="{DynamicResource ClaudeContentSurfaceBrush}" controls:ModalBlur.IsHost="True">
+    <!-- 🔴 Background = ClaudeWindowSurfaceBrush (2026-09-22 改回窗口层, 整窗均匀):
+         上版用固定 ClaudeContentSurfaceBrush (85%) 造成两个问题 (用户报):
+         ① 内容层不随滑块变 ⇒ 透明度滑到 100 页面仍 ~90% 不透明, 滑块形同虚设;
+         ② 36px 标题条露窗口层 (35%) 而内容区 85% ⇒ 顶部一条色缝。
+         现内容区与标题条统一吃窗口层: 整窗均匀跟滑块 (100 = 35% 底 + SystemBackdrop
+         模糊, 真 Terminal 观感), 文字浓度由用户拖滑块自调。8 个表单对话框仍用
+         ContentSurface (表单密集区保可读性), ContentSurface 的 T=0 实色联动不变。 -->
+    <Grid Grid.Column="1" Grid.Row="1" Background="{DynamicResource ClaudeWindowSurfaceBrush}" controls:ModalBlur.IsHost="True">
       <!-- 页面切换 200ms 交叉淡入 (时长令牌 MotionStandard): 导航换页不再硬切。
            CrossFade 只动 Opacity (两页各渲染一次后混合), 软件渲染管线开销可控;
            同一页面 VM 实例复用时 (keymap 页缓存) 引用不变不触发过渡 -->
