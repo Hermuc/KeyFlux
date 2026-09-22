@@ -98,7 +98,7 @@ public static class ActionSchemeCatalog
     }
 
     /// <summary>自定义匹配类型的显示标签: en 语境优先 labelEn, 否则 label; 二者皆空回退 id (用户数据, 不进 i18n)。</summary>
-    private static string CustomTextTypeLabel(MatchType t)
+    internal static string CustomTextTypeLabel(MatchType t)
         => I18n.Language == I18n.En && !string.IsNullOrEmpty(t.LabelEn) ? t.LabelEn : (t.Label ?? t.Id);
 
     // (textType / fileExt 的可选行为与默认推荐全部由 BehaviorCatalog 从行为包 appliesTo 推导,

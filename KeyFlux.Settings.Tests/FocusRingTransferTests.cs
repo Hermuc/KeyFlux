@@ -34,15 +34,19 @@ public sealed class FocusRingTransferTests
         main.Config = new Config
         {
             FileGroups = [new FileGroup { Name = "image", Label = "图片", Exts = ["jpg", "png"] }],
+            SelectedAction = new SelectedAction
+            {
+                Mappings =
+                [
+                    new SelectedMapping
+                    {
+                        MatchType = "fileExt", MatchValue = "jpg, png",
+                        Entries = [new SelectedEntry { Behavior = "open", Options = new RuleOptions() }],
+                    },
+                ],
+            },
         };
-        var page = new SelectedActionPageViewModel(main);
-        page.FileMappings.Add(new MappingRowVm(page, new SelectedMapping
-        {
-            MatchType = "fileExt", MatchValue = "jpg",
-            Entries = [new SelectedEntry { Behavior = "open", Options = new RuleOptions() }],
-        }));
-        page.RefreshPartitionTitles();
-        page.ExpandedRow = page.FileMappings[0]; // 展开 ⇒ 行内编辑器卡 (含 ComboBox) 实例化
+        var page = new SelectedActionPageViewModel(main); // 构造即建两张卡 + 默认展开已配置类型编辑器
 
         var view = new SelectedActionPageView { DataContext = page };
         var win = new Window { Width = 1200, Height = 1000, Content = view };

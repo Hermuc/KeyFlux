@@ -10,8 +10,8 @@ namespace KeyFlux.Settings.ViewModels;
 
 // ============================================================================
 // 选中动作单屏页: 单一热键 + 匹配规则 + 行为菜单 (1..9 数字键选择)。
-// 保存纪律: 启用/删除立即保存; 其余修改经 MainViewModel.SaveAsync 咽喉。
-// 分组后缀写回由咽喉调用 ApplyFileGroupWriteBack 完成。
+// 保存纪律: 启用/删除立即保存; 其余修改 (增行为/提交 transient/条件值) 经 MainViewModel.SaveAsync 咽喉。
+// 数据真源 = Config.SelectedAction; 聚合卡 (TypeCardVm) 直接持有并就地修改底层 Mapping 对象。
 // ============================================================================
 
 /// <summary>行为胶囊 (只读投影; 序号 = entries 下标 + 1, 即菜单数字键位)。</summary>
@@ -39,7 +39,7 @@ public static class BehaviorBadgeColors
 }
 
 /// <summary>
-/// 选中动作单屏页: 主快捷键捕获 + 启用开关 + 两分区规则列表 + 添加弹窗 + 模拟测试条。
+/// 选中动作单屏页: 主快捷键捕获 + 启用开关 + 两张聚合卡 (文本特征 / 文件后缀) + 添加弹窗 + 模拟测试条。
 /// 数据真源 = Config.SelectedAction。
 /// </summary>
 public sealed partial class SelectedActionPageViewModel : ObservableObject, ILanguageRefresh
@@ -50,7 +50,9 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     {
         _main = main;
         UsedHotkeys = BuildUsedHotkeys();
-        ReloadRows();
+        TextCard = new TypeCardVm(this, "textType");
+        FileCard = new TypeCardVm(this, "fileExt");
+        RebuildCards();
     }
 
     public MainViewModel Main => _main;
@@ -74,21 +76,30 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
 
     /// <summary>
-    /// 匹配类型弹窗委托 (视图注入): 打开「匹配类型」窗口, 返回**本次新建的类型 id** (取消/无新建为 null)。
-    /// 弹窗关闭时视图内部已完成行为目录重拉, 故此处只需回灌"新建了什么"给调用方 (如添加映射弹窗自动选中)。
+    /// 匹配类型弹窗委托 (视图注入): 打开「匹配类型」窗口, 返回本次新建的类型 id (取消/无新建为 null)。
     /// </summary>
     public Func<Task<string?>>? MatchTypesDialogAsync { get; set; }
 
-    /// <summary>「匹配类型」: 打开弹窗管理自定义匹配类型 (文本特征 / 文件后缀), 关闭后刷新依赖方。</summary>
-    [RelayCommand]
-    private async Task ManageMatchTypesAsync()
+    // ------------------------------------------------------------- 两张聚合卡
+
+    /// <summary>文本特征聚合卡 (matchType=textType)。</summary>
+    public TypeCardVm TextCard { get; }
+
+    /// <summary>文件后缀聚合卡 (matchType=fileExt)。</summary>
+    public TypeCardVm FileCard { get; }
+
+    /// <summary>配置变化后重建两卡的类型 toggle 集合 (加载 / 增删映射 / 新建类型后)。</summary>
+    public void RebuildCards()
     {
-        if (MatchTypesDialogAsync is null) return;
-        var created = await MatchTypesDialogAsync();
-        // 类型可能增删: 行为勾选列表 (覆盖集) 与添加映射弹窗的类型下拉都要重算
-        RefreshBehaviorOptions();
-        AddPanel?.RefreshTypeOptions(created is null ? null : "type:" + created);
+        TextCard.RebuildToggles();
+        FileCard.RebuildToggles();
+        OnPropertyChanged(nameof(HasAnyMappings));
     }
+
+    /// <summary>卡内 mapping 变化 (删除/提交 transient) 后刷新页级派生状态。</summary>
+    internal void OnCardMappingChanged() => OnPropertyChanged(nameof(HasAnyMappings));
+
+    public bool HasAnyMappings => Config.SelectedAction.Mappings.Count > 0;
 
     // ------------------------------------------------------------- 主快捷键 + 启用
 
@@ -158,78 +169,18 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         OnPropertyChanged(nameof(Enable));
     }
 
+    // ------------------------------------------------------------- 匹配类型管理 / 添加弹窗
 
-    // ------------------------------------------------------------- 两分区映射列表
-
-    /// <summary>文本特征分区 (matchType=textType; 组内行序 = 优先级)。</summary>
-    public ObservableCollection<MappingRowVm> TextMappings { get; } = [];
-
-    /// <summary>文件后缀分区 (matchType=fileExt; 组内行序 = 优先级)。</summary>
-    public ObservableCollection<MappingRowVm> FileMappings { get; } = [];
-
-    public bool HasAnyMappings => TextMappings.Count > 0 || FileMappings.Count > 0;
-
-    private void ReloadRows()
+    /// <summary>「匹配类型」: 打开弹窗管理自定义匹配类型 (文本特征 / 文件后缀), 关闭后刷新依赖方。</summary>
+    [RelayCommand]
+    private async Task ManageMatchTypesAsync()
     {
-        TextMappings.Clear();
-        FileMappings.Clear();
-        foreach (var mapping in Sa.Mappings)
-        {
-            var row = new MappingRowVm(this, mapping);
-            (mapping.MatchType == "textType" ? TextMappings : FileMappings).Add(row);
-        }
-        RefreshPartitionTitles();
-        OnPropertyChanged(nameof(HasAnyMappings));
+        if (MatchTypesDialogAsync is null) return;
+        var created = await MatchTypesDialogAsync();
+        RebuildCards(); // 类型可能增删 (分组 / 自定义类型)
+        RefreshBehaviorOptions();
+        AddPanel?.RefreshTypeOptions(created is null ? null : "type:" + created);
     }
-
-    /// <summary>分区首行标记 (标题在卡内首行展示; 加载/增删后首行可能变化; internal 供测试挂行后触发)。</summary>
-    internal void RefreshPartitionTitles()
-    {
-        foreach (var row in TextMappings) row.IsFirstInPartition = ReferenceEquals(row, TextMappings[0]);
-        foreach (var row in FileMappings) row.IsFirstInPartition = ReferenceEquals(row, FileMappings[0]);
-    }
-
-    /// <summary>删除映射 (确认后立即保存, 1109 文案语义)。</summary>
-    public async Task AskRemoveAsync(MappingRowVm row)
-    {
-        var confirmed = ConfirmAsync is not null
-            ? await ConfirmAsync(I18n.T("967"), string.Format(I18n.T("1109"), row.MatchSummary))
-            : false;
-        if (!confirmed) return;
-
-        if (ReferenceEquals(ExpandedRow, row)) ExpandedRow = null;
-        var list = row.IsTextType ? TextMappings : FileMappings;
-        list.Remove(row);
-        OnPropertyChanged(nameof(HasAnyMappings));
-        RefreshPartitionTitles();
-        await SaveConfigAsync();
-    }
-
-    // ------------------------------------------------------------- 手风琴仲裁
-
-    /// <summary>当前展开的手风琴行 (同屏只开一个; null=全部收起)。</summary>
-    [ObservableProperty]
-    private MappingRowVm? _expandedRow;
-
-    partial void OnExpandedRowChanged(MappingRowVm? value)
-    {
-        foreach (var row in TextMappings.Concat(FileMappings))
-        {
-            if (ReferenceEquals(row, value)) continue;
-            if (row.IsExpanded)
-            {
-                row.IsExpanded = false;
-                row.CloseEditor();
-            }
-        }
-        if (value is not null)
-        {
-            value.IsExpanded = true;
-            value.OpenEditor();
-        }
-    }
-
-    // ------------------------------------------------------------- 添加映射弹窗
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAddPanelOpen))]
@@ -243,13 +194,14 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     [RelayCommand]
     private void CloseAddPanel() => AddPanel = null;
 
-    /// <summary>弹窗确认: 构造 SelectedMapping 插入对应分区尾部 (组内行序 = 优先级, 新行排最后)。</summary>
+    /// <summary>弹窗确认: 构造 SelectedMapping 插入对应分区 (组内行序 = 优先级, 新行排最后)。</summary>
     public void AddMapping(AddMappingVm panel)
     {
         var typeValue = panel.TypeSelected?.Value ?? "";
         if (string.IsNullOrEmpty(typeValue)) return; // 分隔项/未选中防御
-        var isGroup = typeValue.StartsWith("group:");
-        var isFileExt = isGroup; // 分组项即 fileExt 类 mapping (matchValue = 组后缀集)
+        var isFileExt = typeValue.StartsWith("group:")
+                        || (typeValue.StartsWith("type:")
+                            && Config.MatchTypes.FirstOrDefault(t => "type:" + t.Id == typeValue)?.Kind == "fileExt");
         var mapping = new SelectedMapping
         {
             MatchType = isFileExt ? "fileExt" : "textType",
@@ -269,9 +221,9 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         };
         if (mapping.Entries.Count == 0) return;
 
-        // 同 (matchType, matchValue) 分组去重: 该分组已配置时不重复添加 (后端校验同款规则)
-        if ((isGroup ? FileMappings : TextMappings).Any(r =>
-                r.Mapping.MatchType == mapping.MatchType && r.Mapping.MatchValue == mapping.MatchValue))
+        // 同 (matchType, matchValue) 去重: 该类型已配置时不重复添加
+        if (Config.SelectedAction.Mappings.Any(m =>
+                m.MatchType == mapping.MatchType && m.MatchValue == mapping.MatchValue))
         {
             AddPanel = null;
             StatusText = I18n.T("1115"); // 该匹配条件已存在
@@ -279,10 +231,9 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         }
 
         AddPanel = null;
-        var row = new MappingRowVm(this, mapping);
-        (isFileExt ? FileMappings : TextMappings).Add(row);
-        OnPropertyChanged(nameof(HasAnyMappings));
-        RefreshPartitionTitles();
+        Config.SelectedAction.Mappings.Add(mapping);
+        RebuildCards();
+        OnCardMappingChanged();
     }
 
     // ------------------------------------------------------------- 模拟测试条
@@ -321,8 +272,8 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     private string _previewText = "";
 
     /// <summary>
-    /// 模拟测试: 先 SyncToModel 再深拷贝快照随请求发出 (未保存修改也能测试);
-    /// 命中时高亮对应行并展示菜单键位预览; 400 展示后端 message。
+    /// 模拟测试: 先投影回模型 (本版卡直接持有底层对象, Config 已是最新) 再深拷贝快照随请求发出;
+    /// 命中时高亮对应卡详情并展示菜单键位预览; 400 展示后端 message。
     /// </summary>
     [RelayCommand]
     private async Task RunTestAsync()
@@ -339,9 +290,6 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         HasResult = false;
         SetMatchedRow(null);
 
-        // 评审 C2: 深拷贝快照前先投影两分区回模型 (与本注释口径一致),
-        // 否则「新加映射后直接 ▶ 测试」时快照里没有新映射
-        SyncToModel();
         var snapshot = JsonSerializer.Deserialize<SelectedAction>(
             JsonSerializer.Serialize(Sa, SettingsJson.Options), SettingsJson.Options);
         var resp = await Api.TestSelectedActionAsync(new SelectedActionTestRequest
@@ -397,21 +345,28 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         _ = RunTestCommand.ExecuteAsync(null);
     }
 
-    /// <summary>命中回显: 按后端返回的 matchType/matchValue 找到对应行 (按值匹配, 忽略大小写)。</summary>
+    /// <summary>命中回显: 按后端返回的 matchType/matchValue 找到对应卡详情编辑器 (按值匹配, 忽略大小写)。</summary>
     private MappingRowVm? FindRow(string matchType, string matchValue)
     {
-        var list = matchType == "textType" ? TextMappings : FileMappings;
-        foreach (var row in list)
+        foreach (var card in new[] { TextCard, FileCard })
         {
-            if (string.Equals(row.Mapping.MatchValue, matchValue, StringComparison.OrdinalIgnoreCase)) return row;
+            if (card.Detail is { } d && d.MatchType == matchType
+                && string.Equals(d.Mapping.MatchValue, matchValue, StringComparison.OrdinalIgnoreCase))
+            {
+                return d;
+            }
         }
         return null;
     }
 
+    private MappingRowVm? _matchedRow;
+
     private void SetMatchedRow(MappingRowVm? row)
     {
-        foreach (var r in TextMappings) r.IsMatched = ReferenceEquals(r, row);
-        foreach (var r in FileMappings) r.IsMatched = ReferenceEquals(r, row);
+        if (ReferenceEquals(_matchedRow, row)) return;
+        if (_matchedRow is not null) _matchedRow.IsMatched = false;
+        _matchedRow = row;
+        if (row is not null) row.IsMatched = true;
     }
 
     // ------------------------------------------------------------- 行为目录
@@ -435,51 +390,21 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     /// <summary>行为目录变化后刷新全部下拉/勾选列表 (行为库窗口关闭后也会调用)。</summary>
     public void RefreshBehaviorOptions()
     {
-        foreach (var row in TextMappings.Concat(FileMappings))
+        foreach (var card in new[] { TextCard, FileCard })
         {
-            row.RefreshChips();
-            foreach (var editor in row.Editors)
+            if (card.Detail is { } d)
             {
-                editor.RefreshOptions();
+                d.RefreshChips();
+                foreach (var editor in d.Editors) editor.RefreshOptions();
             }
         }
         AddPanel?.RefreshPicks();
     }
 
-    // ------------------------------------------------------------- 保存 / 写回
+    // ------------------------------------------------------------- 保存
 
-    /// <summary>两分区投影回模型 (行 VM 直接持有底层对象, 属性修改天然同步)。</summary>
-    internal void SyncToModel()
-    {
-        Sa.Mappings.Clear();
-        foreach (var row in TextMappings) Sa.Mappings.Add(row.Mapping);
-        foreach (var row in FileMappings) Sa.Mappings.Add(row.Mapping);
-    }
-
-    /// <summary>主配置保存 (启用开关/删除映射语义为「立即保存」故跳过节流)。</summary>
-    public Task<bool> SaveConfigAsync()
-    {
-        SyncToModel();
-        return _main.SaveAsync(force: true);
-    }
-
-    /// <summary>
-    /// 保存前把关联分组的前件值修改写回 Config.FileGroups。
-    /// 多行关联同一分组时后写者胜。
-    /// </summary>
-    internal void ApplyFileGroupWriteBack()
-    {
-        foreach (var row in FileMappings)
-        {
-            if (row.AssociatedGroupName is null) continue;
-            var parsed = ActionSchemeCatalog.NormalizeExts(row.Mapping.MatchValue);
-            if (parsed.Count == 0) continue;
-            var group = Config.FileGroups.FirstOrDefault(g => g.Name == row.AssociatedGroupName);
-            if (group is null) continue;
-            if (ActionSchemeCatalog.SameExts(parsed, group.Exts)) continue;
-            group.Exts = parsed;
-        }
-    }
+    /// <summary>主配置保存 (启用开关/删除映射/提交 transient 语义为「立即保存」故跳过节流)。</summary>
+    public Task<bool> SaveConfigAsync() => _main.SaveAsync(force: true);
 
     // ------------------------------------------------------------- 语言刷新
 
@@ -487,16 +412,14 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     {
         LanguageTick++;
         OnPropertyChanged(nameof(HotkeyHintText)); // 条件拼接文案, 语言切换需重算
-        foreach (var row in TextMappings) row.RefreshLanguage();
-        foreach (var row in FileMappings) row.RefreshLanguage();
+        TextCard.RefreshLanguage();
+        FileCard.RefreshLanguage();
         AddPanel?.RefreshLanguage();
         if (HasResult && ResultMatched)
         {
-            // 结果文案为即时拼接, 触发重算
             OnPropertyChanged(nameof(MatchedTypeText));
             OnPropertyChanged(nameof(MatchedValueText));
             OnPropertyChanged(nameof(PreviewText));
         }
     }
 }
-

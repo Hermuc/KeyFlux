@@ -8,90 +8,23 @@
              x:DataType="vm:SelectedActionPageViewModel">
 
   <!--
-    entry.options 三开关本版 UI 不呈现 (引擎未消费), 模型字段保留兼容存量数据。
-    两分区共用共享行卡模板 MappingRowCard, 分区差异由行 VM 的 IsTextType 决定。
+    聚合卡设计 (2026-09): 两张卡 = 文本特征 (textType) / 文件后缀 (fileExt)。
+    卡内列出该分区全部类型 toggle (始终可见); 点亮 = 正在查看 (卡内唯一点亮);
+    小圆点 = 已配置; 点 toggle 切详情; 卡右侧红 ✕ = 删除当前点亮类型的配置 (确认+立即保存)。
+    未配置类型点击进入「待配置」详情态 (不落盘), 用户添加行为后才创建 mapping。
   -->
-
 
   <UserControl.Resources>
     <services:BoolToSeparatorHeightConverter x:Key="BoolToSeparatorHeight" />
     <services:PopupBackgroundConverter x:Key="PopupBg" />
 
-    <!-- 共享行卡模板: 文本特征/文件后缀两分区共用 (Classes 样式见 UserControl.Styles) -->
-    <DataTemplate x:Key="MappingRowCard" x:DataType="vm:MappingRowVm">
-
-        <Border Classes="row-card actionCard" Classes.matched="{Binding IsMatched}"
-                Background="{DynamicResource ClaudeIvoryBrush}"
-                CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="12" Margin="0,0,0,8"
-                Tapped="OnRowHeaderTapped">
+    <!-- 类型编辑器 (卡内当前查看类型的详情; MappingRowVm) -->
+    <DataTemplate x:Key="TypeEditorTemplate" x:DataType="vm:MappingRowVm">
+      <!-- 外层卡片: 匹配高亮 (.matched) 作用对象; DataContext = MappingRowVm -->
+      <Border Classes="actionCard row-card" Classes.matched="{Binding IsMatched}"
+              Background="{DynamicResource ClaudeIvoryBrush}"
+              CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="12" Margin="0,4,0,6">
         <StackPanel Spacing="8">
-          <!-- 行头: 分区标题 (仅分区首行, 沿用原徽章色) + 条件值编辑 + 行操作 -->
-          <Grid ColumnDefinitions="Auto,*,Auto">
-            <TextBlock IsVisible="{Binding IsFirstInPartition}"
-                       Text="{Binding TypeBadgeText}" Foreground="{Binding TypeBadgeColorHex}"
-                       FontWeight="SemiBold" FontSize="15" MinWidth="64"
-                       VerticalAlignment="Center" Margin="0,0,8,0" />
-            <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-              <!-- textType: 文本特征互斥直选 Toggle (所见即所选; 点亮与标题同色; 顺序同 ActionSchemeCatalog.TextTypes) -->
-              <StackPanel IsVisible="{Binding IsTextType}" Orientation="Horizontal" Spacing="6">
-                <ToggleButton Classes="type-toggle tone-terracotta"
-                              IsChecked="{Binding IsUrl, Mode=TwoWay}"
-                              Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
-                              Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1059}" />
-                <ToggleButton Classes="type-toggle tone-terracotta"
-                              IsChecked="{Binding IsPath, Mode=TwoWay}"
-                              Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
-                              Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1060}" />
-                <ToggleButton Classes="type-toggle tone-terracotta"
-                              IsChecked="{Binding IsMagnet, Mode=TwoWay}"
-                              Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
-                              Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1061}" />
-                <ToggleButton Classes="type-toggle tone-terracotta"
-                              IsChecked="{Binding IsBilibili, Mode=TwoWay}"
-                              Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
-                              Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2580}" />
-                <ToggleButton Classes="type-toggle tone-terracotta"
-                              IsChecked="{Binding IsPlain, Mode=TwoWay}"
-                              Checked="OnTextTypeToggleChanged" Unchecked="OnTextTypeToggleChanged"
-                              Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1062}" />
-              </StackPanel>
-              <!-- fileExt: 条件值 + 分组快捷填入 (再点已亮项 = 解除关联并清空) -->
-              <StackPanel IsVisible="{Binding !IsTextType}" Spacing="6">
-                <TextBox Text="{Binding MatchValueDisplay}"
-                         Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1034}" />
-                <StackPanel IsVisible="{Binding ShowFileGroupFill}" Orientation="Horizontal" Spacing="6">
-                  <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
-                             Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1006}" />
-                  <ItemsControl ItemsSource="{Binding GroupToggles}">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel />
-                      </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:FileGroupToggleVm">
-                        <ToggleButton Classes="type-toggle tone-coral"
-                                      IsChecked="{Binding IsChecked, Mode=TwoWay}"
-                                      Content="{Binding Label}" />
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
-              </StackPanel>
-              <!-- (原 MatchHint 类型副标题已删: 2026-09-13 用户清理冗余文字) -->
-            </StackPanel>
-
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
-              <Button Classes="icon-btn" Command="{Binding TestRowCommand}" Content="󰐊" FontFamily="{StaticResource MdiFont}" Margin="0,3,0,0" FontSize="18"
-                      Background="Transparent"
-                      ToolTip.ShowDelay="200"
-                      ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
-              <Button Theme="{StaticResource DeleteKey}" Command="{Binding AskRemoveCommand}"
-                      ToolTip.ShowDelay="200"
-                      ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1120}" />
-            </StackPanel>
-          </Grid>
-
           <!-- chips 键位表 (序号即菜单数字键) -->
           <ItemsControl ItemsSource="{Binding Chips}">
             <ItemsControl.ItemsPanel>
@@ -112,70 +45,127 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
 
-          <!-- 行内手风琴编辑器 (同屏只开一个, 由页面 ExpandedRow 仲裁) -->
-          <StackPanel IsVisible="{Binding IsExpanded}" Spacing="8" Margin="0,4,0,0">
-            <ItemsControl ItemsSource="{Binding Editors}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:EntryRowVm">
-                    <Border Classes="actionCard rowEditor" Background="{DynamicResource ClaudeIvoryBrush}"
-                            CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="10" Margin="0,0,0,6">
-                    <StackPanel Spacing="8">
-                      <Grid ColumnDefinitions="Auto,*,Auto">
-                        <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="7,2"
-                                VerticalAlignment="Center">
-                          <TextBlock Text="{Binding Index}" Foreground="{StaticResource ClaudeTerracottaBrush}"
-                                     FontWeight="SemiBold" FontSize="13" />
-                        </Border>
-                        <ComboBox Grid.Column="1" Margin="10,0" HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding BehaviorOptions}"
-                                  SelectedItem="{Binding BehaviorSelected}" />
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
-                          <Button Classes="icon-btn" Command="{Binding MoveUpCommand}"
-                                  IsEnabled="{Binding CanMoveUp}" Content="↑" />
-                          <Button Classes="icon-btn" Command="{Binding MoveDownCommand}"
-                                  IsEnabled="{Binding CanMoveDown}" Content="↓" />
-                          <Button Theme="{StaticResource DeleteKey}" Command="{Binding RemoveCommand}"
-                                  IsEnabled="{Binding CanRemove}"
-                                  ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1108}" />
-                        </StackPanel>
-                      </Grid>
-                      <!-- (原 BehaviorHint 行为描述已删: 随行为切换变化, 用户清理冗余文字) -->
-                      <!-- 命令模板 -->
-                      <StackPanel IsVisible="{Binding ShowTemplate}" Spacing="4">
-                        <TextBlock FontSize="11" Foreground="{StaticResource ClaudeStoneGrayBrush}"
-                                   Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1012}" />
-                        <TextBox Text="{Binding ActionValue}" TextWrapping="Wrap" AcceptsReturn="False" />
+          <!-- 行为编辑行 (entry 级 ↑↓ 排序 / 删除; 多 entry 数字菜单) -->
+          <ItemsControl ItemsSource="{Binding Editors}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:EntryRowVm">
+                <Border Classes="actionCard rowEditor"
+                        Background="{DynamicResource ClaudeIvoryBrush}"
+                        CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="10" Margin="0,0,0,6">
+                  <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                      <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="7,2"
+                              VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Index}" Foreground="{DynamicResource ClaudeTerracottaBrush}"
+                                   FontWeight="SemiBold" FontSize="13" />
+                      </Border>
+                      <ComboBox Grid.Column="1" Margin="10,0" HorizontalAlignment="Stretch"
+                                ItemsSource="{Binding BehaviorOptions}"
+                                SelectedItem="{Binding BehaviorSelected}" />
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                        <Button Classes="icon-btn" Command="{Binding MoveUpCommand}"
+                                IsEnabled="{Binding CanMoveUp}" Content="↑" />
+                        <Button Classes="icon-btn" Command="{Binding MoveDownCommand}"
+                                IsEnabled="{Binding CanMoveDown}" Content="↓" />
+                        <Button Theme="{StaticResource DeleteKey}" Command="{Binding RemoveCommand}"
+                                IsEnabled="{Binding CanRemove}"
+                                ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1108}" />
                       </StackPanel>
-                      <TextBlock IsVisible="{Binding IsNoValue}" FontSize="11" Foreground="{StaticResource ClaudeMutedGreenBrush}"
-                                 TextWrapping="Wrap" Text="{Binding TemplateHint}" />
-                      <!-- 工作目录 -->
-                      <TextBox Text="{Binding WorkingDir}"
-                               Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1015}" />
-                      <!-- 评审 D1: Options 三开关 (1016/1017/1018) 本版不渲染, 模型字段保留前向兼容 (见文件头注记) -->
+                    </Grid>
+                    <StackPanel IsVisible="{Binding ShowTemplate}" Spacing="4">
+                      <TextBlock FontSize="11" Foreground="{StaticResource ClaudeStoneGrayBrush}"
+                                 Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1012}" />
+                      <TextBox Text="{Binding ActionValue}" TextWrapping="Wrap" AcceptsReturn="False" />
                     </StackPanel>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                    <TextBlock IsVisible="{Binding IsNoValue}" FontSize="11" Foreground="{StaticResource ClaudeMutedGreenBrush}"
+                               TextWrapping="Wrap" Text="{Binding TemplateHint}" />
+                    <TextBox Text="{Binding WorkingDir}"
+                             Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1015}" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
 
-            <!-- 添加行为 (达 9 禁用 + 提示) -->
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Command="{Binding AddEntryCommand}" IsEnabled="{Binding CanAddEntry}"
-                      Background="Transparent" BorderThickness="1" BorderBrush="{StaticResource ClaudeTerracottaBrush}"
-                      Foreground="{StaticResource ClaudeTerracottaBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,5" FontSize="12"
-                      Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1106}" />
-              <TextBlock IsVisible="{Binding !CanAddEntry}" FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}"
-                         VerticalAlignment="Center"
-                         Text="{Binding AddEntryHint}" />
-            </StackPanel>
+          <!-- 添加行为 (达 9 禁用 + 提示) -->
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Command="{Binding AddEntryCommand}" IsEnabled="{Binding CanAddEntry}"
+                    Background="Transparent" BorderThickness="1" BorderBrush="{StaticResource ClaudeTerracottaBrush}"
+                    Foreground="{StaticResource ClaudeTerracottaBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="12,5" FontSize="12"
+                    Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1106}" />
+            <TextBlock IsVisible="{Binding !CanAddEntry}" FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}"
+                       VerticalAlignment="Center"
+                       Text="{Binding AddEntryHint}" />
           </StackPanel>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+
+    <!-- 聚合卡 (TypeCardVm) -->
+    <DataTemplate x:Key="TypeCardTemplate" x:DataType="vm:TypeCardVm">
+      <Border Classes="actionCard type-card" Background="{DynamicResource ClaudeIvoryBrush}"
+              CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="12" Margin="0,0,0,8">
+        <StackPanel Spacing="8">
+          <!-- 卡头: 标题 + 右侧测试▶ / 红 ✕ (删除当前点亮类型配置) -->
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"
+                       Foreground="{StaticResource ClaudeTerracottaBrush}" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
+              <Button Classes="icon-btn" Command="{Binding Detail.TestRowCommand}" Content="󰐊" FontFamily="{StaticResource MdiFont}" Margin="0,3,0,0" FontSize="18"
+                      Background="Transparent"
+                      ToolTip.ShowDelay="200"
+                      ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
+              <Button Theme="{StaticResource DeleteKey}" Command="{Binding DeleteSelectedCommand}"
+                      IsEnabled="{Binding CanDeleteSelected}"
+                      ToolTip.ShowDelay="200"
+                      ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1120}" />
+            </StackPanel>
+          </Grid>
+
+          <!-- 全部类型 toggle (始终可见): 点亮=正在查看; 小圆点=已配置 -->
+          <ItemsControl ItemsSource="{Binding Toggles}" ClipToBounds="False">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:TypeToggleVm">
+                <Grid Margin="0,0,6,6">
+                  <ToggleButton Classes="type-toggle tone-terracotta"
+                                IsChecked="{Binding IsLit, Mode=OneWay}"
+                                Click="OnTypeToggleClicked"
+                                Content="{Binding Label}" />
+                  <Ellipse Classes="config-dot" IsVisible="{Binding IsConfigured}"
+                           Width="7" Height="7" HorizontalAlignment="Right" VerticalAlignment="Top"
+                           Margin="0,2,2,0" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- 新建匹配类型入口 (复用 MatchTypesDialogAsync) -->
+          <Button Background="Transparent" BorderThickness="0" Padding="0" Margin="0,2,0,0"
+                  FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" HorizontalAlignment="Left"
+                  Command="{Binding NewTypeCommand}"
+                  Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2553}" />
+
+          <!-- 未配置 + 空行为: 待配置态 (不落盘) -->
+          <Border IsVisible="{Binding IsPending}" Background="{StaticResource ClaudeSandBrush}"
+                  CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="10,8">
+            <TextBlock FontSize="12" Foreground="{StaticResource ClaudeDarkWarmBrush}" TextWrapping="Wrap"
+                       Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2537}" />
+          </Border>
+
+          <!-- 当前查看类型的编辑器详情 -->
+          <ContentControl Content="{Binding Detail}" ContentTemplate="{StaticResource TypeEditorTemplate}" />
         </StackPanel>
       </Border>
     </DataTemplate>
   </UserControl.Resources>
 
   <UserControl.Styles>
-    <!-- 分隔项容器压制: 无 hover/选中高亮、透明背景 (与弹层一致)、不可点击、紧凑 -->
+    <!-- 分隔项容器压制 (弹窗下拉用) -->
     <Style Selector="ComboBoxItem.sep-item">
       <Setter Property="IsHitTestVisible" Value="False" />
       <Setter Property="Background" Value="Transparent" />
@@ -186,7 +176,7 @@
       <Setter Property="Background" Value="Transparent" />
     </Style>
 
-    <!-- 分段胶囊样式: 未选白底灰字共用; 点亮态与分区标题同色实底 (文本蓝 / 后缀橙) -->
+    <!-- 类型 toggle: 未选白底灰字; 点亮态实底 (陶土色, 与卡标题同色) -->
     <Style Selector="ToggleButton.type-toggle">
       <Setter Property="Padding" Value="14,5"/>
       <Setter Property="CornerRadius" Value="999"/>
@@ -197,102 +187,54 @@
       <Setter Property="FontSize" Value="13"/>
       <Setter Property="MinHeight" Value="30"/>
     </Style>
-    <!-- 点亮态必须打在模板 PART_ContentPresenter 上, 只改控件属性会被 Fluent 主题覆盖 -->
-    <Style Selector="ToggleButton.tone-terracotta:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="ToggleButton.type-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{StaticResource ClaudeTerracottaBrush}"/>
       <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}"/>
     </Style>
-    <Style Selector="ToggleButton.tone-terracotta:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="ToggleButton.type-toggle:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{StaticResource ClaudeTerracottaBrush}"/>
       <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}"/>
     </Style>
-    <Style Selector="ToggleButton.tone-terracotta:checked">
+    <Style Selector="ToggleButton.type-toggle:checked">
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
-    <Style Selector="ToggleButton.tone-coral:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource ClaudeCoralBrush}"/>
-      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}"/>
+    <!-- 已配置小圆点微标 (红 ✕ 同色系) -->
+    <Style Selector="Ellipse.config-dot">
+      <Setter Property="Fill" Value="{StaticResource ClaudeTerracottaBrush}"/>
     </Style>
-    <Style Selector="ToggleButton.tone-coral:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource ClaudeCoralBrush}"/>
-      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}"/>
-    </Style>
-    <Style Selector="ToggleButton.tone-coral:checked">
-      <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
-    </Style>
-    <!-- 组件框外观 (2026-09-16): 取 Settings / 插件页同款**阴影**, 但描边**有意更细**。
-         用户先要求"同款阴影+描边", 看过实际效果后裁定本页"线条太粗/太重" ⇒ BorderThickness 2 -> 1。
-         原因: 本页是**卡片密集堆叠**(行卡间距仅 8px, 且行卡内还嵌一张子卡),
-         同一 2px 在 Settings 页(卡间距 16px、无嵌套)显得正常, 在这里则框线密度过高而发重。
-         ⇒ 本页配方 = BoxShadow ClaudeShadowCard + **1px** ClaudeBorderCreamBrush
-           (其余三处 Border.pluginCard / settingsCard / leftPanel 仍为 2px, 未动)。
-         ⚠️ 这些属性原先**内联**写在各 Border 元素上 —— Avalonia 内联值优先级高于样式 Setter,
-         必须先移除内联的 BorderBrush / BorderThickness 交由本样式承载, 否则永远不生效。
-         声明在 .row-card 状态样式**之前**: 状态样式只覆盖 BorderBrush (不动粗细/阴影),
-         故「默认态 / 选中态(.matched)」的描边粗细与阴影完全一致, 仅颜色区分 ⇒ 视觉统一协调 -->
+
+    <!-- 组件框外观 (卡密集堆叠, 描边 1px 比其它处更细) -->
     <Style Selector="Border.actionCard">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
-      <!-- 点组件框非交互区 = 选中该框 (2026-09-18 用户补充裁定): Focusable 打开后,
-           FocusManager 在指针按下时沿视觉树上溯到最近可聚焦祖先 (即本卡) 并聚焦,
-           ComponentFocusRing 据焦点挂 .ring 点亮橙环; 点上已聚焦可聚焦子项 (输入框/开关/
-           快捷键框) 时上溯止步于子项 ⇒ 环按「最内层唯一」规则归属。IsTabStop=False
-           保证 Tab 键序不因卡片可聚焦而多停靠点。 -->
       <Setter Property="Focusable" Value="True" />
       <Setter Property="IsTabStop" Value="False" />
-      <!-- 悬停光圈淡入 (120ms = 皮肤令牌 ClaudeMotion.Micro, 与全局"悬停微交互最短"的频率闸门一致)。
-           光圈层在静止档 / 悬停档 / 按下档 / 聚焦档里**恒占第 3 层**(静止为 alpha=0 的占位),
-           层数相等 ⇒ BoxShadowsAnimator 逐层插值, 移入/移出都是平滑渐隐而非跳变。 -->
       <Setter Property="Transitions">
         <Transitions>
           <BoxShadowsTransition Property="BoxShadow" Duration="{x:Static vm:ClaudeMotion.Micro}" />
         </Transitions>
       </Setter>
     </Style>
-    <!-- 悬停反馈 (2026-09-17 又一轮裁定: **取消投影加深** 之后新增**陶土色弥散光圈**):
-         历史: ① BorderBrush 换 ClaudeRingWarmBrush(#d1cfc5) ⇒ 悬停出灰线, 用户要求清除;
-               ② 改用去环版「只加深投影」⇒ 加深不够明显; ③ 增强为双层强影 ⇒ 又过于明显;
-               ④ 降重后仍不满意 ⇒ 用户先裁定取消加深 (悬停 = 静止档);
-               ⑤ 本次 (同日) 用户要求「悬停时组件框周围显示一圈**光圈**」并明确**不能是纯线条**。
-         实现 = 在原有双层投影之上追加一层无偏移/大模糊/低透明度的陶土色弥散 (ClaudeShadowCardHaloHover),
-         而不是加描边环 —— `0 0 0 N` 零扩散层就是一根线 (步骤①的灰线即它), 已明令清除;
-         Halo 的光圈层 Blur=16 ⇒ 约 8px 渐隐尾巴, 无生硬边缘。
-         描边色**不变** (仍奶油色, 无灰线); 投影前两层也与静止档逐位相同 ⇒ 只有光圈在动。
-         防回归: ActionPageCardStyleTests 逐卡断言悬停后 BorderBrush 仍为奶油色 (无灰线)
-         且 BoxShadow == ClaudeShadowCardHaloHover。
-         .matched 的陶土边不受影响 (本样式只动 BoxShadow)。 -->
     <Style Selector="Border.actionCard:pointerover">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloHover}" />
     </Style>
-    <!-- 聚焦橙环 (2026-09-18 用户报缺, 同日再裁定「最内层唯一」): 单击卡内控件后卡片包一圈
-         Coral 实环, 与插件页 pluginCard / 选项页 settingsCard 同款机制 —— 由 ComponentFocusRing
-         挂 .ring 类 (取代 :focus-within: 快捷键捕获框等自饰子框获焦时, 环转移到子框自己的
-         描边上, 父卡不亮)。声明在 :pointerover 之后 ⇒ 悬停+聚焦同现时焦点环胜出。
-         ⚠ 排除 .row-card 与 .rowEditor (2026-09-18 用户两轮报): 映射行卡与行内编辑器卡是
-         列表条目而非组件框, 不应包环; 亮环只留给页面级组件框 (主快捷键卡 / 模拟测试条)。
-         (ComponentFocusRing 已在遍历侧阻断这两类, 此处 :not() 为第二道防线。) -->
     <Style Selector="Border.actionCard.ring:not(.row-card):not(.rowEditor)">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
     </Style>
-    <!-- 行内编辑器卡去影 (2026-09-18 用户报): 它是行卡内部的嵌套面板, 双层投影会画出一圈
-         可见阴影, 与外层行卡阴影叠加显脏 ⇒ 静止/悬停档全部清零, 只留 1px 奶油描边分层。
-         选择器带 .actionCard 前缀 + 声明在 :pointerover 之后, 权重压过 actionCard 两档。 -->
+    <!-- 行内编辑器卡去影 (嵌套面板, 双层投影显脏) -->
     <Style Selector="Border.actionCard.rowEditor">
       <Setter Property="BoxShadow" Value="0 0 0 0 Transparent" />
     </Style>
     <Style Selector="Border.actionCard.rowEditor:pointerover">
       <Setter Property="BoxShadow" Value="0 0 0 0 Transparent" />
     </Style>
-    <!-- 映射行卡: 悬停只加光圈 (行卡元素同时带 row-card + actionCard 两类, 上一条已覆盖),
-         测试命中高亮 (暖陶土底 + 陶土边) 见下 -->
     <Style Selector="Border.row-card.matched">
       <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
     </Style>
-    <!-- 行为胶囊 (chip): 彩色描边 + 同色文字, 徽章色由 VM 按 BaseActionOf 推导 -->
+    <!-- 行为胶囊 -->
     <Style Selector="Border.chip">
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusLg}" />
@@ -300,8 +242,7 @@
       <Setter Property="Margin" Value="0,0,6,6" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <!-- 小型图标按钮 (↑ ↓ ✕ ▶): 悬停/按下/禁用都不出灰色底框 ——
-         Fluent 在模板部件上设背景, 必须同样打在部件上才能压掉。 -->
+    <!-- 小型图标按钮 (↑ ↓ ✕ ▶) -->
     <Style Selector="Button.icon-btn">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
@@ -312,9 +253,6 @@
       <Setter Property="Foreground" Value="{StaticResource ClaudeDarkWarmBrush}" />
       <Setter Property="ToolTip.ShowDelay" Value="200" />
     </Style>
-    <!-- 基态也要压掉模板部件底色: Fluent 在 PART_ContentPresenter 上设背景
-         (默认是系统强调色蓝), 只改控件属性会在基态被模板值压住 ——
-         这正是"▶ 按钮是蓝色方框"的根因, 与皮肤契约里记录的坑同源。 -->
     <Style Selector="Button.icon-btn /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
     </Style>
@@ -326,7 +264,6 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{StaticResource ClaudeDarkWarmBrush}" />
     </Style>
-    <!-- 禁用 (首行↑/末行↓): 仅箭头变灰, 无底框 -->
     <Style Selector="Button.icon-btn:disabled">
       <Setter Property="Foreground" Value="{StaticResource ClaudeWarmSilverBrush}" />
     </Style>
@@ -334,9 +271,7 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{StaticResource ClaudeWarmSilverBrush}" />
     </Style>
-    <!-- (原 Button.icon-btn.danger 红色 ✕ 样式已废: 2026-09-13 删除键统一改皮肤
-         DeleteKey 背退格键形 ControlTheme, 见 Styles/Skins/Claude.axaml) -->
-    <!-- 黄色提示条 (StatusText / 热键卡提示): 统一底色与内距 -->
+    <!-- 黄色提示条 -->
     <Style Selector="Border.hint">
       <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusPanel}" />
@@ -344,23 +279,15 @@
     </Style>
   </UserControl.Styles>
 
-  <!-- ComboOption 隐式模板: 行为/文件分组下拉的 Item 与 SelectionBox 共用;
-       弹窗类型下拉的分隔线样式在 ItemTemplate 上显式覆盖, 不受影响 -->
+  <!-- ComboOption 隐式模板 -->
   <UserControl.DataTemplates>
     <DataTemplate DataType="services:ComboOption">
       <TextBlock Text="{Binding Label}" />
     </DataTemplate>
   </UserControl.DataTemplates>
 
-  <!-- 左内边距 20 -> 8, 同时给下面两行各加 12px 左 Margin —— 三者等量抵消, **视觉布局一行不变**,
-       但把 ScrollViewer 的左裁剪边界从 x=20 挪到 x=8, 让卡片左侧多出 12px 画阴影的余地。
-       原布局: 内容左对齐 => 卡片左沿与视口左沿【重合】(实测 0px 余量) => 左侧阴影被视口裁掉,
-       而右侧有 566px 余量故阴影正常 —— 表现为"右有左无"的不对称 (2026-09-16 用户报)。
-       ⚠️ 不能用 ScrollViewer.Padding 代替: Padding 会把 ScrollContentPresenter 的裁剪边界
-       一起内缩, 阴影照样被裁 (见 SettingsPageView 同名注释记录的坑) -->
   <Grid Margin="8,20,20,20" RowDefinitions="Auto,*">
-
-    <!-- ===================== 顶部: 标题 + 管理行为… + 添加映射 ===================== -->
+    <!-- 顶部: 标题 + 管理行为… + 管理匹配类型 + 添加映射 -->
     <DockPanel Grid.Row="0" Margin="12,0,0,12" controls:ModalBlur.IsActive="{Binding IsAddPanelOpen}">
       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <Button Command="{Binding ManageMatchTypesCommand}" Background="Transparent" BorderThickness="1"
@@ -385,13 +312,13 @@
       <StackPanel x:Name="PageRoot" MaxWidth="860" HorizontalAlignment="Left" Spacing="14"
                   Margin="12,0,0,0">
 
-        <!-- 说明条 (单键分发语义, 复用 960) -->
+        <!-- 说明条 -->
         <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="12,9">
           <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource ClaudeDarkWarmBrush}"
                      Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=960}" />
         </Border>
 
-        <!-- 页内提示条 (重复映射等非阻断反馈) -->
+        <!-- 页内提示条 -->
         <Border Classes="hint" IsVisible="{Binding StatusText, Converter={StaticResource NotEmpty}}">
           <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" TextWrapping="Wrap" />
         </Border>
@@ -403,55 +330,30 @@
             <Grid ColumnDefinitions="*,Auto,Auto">
               <TextBlock FontWeight="SemiBold" VerticalAlignment="Center"
                          Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1063}" />
-              <!-- On/Off 文字样式对齐插件页 (10px SemiBold + 状态色, 用户反馈默认 OnContent 字体不好看);
-                 ToggleSwitch 自身 OnContent/OffContent 置空抑制默认文字 -->
-            <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enable}" MinWidth="10"
-                          OnContent="" OffContent="" />
-            <TextBlock Grid.Column="2" Text="ON" FontSize="10" FontWeight="SemiBold"
-                       Foreground="{StaticResource ClaudeOliveGrayBrush}" VerticalAlignment="Center"
-                       Margin="4,0,0,0" IsVisible="{Binding Enable}" />
-            <TextBlock Grid.Column="2" Text="OFF" FontSize="10" FontWeight="SemiBold"
-                       Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
-                       Margin="4,0,0,0" IsVisible="{Binding !Enable}" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enable}" MinWidth="10"
+                            OnContent="" OffContent="" />
+              <TextBlock Grid.Column="2" Text="ON" FontSize="10" FontWeight="SemiBold"
+                         Foreground="{StaticResource ClaudeOliveGrayBrush}" VerticalAlignment="Center"
+                         Margin="4,0,0,0" IsVisible="{Binding Enable}" />
+              <TextBlock Grid.Column="2" Text="OFF" FontSize="10" FontWeight="SemiBold"
+                         Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
+                         Margin="4,0,0,0" IsVisible="{Binding !Enable}" />
             </Grid>
             <controls:HotkeyCapture Hotkey="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).Hotkey, Mode=TwoWay}"
                                     UsedHotkeys="{Binding #PageRoot.((vm:SelectedActionPageViewModel)DataContext).UsedHotkeys}" />
-            <!-- 热键提示条 (互斥合并: 未保存 1077 优先于空热键警示 976, 文案见 VM.HotkeyHintText) -->
             <Border Classes="hint" IsVisible="{Binding HotkeyHintText, Converter={StaticResource NotEmpty}}">
               <TextBlock Text="{Binding HotkeyHintText}" FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" TextWrapping="Wrap" />
             </Border>
           </StackPanel>
         </Border>
 
-        <!-- 匹配优先级说明 (组内行序 = 优先级) -->
-        <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" TextWrapping="Wrap"
-                   Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=978}" />
+        <!-- 文本特征聚合卡 -->
+        <ContentControl Content="{Binding TextCard}" ContentTemplate="{StaticResource TypeCardTemplate}" />
 
-        <!-- 空状态 -->
-        <StackPanel IsVisible="{Binding !HasAnyMappings}" Spacing="8" Margin="0,20">
-          <TextBlock Text="👆" FontSize="40" HorizontalAlignment="Center" />
-          <TextBlock FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"
-                     Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1112}" />
-          <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" HorizontalAlignment="Center"
-                     Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1113}" />
-        </StackPanel>
+        <!-- 文件后缀聚合卡 -->
+        <ContentControl Content="{Binding FileCard}" ContentTemplate="{StaticResource TypeCardTemplate}" />
 
-        <!-- ===================== 分区一: 文本特征 ===================== -->
-        <!-- ClipToBounds=False (2026-09-16 用户报"阴影被裁切"): ItemsControl 默认裁剪到自身边界,
-             而行卡的 BoxShadow 画在卡片边界之外 ⇒ 不关掉就只剩卡片之间那一段可见,
-             列表外沿(首卡上/末卡下/各卡左右)的阴影全被切掉。与插件页同一手法与同一坑。 -->
-        <StackPanel IsVisible="{Binding TextMappings.Count}">
-          <ItemsControl ItemsSource="{Binding TextMappings}" ClipToBounds="False"
-                        ItemTemplate="{StaticResource MappingRowCard}" />
-        </StackPanel>
-
-        <!-- ===================== 分区二: 文件后缀 ===================== -->
-        <StackPanel IsVisible="{Binding FileMappings.Count}">
-          <ItemsControl ItemsSource="{Binding FileMappings}" ClipToBounds="False"
-                        ItemTemplate="{StaticResource MappingRowCard}" />
-        </StackPanel>
-
-        <!-- ===================== 底部紧凑模拟测试条 ===================== -->
+        <!-- 底部紧凑模拟测试条 -->
           <Border Classes="actionCard" Background="{DynamicResource ClaudeIvoryBrush}"
                   CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
           <StackPanel Spacing="8">
@@ -471,10 +373,8 @@
             <TextBlock IsVisible="{Binding TestError}" Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12"
                        TextWrapping="Wrap" Text="{Binding TestError}" />
             <StackPanel IsVisible="{Binding HasResult}" Spacing="6">
-              <!-- 未命中 -->
               <TextBlock IsVisible="{Binding !ResultMatched}" FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                          Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=993}" />
-              <!-- 命中: 类型 + 值 + 菜单键位 + 预览 -->
               <StackPanel IsVisible="{Binding ResultMatched}" Spacing="6">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="8,3">
@@ -519,7 +419,7 @@
       </StackPanel>
     </ScrollViewer>
 
-    <!-- ===================== 添加映射弹窗 (页内 overlay, 非独立窗口) ===================== -->
+    <!-- 添加映射弹窗 (页内 overlay, 非独立窗口) -->
     <Border Grid.RowSpan="2" IsVisible="{Binding IsAddPanelOpen}" Background="Transparent">
       <ContentControl Content="{Binding AddPanel}" HorizontalAlignment="Center" VerticalAlignment="Center">
         <ContentControl.DataTemplates>
@@ -528,12 +428,10 @@
                     Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="20" Margin="20"
                     BoxShadow="0 8 24 rgba(0,0,0,0.25)">
               <StackPanel Spacing="12">
-                <!-- 标题 + 说明 -->
                 <TextBlock FontSize="17" FontWeight="SemiBold"
                            Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1105}" />
                 <TextBlock FontSize="12" Foreground="{StaticResource ClaudeOliveGrayBrush}" TextWrapping="Wrap" Text="{Binding Hint}" />
 
-                <!-- 步骤 1: 类型 (文件后缀 + 文本特征四选一) -->
                 <StackPanel Spacing="4">
                   <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1004}" />
@@ -552,14 +450,12 @@
                       </DataTemplate>
                     </ComboBox.ItemTemplate>
                   </ComboBox>
-                  <!-- 内联新建入口: 打开匹配类型弹窗, 新建成功后自动选中该类型 (少一步来回) -->
                   <Button Command="{Binding CreateTypeCommand}"
                           Background="Transparent" BorderThickness="0" Padding="0" Margin="0,2,0,0"
                           FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" HorizontalAlignment="Left"
                           Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2553}" />
                 </StackPanel>
 
-                <!-- 留桩提示条 (自定义文本类型暂无专属行为; 2517 文案 + 2518 跳转, §D.2.4) -->
                 <Border IsVisible="{Binding ShowStubHint}"
                         Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusPanel}" Padding="10,8">
                   <StackPanel Orientation="Horizontal" Spacing="8">
@@ -573,7 +469,6 @@
                   </StackPanel>
                 </Border>
 
-                <!-- 步骤 2: 条件值 (仅文件后缀) -->
                 <StackPanel Spacing="4" IsVisible="{Binding IsFileExt}">
                   <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1005}" />
@@ -581,7 +476,6 @@
                            Background="{DynamicResource ClaudeIvoryBrush}" />
                 </StackPanel>
 
-                <!-- 步骤 3: 行为勾选 (勾选顺序 = 菜单键位; 最多 9) -->
                 <StackPanel Spacing="4">
                   <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
                              Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1011}" />
@@ -604,15 +498,12 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </ScrollViewer>
-                  <!-- 评审 D2: 链接式「管理行为…」入口, 复用视图 OnManageBehaviors
-                       (打开 BehaviorLibraryWindow, 关闭后 vm.ReloadBehaviorCatalogAsync 刷新勾选列表) -->
                   <Button Background="Transparent" BorderThickness="0" Padding="0" Margin="0,2,0,0"
                           FontSize="12" Foreground="{StaticResource ClaudeTerracottaBrush}" HorizontalAlignment="Left"
                           Click="OnManageBehaviors"
                           Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1083}" />
                 </StackPanel>
 
-                <!-- 底部按钮 -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,4,0,0">
                   <Button Command="{Binding $parent[views:SelectedActionPageView].((vm:SelectedActionPageViewModel)DataContext).CloseAddPanelCommand}"
                           Background="{DynamicResource ClaudeIvoryBrush}" BorderThickness="1" BorderBrush="{StaticResource ClaudeBorderCreamBrush}"

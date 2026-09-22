@@ -5,12 +5,15 @@ using KeyFlux.Settings.ViewModels;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
-/// 选中动作单屏页 (方案 D) 纯 ViewModel 单测:
+/// 选中动作单屏页 (聚合卡重构后) 纯 ViewModel 单测:
 ///   - 键位推导: chips 序号 1 起自动顺延 / 增删排序后重排 / 9 上限 / 单行为删除禁用;
-///   - 类型过滤: 行为下拉与弹窗勾选列表按 BehaviorCatalog.Covering 前提过滤;
+///   - 类型过滤: 行为下拉按 BehaviorCatalog.Covering 前提过滤;
 ///   - 校验回显: 弹窗 CanConfirm (fileExt 需非空值+至少一勾) / 行为增删约束;
-///   - 弹窗落位: fileExt -> FileMappings / textType -> TextMappings, 列表顺序 = 菜单键位顺序;
-///   - 热键与手风琴仲裁: Hotkey 写模型+未保存标记 / UsedHotkeys 收集 / 同屏只开一个。
+///   - 弹窗落位: AddMapping 直接写 Config.SelectedAction.Mappings (dedup 同 matchType+matchValue),
+///     卡级 toggle 变为「已配置」(小圆点);
+///   - 热键与删除: Hotkey 写模型+未保存标记 / UsedHotkeys 收集 / 卡级红 ✕ 删除当前点亮类型配置。
+/// 注: 旧两分区 (TextMappings/FileMappings) 与手风琴 (ExpandedRow) 已随聚合卡重构移除,
+///     类型查看态上移到 TypeCardVm (lit=查看, dot=配置)。
 /// </summary>
 [Collection("I18nSerial")]
 public sealed class SelectedActionPageViewModelTests
@@ -34,6 +37,19 @@ public sealed class SelectedActionPageViewModelTests
         return (new SelectedActionPageViewModel(main), main.Config!);
     }
 
+    /// <summary>构造一条 MappingRowVm 并展开编辑器 (纯 VM, 不经卡片/手风琴)。</summary>
+    private static MappingRowVm NewRow(SelectedActionPageViewModel page, string matchType, string matchValue, params string[] behaviors)
+    {
+        var row = new MappingRowVm(page, new SelectedMapping
+        {
+            MatchType = matchType,
+            MatchValue = matchValue,
+            Entries = [.. behaviors.Select(b => new SelectedEntry { Behavior = b, Options = new RuleOptions() })],
+        });
+        row.OpenEditor();
+        return row;
+    }
+
     /// <summary>bug2 回归: 迁移来的 >^p 应在 VM.Hotkey 中, 且 AhkToDisplay 能渲染 (RCtrl+P)。</summary>
     [Fact]
     public void Hotkey_FromMigratedConfig_IsExposedAndDisplayable()
@@ -50,34 +66,6 @@ public sealed class SelectedActionPageViewModelTests
         Assert.Equal("RCtrl+P", HotkeyLogic.AhkToDisplay(page.Hotkey));
     }
 
-    /// <summary>构造 fileExt 行 (entries 逐个给 behavior) 并展开。</summary>
-    private static MappingRowVm NewFileRow(SelectedActionPageViewModel page, params string[] behaviors)
-    {
-        var row = new MappingRowVm(page, new SelectedMapping
-        {
-            MatchType = "fileExt",
-            MatchValue = "jpg",
-            Entries = [.. behaviors.Select(b => new SelectedEntry { Behavior = b, Options = new RuleOptions() })],
-        });
-        page.FileMappings.Add(row); // 行必须挂到分区: 仲裁/调序/写回都遍历分区集合
-        page.ExpandedRow = row;
-        return row;
-    }
-
-    /// <summary>构造 textType(url) 行并展开。</summary>
-    private static MappingRowVm NewUrlRow(SelectedActionPageViewModel page, params string[] behaviors)
-    {
-        var row = new MappingRowVm(page, new SelectedMapping
-        {
-            MatchType = "textType",
-            MatchValue = "url",
-            Entries = [.. behaviors.Select(b => new SelectedEntry { Behavior = b, Options = new RuleOptions() })],
-        });
-        page.TextMappings.Add(row); // 行必须挂到分区: 仲裁/调序都遍历分区集合
-        page.ExpandedRow = row;
-        return row;
-    }
-
     // ------------------------------------------------------------- 键位推导 (chips)
 
     /// <summary>chips 序号 1 起随 entries 顺延, 增删后重排; 标签 = 行为显示名。</summary>
@@ -85,7 +73,7 @@ public sealed class SelectedActionPageViewModelTests
     public void Chips_Numbers_AutoIncrement_On_Add_And_Remove()
     {
         var (page, _) = CreatePage();
-        var row = NewFileRow(page, "open", "run");
+        var row = NewRow(page, "fileExt", "jpg", "open", "run");
 
         Assert.Equal([1, 2], row.Chips.Select(c => c.Index));
         Assert.Equal("open", row.Chips[0].Label);
@@ -104,7 +92,7 @@ public sealed class SelectedActionPageViewModelTests
     public void MoveEntry_Swaps_Chip_Order_Keeps_Editor_Identity()
     {
         var (page, _) = CreatePage();
-        var row = NewFileRow(page, "open", "run", "copy");
+        var row = NewRow(page, "fileExt", "jpg", "open", "run", "copy");
         var first = row.Editors[0];
 
         row.MoveEntry(first, +1);
@@ -122,7 +110,7 @@ public sealed class SelectedActionPageViewModelTests
     public void Single_Entry_Remove_Disabled_And_Boundary_Keys_Disabled()
     {
         var (page, _) = CreatePage();
-        var row = NewFileRow(page, "open");
+        var row = NewRow(page, "fileExt", "jpg", "open");
         var editor = row.Editors[0];
 
         Assert.False(editor.CanRemove);
@@ -139,8 +127,8 @@ public sealed class SelectedActionPageViewModelTests
     public void AddEntry_Disabled_At_Nine()
     {
         var (page, _) = CreatePage();
-        var row = NewFileRow(page,
-            "copy", "open", "open_folder", "open_path", "run", "script"); // 通配覆盖集 6 项
+        var row = NewRow(page,
+            "fileExt", "jpg", "copy", "open", "open_folder", "open_path", "run", "script"); // 通配覆盖集 6 项
         // 追加 3 个重复行为直充到 9 (绕过覆盖集耗尽; 键位推导只关心数量)
         for (var i = 0; i < 3; i++)
         {
@@ -165,31 +153,17 @@ public sealed class SelectedActionPageViewModelTests
     public void AddEntry_Blocked_When_MatchType_Has_Single_Behavior()
     {
         var (page, _) = CreatePage();
-        MappingRowVm NewRow(string matchValue, params string[] behaviors) =>
-            new(page, new SelectedMapping
-            {
-                MatchType = "textType",
-                MatchValue = matchValue,
-                Entries = [.. behaviors.Select(b => new SelectedEntry
-                {
-                    Behavior = b,
-                    Options = new RuleOptions(),
-                })],
-            });
 
-        var magnetRow = NewRow("magnet", "magnet_download");
-        page.TextMappings.Add(magnetRow);
+        var magnetRow = NewRow(page, "textType", "magnet", "magnet_download");
         Assert.False(magnetRow.CanAddEntry);
         Assert.Equal(I18n.T("1119"), magnetRow.AddEntryHint); // 单行为提示, 非 9 上限文案
         magnetRow.AddEntryCommand.Execute(null);
         Assert.Single(magnetRow.Mapping.Entries); // 守卫生效不追加
 
-        var magnetEmpty = NewRow("magnet");
-        page.TextMappings.Add(magnetEmpty);
+        var magnetEmpty = NewRow(page, "textType", "magnet");
         Assert.True(magnetEmpty.CanAddEntry); // 空行仍允许加第一个
 
-        var plainRow = NewRow("plain", "search");
-        page.TextMappings.Add(plainRow);
+        var plainRow = NewRow(page, "textType", "plain", "search");
         Assert.True(plainRow.CanAddEntry); // plain 覆盖集 5 项, 未占满仍可加
 
         foreach (var b in new[] { "copy", "run", "script", "send_keys" })
@@ -206,13 +180,7 @@ public sealed class SelectedActionPageViewModelTests
     public void AddEntry_Picks_First_Unused_Covering_Behavior()
     {
         var (page, _) = CreatePage();
-        var row = new MappingRowVm(page, new SelectedMapping
-        {
-            MatchType = "textType",
-            MatchValue = "plain",
-            Entries = [new SelectedEntry { Behavior = "search", Options = new RuleOptions() }],
-        });
-        page.TextMappings.Add(row); // 行必须挂到分区: 仲裁/调序都遍历分区集合
+        var row = NewRow(page, "textType", "plain", "search");
 
         for (var i = 0; i < 4; i++)
         {
@@ -233,9 +201,9 @@ public sealed class SelectedActionPageViewModelTests
     public void BehaviorOptions_Filtered_By_Mapping_Premise()
     {
         var (page, _) = CreatePage();
-        var fileRow = NewFileRow(page, "open");
-        var fileOptions = fileRow.Editors[0].BehaviorOptions.Select(o => o.Value).ToHashSet(); // urlRow 展开前抓取
-        var urlRow = NewUrlRow(page, "open_url"); // 仲裁收起 fileRow (同屏只开一个)
+        var fileRow = NewRow(page, "fileExt", "jpg", "open");
+        var fileOptions = fileRow.Editors[0].BehaviorOptions.Select(o => o.Value).ToHashSet();
+        var urlRow = NewRow(page, "textType", "url", "open_url");
 
         Assert.Equal(new HashSet<string> { "copy", "open", "open_folder", "open_path", "run", "script" },
             fileOptions);
@@ -326,13 +294,14 @@ public sealed class SelectedActionPageViewModelTests
         Assert.True(panel.CanConfirm);
     }
 
-    // ------------------------------------------------------------- 弹窗落位
+    // ------------------------------------------------------------- 弹窗落位 (直写模型 + 卡级点亮)
 
-    /// <summary>确认落位: fileExt -> FileMappings 尾部, entries 顺序 = 勾选顺序 (即菜单键位), 弹窗关闭。</summary>
+    /// <summary>确认落位: fileExt -> Config.SelectedAction.Mappings (matchType=fileExt, MatchValue=值),
+    /// 列表顺序 = 勾选顺序 (即菜单键位), 弹窗关闭; 卡级 toggle 变为已配置。</summary>
     [Fact]
-    public void AddMapping_FileExt_Goes_To_FilePartition_With_PickOrder()
+    public void AddMapping_FileExt_Writes_Model_And_Lights_Card_Dot()
     {
-        var (page, _) = CreatePage();
+        var (page, config) = CreatePage();
         page.OpenAddPanelCommand.Execute(null);
         var panel = page.AddPanel!;
         panel.MatchValue = "jpg";
@@ -343,17 +312,17 @@ public sealed class SelectedActionPageViewModelTests
 
         Assert.Null(page.AddPanel);
         Assert.True(page.HasAnyMappings);
-        Assert.Empty(page.TextMappings);
-        var row = Assert.Single(page.FileMappings);
-        Assert.Equal("jpg", row.Mapping.MatchValue);
-        Assert.Equal(["open", "run"], row.Mapping.Entries.Select(e => e.Behavior)); // 列表位置序
+        var m = Assert.Single(config.SelectedAction.Mappings);
+        Assert.Equal("fileExt", m.MatchType);
+        Assert.Equal("jpg", m.MatchValue);
+        Assert.Equal(["open", "run"], m.Entries.Select(e => e.Behavior)); // 列表位置序
     }
 
-    /// <summary>确认落位: 文本特征类型 -> TextMappings, MatchValue = 特征词本身。</summary>
+    /// <summary>确认落位: 文本特征类型 -> Config.SelectedAction.Mappings, MatchValue = 特征词本身。</summary>
     [Fact]
-    public void AddMapping_TextType_Goes_To_TextPartition()
+    public void AddMapping_TextType_Writes_Model()
     {
-        var (page, _) = CreatePage();
+        var (page, config) = CreatePage();
         page.OpenAddPanelCommand.Execute(null);
         var panel = page.AddPanel!;
         panel.TypeSelected = panel.TypeOptions.OfType<ComboOption>().First(o => o.Value == "magnet");
@@ -361,18 +330,17 @@ public sealed class SelectedActionPageViewModelTests
 
         page.AddMapping(panel);
 
-        Assert.Empty(page.FileMappings);
-        var row = Assert.Single(page.TextMappings);
-        Assert.Equal("textType", row.Mapping.MatchType);
-        Assert.Equal("magnet", row.Mapping.MatchValue);
-        Assert.Equal(["magnet_download"], row.Mapping.Entries.Select(e => e.Behavior));
+        var m = Assert.Single(config.SelectedAction.Mappings);
+        Assert.Equal("textType", m.MatchType);
+        Assert.Equal("magnet", m.MatchValue);
+        Assert.Equal(["magnet_download"], m.Entries.Select(e => e.Behavior));
     }
 
     /// <summary>零勾选确认: 不创建映射, 弹窗保持打开 (由用户显式取消)。</summary>
     [Fact]
     public void AddMapping_Without_Pick_Does_Nothing()
     {
-        var (page, _) = CreatePage();
+        var (page, config) = CreatePage();
         page.OpenAddPanelCommand.Execute(null);
         var panel = page.AddPanel!;
         panel.MatchValue = "jpg"; // 有值但零勾选
@@ -381,11 +349,31 @@ public sealed class SelectedActionPageViewModelTests
 
         Assert.Same(panel, page.AddPanel); // 弹窗未关闭
         Assert.False(page.HasAnyMappings);
-        Assert.Empty(page.FileMappings);
-        Assert.Empty(page.TextMappings);
+        Assert.Empty(config.SelectedAction.Mappings);
     }
 
-    // ------------------------------------------------------------- 热键 / 开关 / 仲裁
+    /// <summary>重复 (matchType, matchValue) 落位被去重: 已配置则不重复添加。</summary>
+    [Fact]
+    public void AddMapping_Deduplicates_Same_Type_And_Value()
+    {
+        var (page, config) = CreatePage();
+        page.OpenAddPanelCommand.Execute(null);
+        var panel = page.AddPanel!;
+        panel.MatchValue = "jpg";
+        panel.BehaviorPicks.First(p => p.Pack.Id == "open").IsChecked = true;
+        page.AddMapping(panel);
+        Assert.Single(config.SelectedAction.Mappings);
+
+        // 再次添加完全相同的匹配条件 -> 去重, 总数仍为 1 (且不改变已存条目)
+        page.OpenAddPanelCommand.Execute(null);
+        var panel2 = page.AddPanel!;
+        panel2.MatchValue = "jpg";
+        panel2.BehaviorPicks.First(p => p.Pack.Id == "open").IsChecked = true;
+        page.AddMapping(panel2);
+        Assert.Single(config.SelectedAction.Mappings);
+    }
+
+    // ------------------------------------------------------------- 热键 / 开关
 
     /// <summary>热键 setter 写模型并置未保存标记; 空热键警示联动。</summary>
     [Fact]
@@ -419,123 +407,47 @@ public sealed class SelectedActionPageViewModelTests
         Assert.DoesNotContain(HotkeyLogic.NormalizeHotkey("F9"), page.UsedHotkeys);
     }
 
-    /// <summary>手风琴仲裁: 同屏只开一个 —— 新展开收起旧行 (编辑器清空), 再展开即重建。</summary>
+    // ------------------------------------------------------------- 卡级删除 (红 ✕)
+
+    /// <summary>删除当前点亮类型的配置: 未注入确认框委托 (或拒绝) 时不删除 (防御性回退, 不静默丢数据)。</summary>
     [Fact]
-    public void ExpandedRow_Only_One_Open_At_A_Time()
-    {
-        var (page, _) = CreatePage();
-        var row1 = NewFileRow(page, "open");
-        Assert.True(row1.IsExpanded); // NewFileRow 展开 row1
-        var row2 = NewUrlRow(page, "open_url");
-
-        Assert.True(row2.IsExpanded); // 展开 row2
-        Assert.Same(row2, page.ExpandedRow);
-        Assert.False(row1.IsExpanded); // row1 被仲裁收起
-        Assert.Empty(row1.Editors);    // 编辑器清空
-        Assert.NotEmpty(row2.Editors);
-
-        page.ExpandedRow = null; // 全部收起
-        Assert.False(row2.IsExpanded);
-        Assert.Empty(row2.Editors);
-    }
-
-    /// <summary>删除映射: 未注入确认框委托时不删除 (防御性回退, 不静默丢数据)。</summary>
-    [Fact]
-    public async Task AskRemove_Without_ConfirmDelegate_Does_Not_Remove()
-    {
-        var (page, _) = CreatePage();
-        page.OpenAddPanelCommand.Execute(null);
-        var panel = page.AddPanel!;
-        panel.MatchValue = "jpg";
-        panel.BehaviorPicks[0].IsChecked = true;
-        page.AddMapping(panel);
-        var row = Assert.Single(page.FileMappings);
-
-        await page.AskRemoveAsync(row); // ConfirmAsync == null -> 拒绝
-
-        // AddMapping 未同步模型 (SyncToModel 在保存咽喉处), 仅断言页面分区
-        Assert.Single(page.FileMappings);
-    }
-
-    /// <summary>删除映射: 确认后移除并立即保存 (SaveAsync 无 Api 时安全返回 false, 内存态已一致)。</summary>
-    [Fact]
-    public async Task AskRemove_Confirmed_Removes_Row()
+    public async Task DeleteSelected_Without_ConfirmDelegate_Does_Not_Remove()
     {
         var (page, config) = CreatePage();
-        page.OpenAddPanelCommand.Execute(null);
-        var panel = page.AddPanel!;
-        panel.MatchValue = "jpg";
-        panel.BehaviorPicks[0].IsChecked = true;
-        page.AddMapping(panel);
-        var row = Assert.Single(page.FileMappings);
+        config.SelectedAction.Mappings.Add(new SelectedMapping
+        {
+            MatchType = "fileExt", MatchValue = "jpg, png",
+            Entries = [new SelectedEntry { Behavior = "open", Options = new RuleOptions() }],
+        });
+        page.RebuildCards();
+        var fileCard = page.FileCard;
+        Assert.True(fileCard.IsTypeConfigured("group:image"));
+        fileCard.SelectType("group:image");
+
+        await fileCard.DeleteSelectedCommand.ExecuteAsync(null); // ConfirmAsync == null -> 拒绝
+        Assert.Single(config.SelectedAction.Mappings);
+    }
+
+    /// <summary>删除当前点亮类型的配置: 确认后移除并立即保存 (无 Api 时 SaveAsync 安全返回 false, 内存态已一致)。</summary>
+    [Fact]
+    public async Task DeleteSelected_Confirmed_Removes_Mapping()
+    {
+        var (page, config) = CreatePage();
+        config.SelectedAction.Mappings.Add(new SelectedMapping
+        {
+            MatchType = "fileExt", MatchValue = "jpg, png",
+            Entries = [new SelectedEntry { Behavior = "open", Options = new RuleOptions() }],
+        });
+        page.RebuildCards();
+        var fileCard = page.FileCard;
+        Assert.True(fileCard.IsTypeConfigured("group:image"));
+        fileCard.SelectType("group:image");
         page.ConfirmAsync = (_, _) => Task.FromResult(true);
 
-        await page.AskRemoveAsync(row);
+        await fileCard.DeleteSelectedCommand.ExecuteAsync(null);
 
-        Assert.Empty(page.FileMappings);
+        Assert.Empty(config.SelectedAction.Mappings);
         Assert.False(page.HasAnyMappings);
-        // SyncToModel 已把空分区写回模型
-        Assert.Empty(config.SelectedAction.Mappings);
-    }
-
-    // ------------------------------------------------------------- 保存链路投影 (评审 C1)
-
-    /// <summary>
-    /// 评审 C1 语义锁定: 新增映射只动页面集合 (SyncToModel 位于保存咽喉处, AddMapping 不投影);
-    /// MainViewModel.SaveAsync 现于节流判断前代调 ActionVm.SyncToModel —— 本测试锁定该投影步骤:
-    /// 调用后新增 mapping 进入 config.SelectedAction.Mappings, 即 Ctrl+S 保存载荷与 GET /config 可见。
-    /// </summary>
-    [Fact]
-    public void SyncToModel_Projects_NewMapping_Into_Model()
-    {
-        var (page, config) = CreatePage();
-        Assert.Empty(config.SelectedAction.Mappings);
-
-        page.OpenAddPanelCommand.Execute(null);
-        var panel = page.AddPanel!;
-        panel.MatchValue = "jpg";
-        panel.BehaviorPicks.First(p => p.Pack.Id == "open").IsChecked = true;
-        page.AddMapping(panel);
-        Assert.Single(page.FileMappings);
-        // 投影前: 模型尚无该 mapping (AddMapping 只动集合, 与删除测试注释口径一致)
-        Assert.Empty(config.SelectedAction.Mappings);
-
-        page.SyncToModel();
-
-        var m = Assert.Single(config.SelectedAction.Mappings);
-        Assert.Equal("fileExt", m.MatchType);
-        Assert.Equal("jpg", m.MatchValue);
-        Assert.Equal(["open"], m.Entries.Select(e => e.Behavior));
-    }
-
-    // ------------------------------------------------------------- 分区首行标记 (卡内标题展示)
-
-    /// <summary>分区标题只在首行卡内展示: 加载后标首行; 移动换位后标记跟随新序;
-    /// 删除首行后顺延到下一行 (标题不消失)。</summary>
-    [Fact]
-    public async Task PartitionTitleFlag_Follows_Row_Order_And_Shifts_On_Remove()
-    {
-        var config = BuildConfig();
-        config.SelectedAction = new SelectedAction
-        {
-            Mappings =
-            [
-                new SelectedMapping { MatchType = "textType", MatchValue = "url", Entries = [new SelectedEntry { Behavior = "open_url", Options = new RuleOptions() }] },
-                new SelectedMapping { MatchType = "textType", MatchValue = "plain", Entries = [new SelectedEntry { Behavior = "search", Options = new RuleOptions() }] },
-            ],
-        };
-        var (page, _) = CreatePage(config);
-        Assert.True(page.TextMappings[0].IsFirstInPartition);
-        Assert.False(page.TextMappings[1].IsFirstInPartition);
-
-        page.TextMappings.Move(1, 0); // 集合移动后刷新, 标记随新序换位
-        page.RefreshPartitionTitles();
-        Assert.False(page.TextMappings[1].IsFirstInPartition);
-        Assert.True(page.TextMappings[0].IsFirstInPartition);
-
-        page.ConfirmAsync = (_, _) => Task.FromResult(true); // 删除首行 -> 标记顺延
-        await page.AskRemoveAsync(page.TextMappings[0]);
-        Assert.True(page.TextMappings[0].IsFirstInPartition);
-        Assert.Single(page.TextMappings);
+        Assert.False(fileCard.IsTypeConfigured("group:image"));
     }
 }

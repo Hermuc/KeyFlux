@@ -16,19 +16,15 @@ using Xunit;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
-/// 选中动作页组件框外观守护 (2026-09-16)。
+/// 选中动作页组件框外观守护 (2026-09-16, 聚合卡重构后适配):
 ///
 /// 本页配方 = BoxShadow **ClaudeShadowCardHalo** (静止) / **ClaudeShadowCardHaloHover** (悬停光圈)
 /// + BorderThickness **1** + ClaudeBorderCreamBrush。
 /// 阴影取 Settings / 插件页同款; **描边有意比其它三处(2px)更细** —— 用户看过实际效果后裁定
-/// 本页"线条太粗/太重": 本页卡片密集堆叠(行卡间距仅 8px, 且行卡内嵌一张子卡),
-/// 同一 2px 在此处框线密度过高而发重。**勿把本页"修正"成 2px**, 那不是笔误。
+/// 本页"线条太粗/太重"。
 ///
-/// 本页原先把 BorderBrush/BorderThickness **内联**写在每个 Border 上且无阴影,
-/// 现统一由 Border.actionCard 样式承载 (内联值优先级高于样式 Setter, 必须移除内联项)。
-///
-/// 另一条守护: **默认态与选中态 (.matched) 的描边粗细与阴影必须相同**, 仅颜色区分 ——
-/// 状态样式只覆盖 BorderBrush, 不得改粗细/阴影, 否则选中行会与相邻行"厚薄不一"。
+/// 重构后页面由两张聚合卡 (TypeCardVm: 文本特征 / 文件后缀) + 主快捷键卡 + 模拟测试条 组成,
+/// 卡内类型 toggle 的 ItemsControl 必须关裁剪 (小圆点微标不被切), 卡体在 ScrollViewer 内须留阴影余量。
 /// </summary>
 [Collection("I18nSerial")]
 public sealed class ActionPageCardStyleTests
@@ -40,25 +36,29 @@ public sealed class ActionPageCardStyleTests
         main.Config = new Config
         {
             FileGroups = [new FileGroup { Name = "image", Label = "图片", Exts = ["jpg", "png"] }],
+            SelectedAction = new SelectedAction
+            {
+                Mappings =
+                [
+                    new SelectedMapping
+                    {
+                        MatchType = "fileExt", MatchValue = "jpg, png",
+                        Entries = [new SelectedEntry { Behavior = "open", Options = new RuleOptions() }],
+                    },
+                    new SelectedMapping
+                    {
+                        MatchType = "textType", MatchValue = "url",
+                        Entries = [new SelectedEntry { Behavior = "open_url", Options = new RuleOptions() }],
+                    },
+                ],
+            },
         };
-        var page = new SelectedActionPageViewModel(main);
-        page.FileMappings.Add(new MappingRowVm(page, new SelectedMapping
-        {
-            MatchType = "fileExt", MatchValue = "jpg",
-            Entries = [new SelectedEntry { Behavior = "open", Options = new RuleOptions() }],
-        }));
-        page.TextMappings.Add(new MappingRowVm(page, new SelectedMapping
-        {
-            MatchType = "textType", MatchValue = "url",
-            Entries = [new SelectedEntry { Behavior = "open_url", Options = new RuleOptions() }],
-        }));
-        page.RefreshPartitionTitles();
-        page.ExpandedRow = page.FileMappings[0]; // 展开一行 ⇒ 嵌套条目卡也实例化
+        var page = new SelectedActionPageViewModel(main); // 构造即按模型建两张卡 + 默认查看已配置类型
 
         var view = new SelectedActionPageView { DataContext = page };
-        // 窗口 1000 高: 页面内容约 900 高, 用 820 会把最底部的「模拟测试」卡切掉,
-        // 导致悬停测试的点落在窗口外 (2026-09-16 踩过)
-        var win = new Window { Width = 1200, Height = 1000, Content = view };
+        // 窗口需足够高: 聚合卡重构后两张卡内联渲染 toggle + 编辑器, 页面内容约 1150 高,
+        // 用 1000 会把最底部的「模拟测试」卡拉到窗口外 (y≈1001), 悬停测试的点落窗外 → 必挂。
+        var win = new Window { Width = 1200, Height = 1400, Content = view };
         win.Show();
         Dispatcher.UIThread.RunJobs();
         return (page, view, win);
@@ -74,7 +74,7 @@ public sealed class ActionPageCardStyleTests
             var cards = view.GetVisualDescendants().OfType<Border>()
                 .Where(b => b.Classes.Contains("actionCard") && !b.Classes.Contains("rowEditor")).ToList();
             Assert.True(cards.Count >= 4,
-                $"应有 >=4 个组件框 (2 张行卡 + 主快捷键卡 + 模拟测试条), 实得 {cards.Count}");
+                $"应有 >=4 个组件框 (2 张聚合卡 + 主快捷键卡 + 模拟测试条), 实得 {cards.Count}");
 
             var shadow = (BoxShadows)view.FindResource("ClaudeShadowCardHalo")!;
             Assert.True(Application.Current!.TryGetResource("ClaudeBorderCreamBrush", out var creamObj));
@@ -85,16 +85,14 @@ public sealed class ActionPageCardStyleTests
                 Assert.Equal(1, card.BorderThickness.Left);
                 Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
                 Assert.Equal(shadow.ToString(), card.BoxShadow.ToString());
-                // 悬停光圈必须是**淡入**的: 卡片自带 BoxShadow 过渡 (皮肤令牌 120ms),
-                // 否则光晕会硬切 —— 与"过渡自然"的要求相悖 (动画播放本身不在 headless 断言,
-                // 只锁接线, 同 MotionSmokeTests 的约定)。
+                // 悬停光圈必须是**淡入**的: 卡片自带 BoxShadow 过渡 (皮肤令牌 120ms)
                 var t = Assert.Single(card.Transitions!.OfType<BoxShadowsTransition>());
                 Assert.Equal("BoxShadow", t.Property!.Name);
                 Assert.Equal(ClaudeMotion.Micro, t.Duration);
             }
 
-            // 行内编辑器卡豁免统一配方 (2026-09-18 用户裁定): 它是行卡内的嵌套面板,
-            // 双层投影与外层行卡阴影叠加显脏 ⇒ 静止档必须零阴影, 只留 1px 奶油描边分层。
+            // 行内编辑器卡豁免统一配方 (2026-09-18 用户裁定): 它是卡内的嵌套面板,
+            // 双层投影与外层卡阴影叠加显脏 ⇒ 静止档必须零阴影, 只留 1px 奶油描边分层。
             var editors = view.GetVisualDescendants().OfType<Border>()
                 .Where(b => b.Classes.Contains("rowEditor")).ToList();
             Assert.NotEmpty(editors);
@@ -111,25 +109,22 @@ public sealed class ActionPageCardStyleTests
     }
 
     /// <summary>
-    /// ③ 承载映射行卡的两个 ItemsControl **必须关掉裁剪**。
-    /// ItemsControl 默认裁剪到自身边界, 而行卡 BoxShadow 画在卡片边界之外 ⇒
-    /// 不关掉就只剩卡片之间那一段可见, 列表外沿(首卡上/末卡下/各卡左右)的阴影全被切掉,
-    /// 即用户报的「阴影被裁切」。插件页同款坑、同款修法 (PluginsPageView.axaml 有原始注释)。
+    /// ③ 承载类型 toggle 的 ItemsControl **必须关掉裁剪**。
+    /// 卡内小圆点微标 (config-dot) 画在 toggle 右上角, 若 ItemsControl 裁边界则被切掉。
     /// </summary>
     [AvaloniaFact]
-    public void Mapping_Lists_Must_Not_Clip_Card_Shadow()
+    public void Toggle_Lists_Must_Not_Clip_Card_Shadow()
     {
-        var (page, view, win) = CreateHost();
+        var (_, view, win) = CreateHost();
         try
         {
             var lists = view.GetVisualDescendants().OfType<ItemsControl>()
-                .Where(ic => ReferenceEquals(ic.ItemsSource, page.TextMappings)
-                          || ReferenceEquals(ic.ItemsSource, page.FileMappings))
+                .Where(ic => ic.DataContext is TypeCardVm)
                 .ToList();
-            Assert.Equal(2, lists.Count);
+            Assert.Equal(2, lists.Count); // 文本卡 + 文件卡
             foreach (var list in lists)
             {
-                Assert.False(list.ClipToBounds, "映射行卡的 ItemsControl 必须 ClipToBounds=False, 否则阴影被裁");
+                Assert.False(list.ClipToBounds, "类型 toggle 的 ItemsControl 必须 ClipToBounds=False, 否则圆点徽标被裁");
             }
         }
         finally
@@ -139,30 +134,28 @@ public sealed class ActionPageCardStyleTests
     }
 
     /// <summary>
-    /// ④ 行卡必须在 ScrollViewer 视口内**留出画阴影的水平余量**。
-    /// 实测过的不对称: 内容左对齐贴着视口左沿时, 卡片左沿 - 视口左沿 = 0px ⇒ 左侧阴影被
-    /// ScrollViewer 视口裁掉, 而右侧有 566px 余量正常渲染 ⇒ 表现为"右有左无"。
+    /// ④ 聚合卡必须在 ScrollViewer 视口内**留出画阴影的水平余量**。
+    /// 内容左对齐贴着视口左沿时, 卡片左沿 - 视口左沿 = 0px ⇒ 左侧阴影被 ScrollViewer 视口裁掉。
     /// 阴影 ClaudeShadowCard 第二层 blur=18, 水平外扩约 9px ⇒ 左余量须 >= 9px。
-    /// 修法是**移动裁剪边界而非移动内容**: 页面 Grid 左内边距 20->8, Header 与 PageRoot 各 +12 左 Margin,
-    /// 三者等量抵消故视觉布局不变, 但给左侧腾出 12px。**勿把这三处改回等值**, 否则阴影又被裁。
     /// </summary>
     [AvaloniaFact]
-    public void Row_Cards_Must_Leave_Room_For_Shadow_Inside_Scroller()
+    public void Cards_Must_Leave_Room_For_Shadow_Inside_Scroller()
     {
-        var (page, view, win) = CreateHost();
+        var (_, view, win) = CreateHost();
         try
         {
             var scroller = view.GetVisualDescendants().OfType<ScrollViewer>().First();
-            var card = view.GetVisualDescendants().OfType<Border>()
-                .First(b => ReferenceEquals(b.DataContext, page.FileMappings[0])
-                         || ReferenceEquals(b.DataContext, page.TextMappings[0]));
-            _ = page;
+            var cards = view.GetVisualDescendants().OfType<Border>()
+                .Where(b => b.Classes.Contains("type-card")).ToList();
+            Assert.Equal(2, cards.Count);
 
             var svLeft = scroller.TranslatePoint(default, win)!.Value.X;
-            var cardLeft = card.TranslatePoint(default, win)!.Value.X;
-
-            Assert.True(cardLeft - svLeft >= 9,
-                $"行卡左沿距视口左沿仅 {cardLeft - svLeft:F1}px ⇒ 左侧阴影会被视口裁掉 (需要 >=9px)");
+            foreach (var card in cards)
+            {
+                var cardLeft = card.TranslatePoint(default, win)!.Value.X;
+                Assert.True(cardLeft - svLeft >= 9,
+                    $"聚合卡左沿距视口左沿仅 {cardLeft - svLeft:F1}px ⇒ 左侧阴影会被视口裁掉 (需要 >=9px)");
+            }
         }
         finally
         {
@@ -171,13 +164,7 @@ public sealed class ActionPageCardStyleTests
     }
 
     /// <summary>
-    /// ⑤ 四个组件框**悬停时描边色不变 (无灰线) 且点亮陶土色光圈** (2026-09-17 裁定:
-    /// 先「取消悬停投影加深, 保留基础阴影」, 后要求「悬停时周围显示一圈光圈, 不能是纯线条」)。
-    /// 悬停后 (a) 描边色仍 == 静止色 (奶油), (b) BoxShadow == ClaudeShadowCardHaloHover ——
-    /// 该档 = 静止两层的**逐位复制** + 第 3 层陶土弥散光圈, 故"只加光圈、不动投影与描边"。
-    /// 历史: 灰线 (RingWarm 描边) ⇒ 加深不足 ⇒ 加深过重 ⇒ 取消加深 ⇒ 光圈; 本项把终点固化。
-    /// ⚠ 读终点态前必须先把**全部**卡片的过渡摘掉, 并用 SettleShadow 结算 (见用例内注释):
-    /// headless 下过渡动画走真实时钟且不会被 RunJobs 推进, 否则会在全量跑时偶发红。
+    /// ⑤ 四个组件框**悬停时描边色不变 (无灰线) 且点亮陶土色光圈**。
     /// </summary>
     [AvaloniaFact]
     public void All_Action_Cards_Hover_Adds_Halo_Without_Gray_Border()
@@ -191,15 +178,9 @@ public sealed class ActionPageCardStyleTests
             var hover = (BoxShadows)view.FindResource("ClaudeShadowCardHaloHover")!;
 
             var cards = view.GetVisualDescendants().OfType<Border>()
-                .Where(b => b.Classes.Contains("actionCard") && !b.Classes.Contains("rowEditor")).ToList();
+                .Where(b => b.Classes.Contains("actionCard") && !b.Classes.Contains("rowEditor") && !b.Classes.Contains("row-card")).ToList();
             Assert.True(cards.Count >= 4, $"应有 >=4 个组件框, 实得 {cards.Count}");
 
-            // ★ 先摘掉**全部**卡片的 BoxShadow 过渡, 再动指针 (2026-09-17 修本用例偶发红):
-            // 过渡动画由真实时钟驱动, 一旦启动不会因摘掉 Transitions 而中止; 而悬停某张卡可能
-            // 连带点亮与它重叠/嵌套的卡, 那张卡就会在下一轮被读「静止档」时停在插值中间值上 ——
-            // 实测拿到第 3 层 alpha=0x0a 的半途值 (期望 0x00), 表现为「单跑绿、全量红」。
-            // 全部提前摘除 ⇒ 本用例期间不再有任何过渡在飞。悬停**接线**不靠本用例守护,
-            // 由 Action_Cards_Use_Unified_Card_Recipe 断言。
             foreach (var c in cards)
             {
                 c.Transitions = new Transitions();
@@ -208,7 +189,6 @@ public sealed class ActionPageCardStyleTests
             var checkedNames = new List<string>();
             foreach (var card in cards)
             {
-                // 静止态基线: 指针先停到不压任何卡片的角落, 让本卡的悬停态彻底复位
                 win.MouseMove(new Point(1, 1));
                 SettleShadow(card, rest, $"静止档 [{checkedNames.Count}]");
 
@@ -223,11 +203,10 @@ public sealed class ActionPageCardStyleTests
 
                 Assert.True(card.IsPointerOver,
                     $"{string.Join("+", card.Classes)} 悬停应命中 (Bounds={card.Bounds})");
-                // 悬停: 无灰线 (描边色不变) + 光圈档 (前两层与静止逐位相同, 第 3 层才亮)
                 Assert.Equal(cream, ((ISolidColorBrush)card.BorderBrush!).Color);
                 checkedNames.Add(string.Join("+", card.Classes));
             }
-            Assert.Equal(4, checkedNames.Count);
+            Assert.Equal(cards.Count, checkedNames.Count);
 
             // 行内编辑器卡: 悬停也必须保持零阴影 (2026-09-18 去影裁定, 光圈不适用于嵌套面板)
             var editor = view.GetVisualDescendants().OfType<Border>()
@@ -249,12 +228,8 @@ public sealed class ActionPageCardStyleTests
     }
 
     /// <summary>
-    /// 把卡片的 BoxShadow 推到期望的**终点态**再断言 —— headless 下过渡动画由平台时钟驱动,
-    /// 而 `Dispatcher.UIThread.RunJobs()` **不推进**它 (MotionSmokeTests 已立约定「动画本身不在
-    /// headless 断言」) ⇒ 带过渡直接读只能拿到插值中间值。故显式 `ForceRenderTimerTick` 逐帧推进
-    /// (过渡 = `ClaudeMotion.Micro` 120ms ≈ 8 帧 @60fps, 上限给 40 帧) 直到取值等于期望。
-    /// 正常路径上过渡已在调用前摘除 ⇒ 首轮 RunJobs 即命中; 本函数主要作**兜底与诊断**
-    /// (2026-09-17: 曾出现静止档读到第 3 层 alpha=0x0a 的半途值, 导致本用例「单跑绿、全量红」)。
+    /// 把卡片的 BoxShadow 推到期望的**终点态**再断言。headless 下过渡动画由平台时钟驱动,
+    /// 而 `Dispatcher.UIThread.RunJobs()` **不推进**它 ⇒ 带过渡直接读只能拿到插值中间值。
     /// </summary>
     private static void SettleShadow(Border card, BoxShadows expected, string what)
     {
@@ -282,31 +257,30 @@ public sealed class ActionPageCardStyleTests
         var (page, view, win) = CreateHost();
         try
         {
-            var target = page.FileMappings[0];
-            var card = view.GetVisualDescendants().OfType<Border>()
-                .First(b => b.Classes.Contains("row-card") && ReferenceEquals(b.DataContext, target));
+            // 编辑器卡 DataContext = MappingRowVm; 取文件卡详情编辑器
+            var target = view.GetVisualDescendants().OfType<Border>()
+                .First(b => b.DataContext is MappingRowVm { Mapping.MatchType: "fileExt" });
+            var card = Assert.IsType<MappingRowVm>(target.DataContext);
 
-            var thicknessBefore = card.BorderThickness;
-            var shadowBefore = card.BoxShadow.ToString();
-            Assert.DoesNotContain("matched", card.Classes);
+            var thicknessBefore = target.BorderThickness;
+            var shadowBefore = target.BoxShadow.ToString();
+            Assert.DoesNotContain("matched", target.Classes);
 
-            target.IsMatched = true; // 真实驱动 Classes.matched 绑定
+            card.IsMatched = true; // 真实驱动 Classes.matched 绑定
             Dispatcher.UIThread.RunJobs();
 
-            Assert.Contains("matched", card.Classes);
-            Assert.Equal(thicknessBefore, card.BorderThickness);
-            Assert.Equal(shadowBefore, card.BoxShadow.ToString());
+            Assert.Contains("matched", target.Classes);
+            Assert.Equal(thicknessBefore, target.BorderThickness);
+            Assert.Equal(shadowBefore, target.BoxShadow.ToString());
             Application.Current!.TryGetResource("ClaudeTerracottaBrush", out var terra);
-            Assert.Equal(((ISolidColorBrush)terra!).Color, ((ISolidColorBrush)card.BorderBrush!).Color);
+            Assert.Equal(((ISolidColorBrush)terra!).Color, ((ISolidColorBrush)target.BorderBrush!).Color);
 
-            // 悬停已选中的行卡时仍须保持陶土边 —— 2026-09-17 后悬停只改 BoxShadow、
-            // 不动描边色, 与 .matched 的 BorderBrush 无交集 ⇒ 天然不冲突;
-            // 此项防将来又把悬停改回"换描边色"而压掉陶土边。
-            var hp = card.TranslatePoint(new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), win)!.Value;
+            // 悬停已选中的编辑器卡时仍须保持陶土边 (悬停只改 BoxShadow、不动描边色)
+            var hp = target.TranslatePoint(new Point(target.Bounds.Width / 2, target.Bounds.Height / 2), win)!.Value;
             win.MouseMove(hp);
             Dispatcher.UIThread.RunJobs();
-            Assert.True(card.IsPointerOver);
-            Assert.Equal(((ISolidColorBrush)terra!).Color, ((ISolidColorBrush)card.BorderBrush!).Color);
+            Assert.True(target.IsPointerOver);
+            Assert.Equal(((ISolidColorBrush)terra!).Color, ((ISolidColorBrush)target.BorderBrush!).Color);
         }
         finally
         {

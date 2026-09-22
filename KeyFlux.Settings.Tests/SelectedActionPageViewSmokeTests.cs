@@ -13,9 +13,9 @@ using KeyFlux.Settings.Views;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
-/// 选中动作页 XAML 运行时冒烟: 编译期查不出 StaticResource 解析失败、共享行卡
-/// DataTemplate 内的事件绑定 / $parent 绑定错误, 只能靠实例化整页 + 布局运行兜底。
-/// 覆盖: 空态渲染 / fileExt+textType 两分区行卡渲染 / 展开手风琴再收起。
+/// 选中动作页 XAML 运行时冒烟 (聚合卡重构后): 编译期查不出 StaticResource 解析失败、
+/// 共享编辑器 DataTemplate 内的事件绑定 / $parent 绑定错误, 只能靠实例化整页 + 布局运行兜底。
+/// 覆盖: 空态渲染 / 两聚合卡 toggle 渲染 / 切换查看类型 (点亮 + 待配置态) / 弹窗模糊。
 /// </summary>
 [Collection("I18nSerial")]
 public sealed class SelectedActionPageViewSmokeTests
@@ -27,23 +27,24 @@ public sealed class SelectedActionPageViewSmokeTests
         main.Config = new Config
         {
             FileGroups = [new FileGroup { Name = "image", Label = "图片", Exts = ["jpg", "png"] }],
+            SelectedAction = new SelectedAction
+            {
+                Mappings =
+                [
+                    new SelectedMapping
+                    {
+                        MatchType = "fileExt", MatchValue = "jpg, png",
+                        Entries = [new SelectedEntry { Behavior = "open", Options = new RuleOptions() }],
+                    },
+                    new SelectedMapping
+                    {
+                        MatchType = "textType", MatchValue = "url",
+                        Entries = [new SelectedEntry { Behavior = "open_url", Options = new RuleOptions() }],
+                    },
+                ],
+            },
         };
-        var page = new SelectedActionPageViewModel(main);
-        // 两分区各一行 (触发共享行卡模板的两个数据形态), 各带一个已展开手风琴的 entries
-        page.FileMappings.Add(new MappingRowVm(page, new SelectedMapping
-        {
-            MatchType = "fileExt",
-            MatchValue = "jpg",
-            Entries = [new SelectedEntry { Behavior = "open", Options = new RuleOptions() }],
-        }));
-        page.TextMappings.Add(new MappingRowVm(page, new SelectedMapping
-        {
-            MatchType = "textType",
-            MatchValue = "url",
-            Entries = [new SelectedEntry { Behavior = "open_url", Options = new RuleOptions() }],
-        }));
-        page.RefreshPartitionTitles(); // 同真实加载链路: 分区首行标题标记
-        page.ExpandedRow = page.FileMappings[0];
+        var page = new SelectedActionPageViewModel(main); // 按模型建两张卡
 
         var view = new SelectedActionPageView { DataContext = page };
         var window = new Window { Width = 1200, Height = 820, Content = view };
@@ -87,17 +88,22 @@ public sealed class SelectedActionPageViewSmokeTests
             .FirstOrDefault();
 
     [AvaloniaFact]
-    public void Page_Instantiates_And_Renders_Both_Partitions()
+    public void Page_Instantiates_And_Renders_Both_Cards()
     {
         var (page, view, window) = CreateHost();
         try
         {
-            // 行卡由共享 DataTemplate 渲染: 两分区各应产出可见的行内按钮
-            var buttons = view.GetVisualDescendants().OfType<Button>().ToList();
-            Assert.NotEmpty(buttons);
+            // 两聚合卡 + 主快捷键卡 + 模拟测试条 均实例化
+            var cards = view.GetVisualDescendants().OfType<Border>()
+                .Where(b => b.Classes.Contains("type-card")).ToList();
+            Assert.Equal(2, cards.Count);
 
-            // 隐式 ComboOption 模板必须同时作用于下拉项与 SelectionBox (后者无显式模板,
-            // 依赖 ContentPresenter 回退到页面资源查找 —— A4 去重的核心风险点)
+            // 类型 toggle 渲染 (文本卡 5 个内置特征 + 文件卡至少 1 个分组)
+            var toggles = view.GetVisualDescendants().OfType<ToggleButton>()
+                .Where(b => b.Classes.Contains("type-toggle")).ToList();
+            Assert.True(toggles.Count >= 6, $"应渲染文本卡 5 toggle + 文件卡 >=1, 实得 {toggles.Count}");
+
+            // 已配置类型编辑器内的 ComboBox (行为下拉) 经隐式 ComboOption 模板渲染 SelectionBox
             foreach (var combo in view.GetVisualDescendants().OfType<ComboBox>())
             {
                 if (combo.SelectedItem is Services.ComboOption opt && !opt.IsSeparator)
@@ -108,13 +114,10 @@ public sealed class SelectedActionPageViewSmokeTests
                 }
             }
 
-            // 展开另一分区行 → 手风琴内容 (编辑器面板) 出现, 无 XAML 运行时异常
-            page.ExpandedRow = page.TextMappings[0];
+            // 切换查看类型 (点亮 + 待配置态渲染), 无 XAML 运行时异常
+            page.TextCard.SelectType("path"); // 未配置 -> 待配置态
             Dispatcher.UIThread.RunJobs();
-            Assert.NotEmpty(view.GetVisualDescendants().OfType<ContentControl>());
-
-            // 收起后不抛异常 (删除/收起路径依赖 ExpandedRow 仲裁)
-            page.ExpandedRow = null;
+            page.FileCard.SelectType("group:image"); // 已配置 -> 编辑器详情
             Dispatcher.UIThread.RunJobs();
         }
         finally

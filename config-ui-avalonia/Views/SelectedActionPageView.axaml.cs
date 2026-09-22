@@ -86,17 +86,12 @@ public partial class SelectedActionPageView : UserControl
         await vm.ReloadBehaviorCatalogAsync();
     }
 
-    /// <summary>行头点击展开/收起手风琴; 点在输入控件/按钮/开关上时交给控件自身。</summary>
-    private void OnRowHeaderTapped(object? sender, TappedEventArgs e)
+    /// <summary>类型 toggle 点击: 切卡当前查看类型 (点亮=正在查看; 不改变配置)。</summary>
+    private void OnTypeToggleClicked(object? sender, RoutedEventArgs e)
     {
-        if (e.Source is Visual source
-            && source.GetSelfAndVisualAncestors().Any(a => a is Button or ToggleSwitch or ComboBox or TextBox or CheckBox or ToggleButton))
+        if (sender is ToggleButton { DataContext: TypeToggleVm toggle })
         {
-            return;
-        }
-        if (sender is Border { DataContext: MappingRowVm row })
-        {
-            row.ToggleExpandCommand.Execute(null);
+            toggle.SelectCommand.Execute(null);
         }
     }
 
@@ -115,15 +110,6 @@ public partial class SelectedActionPageView : UserControl
                 if (!isSep) item.Classes.Remove("sep-item");
             }
         }, DispatcherPriority.Loaded);
-    }
-
-    /// <summary>文本特征 Toggle 联动: 数据写入已在 VM 完成, 此处仅刷新同组其余三项视觉态。</summary>
-    private void OnTextTypeToggleChanged(object? sender, RoutedEventArgs e)
-    {
-        if (sender is ToggleButton { DataContext: MappingRowVm row })
-        {
-            row.NotifyTogglesChanged();
-        }
     }
 
     /// <summary>两按钮确认对话框 (复刻旧实现): 返回是否确认。</summary>

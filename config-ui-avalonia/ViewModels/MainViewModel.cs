@@ -264,18 +264,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (Config is null || Session.Api is null || _saving) return false;
 
-        // 评审 F1: 统一保存咽喉 —— 选中动作页关联分组的后缀修改先写回 fileGroups
-        // (Ctrl+S / 侧栏「保存」/ 各页 SaveConfigAsync / 删除映射全部经此)。
-        // 置于节流与 CleanForSave 之前: 被节流跳过的保存也已把内存 Config 写一致,
-        // 下次真实保存自然落盘。(2026-09 方案 D: 写回源从编辑页单实例改为两分区行 VM)
-        ActionVm?.ApplyFileGroupWriteBack();
-
-        // 评审 C1: 两分区行 VM 直接持有底层 Mapping 对象, 但「添加/排序映射」只动
-        // ObservableCollection, Sa.Mappings 须投影后才进入保存载荷 —— 页面自身的
-        // SaveConfigAsync 已带 SyncToModel, 但 Ctrl+S / 侧栏「保存」等外部入口此前
-        // 跳过了这一步, 新增映射在纯 Ctrl+S 流程下不落盘。与写回同理置于节流之前:
-        // 被节流跳过的保存也已把内存 Config 写一致, 下次真实保存自然落盘。
-        ActionVm?.SyncToModel();
+        // 选中动作聚合卡直接持有并就地修改底层 Mapping 对象 (卡内增删/提交均即时反映到
+        // Config.SelectedAction.Mappings), 不再需要投影或分组后缀写回步骤。
 
         var now = DateTime.UtcNow;
         if (!force && (now - _lastSaveAtUtc).TotalMilliseconds < 1000) return false;
