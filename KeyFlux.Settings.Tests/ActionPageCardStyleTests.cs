@@ -18,7 +18,8 @@ namespace KeyFlux.Settings.Tests;
 /// <summary>
 /// 选中动作页组件框外观守护 (2026-09-16, 聚合卡重构后适配):
 ///
-/// 本页配方 = BoxShadow **ClaudeShadowCardHalo** (静止) / **ClaudeShadowCardHaloHover** (悬停光圈)
+/// 本页配方 = BoxShadow **SelectedActionCardShadow** (静止) / **SelectedActionCardShadowHover** (悬停光圈)
+/// (2026-09-22 起由皮肤 Halo 家族改为本页专用四面等距配方 —— 原 offsetY 6 导致顶部/左右几乎无影)
 /// + BorderThickness **1** + ClaudeBorderCreamBrush。
 /// 阴影取 Settings / 插件页同款; **描边有意比其它三处(2px)更细** —— 用户看过实际效果后裁定
 /// 本页"线条太粗/太重"。
@@ -78,7 +79,7 @@ public sealed class ActionPageCardStyleTests
             Assert.True(cards.Count >= 4,
                 $"应有 >=4 个组件框 (2 张聚合卡 + 主快捷键卡 + 模拟测试条), 实得 {cards.Count}");
 
-            var shadow = (BoxShadows)view.FindResource("ClaudeShadowCardHalo")!;
+            var shadow = (BoxShadows)view.FindResource("SelectedActionCardShadow")!;
             Assert.True(Application.Current!.TryGetResource("ClaudeBorderCreamBrush", out var creamObj));
             var cream = ((SolidColorBrush)creamObj!).Color;
 
@@ -137,9 +138,9 @@ public sealed class ActionPageCardStyleTests
     }
 
     /// <summary>
-    /// ④ 聚合卡必须在 ScrollViewer 视口内**留出画阴影的水平余量**。
-    /// 内容左对齐贴着视口左沿时, 卡片左沿 - 视口左沿 = 0px ⇒ 左侧阴影被 ScrollViewer 视口裁掉。
-    /// 阴影 ClaudeShadowCard 第二层 blur=18, 水平外扩约 9px ⇒ 左余量须 >= 9px。
+    /// ④ 聚合卡必须在 ScrollViewer 视口内**留出画阴影的四边余量**（2026-09-22 扩展为四面）。
+    /// 阴影本页配方 SelectedActionCardShadow: blur 4/14 + offsetY 0/2 ⇒ 四边外扩约 5~9px,
+    /// 取 9px 作为统一余量要求; 内容左对齐贴视口左沿或卡片顶到视口上下沿都会把投影裁掉。
     /// </summary>
     [AvaloniaFact]
     public void Cards_Must_Leave_Room_For_Shadow_Inside_Scroller()
@@ -152,12 +153,24 @@ public sealed class ActionPageCardStyleTests
                 .Where(b => b.Classes.Contains("type-card")).ToList();
             Assert.Equal(2, cards.Count);
 
-            var svLeft = scroller.TranslatePoint(default, win)!.Value.X;
+            var svOrigin = scroller.TranslatePoint(default, win)!.Value;
+            const double need = 9; // SelectedActionCardShadow 最大外扩 (blur 14 / 2 + offsetY 2 = 9)
+
             foreach (var card in cards)
             {
-                var cardLeft = card.TranslatePoint(default, win)!.Value.X;
-                Assert.True(cardLeft - svLeft >= 9,
-                    $"聚合卡左沿距视口左沿仅 {cardLeft - svLeft:F1}px ⇒ 左侧阴影会被视口裁掉 (需要 >=9px)");
+                var p = card.TranslatePoint(default, win)!.Value;
+                var cardRight = p.X + card.Bounds.Width;
+                var cardBottom = p.Y + card.Bounds.Height;
+                var viewportRight = svOrigin.X + scroller.Bounds.Width;
+
+                Assert.True(p.X - svOrigin.X >= need,
+                    $"聚合卡左余量仅 {p.X - svOrigin.X:F1}px (需 >= {need}px) ⇒ 左侧阴影被裁");
+                Assert.True(viewportRight - cardRight >= need,
+                    $"聚合卡右余量仅 {viewportRight - cardRight:F1}px (需 >= {need}px) ⇒ 右侧阴影被裁");
+                Assert.True(p.Y - svOrigin.Y >= need - 2,
+                    $"聚合卡上余量仅 {p.Y - svOrigin.Y:F1}px ⇒ 顶部阴影被裁");
+                Assert.True(cardBottom <= svOrigin.Y + scroller.Bounds.Height + need,
+                    "聚合卡底部超视口 ⇒ 底部阴影被裁");
             }
         }
         finally
@@ -177,8 +190,8 @@ public sealed class ActionPageCardStyleTests
         {
             Assert.True(Application.Current!.TryGetResource("ClaudeBorderCreamBrush", out var creamObj));
             var cream = ((SolidColorBrush)creamObj!).Color;
-            var rest = (BoxShadows)view.FindResource("ClaudeShadowCardHalo")!;
-            var hover = (BoxShadows)view.FindResource("ClaudeShadowCardHaloHover")!;
+            var rest = (BoxShadows)view.FindResource("SelectedActionCardShadow")!;
+            var hover = (BoxShadows)view.FindResource("SelectedActionCardShadowHover")!;
 
             var cards = view.GetVisualDescendants().OfType<Border>()
                 .Where(b => b.Classes.Contains("actionCard") && !b.Classes.Contains("rowEditor") && !b.Classes.Contains("row-card")).ToList();

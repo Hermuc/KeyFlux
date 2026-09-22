@@ -83,7 +83,7 @@ public sealed class FocusRingTransferTests
             var cap = view.GetVisualDescendants().OfType<HotkeyCapture>().First();
             var card = Assert.IsType<Border>(EligibleCard(cap));
             card.Transitions = new Transitions(); // headless 不推动画时钟, 摘掉后读终点态
-            var rest = (BoxShadows)view.FindResource("ClaudeShadowCardHalo")!;
+            var rest = (BoxShadows)view.FindResource("SelectedActionCardShadow")!;
 
             Assert.True(cap.Focus());
             Dispatcher.UIThread.RunJobs();
@@ -118,8 +118,8 @@ public sealed class FocusRingTransferTests
             {
                 c.Transitions = new Transitions();
             }
-            var focusRing = (BoxShadows)view.FindResource("ClaudeShadowCardHaloFocus")!;
-            var rest = (BoxShadows)view.FindResource("ClaudeShadowCardHalo")!;
+            var focusRing = (BoxShadows)view.FindResource("SelectedActionCardShadowFocus")!;
+            var rest = (BoxShadows)view.FindResource("SelectedActionCardShadow")!;
 
             Assert.True(btn.Focus());
             Dispatcher.UIThread.RunJobs();
@@ -175,8 +175,8 @@ public sealed class FocusRingTransferTests
             var cap = view.GetVisualDescendants().OfType<HotkeyCapture>().First();
             var card = EligibleCard(cap)!;
             card.Transitions = new Transitions();
-            var focusRing = (BoxShadows)view.FindResource("ClaudeShadowCardHaloFocus")!;
-            var rest = (BoxShadows)view.FindResource("ClaudeShadowCardHalo")!;
+            var focusRing = (BoxShadows)view.FindResource("SelectedActionCardShadowFocus")!;
+            var rest = (BoxShadows)view.FindResource("SelectedActionCardShadow")!;
 
             // headless 输入管线的首个事件可能被吞, 先在窗口角落空点一下预热
             win.MouseDown(new Point(1, 1), MouseButton.Left, RawInputModifiers.None);

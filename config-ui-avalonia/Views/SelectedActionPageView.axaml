@@ -18,6 +18,16 @@
     <services:BoolToSeparatorHeightConverter x:Key="BoolToSeparatorHeight" />
     <services:PopupBackgroundConverter x:Key="PopupBg" />
 
+    <!-- 本页组件框专用投影 (2026-09-22, 用户报"只有下方有阴影"):
+         原共用 ClaudeShadowCardHalo 的两层 offsetY=2/6 + blur 4/18 ⇒ 上方外扩仅 ~3px
+         (且第 1 层 offsetY 2 blur 4 上方外扩为 0), 左右虽有 ~9px 却被 ContentControl
+         宿主的裁剪吃掉（见卡片宿主的 ClipToBounds="False" 注释）—— 用户看到的就是"只有下方有影"。
+         本页改用**四面近似等距**配方: offsetY 0/2 + blur 4/14 ⇒ 四边外扩 5~9px, 观感均匀完整。
+         ⚠ 层数必须保持 3 层 (BoxShadowsAnimator 按 oldValue.Count 输出层数, 见皮肤注释)。 -->
+    <BoxShadows x:Key="SelectedActionCardShadow">0 0 6 0 #1c000000, 0 2 16 0 #24000000, 0 0 16 2 #00c96442</BoxShadows>
+    <BoxShadows x:Key="SelectedActionCardShadowHover">0 0 6 0 #1c000000, 0 2 16 0 #24000000, 0 0 16 2 #4dc96442</BoxShadows>
+    <BoxShadows x:Key="SelectedActionCardShadowFocus">0 0 0 0 #00000000, 0 0 0 0 #00000000, 0 0 0 2 #d97757</BoxShadows>
+
     <!-- 类型编辑器 (卡内当前查看类型的详情; MappingRowVm) -->
     <DataTemplate x:Key="TypeEditorTemplate" x:DataType="vm:MappingRowVm">
       <!-- 外层卡片: 匹配高亮 (.matched) 作用对象; DataContext = MappingRowVm -->
@@ -206,7 +216,7 @@
 
     <!-- 组件框外观 (卡密集堆叠, 描边 1px 比其它处更细) -->
     <Style Selector="Border.actionCard">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
+      <Setter Property="BoxShadow" Value="{StaticResource SelectedActionCardShadow}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
       <Setter Property="Focusable" Value="True" />
@@ -218,10 +228,10 @@
       </Setter>
     </Style>
     <Style Selector="Border.actionCard:pointerover">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloHover}" />
+      <Setter Property="BoxShadow" Value="{StaticResource SelectedActionCardShadowHover}" />
     </Style>
     <Style Selector="Border.actionCard.ring:not(.row-card):not(.rowEditor)">
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloFocus}" />
+      <Setter Property="BoxShadow" Value="{StaticResource SelectedActionCardShadowFocus}" />
     </Style>
     <!-- 行内编辑器卡去影 (嵌套面板, 双层投影显脏) -->
     <Style Selector="Border.actionCard.rowEditor">
@@ -357,10 +367,14 @@
         </Border>
 
         <!-- 文本特征聚合卡 -->
-        <ContentControl Content="{Binding TextCard}" ContentTemplate="{StaticResource TypeCardTemplate}" />
+        <!-- ClipToBounds=False: 卡片投影 (外扩 5~9px) 画在自身边界外, 默认裁剪会吃掉左右两侧阴影
+             (2026-09-22 用户报"只有下方有阴影"); 与 PluginsPageView 同因同法。 -->
+        <ContentControl Content="{Binding TextCard}" ContentTemplate="{StaticResource TypeCardTemplate}"
+                       ClipToBounds="False" />
 
         <!-- 文件后缀聚合卡 -->
-        <ContentControl Content="{Binding FileCard}" ContentTemplate="{StaticResource TypeCardTemplate}" />
+        <ContentControl Content="{Binding FileCard}" ContentTemplate="{StaticResource TypeCardTemplate}"
+                       ClipToBounds="False" />
 
         <!-- 底部紧凑模拟测试条 -->
           <Border Classes="actionCard" Background="{DynamicResource ClaudeIvoryBrush}"
