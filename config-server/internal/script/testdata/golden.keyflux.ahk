@@ -11,6 +11,7 @@
 #Include lib/core/AbbrInput.ahk
 #Include lib/core/CommandDisplay.ahk
 #Include lib/core/ImeInputHost.ahk
+#Include lib/core/CommandImeGuard.ahk
 #Include lib/core/CommandInputHooks.ahk
 #Include lib/actions/Actions.ahk
 #Include lib/core/KeymapManager.ahk
@@ -52,6 +53,11 @@ InitTrayMenu()
 ; 若要回到「命令框历史行为」(吞键 + 投递显示), 注释掉下面两行即可 (零其它改动)。
 CommandInputHooks.Register(ImeInputHost)
 ImeInputHost.Enable()
+; 命令框会话内「锁英文」(CommandImeGuard): 在 OnSessionBegin 强制历史形态(吞键+投递英文,
+; 不使用输入法), 从而英文态弹框不会变中文, Shift 也无中文可切。注册顺序必须在
+; ImeInputHost 之后(后生效, 覆盖其透传标志)。插件无关, 可注释此行整体关闭。
+; 见 docs/design-ime-guard.md。
+CommandInputHooks.Register(CommandImeGuard)
 InitKeymap()
 InitQuickSwitch({collectEnabled: true, autoShow: true, autoJumpOpen: true, autoJumpSave: false, pollIntervalMs: 800, maxHistory: 200, overlayRows: 8, overlayRowsCompact: 4, excludedPrefixes: ["D:\Archive", "C:\Temp"]})
 OnExit(KeyFluxExit)
@@ -161,16 +167,21 @@ ExecCapslockAbbr(command) {
  *
  * 🔴 为什么动态: InputHook 对象一次性, 每会话新建。可见性按透传开关二态:
  *   透传模式 (SuppressKeycap=true, ImeInputHost 启用时恒如此) => InputHook("V"):
- *   物理键透传到命令框窗口 —— 英文字母原生显示; 拼音进 IME 原生组合/上屏, 上屏中文
- *   以 WM_CHAR 直达 (非白名单, 无框)。词表必须置空: V 模式下拼音字母照样进
- *   ih.Input 缓冲, MatchList 内建匹配先于 OnChar, 拼音后缀命中缩写词会误执行命令。
- *   历史形态 (false) => InputHook(""): 吞文本键, 显示靠投递 (数据 patch 后无八角框)。
+ *   物理键透传到命令框窗口 —— 英文字母原生显示; 上屏中文以 WM_CHAR 直达 (非白名单,
+ *   无框)。历史形态 (false) => InputHook(""): 吞文本键, 显示靠投递 (数据 patch 后无八角框)。
+ *
+ * 词表 (v4.2 恢复, 两形态共用): 设置面板的命令全部由英文字母组成, 且命令框内需要
+ * 输入中文的唯一场景是前置键 (如空格) 触发插件之后 —— 那时字符已被插件 OnChar
+ * 消费 (DispatchChar 提前 return), 到不了匹配层; MatchList 为**全串匹配**, 搜索期
+ * 的 Input 形如 " se" (带空格前缀) ≠ "se", 永不误触发。故 v4 的「透传词表置空」
+ * 废除, 两形态同词表: 全串命中走 Match 分支 (ExecCapslockAbbr), 带前缀后缀命中走
+ * FuzzySuffixFire —— 双通道行为与历史形态完全一致。
  * 时序: EnterCapslockAbbr 先 BeginSession() (OnSessionBegin 已置 SuppressKeycap),
  * 再调本函数, 此刻读该标志即拿到正确形态。
  */
 MakeCapsHook() {
   ih := InputHook(CommandDisplay.SuppressKeycap ? "V" : "", "{CapsLock}{Esc}"
-                  , CommandDisplay.SuppressKeycap ? "" : "edit,expr,jk,multi,web")
+                  , "edit,expr,jk,multi,web")
   ih.KeyOpt("{CapsLock}", "S")
   ih.KeyOpt("{Esc}", "S")
   ; S = V 模式下抑制透传 (EndKey 默认透传): CapsLock 防切大小写状态, Esc 防触发 exe
