@@ -204,27 +204,23 @@
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
     <Style Selector="ComboBox /template/ Border#Background">
-      <Setter Property="BorderBrush" Value="#c8c3b4" />
-    </Style>
-    <Style Selector="ComboBox /template/ Border#HighlightBackground">
+      <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
     <Style Selector="ComboBox:pointerover /template/ Border#Background">
-      <Setter Property="BorderBrush" Value="#c8c3b4" />
-    </Style>
-    <Style Selector="ComboBox:pointerover /template/ Border#HighlightBackground">
+      <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
     <Style Selector="ComboBox:focus /template/ Border#Background">
-      <Setter Property="BorderBrush" Value="#c8c3b4" />
-    </Style>
-    <Style Selector="ComboBox:focus /template/ Border#HighlightBackground">
+      <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
     <Style Selector="ComboBox:dropdownopen /template/ Border#Background">
+      <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
     <Style Selector="ComboBox:dropdownopen /template/ Border#HighlightBackground">
+      <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
 
