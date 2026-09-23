@@ -177,6 +177,22 @@
   </UserControl.Resources>
 
   <UserControl.Styles>
+    <!-- 输入框和谐灰边框 (2026-09-23, 用户三轮定色): claudeInput 的奶油边 (#f0eee6) 过淡
+         "跟没有边框一样", Fluent 默认边框过黑 —— 取介于 Sand(#e8e6dc) 与 StoneGray(#87867f)
+         之间的暖中灰 #c8c3b4, 与 Claude 暖色 UI 和谐且清晰可辨。
+         页级类型选择器: 本页全部 TextBox/ComboBox (含将来新增) 自动生效, 零逐控件配置;
+         只读回显框同色 (视觉一致)。 -->
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    </Style>
+
     <!-- 分隔项容器压制 (弹窗下拉用) -->
     <Style Selector="ComboBoxItem.sep-item">
       <Setter Property="IsHitTestVisible" Value="False" />
