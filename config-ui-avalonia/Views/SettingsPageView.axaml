@@ -574,20 +574,22 @@
               <TextBox Text="{Binding Options.KeyboardLayout}" AcceptsReturn="True" AcceptsTab="True"
                        MinHeight="180" FontFamily="Consolas,Courier New" FontSize="13"
                        TextWrapping="Wrap" /><!-- Wrap: NoWrap 时右列锁宽下只能横向滚动查看, 换行后窄卡内完整可读且测量宽被钳制稳定 -->
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="0" Padding="10,5">
+              <!-- WrapPanel: 窄卡放不下时换行而不是溢出卡片边框 (2026-09-23 用户报障);
+                   间距改用 Margin (WrapPanel 无 Spacing 属性) -->
+              <WrapPanel>
+                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="0" Padding="10,5" Margin="0,0,8,8">
                   <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=723}" />
                 </Button>
-                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="74" Padding="10,5">
+                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="74" Padding="10,5" Margin="0,0,8,8">
                   <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=724}" />
                 </Button>
-                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="104" Padding="10,5">
+                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="104" Padding="10,5" Margin="0,0,8,8">
                   <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=725}" />
                 </Button>
-                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="1" Padding="10,5">
+                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="1" Padding="10,5" Margin="0,0,8,8">
                   <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=726}" />
                 </Button>
-              </StackPanel>
+              </WrapPanel>
             </StackPanel>
           </StackPanel>
         </Border>
