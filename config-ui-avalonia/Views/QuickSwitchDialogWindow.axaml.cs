@@ -22,6 +22,7 @@ public partial class QuickSwitchDialogWindow : Window
         Services.Win32.DialogChrome.Apply(this);
         TitleBarIconSuppressor.Attach(this);
         Title = I18n.T("2408");
+        Services.Win32.DialogPlacer.AttachAutoCenter(this); // 统一定位: 异步内容长高后自动重居中
         I18n.Changed += OnLanguageChanged;
         Closed += (_, _) => I18n.Changed -= OnLanguageChanged;
     }
