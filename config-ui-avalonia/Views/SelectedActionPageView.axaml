@@ -194,21 +194,37 @@
     </Style>
     <!-- 悬停/聚焦不回黑: Fluent 主题的 pointerover/focus/dropdownopen 会直接把模板部件
          的 BorderBrush 改成深色 (优先级压过控件属性), 须用**同选择器**在页级再压回灰边。
-         部件名: TextBox=Border#PART_BorderElement (claudeInput 同款),
-         ComboBox=ContentPresenter#PART_ContentPresenter (模板无 PART_Border, 见皮肤注释)。 -->
+         部件名 (headless 探针实测, 勿凭记忆): TextBox=Border#PART_BorderElement;
+         ComboBox 的可见边框是**两层** Border#Background + Border#HighlightBackground
+         (悬停时分别 #cc000000/#66000000), ContentPresenter#PART_ContentPresenter 并不画边。 -->
     <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
     <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
-    <Style Selector="ComboBox:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="ComboBox /template/ Border#Background">
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
-    <Style Selector="ComboBox:focus /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="ComboBox /template/ Border#HighlightBackground">
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
-    <Style Selector="ComboBox:dropdownopen /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="ComboBox:pointerover /template/ Border#Background">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
+    <Style Selector="ComboBox:pointerover /template/ Border#HighlightBackground">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
+    <Style Selector="ComboBox:focus /template/ Border#Background">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
+    <Style Selector="ComboBox:focus /template/ Border#HighlightBackground">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
+    <Style Selector="ComboBox:dropdownopen /template/ Border#Background">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
+    <Style Selector="ComboBox:dropdownopen /template/ Border#HighlightBackground">
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
 
