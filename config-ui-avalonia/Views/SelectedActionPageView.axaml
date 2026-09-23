@@ -192,6 +192,25 @@
       <Setter Property="BorderBrush" Value="#c8c3b4" />
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
     </Style>
+    <!-- 悬停/聚焦不回黑: Fluent 主题的 pointerover/focus/dropdownopen 会直接把模板部件
+         的 BorderBrush 改成深色 (优先级压过控件属性), 须用**同选择器**在页级再压回灰边。
+         部件名: TextBox=Border#PART_BorderElement (claudeInput 同款),
+         ComboBox=ContentPresenter#PART_ContentPresenter (模板无 PART_Border, 见皮肤注释)。 -->
+    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
+    <Style Selector="ComboBox:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
+    <Style Selector="ComboBox:focus /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
+    <Style Selector="ComboBox:dropdownopen /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
 
     <!-- 分隔项容器压制 (弹窗下拉用) -->
     <Style Selector="ComboBoxItem.sep-item">
