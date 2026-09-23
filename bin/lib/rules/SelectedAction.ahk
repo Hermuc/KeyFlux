@@ -47,7 +47,10 @@ SelectedActionInit(hotkeyName, entries) {
   SelectedAction.Data := entries
   if not (SelectedAction.PlayTimerStarted) {
     SelectedAction.PlayTimerStarted := true
-    SetTimer(SelectedAction.WatchPlayRequest, 250)
+    ; ⚠ AHK v2 不接受「静态方法引用」直接作 SetTimer 回调 (ValueError: Invalid callback
+    ; function), 须传可调用的函数对象 —— 用闭包包一层 (与 bin/lib 既有 SetTimer(() => ...)
+    ; 惯例一致; 2026-09-23 实测引擎加载即报此错, 已修复)。
+    SetTimer(() => SelectedAction.WatchPlayRequest(), 250)
   }
   ; N 键链式热键 (物理键数 ≥3): AHK 原生自定义组合只支持两键, 拆为「头部热键 + 尾部 InputHook 顺序匹配」。
   ; 头部两种形态 (UI 生成端 HotkeyCaptureCore.CommitStaged 对应):
