@@ -831,41 +831,13 @@
     "zh": "匹配优先级: 从上到下, 第一个命中的规则生效",
     "en": "Matching priority: top to bottom, first match wins"
   },
-  "987": {
-    "zh": "模拟测试",
-    "en": "Simulation Test"
-  },
-  "988": {
-    "zh": "模拟选中内容 (文本或文件路径, 多文件用换行分隔)",
-    "en": "Simulated selection (text or file paths; separate files with newlines)"
-  },
-  "989": {
-    "zh": "模拟文件选中",
-    "en": "Treat content as files"
-  },
   "990": {
     "zh": "测试",
     "en": "Test"
   },
-  "991": {
-    "zh": "请输入模拟选中内容",
-    "en": "Please enter simulated content"
-  },
   "992": {
     "zh": "测试失败: ",
     "en": "Test failed: "
-  },
-  "993": {
-    "zh": "没有匹配到任何规则",
-    "en": "No rule matched"
-  },
-  "996": {
-    "zh": "执行预览",
-    "en": "Execution preview"
-  },
-  "997": {
-    "zh": "(无预览)",
-    "en": "(no preview)"
   },
   "999": {
     "zh": "(未设置)",
@@ -1098,10 +1070,6 @@
   "1109": {
     "zh": "确定删除规则「{0}」吗? 删除后会立即保存。",
     "en": "Delete rule \"{0}\"? This saves immediately."
-  },
-  "1110": {
-    "zh": "菜单键位",
-    "en": "Menu keys"
   },
   "1111": {
     "zh": "选择类型、填写条件值, 再勾选要放进菜单的行为 (按勾选顺序编号, 最多 9 个)。",

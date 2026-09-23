@@ -46,6 +46,8 @@ func Run(hasError chan<- struct{}, rainDone <-chan struct{}, debug bool, headles
 	// 选中动作单键分发 API (方案 D): 旧 action-schemes CRUD 六路由已随重构移除,
 	// 存量配置经 ParseConfig 读时一次性迁移
 	router.POST("/api/selected-action/test", TestSelectedActionHandler)
+	// 彩蛋 (▶ 真实执行): 设置界面 ▶ 经白名单校验后写请求文件, 由 AHK 引擎轮询消费
+	router.POST("/api/selected-action/play", PlaySelectedActionHandler)
 
 	// 行为包 (选中动作「行为库」)
 	router.GET("/api/behaviors", GetBehaviorsHandler)

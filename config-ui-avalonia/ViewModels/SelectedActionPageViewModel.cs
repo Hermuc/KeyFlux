@@ -1,5 +1,3 @@
-using System.Collections.ObjectModel;
-using System.Text.Json;
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -16,9 +14,6 @@ namespace KeyFlux.Settings.ViewModels;
 
 /// <summary>行为胶囊 (只读投影; 序号 = entries 下标 + 1, 即菜单数字键位)。</summary>
 public sealed record EntryChipVm(int Index, string Label, string ColorHex);
-
-/// <summary>模拟结果菜单键位 (key 从 1 起; 颜色按行为基础动作推导)。</summary>
-public sealed record MenuKeyVm(int Key, string Name, string ColorHex);
 
 /// <summary>行为徽章配色: 链接蓝 / 路径绿 / 磁力·注册表紫 / 其余灰 (浅色主题可读; 行类型徽章另用后缀橙)。</summary>
 public static class BehaviorBadgeColors
@@ -236,139 +231,6 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         OnCardMappingChanged();
     }
 
-    // ------------------------------------------------------------- 模拟测试条
-
-    /// <summary>模拟选中内容 (复刻旧默认 "https://github.com/Hermuc/KeyFlux")。</summary>
-    [ObservableProperty]
-    private string _testContent = "https://github.com/Hermuc/KeyFlux";
-
-    [ObservableProperty]
-    private bool _testIsFile;
-
-    [ObservableProperty]
-    private bool _testing;
-
-    [ObservableProperty]
-    private string _testError = "";
-
-    [ObservableProperty]
-    private bool _hasResult;
-
-    [ObservableProperty]
-    private bool _resultMatched;
-
-    /// <summary>命中类型徽章文本 (MatchTypeLabel)。</summary>
-    [ObservableProperty]
-    private string _matchedTypeText = "";
-
-    /// <summary>命中条件值。</summary>
-    [ObservableProperty]
-    private string _matchedValueText = "";
-
-    public ObservableCollection<MenuKeyVm> MenuKeys { get; } = [];
-
-    /// <summary>执行预览。</summary>
-    [ObservableProperty]
-    private string _previewText = "";
-
-    /// <summary>
-    /// 模拟测试: 先投影回模型 (本版卡直接持有底层对象, Config 已是最新) 再深拷贝快照随请求发出;
-    /// 命中时高亮对应卡详情并展示菜单键位预览; 400 展示后端 message。
-    /// </summary>
-    [RelayCommand]
-    private async Task RunTestAsync()
-    {
-        if (string.IsNullOrWhiteSpace(TestContent))
-        {
-            TestError = I18n.T("991");
-            return;
-        }
-        if (Api is null) return;
-
-        Testing = true;
-        TestError = "";
-        HasResult = false;
-        SetMatchedRow(null);
-
-        var snapshot = JsonSerializer.Deserialize<SelectedAction>(
-            JsonSerializer.Serialize(Sa, SettingsJson.Options), SettingsJson.Options);
-        var resp = await Api.TestSelectedActionAsync(new SelectedActionTestRequest
-        {
-            Content = TestContent,
-            IsFile = TestIsFile,
-            SelectedAction = snapshot,
-            MatchTypes = Config.MatchTypes, // 未保存的新类型也参与模拟测试 (§D.3.10)
-        });
-
-        Testing = false;
-        if (!resp.Success)
-        {
-            TestError = I18n.T("992") + (resp.ErrorMessage ?? $"HTTP {resp.StatusCode}");
-            return;
-        }
-
-        HasResult = true;
-        var result = resp.Value;
-        if (result is { Matched: true })
-        {
-            ResultMatched = true;
-            MatchedTypeText = ActionSchemeCatalog.MatchTypeLabel(result.MatchType);
-            MatchedValueText = result.MatchValue;
-            MenuKeys.Clear();
-            foreach (var item in result.Menu)
-            {
-                MenuKeys.Add(new MenuKeyVm(item.Key, item.Name, BehaviorBadgeColors.ForBehavior(item.Behavior)));
-            }
-            PreviewText = string.IsNullOrEmpty(result.Preview) ? I18n.T("997") : result.Preview;
-            SetMatchedRow(FindRow(result.MatchType, result.MatchValue));
-        }
-        else
-        {
-            ResultMatched = false;
-        }
-    }
-
-    /// <summary>行内 ▶ 测试: 预填底部模拟条 (按映射类型给示例内容) 并立即执行。</summary>
-    public void RunTestFor(MappingRowVm row)
-    {
-        TestIsFile = !row.IsTextType;
-        TestContent = row.IsTextType
-            ? row.Mapping.MatchValue switch
-            {
-                "url" => "https://github.com/Hermuc/KeyFlux",
-                "path" => "C:\\Windows\\explorer.exe",
-                "magnet" => "magnet:?xt=urn:btih:example",
-                "bilibili" => "BV1xx411c7mD",
-                _ => "hello world",
-            }
-            : "C:\\example\\photo.jpg";
-        _ = RunTestCommand.ExecuteAsync(null);
-    }
-
-    /// <summary>命中回显: 按后端返回的 matchType/matchValue 找到对应卡详情编辑器 (按值匹配, 忽略大小写)。</summary>
-    private MappingRowVm? FindRow(string matchType, string matchValue)
-    {
-        foreach (var card in new[] { TextCard, FileCard })
-        {
-            if (card.Detail is { } d && d.MatchType == matchType
-                && string.Equals(d.Mapping.MatchValue, matchValue, StringComparison.OrdinalIgnoreCase))
-            {
-                return d;
-            }
-        }
-        return null;
-    }
-
-    private MappingRowVm? _matchedRow;
-
-    private void SetMatchedRow(MappingRowVm? row)
-    {
-        if (ReferenceEquals(_matchedRow, row)) return;
-        if (_matchedRow is not null) _matchedRow.IsMatched = false;
-        _matchedRow = row;
-        if (row is not null) row.IsMatched = true;
-    }
-
     // ------------------------------------------------------------- 行为目录
 
     /// <summary>拉取行为目录快照 (视图挂载后触发; 已加载则跳过), 完成后刷新下拉与勾选列表。</summary>
@@ -406,6 +268,24 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
     /// <summary>主配置保存 (启用开关/删除映射/提交 transient 语义为「立即保存」故跳过节流)。</summary>
     public Task<bool> SaveConfigAsync() => _main.SaveAsync(force: true);
 
+    // ------------------------------------------------------------- 彩蛋 (▶ 真实执行)
+
+    /// <summary>
+    /// 行内 ▶ 彩蛋: 用该行类型真实配置的行为, 经后端白名单校验后驱动 AHK 引擎执行预设样例。
+    /// 后端只写请求文件、不回传执行结果; 引擎侧异步轮询消费并真实执行 (成功/失败由引擎 Tip 反馈)。
+    /// 网络失败/后端拒绝时在本页状态条提示, 不阻断界面。
+    /// </summary>
+    public async Task PlaySampleAsync(string typeId)
+    {
+        if (string.IsNullOrWhiteSpace(typeId) || Api is null) return;
+        StatusText = "";
+        var resp = await Api.PlaySelectedActionAsync(typeId);
+        if (!resp.Success)
+        {
+            StatusText = resp.ErrorMessage ?? $"HTTP {resp.StatusCode}";
+        }
+    }
+
     // ------------------------------------------------------------- 语言刷新
 
     public void OnLanguageChanged()
@@ -415,11 +295,5 @@ public sealed partial class SelectedActionPageViewModel : ObservableObject, ILan
         TextCard.RefreshLanguage();
         FileCard.RefreshLanguage();
         AddPanel?.RefreshLanguage();
-        if (HasResult && ResultMatched)
-        {
-            OnPropertyChanged(nameof(MatchedTypeText));
-            OnPropertyChanged(nameof(MatchedValueText));
-            OnPropertyChanged(nameof(PreviewText));
-        }
     }
 }

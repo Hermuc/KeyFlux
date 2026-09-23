@@ -76,8 +76,8 @@ public sealed class ActionPageCardStyleTests
                 .Where(b => b.Classes.Contains("actionCard")
                             && !b.Classes.Contains("rowEditor")
                             && !b.Classes.Contains("row-card")).ToList();
-            Assert.True(cards.Count >= 4,
-                $"应有 >=4 个组件框 (2 张聚合卡 + 主快捷键卡 + 模拟测试条), 实得 {cards.Count}");
+            Assert.True(cards.Count >= 3,
+                $"应有 >=3 个组件框 (2 张聚合卡 + 主快捷键卡), 实得 {cards.Count}");
 
             var shadow = (BoxShadows)view.FindResource("SelectedActionCardShadow")!;
             Assert.True(Application.Current!.TryGetResource("ClaudeBorderCreamBrush", out var creamObj));
@@ -196,7 +196,7 @@ public sealed class ActionPageCardStyleTests
 
             var cards = view.GetVisualDescendants().OfType<Border>()
                 .Where(b => b.Classes.Contains("actionCard") && !b.Classes.Contains("rowEditor") && !b.Classes.Contains("row-card")).ToList();
-            Assert.True(cards.Count >= 4, $"应有 >=4 个组件框, 实得 {cards.Count}");
+            Assert.True(cards.Count >= 3, $"应有 >=3 个组件框, 实得 {cards.Count}");
 
             foreach (var c in cards)
             {
@@ -267,41 +267,5 @@ public sealed class ActionPageCardStyleTests
             $"Transitions={card.Transitions.Count}; Bounds={card.Bounds}");
     }
 
-    /// <summary>② 选中态 (.matched) 只换颜色, 粗细与阴影必须与默认态完全一致。</summary>
-    [AvaloniaFact]
-    public void Matched_State_Keeps_Thickness_And_Shadow()
-    {
-        var (page, view, win) = CreateHost();
-        try
-        {
-            // 编辑器卡 DataContext = MappingRowVm; 取文件卡详情编辑器
-            var target = view.GetVisualDescendants().OfType<Border>()
-                .First(b => b.DataContext is MappingRowVm { Mapping.MatchType: "fileExt" });
-            var card = Assert.IsType<MappingRowVm>(target.DataContext);
-
-            var thicknessBefore = target.BorderThickness;
-            var shadowBefore = target.BoxShadow.ToString();
-            Assert.DoesNotContain("matched", target.Classes);
-
-            card.IsMatched = true; // 真实驱动 Classes.matched 绑定
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.Contains("matched", target.Classes);
-            Assert.Equal(thicknessBefore, target.BorderThickness);
-            Assert.Equal(shadowBefore, target.BoxShadow.ToString());
-            Application.Current!.TryGetResource("ClaudeTerracottaBrush", out var terra);
-            Assert.Equal(((ISolidColorBrush)terra!).Color, ((ISolidColorBrush)target.BorderBrush!).Color);
-
-            // 悬停已选中的编辑器卡时仍须保持陶土边 (悬停只改 BoxShadow、不动描边色)
-            var hp = target.TranslatePoint(new Point(target.Bounds.Width / 2, target.Bounds.Height / 2), win)!.Value;
-            win.MouseMove(hp);
-            Dispatcher.UIThread.RunJobs();
-            Assert.True(target.IsPointerOver);
-            Assert.Equal(((ISolidColorBrush)terra!).Color, ((ISolidColorBrush)target.BorderBrush!).Color);
-        }
-        finally
-        {
-            win.Close();
-        }
-    }
+    /// <summary>② 选中态 (.matched) 已随「模拟测试」卡片一并移除, 命中高亮不再存在。</summary>
 }

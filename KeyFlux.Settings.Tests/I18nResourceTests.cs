@@ -99,7 +99,9 @@ public sealed class I18nResourceTests
     /// 2026-09-22 移除毛玻璃功能: **删除 3 键 (2500 窗口毛玻璃 / 2501 启用毛玻璃 /
     ///   2502 透明度)** -> 406。三者唯一消费方是设置页「窗口毛玻璃」卡, 随卡片一并移除。
     ///   (删除前已确认: 全仓引用数 0。)
-    private const int ExpectedKeyCount = 406;
+    /// 2026-09-22 删除「模拟测试」卡片相关 8 键 (987 988 989 991 993 996 997 1110) -> 398;
+    ///   保留 990 (▶ Tooltip) 与 992 (匹配类型页「试一下」消费)。
+    private const int ExpectedKeyCount = 398;
 
     private const string LabelPrefix = "label:";
 

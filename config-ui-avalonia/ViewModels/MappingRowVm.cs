@@ -166,9 +166,6 @@ public sealed partial class MappingRowVm : ObservableObject
 
     // ---- 编辑器 (卡级展示当前查看类型的详情, 始终展开) ----
 
-    [ObservableProperty]
-    private bool _isMatched;
-
     public ObservableCollection<EntryRowVm> Editors { get; } = [];
 
     /// <summary>展开: 重建编辑行 (收起态由卡级统一仲裁)。</summary>
@@ -270,9 +267,9 @@ public sealed partial class MappingRowVm : ObservableObject
 
     // ---- 行级操作 ----
 
-    /// <summary>行内 ▶ 测试: 预填底部模拟条并立即执行。</summary>
+    /// <summary>行内 ▶ 彩蛋: 用本行类型真实配置的行为, 经后端白名单校验后驱动 AHK 引擎执行预设样例。</summary>
     [RelayCommand]
-    private void TestRow() => _page.RunTestFor(this);
+    private void PlaySample() => _page.PlaySampleAsync(_typeId ?? "");
 
     /// <summary>语言切换: 下拉副本/摘要即时拼接刷新。</summary>
     public void RefreshLanguage()

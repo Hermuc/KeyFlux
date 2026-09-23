@@ -119,6 +119,14 @@ public sealed class SelectedActionPageViewSmokeTests
             Dispatcher.UIThread.RunJobs();
             page.FileCard.SelectType("group:image"); // 已配置 -> 编辑器详情
             Dispatcher.UIThread.RunJobs();
+
+            // 聚合卡头部的 ▶ 彩蛋按钮存在 (Command 绑定 PlaySampleCommand, Tooltip 用 i18n 990)
+            var detail = page.TextCard.Detail ?? page.FileCard.Detail;
+            Assert.NotNull(detail);
+            Assert.NotNull(detail.PlaySampleCommand);
+            var playButton = view.GetVisualDescendants().OfType<Button>()
+                .FirstOrDefault(b => b.Classes.Contains("icon-btn") && b.Content?.ToString() == "󰐊");
+            Assert.NotNull(playButton);
         }
         finally
         {

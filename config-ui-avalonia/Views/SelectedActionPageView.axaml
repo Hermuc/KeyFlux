@@ -30,8 +30,8 @@
 
     <!-- 类型编辑器 (卡内当前查看类型的详情; MappingRowVm) -->
     <DataTemplate x:Key="TypeEditorTemplate" x:DataType="vm:MappingRowVm">
-      <!-- 外层卡片: 匹配高亮 (.matched) 作用对象; DataContext = MappingRowVm -->
-      <Border Classes="actionCard row-card" Classes.matched="{Binding IsMatched}"
+      <!-- 外层卡片: DataContext = MappingRowVm -->
+      <Border Classes="actionCard row-card"
               Background="{DynamicResource ClaudeIvoryBrush}"
               CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="12" Margin="0,4,0,6">
         <StackPanel Spacing="8">
@@ -125,7 +125,7 @@
             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"
                        Foreground="{StaticResource ClaudeTerracottaBrush}" />
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
-              <Button Classes="icon-btn" Command="{Binding Detail.TestRowCommand}" Content="󰐊" FontFamily="{StaticResource MdiFont}" Margin="0,3,0,0" FontSize="18"
+              <Button Classes="icon-btn" Command="{Binding Detail.PlaySampleCommand}" Content="󰐊" FontFamily="{StaticResource MdiFont}" Margin="0,3,0,0" FontSize="18"
                       Background="Transparent"
                       ToolTip.ShowDelay="200"
                       ToolTip.Tip="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
@@ -245,10 +245,6 @@
     </Style>
     <Style Selector="Border.actionCard.row-card:pointerover">
       <Setter Property="BoxShadow" Value="0 0 0 0 Transparent" />
-    </Style>
-    <Style Selector="Border.row-card.matched">
-      <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
     </Style>
     <!-- 行为胶囊 -->
     <Style Selector="Border.chip">
@@ -372,69 +368,6 @@
         <!-- 文件后缀聚合卡 -->
         <ContentControl Content="{Binding FileCard}" ContentTemplate="{StaticResource TypeCardTemplate}"
                        ClipToBounds="False" />
-
-        <!-- 底部紧凑模拟测试条 -->
-          <Border Classes="actionCard" Background="{DynamicResource ClaudeIvoryBrush}"
-                  CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
-          <StackPanel Spacing="8">
-            <TextBlock FontWeight="SemiBold"
-                       Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=987}" />
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-              <TextBox Text="{Binding TestContent}" MinWidth="120"
-                       Watermark="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=988}" />
-              <CheckBox Grid.Column="1" IsChecked="{Binding TestIsFile}" VerticalAlignment="Center"
-                        Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=989}" />
-              <Button Grid.Column="2" Command="{Binding RunTestCommand}" Background="{StaticResource ClaudeTerracottaBrush}"
-                      Foreground="{StaticResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusMd}" Padding="20,9" FontSize="14"
-                      VerticalAlignment="Center" ToolTip.ShowDelay="200"
-                      IsEnabled="{Binding !Testing}"
-                      Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=990}" />
-            </Grid>
-            <TextBlock IsVisible="{Binding TestError}" Foreground="{StaticResource ClaudeErrorBrush}" FontSize="12"
-                       TextWrapping="Wrap" Text="{Binding TestError}" />
-            <StackPanel IsVisible="{Binding HasResult}" Spacing="6">
-              <TextBlock IsVisible="{Binding !ResultMatched}" FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}"
-                         Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=993}" />
-              <StackPanel IsVisible="{Binding ResultMatched}" Spacing="6">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Border Background="{StaticResource ClaudeSandBrush}" CornerRadius="{StaticResource ClaudeRadiusSm}" Padding="8,3">
-                    <TextBlock Text="{Binding MatchedTypeText}" Foreground="{StaticResource ClaudeTerracottaBrush}" FontSize="12" />
-                  </Border>
-                  <TextBlock Text="{Binding MatchedValueText}" FontSize="13" FontWeight="SemiBold"
-                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
-                             Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1110}" />
-                  <ItemsControl ItemsSource="{Binding MenuKeys}">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel />
-                      </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:MenuKeyVm">
-                        <Border Classes="chip" BorderBrush="{Binding ColorHex}">
-                          <StackPanel Orientation="Horizontal" Spacing="4">
-                            <TextBlock Text="{Binding Key}" Foreground="{Binding ColorHex}"
-                                       FontSize="12" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Name}" Foreground="{Binding ColorHex}" FontSize="12" />
-                          </StackPanel>
-                        </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock FontSize="12" Foreground="{StaticResource ClaudeStoneGrayBrush}" VerticalAlignment="Center"
-                             Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=996}" />
-                  <TextBlock Text="{Binding PreviewText}" FontSize="12" TextWrapping="Wrap"
-                             VerticalAlignment="Center" />
-                </StackPanel>
-              </StackPanel>
-            </StackPanel>
-          </StackPanel>
-        </Border>
 
       </StackPanel>
     </ScrollViewer>

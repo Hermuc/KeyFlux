@@ -17,6 +17,8 @@ namespace KeyFlux.Settings.Services;
 //   POST   /server/command/:id          id=2|3|4, 恒 200 {} (会 exec KeyFlux.exe)
 //   POST   /api/selected-action/test    模拟测试 (含页面快照语义; 2026-09 方案 D,
 //                                       旧 /api/action-schemes 6 路由已随多方案模型退役)
+//   POST   /api/selected-action/play     彩蛋 (▶ 真实执行): 白名单校验 typeId → 写请求文件,
+//                                       由 AHK 引擎轮询消费 (2026-09 选定「走引擎真实执行」)
 //   GET    /api/plugins                 用户插件目录 (data/plugins)
 //   POST   /api/plugins/import          multipart file=zip -> 安装, 返回 manifest
 //   DELETE /api/plugins/:id             删除用户插件目录
@@ -120,6 +122,20 @@ public sealed class SelectedActionTestResult
     public string Preview { get; set; } = "";
 }
 
+/// <summary>POST /api/selected-action/play 请求体 (typeId 经白名单校验, 见 Go PlaySelectedActionHandler)。</summary>
+public sealed class PlayRequest
+{
+    [JsonPropertyName("typeId")]
+    public string TypeId { get; set; } = "";
+}
+
+/// <summary>POST /api/selected-action/play 响应体 (成功恒 {"ok":true})。</summary>
+public sealed class PlayResponse
+{
+    [JsonPropertyName("ok")]
+    public bool Ok { get; set; }
+}
+
 /// <summary>
 /// settings.exe API 抽象, 便于 ViewModel 依赖注入与单测替换 (可用假实现替身)。
 /// 所有方法永不抛出网络异常: 传输层错误统一折叠为 StatusCode=0 的失败响应。
@@ -132,6 +148,9 @@ public interface ISettingsApi
     Task<ApiResponse<EmptyJson>> SendServerCommandAsync(int id, CancellationToken ct = default);
 
     Task<ApiResponse<SelectedActionTestResult>> TestSelectedActionAsync(SelectedActionTestRequest request, CancellationToken ct = default);
+
+    // 彩蛋 (▶ 真实执行): 白名单校验 typeId → 写请求文件, 由 AHK 引擎轮询消费
+    Task<ApiResponse<PlayResponse>> PlaySelectedActionAsync(string typeId, CancellationToken ct = default);
 
     // 行为包 (选中动作「行为库」, CONTRACTS §3.9)
     Task<ApiResponse<BehaviorCatalogResponse>> GetBehaviorsAsync(CancellationToken ct = default);
@@ -212,6 +231,9 @@ public sealed class SettingsApiClient : ISettingsApi, IDisposable
 
     public Task<ApiResponse<SelectedActionTestResult>> TestSelectedActionAsync(SelectedActionTestRequest request, CancellationToken ct = default)
         => SendAsync<SelectedActionTestResult>(HttpMethod.Post, "api/selected-action/test", request, ct);
+
+    public Task<ApiResponse<PlayResponse>> PlaySelectedActionAsync(string typeId, CancellationToken ct = default)
+        => SendAsync<PlayResponse>(HttpMethod.Post, "api/selected-action/play", new PlayRequest { TypeId = typeId }, ct);
 
     public Task<ApiResponse<BehaviorCatalogResponse>> GetBehaviorsAsync(CancellationToken ct = default)
         => SendAsync<BehaviorCatalogResponse>(HttpMethod.Get, "api/behaviors", content: null, ct);

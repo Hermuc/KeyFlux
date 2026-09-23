@@ -1036,6 +1036,7 @@ v4.1 焦点降级语义 + 延后收尾状态 + 终止字符强制投递语义) +
 | `GET /config` | model → `ConfigToDTO` → DTO → gin JSON | DTO 排除 `json:"-"` 计算态字段 |
 | `PUT /config` | gin JSON → DTO → `DTOToConfig` → model → 校验 → 落盘 | 落盘仍走 model, 生成器输入不变 |
 | `POST /api/selected-action/test` | **直接序列化 model** (未经 DTO) | 方案 D 后仅剩模拟测试端点 (旧 action-schemes CRUD 六路由已移除, 存量配置读时一次性迁移为顶层 selectedAction) |
+| `POST /api/selected-action/play` | **直接序列化 model** (未经 DTO) | 彩蛋 (▶ 真实执行): 白名单校验 typeId → 原子写请求文件 `%TEMP%\kf_play_request.json`, 由 AHK 引擎轮询消费 (见 §5.2.1) |
 | `GET /shortcuts` | 内联结构体, 无 model 依赖 | 无需 DTO |
 
 **改 json tag 须同时改两处**: `internal/script/model/types.go` (存储模型) 与 `internal/server/dto.go` (传输 DTO);
@@ -1054,6 +1055,47 @@ Go 侧 `server/dto_test.go` 的 `Test<X>RoundTrip` 锁 PUT→model→GET 往返�
 `model.ActionScheme.RestartFailed` 与 `ActionSchemeDTO.RestartFailed` 同时存在。
 action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经 DTO 转换;
 移除 model 侧定义需先将 action-scheme 端点 DTO 化, 属后续清理范围。
+
+### 5.2.1 彩蛋通道: `POST /api/selected-action/play` → 请求文件 → AHK 轮询 (2026-09-22 冻结)
+
+「选中动作」页聚合卡头部的 ▶ 按钮 (XAML 绑定 `Detail.PlaySampleCommand`, Tooltip 用 i18n `990`)
+改造为**彩蛋**: 用该行类型真实配置的行为, 经本通道让 AHK 引擎**直接执行预设样例** (用户选定
+「走引擎真实执行」这一最忠实方案, 而非前端模拟)。
+
+**数据流 (前端 ▶ → Go 端点 → 请求文件 → AHK 轮询 → `_Execute`)**:
+
+1. **前端 → 后端**: `MappingRowVm.PlaySampleCommand` → `SelectedActionPageViewModel.PlaySampleAsync(typeId)`
+   → `SettingsApiClient.PlaySelectedActionAsync(typeId)` (`POST /api/selected-action/play`, body `{"typeId":"..."}`)。
+   `typeId` 取该行的类型标识 (`MappingRowVm._typeId`): 内置文本特征 / `group:<name>` / `type:<id>`。
+2. **后端路由/处理器** (`internal/server/selectedaction_play.go`): 白名单校验 → 折叠 → 原子写 → 返回 `{"ok":true}`。
+   - **白名单校验** (否则 400): 仅接受 ① 内置文本特征值 (`url`/`path`/`magnet`/`bilibili`/`plain`)
+     ② 已配置的 `group:<name>` (在 `config.FileGroups` 中存在) ③ 已配置的 `type:<id>` (在 `config.MatchTypes` 中存在)。
+   - **group 折叠**: `group:<name>` 由后端解析为规范化后缀串 `strings.Join(g.Exts, ",")`, 写入请求文件
+     (引擎侧按 `matchValue` 精确命中组, 无全局 groups 表)。
+   - **原子写**: 先写同目录临时文件 (`os.CreateTemp`) 再 `os.Rename` 到最终名, 避免引擎读到半截内容;
+     文件落点 `%TEMP%\kf_play_request.json` (`os.TempDir()`), 内容 `{"typeId":"...","seq":<自增>}`。
+   - `seq` 为进程内 `atomic` 自增序号, 供引擎去重。
+3. **引擎侧轮询** (`bin/lib/rules/SelectedAction.ahk`):
+   - `SelectedActionInit` 留存 entries 副本 (`static Data := entries`) 并注册 `SetTimer(SelectedAction.WatchPlayRequest, 250)`。
+   - `WatchPlayRequest` 每 250ms: `FileExist` 不存在即零开销返回; 存在则读文件 → 正则提取 `typeId`/`seq`
+     (引擎无内置 JSON 库, 用受控格式正则) → `seq` 去重 (`static PlayLastSeq`) → **执行后 `FileDelete` 删除文件
+     (无论成败, 幂等)** → 调 `PlaySample(typeId)`。
+   - `PlaySample(typeId)`: 按 typeId 构造硬编码样例 `selected` (文本特征→文本样例; 文件后缀/`type:<id>` fileExt→
+     `{type:"file", content: A_Desktop}`), 经 `_FindGroup(typeId)` 按 `matchValue` 精确命中组, 取**组内首条**
+     entry 走 `_Execute` 真实执行 (与菜单序号 1 等价, 不改菜单逻辑); 未命中/未配置用现有翻译文案 Tip 提示 (不新增 i18n 键)。
+   - **样例内容 (硬编码, 不进配置)**: `url`→`https://github.com/Hermuc/KeyFlux`; `path`→`A_Desktop`;
+     `bilibili`→`BV1xx411c7mD`; `magnet`→`magnet:?xt=urn:btih:0000000000000000000000000000000000000000`;
+     `plain`→示例文本; `group:*`/`type:*`(fileExt)→`{type:"file", content: A_Desktop}`; 自定义 text 类型→按 text 处理。
+
+**安全边界** (与引擎对称, 缺一不可):
+
+- **仅白名单 typeId**: 后端 `resolvePlayTypeId` 拒绝一切非白名单值 (空串 / 未知串 / 不存在的 group/type 一律 400),
+  引擎端 `PlaySample` 不接收任何来自请求文件之外的参数。
+- **样例硬编码**: 执行内容全程硬编码在 AHK 端, 请求文件只含 `typeId` + `seq`, **不含任何命令/路径参数** ⇒ 无注入面。
+- **执行后删文件**: `WatchPlayRequest` 无论成败都 `FileDelete`, 保证幂等、不残留、不被重复触发; 文件不存在时零开销返回。
+
+**部署提示**: 改 `bin/lib/rules/SelectedAction.ahk` ⇒ 定向 cp 到部署树 `…\KeyFlux-1.0-beta1\bin\lib\rules\SelectedAction.ahk`,
+且引擎需**重载** (托盘 Reload / `Alt+'`) 后彩蛋才生效; 后端改 Go ⇒ `make buildServer` + `settings.exe` 三处同步。
 
 ## 5.3 契约测试前置二进制契约 (2026-09-03 冻结)
 
