@@ -1,6 +1,9 @@
+using System;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using KeyFlux.Settings.Services;
 using KeyFlux.Settings.ViewModels;
 
@@ -26,6 +29,10 @@ public partial class PluginSettingsDialogWindow : Window
         I18n.Changed += OnLanguageChanged;
         Closed += (_, _) => I18n.Changed -= OnLanguageChanged;
         Opened += OnOpened;
+        // SizeToContent=Height + CenterOwner 的组合缺陷: 打开瞬间按「未加载表单的小高度」
+        // 居中, LoadAsync 之后窗口向下长高、锚点不动 ⇒ 弹窗严重偏下 (2026-09-23 用户报障)。
+        // 对策: 内容加载完毕与后续尺寸变化 (如语言切换) 时相对宿主重新居中。
+        SizeChanged += (_, _) => CenterToOwner();
     }
 
     private void OnLanguageChanged()
@@ -39,6 +46,35 @@ public partial class PluginSettingsDialogWindow : Window
         Title = vm.DisplayName;
         try { await vm.LoadAsync(); }
         catch { /* 加载失败已由 VM 的 LoadError 呈现 */ }
+        // 等布局把表单行撑开后再居中 (RunJobs 让 SizeChanged/布局排空)
+        await Dispatcher.UIThread.InvokeAsync(() => { });
+        CenterToOwner();
+    }
+
+    /// <summary>相对宿主窗口垂直水平居中; 无宿主时退化为屏幕工作区居中。高度超出时贴宿主顶部。</summary>
+    private void CenterToOwner()
+    {
+        var w = Bounds.Width;
+        var h = Bounds.Height;
+        PixelPoint target;
+        if (Owner is Window owner)
+        {
+            var op = owner.Position;
+            var ow = owner.Bounds.Width;
+            var oh = owner.Bounds.Height;
+            var x = op.X + (ow - w) / 2;
+            var y = Math.Max(op.Y + 8, op.Y + (oh - h) / 2); // 高度超出宿主时贴顶, 不再往下顶
+            target = new PixelPoint((int)Math.Round(x), (int)Math.Round(y));
+        }
+        else
+        {
+            var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+            var wa = screen.WorkingArea;
+            target = new PixelPoint(
+                (int)Math.Round(wa.X + (wa.Width - w) / 2),
+                (int)Math.Round(wa.Y + (wa.Height - h) / 2));
+        }
+        Position = target;
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
