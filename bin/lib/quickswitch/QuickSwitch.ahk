@@ -7,8 +7,8 @@
 ; 关键纪律:
 ;   * 轮询每 tick 只做 WinActive/WinGetClass 级廉价判断; Shell 枚举/磁盘 IO 只在
 ;     「对话框新出现」这一跳变上各做一次 (设计 D6 / QS-P0-10)。
-;   * 热键回调 (QuickSwitchGoto) 内零枚举、零磁盘 IO: 只用已缓存的候选; 落盘经 SetTimer 异步。
-;   * 浮层显示期间 Suspend(true), 隐藏时 Suspend(false) (设计 QS-P0-09, 防 ^g 递归);
+;   * 手动入口 (QuickSwitchRun) 内零枚举、零磁盘 IO: 只用已缓存的候选; 落盘经 SetTimer 异步。
+;   * 浮层显示期间 Suspend(true), 隐藏时 Suspend(false) (设计 QS-P0-09, 防浮层期间热键重入);
 ;     仅当"是我们自己挂起的"才恢复, 绝不误恢复用户的「暂停 KeyFlux」。
 ;   * 所有路径 try/catch, 绝不把异常抛进定时器/热键链路。
 ; 依赖方向: 编排 -> DialogInspector / FolderHistory / HistoryStore / FolderRanker / QuickSwitchUI。
@@ -361,7 +361,7 @@ _QuickSwitchRecord(path) {
   }
 }
 
-; 挂起自身热键 (防浮层显示期间 ^g 递归); 仅当是我们挂起的才恢复。
+; 挂起自身热键 (防浮层显示期间热键重入); 仅当是我们挂起的才恢复。
 _QuickSwitchSuspendOn() {
   global QSSTATE
   if (!A_IsSuspended) {

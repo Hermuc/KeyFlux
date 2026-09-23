@@ -1756,14 +1756,6 @@
             "comment": "重映射为 LControl",
             "remapToKey": "LControl"
           }
-        ],
-        "^g": [
-          {
-            "windowGroupID": 2,
-            "actionTypeID": 9,
-            "comment": "label:2408",
-            "actionValueID": 9
-          }
         ]
       }
     },

@@ -161,7 +161,9 @@ ToggleCapslock() {
 }
 
 /**
- * 快速切换 (QuickSwitch): 跳转到推荐的首个候选文件夹 (默认热键 Ctrl+G)。
+ * 快速切换 (QuickSwitch): 跳转到推荐的首个候选文件夹。
+ * 无默认热键 (2026-09-23 起 ^g 绑定已从配置移除, 触发靠轮询自动路径); 本入口经
+ * 生成端 callMap[9] 保留, 供将来托盘/其它非热键通道复用。
  * 薄壳: 仅转调编排层 QuickSwitchRun(); 不含任何窗口/枚举/磁盘逻辑。
  * 注: AHK 全局函数命名空间唯一, 故编排入口在 QuickSwitch.ahk 中名为 QuickSwitchRun,
  *     本薄壳独占 QuickSwitchGoto 这一名字 (生成端 callMap[9] 调用的即本函数)。

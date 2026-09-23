@@ -26,6 +26,8 @@ Core(bin/lib/core/*)  <- 各层只读依赖
 - **入口命名**: 生成端 `callMap[9]` 调用的公开符号是 `QuickSwitchGoto()`, 它定义在
   `type9_keyflux.ahk` (薄壳, 转调编排层)。因 AHK 全局函数命名空间唯一, 编排入口在
   `QuickSwitch.ahk` 中名为 `QuickSwitchRun()` (语义等价于设计 N1 的 `QuickSwitchGoto`)。
+  当前默认配置**不绑定热键** (2026-09-23 移除 ^g): 触发依赖轮询自动路径 (对话框出现
+  即自动跳转/浮层), 本入口保留供将来非热键通道 (托盘等) 复用。
 
 ## 命名前缀 (避免全局函数冲突, 交由 tools/lint_ident.py 静态闸门守护)
 
