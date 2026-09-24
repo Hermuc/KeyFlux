@@ -236,15 +236,22 @@ public static class DialogMotion
             return;
         }
 
-        // 兜底: 构造期 Content 未就位时在这里补落姿势 (正常路径已在 Attach 落好, 此处幂等)
+        // 兜底: 构造期 Content 未就位时在这里补落姿势 (正常路径已在 PoseBeforeShow 落好)。
+        //
+        // ⚠ 正常路径下【不要】在这里重复设 Opacity/RenderTransform (2026-09-24 用户报障
+        // "弹窗先显示了文字, 然后闪一下再出现")。构造期 PoseBeforeShow 已经把姿势落成
+        // Opacity=0, 窗口首帧就是透明的; 若这里再赋一遍同样的值, 虽然值相同不会产生过渡,
+        // 但会给将来任何"让 Opacity 在 Opened 之前被别处改回 1"的改动留下伪装 ——
+        // 一旦真发生, 用户看到的就是"先可见 → 被压回 0 → 再淡入"的三段闪烁。
+        // 故只在姿势确实没落上时才补。
         var body = state.Body ?? EnsureGlassShell(content);
         state.Body = body;
         if (!body.Classes.Contains(MotionClass))
         {
             body.Classes.Add(MotionClass);
+            body.Opacity = 0;
+            body.RenderTransform = Pose(EnterScale, EnterOffsetY);
         }
-        body.Opacity = 0;
-        body.RenderTransform = Pose(EnterScale, EnterOffsetY);
 
         // 背景: 变暗 + 模糊 + 略微缩小 (Scrim 统一编排; 作用对象是 owner 主窗, 不是弹窗自己)
         if (window.Owner is { } ownerTop)
