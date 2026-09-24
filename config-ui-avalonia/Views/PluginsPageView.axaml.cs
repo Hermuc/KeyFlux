@@ -77,7 +77,10 @@ public partial class PluginsPageView : UserControl
         {
             DataContext = new PluginSettingsDialogViewModel(vm.Main, card.Manifest),
         };
-        await pluginDialog.ShowDialog(owner);
+        // 走 ShowDialogWhenReadyAsync 而不是 ShowDialog: 设置项需一次后端往返才知道有几行,
+        // 而窗口是 SizeToContent=Height + MaxHeight —— 先 Show 会以 620 高上屏再塌缩,
+        // 未绘制区域呈黑块 (2026-09-24 用户报障, 见方法注释)。
+        await pluginDialog.ShowDialogWhenReadyAsync(owner);
     }
 
     /// <summary>导入本地插件包: 选 zip -> 读字节 -> POST /api/plugins/import。</summary>
