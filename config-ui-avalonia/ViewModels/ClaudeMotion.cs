@@ -14,8 +14,8 @@ namespace KeyFlux.Settings.ViewModels;
 /// · 交互反馈类 Press/Micro/Standard/Enter — 上限 300ms (生产率基线)。
 /// · 内容揭示类 Roll/Unroll — 上限 600ms。**放宽的由来 (2026-09-24 用户裁定)**:
 ///   分区体展开要"像书卷/卷轴缓缓摊开", 240ms 级别的淡入+位移读不出"缓缓铺展"的体量感,
-///   故 420ms 为摊开时长; 仍远低于 600ms 的"可感知卡顿"线, 且只用 SineEaseInOut
-///   (起止都柔, 无突兀加减速) 保证"节奏连贯"。
+///   故揭示类整体慢于交互类; 摊开时长经两轮调校定为 380ms (初版 420ms, 后按"稍微加快一点点"收紧),
+///   仍远低于 600ms 的"可感知卡顿"线, 且只用 SineEaseInOut (起止都柔) 保证"节奏连贯"。
 /// 递增序 (在两类内部各自递增): Press &lt; Micro &lt; Standard &lt; Enter &lt; Roll &lt; Unroll。
 /// </summary>
 public static class ClaudeMotion
@@ -39,9 +39,9 @@ public static class ClaudeMotion
     public static readonly TimeSpan Roll = TimeSpan.FromMilliseconds(300);
 
     /// <summary>
-    /// 分区体摊开 (展开) 时长 420ms, SineEaseInOut —— 卷轴徐徐铺展的体量感来源。
+    /// 分区体摊开 (展开) 时长 380ms, SineEaseInOut —— 卷轴徐徐铺展的体量感来源。
     /// 实现: 揭示层 <c>MaxHeight</c> 由状态机从 0 动画到内容自然高 (真实布局增长, 下方卡片被
     /// 顺次推开), 同时前缘卷曲光影带与内容微沉降同步走完; 见 Services/SectionUnroll.cs。
     /// </summary>
-    public static readonly TimeSpan Unroll = TimeSpan.FromMilliseconds(420);
+    public static readonly TimeSpan Unroll = TimeSpan.FromMilliseconds(380);
 }

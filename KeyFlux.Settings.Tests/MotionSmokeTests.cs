@@ -141,7 +141,7 @@ public sealed class MotionSmokeTests
 
     /// <summary>
     /// 减少动效逃生口: KEYFLUX_NO_MOTION=1 时不挂类 (没有动画可播), 且必须**同步**落终态 ——
-    /// 否则会留 300~420ms 的空白占位 (比动画本身更难看)。
+    /// 否则会留 300~380ms 的空白占位 (比动画本身更难看)。
     /// </summary>
     [AvaloniaFact]
     public void SettingsPage_Reduced_Motion_Applies_Final_State_Immediately()
