@@ -145,7 +145,7 @@ public sealed class MotionSmokeTests
 
     /// <summary>
     /// 减少动效逃生口: KEYFLUX_NO_MOTION=1 时不挂类 (没有动画可播), 且必须**同步**落终态 ——
-    /// 否则会留 80~100ms 的空白占位 (比动画本身更难看)。
+    /// 否则会留约 100ms 的空白占位 (比动画本身更难看)。
     /// </summary>
     [AvaloniaFact]
     public void SettingsPage_Reduced_Motion_Applies_Final_State_Immediately()
@@ -240,6 +240,63 @@ public sealed class MotionSmokeTests
     }
 
     /// <summary>
+    /// 折叠**收尾不得有高度台阶** (2026-09-24 用户报「折叠比展开卡」的实测根因): 揭示层收起时会被
+    /// 置 IsVisible=false, 父 StackPanel 的 Spacing 随之消失 —— 曾使卡片在"内容已收完、静止约
+    /// 60ms"之后又掉 10px (实测卡片高 69→59)。修法是把该间距搬进揭示层自身内边距
+    /// (Border.reveal 的 Padding), 间距随纸张一起摊开/卷起。本用例锁死两点: 卷起期间卡片高度
+    /// 单调不增; **动画结束那一刻的高度必须已等于隐藏后的高度** (即撤类前后无台阶)。
+    /// </summary>
+    [AvaloniaFact]
+    public void SettingsPage_RollUp_Ends_Without_Height_Step()
+    {
+        var vm = NewPage(out _);
+        var (_, window, reveals) = Mount(vm);
+        try
+        {
+            vm.ToggleSectionCommand.Execute("mouse");
+            var target = WaitForUnroll(reveals);
+            SampleUntilClassGone(target, SectionUnroll.UnrollClass); // 等摊开收尾
+            var card = target.GetVisualAncestors().OfType<Border>()
+                .First(b => b.Classes.Contains("settingsCard"));
+            var openHeight = card.Bounds.Height;
+            Assert.True(openHeight > 100, $"展开后卡片高度异常: {openHeight:0.#}");
+
+            vm.ToggleSectionCommand.Execute("mouse"); // 收起
+            Dispatcher.UIThread.RunJobs();
+            Assert.Contains(SectionUnroll.RollUpClass, target.Classes);
+
+            var heights = new List<double>();
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < deadline && target.Classes.Contains(SectionUnroll.RollUpClass))
+            {
+                heights.Add(card.Bounds.Height);
+                AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+                Dispatcher.UIThread.RunJobs();
+                System.Threading.Thread.Sleep(8);
+            }
+
+            var lastAnimated = heights.Count > 0 ? heights[^1] : -1;
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Dispatcher.UIThread.RunJobs();
+            var settled = card.Bounds.Height;
+
+            Assert.True(heights.Count >= 3, $"卷起采样过少 ({heights.Count})");
+            Assert.True(settled < openHeight, "收起后卡片没有变矮");
+            Assert.True(Math.Abs(lastAnimated - settled) < 1.0,
+                $"卷起收尾有高度台阶: 动画末帧 {lastAnimated:0.#} → 隐藏后 {settled:0.#} (差 {lastAnimated - settled:0.#}px)");
+            for (var i = 1; i < heights.Count; i++)
+            {
+                Assert.True(heights[i] <= heights[i - 1] + 0.5,
+                    $"卷起过程中卡片高度回涨: {heights[i - 1]:0.#} → {heights[i]:0.#}");
+            }
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    /// <summary>
     /// 等"某一张卡真的进入摊开态"。换卡时摊开被串行闸推迟 (先等旧卡卷起跑完), 故不能当帧断言;
     /// 同时它也顺带守住"闸不会永远不放行" (超时即红)。
     /// </summary>
@@ -298,12 +355,16 @@ public sealed class MotionSmokeTests
     public void SettingsPage_Unroll_Recipe_Matches_Skin_Tokens()
     {
         var view = new SettingsPageView();
-        var animations = view.Styles.OfType<Style>().SelectMany(s => s.Animations).OfType<Animation>().ToList();
+        var styles = view.Styles.OfType<Style>().ToList();
 
-        var unrollAnims = animations.Where(a => a.Duration == ClaudeMotion.Unroll).ToList();
-        var rollAnims = animations.Where(a => a.Duration == ClaudeMotion.Roll).ToList();
+        // 用**类名**而不是时长来分辨两向: 2026-09-24 起 Roll 与 Unroll 等长 (均 100ms),
+        // 按 Duration 分组会把两向混成一堆 —— 方向信息现在只存在于 XAML 选择器的类名里。
+        var unrollAnims = StyleAnimations(styles, SectionUnroll.UnrollClass);
+        var rollAnims = StyleAnimations(styles, SectionUnroll.RollUpClass);
         Assert.Equal(2, unrollAnims.Count); // 卷曲带 + 内容落平
         Assert.Equal(2, rollAnims.Count);
+        foreach (var a in unrollAnims) Assert.Equal(ClaudeMotion.Unroll, a.Duration);
+        foreach (var a in rollAnims) Assert.Equal(ClaudeMotion.Roll, a.Duration);
 
         foreach (var a in unrollAnims.Concat(rollAnims)) Assert.IsType<SineEaseInOut>(a.Easing);
 
@@ -394,6 +455,11 @@ public sealed class MotionSmokeTests
         // 未挂树/无父级 ⇒ 量不到自然高 ⇒ 返回 0 (调用方据此走直落终态, 而不是抛)
         Assert.Equal(0, RevealHeightMotion.MeasureNaturalHeight(new Border()));
     }
+
+    /// <summary>取"选择器里含指定类名"的样式所携带的动画 (两向等长后只能这样分辨方向)。</summary>
+    private static List<Animation> StyleAnimations(List<Style> styles, string cls) => styles
+        .Where(s => (s.Selector?.ToString() ?? string.Empty).Contains(cls, StringComparison.Ordinal))
+        .SelectMany(s => s.Animations).OfType<Animation>().ToList();
 
     private static bool HasRenderTransform(KeyFrame kf)
         => kf.Setters.OfType<Setter>().Any(s => s.Property == Visual.RenderTransformProperty);

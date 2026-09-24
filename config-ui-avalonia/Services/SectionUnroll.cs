@@ -41,7 +41,7 @@ public sealed class SectionUnrollMarker
 ///
 /// <para><b>换卡串行 (2026-09-24 用户裁定, 为流畅度)。</b> 换卡 = 同帧关旧卡 + 开新卡, 两卡并发
 /// 会让每帧重光栅成本翻倍 (软件渲染下重卡单帧已 20~30ms ⇒ 掉帧) ⇒ 摊开前先等最近一轮卷起跑完
-/// (见 <see cref="s_rollupGate"/>)。代价: 新内容晚约 80ms 出现 (闸 = <see cref="ClaudeMotion.Roll"/>)。若将来渲染管线换成 GPU 有余量,
+/// (见 <see cref="s_rollupGate"/>)。代价: 新内容晚约 100ms 出现 (闸 = <see cref="ClaudeMotion.Roll"/>)。若将来渲染管线换成 GPU 有余量,
 /// 应去掉这道闸 (串行届时纯属拖慢)。</para>
 ///
 /// <para><b>安全面 (本类被审过的四项)。</b>
@@ -93,11 +93,11 @@ public static class SectionUnroll
     ///
     /// <para><b>为什么闸只等"卷起令牌时长"而不是"卷起动画完成回调"</b>: 后者要连收尾余量一起等
     /// (再多约 60ms), 那段空档里没有任何动画在播, 纯属白等; 前者只让新卡晚 <see cref="ClaudeMotion.Roll"/>
-    /// (80ms) 出现, 且其尾部与卷起的收尾余量重叠 —— 那时旧卡高度已≈0, 重光栅成本可忽略。
+    /// (100ms) 出现, 且其尾部与卷起的收尾余量重叠 —— 那时旧卡高度已≈0, 重光栅成本可忽略。
     /// 传 <c>cts.Token</c>: 卷起被取消 (用户连点) 时闸立即放行, 不留下无谓等待。</para>
     ///
     /// <para>未在飞时是已完成的 <c>Task.CompletedTask</c> ⇒ <c>await</c> 同步返回,
-    /// **单卡展开仍是零延迟**; 新内容晚约 80ms 出现是本次取舍的既定代价。</para>
+    /// **单卡展开仍是零延迟**; 新内容晚约 100ms 出现是本次取舍的既定代价。</para>
     /// </summary>
     private static Task s_rollupGate = Task.CompletedTask;
 

@@ -12,10 +12,10 @@ namespace KeyFlux.Settings.ViewModels;
 ///
 /// 两类令牌 (SkinContractTests 分别锁**上限**与**类内**递增):
 /// · 交互反馈类 Press/Micro/Standard/Enter — 上限 300ms (生产率基线);
-/// · 内容揭示类 Roll/Unroll — 上限 600ms, 类内 Roll &lt; Unroll (先卷后摊的收势不做主角)。
+/// · 内容揭示类 Roll/Unroll — 上限 600ms, 类内 Roll ≤ Unroll (2026-09-24 起二者等长, 见下)。
 /// ⚠ 跨类**不再互相单调** (2026-09-24 用户多次提速的既定形态): 揭示类原本是"低频大动作比交互慢"
-///   的示范, 但用户连续收窄 (420 → 380 → 200 → 100ms) ⇒ 最终 Roll=80 与 Press 同值、Unroll=100
-///   落在 Micro(120) 与 Standard(200) 之间。以用户裁定为准, 契约因此只保证类内有序 + 上限
+///   的示范, 但用户连续收窄 (420 → 380 → 200 → 100ms) ⇒ 最终 Roll=Unroll=100ms (均在 Micro 与
+///   Standard 之间)。以用户裁定为准, 契约因此只保证类内有序 + 上限
 ///   (上限的意义 = 防慢到可感知卡顿, 而不是规定它必须比交互慢)。
 ///   揭示类始终只配 SineEaseInOut (起止都柔), 提速靠缩短时长而非换更陡的曲线。
 /// </summary>
@@ -34,14 +34,15 @@ public static class ClaudeMotion
     public static readonly TimeSpan Enter = TimeSpan.FromMilliseconds(220);
 
     /// <summary>
-    /// 分区体卷起 (收拢) 时长 80ms, SineEaseInOut —— 卷轴往回收, 快于摊开 (让位不做主角)。
-    /// 演进: 300ms (初版) → 160ms (随摊开收紧) → 80ms (随摊开压到 100ms 按 5:4 比例跟调; 用户只
-    /// 点名了展开, 但"收起比展开更慢"是错的交互读感, 故维持同一比例)。
+    /// 分区体卷起 (收拢) 时长 100ms, SineEaseInOut —— **与 <see cref="Unroll"/> 等长**。
+    /// 演进: 300ms (初版) → 160ms (随摊开收紧) → 80ms (按 5:4 跟调) → 100ms (与摊开齐平)。
+    /// 修「折叠比展开卡」时改为等长: 帧数才是流畅度的决定因素 (软件光栅下每帧成本相同, 时长更短
+    /// = 帧更少 = 更"跳"), 刻意让收势更快的收益远小于它带来的卡顿感知; 二者等长后一摊一卷手感一致。
     /// ⚠ 本值同时是换卡串行闸的等待时长 (见 Services/SectionUnroll.s_rollupGate): 改这里会一并改变
     /// "点开另一张卡后新内容出现的延迟" —— 二者共用一个数是有意的, 闸的语义就是"等这张卡卷完"。
     /// 与 <see cref="Unroll"/> 共用同一缓动: 一摊一卷的加减速手感必须对称, 否则"节奏连贯"破功。
     /// </summary>
-    public static readonly TimeSpan Roll = TimeSpan.FromMilliseconds(80);
+    public static readonly TimeSpan Roll = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
     /// 分区体摊开 (展开) 时长 100ms, SineEaseInOut —— 2026-09-24 用户指定 (演进 420 → 380 → 200 → 100)。

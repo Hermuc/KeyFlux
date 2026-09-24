@@ -304,7 +304,7 @@
          两类令牌 (SkinContractTests 分别锁界):
            交互反馈类 Press/Micro/Standard/Enter ≤300ms, 递增序 = 按压<微交互<标准<入场;
            内容揭示类 Roll/Unroll ≤600ms, 递增序 = 卷起<摊开 (2026-09-24 用户裁定「卷轴缓缓摊开」,
-           2026-09-24 用户多轮提速后定为 摊开 100ms / 卷起 80ms; 两向共用 SineEaseInOut 保证节奏对称连贯)。
+           2026-09-24 用户多轮提速后定为 摊开/卷起 各 100ms; 两向共用 SineEaseInOut 保证节奏对称连贯)。
          减少动效: 环境变量 KEYFLUX_NO_MOTION=1 时设置页整体跳过入场/摊开 (MotionPreferences)。 -->
 
 

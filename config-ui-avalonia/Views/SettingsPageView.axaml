@@ -251,10 +251,10 @@
            摊开 100ms SineEaseInOut  MaxHeight 0→H (90% 处即到位并保持到 100%, 见下注)
                                                       |  内容 translateY -3px → 归位 (落平)
                                                       |  卷曲带透明度 0 → .9 (28%) → .9 (82%) → 0
-           卷起 80ms SineEaseInOut  MaxHeight H→0  |  内容 归位 → translateY -3px
+           卷起 100ms SineEaseInOut  MaxHeight H→0  |  内容 归位 → translateY -3px
                                                       |  卷曲带同上 (卷回去时纸边同样在卷)
          为什么两向各挂一个类 (.unroll / .rollup): XAML 的 Animation 时长写死, 而两向时长不同
-         (100 / 80), 用两个类让两向各自取自己的令牌 —— 类名与状态机里的常量一一对应。
+         (100 / 100), 用两个类让两向各自取自己的令牌 —— 类名与状态机里的常量一一对应。
          为什么内容落平用 XAML 而不是代码: 代码构造的 Animation 只对基元属性有动画器兜底,
          RenderTransform 会抛 (实测 "No animator registered for the property RenderTransform"),
          XAML 关键帧由编译器替 setter 注册动画器 ⇒ 位移/缩放必须留在 XAML。
@@ -268,6 +268,12 @@
     <Style Selector="Border.reveal">
       <Setter Property="ClipToBounds" Value="True" />
       <Setter Property="MaxHeight" Value="0" />
+      <!-- 标题↔内容的间距放在**这里**而不是父 StackPanel 的 Spacing (故那些 Spacing 已置 0):
+           揭示层收起时会置 IsVisible=false, 父级 Spacing 会跟着消失 ⇒ 曾在"内容已收完、静止约
+           60ms"之后让整卡又掉 10px (实测卡片高 69→59), 即用户报的「折叠比展开卡」(展开侧同样有
+           这一跳, 但落在第 1 帧被随后的运动掩盖)。放进自身内边距后, 这段间距随纸张一起摊开/卷起,
+           两端都不再有跳变; 展开态观感与原先逐像素一致。 -->
+      <Setter Property="Padding" Value="0,10,0,0" />
     </Style>
     <!-- 卷曲光影带: 暖陶土色渐变 (纸面被顶起处的阴影) + 1px 纸边线; 不透明无笔画时是纯色, 故用渐变 -->
     <Style Selector="Border.curl">
@@ -493,7 +499,7 @@
 
         <!-- 🌐 切换语言 (label:781) -->
         <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
-          <StackPanel Spacing="10">
+          <StackPanel Spacing="0">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="language">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=781}"
                          FontWeight="SemiBold" />
@@ -529,7 +535,7 @@
              功能列 (原「备注」) 点击弹 ActionEditorWindow 编辑动作; 底部新建 (label:1118) -->
         <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16"
                 IsVisible="{Binding CustomHotkeys, Converter={StaticResource NotNull}}">
-          <StackPanel Spacing="10">
+          <StackPanel Spacing="0">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}"
                     CommandParameter="customhotkeys">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1116}"
@@ -584,7 +590,7 @@
 
         <!-- 🖱️ 修改鼠标参数 (label:701, 含滚轮参数) -->
         <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
-          <StackPanel Spacing="10">
+          <StackPanel Spacing="0">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="mouse">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=701}"
                          FontWeight="SemiBold" />
@@ -651,7 +657,7 @@
 
         <!-- ⌨️ 修改键盘布局 (label:721) -->
         <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
-          <StackPanel Spacing="10">
+          <StackPanel Spacing="0">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="layout">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=721}"
                          FontWeight="SemiBold" />
@@ -688,7 +694,7 @@
 
         <!-- 🕗 设置触发延时 (label:761, 默认展开) -->
         <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
-          <StackPanel Spacing="10">
+          <StackPanel Spacing="0">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="delay">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=761}"
                          FontWeight="SemiBold" />
@@ -718,7 +724,7 @@
 
         <!-- ✨ 命令框皮肤 (label:741, 18 字段数据驱动) -->
         <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
-          <StackPanel Spacing="10">
+          <StackPanel Spacing="0">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="skin">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=741}"
                          FontWeight="SemiBold" />
@@ -812,7 +818,7 @@
 
         <!-- 🧩 编辑路径变量 (label:907, Vue 中被注释, 按任务规格补齐) -->
         <Border Classes="settingsCard" PointerPressed="OnCardPointerPressed" Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="16">
-          <StackPanel Spacing="10">
+          <StackPanel Spacing="0">
             <Button Classes="sectionHeader" Command="{Binding ToggleSectionCommand}" CommandParameter="pathvars">
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=907}"
                          FontWeight="SemiBold" />
