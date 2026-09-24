@@ -280,6 +280,9 @@ config→ConfigProvider; events→EventBus 既有), config.* 按插件 ID 作用
 `PluginManager.LoadEntry(id)` 以动态调用拉起 `<entry.func>(api)`, 异常隔离为 plugin_error。
 实机验证: `plugins/examples/sample_greeter` 经导入落盘 → 引擎重启 →
 `plugin registered` / `plugin entry loaded` 全链 (logs/plugin_manager.log)。
+(注: 该示例插件已于 2026-09-24 按用户要求从仓库移除 —— 本节为**历史验证记录**,
+链路与契约本身未变, 复现时需自备任一示例插件。)
+
 **已完成(2026-09-12 下午, 三项遗留收口)**:
 ① 启停持久化闭环 —— 生成端消费 `config.options.plugins.disabled`
 (generators/plugins.go: 停用插件不注入不注册, 落注释; UI 开关→SaveAsync→PUT /config
@@ -295,6 +298,8 @@ entry.action 引用 (pluginActionPattern); 运行时 SelectedAction._Execute 增
 实机验证: sample_greeter 升级版 (IAction 注册 + behaviors/sample_timestamp 贡献包) →
 重启自动重生成 → GET /api/behaviors 可见贡献包 → 临时配置规则引用生成
 `action: "plugin:sample_greeter:timestamp"` 分发行。
+(同上: 示例插件已于 2026-09-24 移除, 本节为历史记录。)
+
 **仍遗留**: 插件启用/停用状态在行为库 UI 的展示细化 (插件贡献包当前显示为内置标签)、
 声明式 contributes 的 UI 创作辅助。
 
