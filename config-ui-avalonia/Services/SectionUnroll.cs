@@ -39,6 +39,11 @@ public sealed class SectionUnrollMarker
 /// 到局部值), 再以**当前值**为新动画的起点 ⇒ 连点不跳变。被取消的那一轮什么都不做
 /// (靠 token 早退), 避免"取消了还把面板藏掉"。</para>
 ///
+/// <para><b>换卡串行 (2026-09-24 用户裁定, 为流畅度)。</b> 换卡 = 同帧关旧卡 + 开新卡, 两卡并发
+/// 会让每帧重光栅成本翻倍 (软件渲染下重卡单帧已 20~30ms ⇒ 掉帧) ⇒ 摊开前先等最近一轮卷起跑完
+/// (见 <see cref="s_rollupGate"/>)。代价: 新内容晚约 160ms 出现。若将来渲染管线换成 GPU 有余量,
+/// 应去掉这道闸 (串行届时纯属拖慢)。</para>
+///
 /// <para><b>安全面 (本类被审过的四项)。</b>
 /// · <i>输入校验</i>: 唯一外部输入是绑定给的 <c>bool?</c> 与布局给的尺寸 —— 尺寸校验在
 ///   <see cref="RevealHeightMotion"/>; 附加属性为 <c>bool?</c> 且对 <c>null</c> 直接忽略;
@@ -78,6 +83,23 @@ public static class SectionUnroll
 
     /// <summary>每个分区体一份取消柄 (弱表持有: 页面重建不留悬挂引用)。</summary>
     private static readonly ConditionalWeakTable<Control, State> States = new();
+
+    /// <summary>
+    /// 换卡**串行闸** (2026-09-24 用户裁定: 在"保持软件渲染"的前提下用串行换平滑)。
+    ///
+    /// <para>手风琴换卡会在同一帧里"关旧卡 + 开新卡", 两卡并发动画 ⇒ 每帧重光栅成本叠加。
+    /// 实测软件光栅路径: 轻卡每帧 1.4ms, 重卡 (命令框皮肤卡) 单帧 20~30ms (Debug), 两卡并发
+    /// 直接双倍 ⇒ 掉帧。故摊开前先等最近一轮卷起跑完, 峰值回到单卡水平。</para>
+    ///
+    /// <para><b>为什么闸只等"卷起令牌时长"而不是"卷起动画完成回调"</b>: 后者要连收尾余量一起等
+    /// (再多约 60ms), 那段空档里没有任何动画在播, 纯属白等; 前者只让新卡晚 <see cref="ClaudeMotion.Roll"/>
+    /// (160ms) 出现, 且其尾部与卷起的收尾余量重叠 —— 那时旧卡高度已≈0, 重光栅成本可忽略。
+    /// 传 <c>cts.Token</c>: 卷起被取消 (用户连点) 时闸立即放行, 不留下无谓等待。</para>
+    ///
+    /// <para>未在飞时是已完成的 <c>Task.CompletedTask</c> ⇒ <c>await</c> 同步返回,
+    /// **单卡展开仍是零延迟**; 新内容晚约 160ms 出现是本次取舍的既定代价。</para>
+    /// </summary>
+    private static Task s_rollupGate = Task.CompletedTask;
 
     private sealed class State
     {
@@ -141,6 +163,11 @@ public static class SectionUnroll
     {
         try
         {
+            // 串行闸: 换卡时先让上一张卡的"卷起"跑完, 避免两卡并发动画让每帧重光栅成本翻倍
+            // (软件渲染下重卡单帧已 20~30ms, 见 s_rollupGate 注释)。无卷起在飞时立即通过。
+            await SkipCancellationAsync(s_rollupGate).ConfigureAwait(true);
+            if (cts.IsCancellationRequested) return;
+
             host.IsVisible = true;
             // 顺序不能反: 必须**先记下当前高度** (打断卷起时是插值到一半的值), 再放开上限去量自然高
             // —— 放开之后 host.MaxHeight 就成了 ∞, 再取值只会得到 0, 反悔时会从 0 重新长 (可见跳变)
@@ -195,6 +222,8 @@ public static class SectionUnroll
             }
 
             SwapClass(host, RollUpClass, UnrollClass);
+            // 登记串行闸 (仅在本轮**确实要播动画**时才登记, 否则会平白拖住下一张卡的摊开)
+            s_rollupGate = Task.Delay(ClaudeMotion.Roll, cts.Token);
 
             await RevealHeightMotion.AnimateAsync(host, from, 0, ClaudeMotion.Roll, cts.Token)
                 .ConfigureAwait(true);
@@ -242,6 +271,22 @@ public static class SectionUnroll
     {
         host.Classes.Remove(remove);
         host.Classes.Add(add);
+    }
+
+    /// <summary>
+    /// 等闸放行; 闸被取消 (卷起被打断) 视为"无需再等", 直接放行。
+    /// 闸本身是 <c>Task.Delay(令牌时长, token)</c>, 故等待有上界, 不会挂住。
+    /// </summary>
+    private static async Task SkipCancellationAsync(Task gate)
+    {
+        try
+        {
+            await gate.ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            // 卷起被取消: 没有动画在跑, 无需让位
+        }
     }
 
     /// <summary>

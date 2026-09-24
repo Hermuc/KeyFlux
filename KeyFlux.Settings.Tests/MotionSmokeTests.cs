@@ -107,18 +107,22 @@ public sealed class MotionSmokeTests
             Assert.All(reveals.Where(r => !ReferenceEquals(r, delayReveal)),
                 r => Assert.False(r.IsVisible, "收起态分区体装载期没有隐藏"));
 
-            // 手风琴换卡: 新卡进摊开态 (.unroll) + 旧卡进卷起态 (.rollup), 两条动画同帧起播
-            vm.ToggleSectionCommand.Execute("mouse");
+            // 手风琴换卡: 旧卡当帧进卷起态 (.rollup), 新卡的摊开被串行闸推迟到卷起跑完
+            vm.ToggleSectionCommand.Execute("mouse"); // 手风琴: 关「设置触发延时」+ 开「修改鼠标参数」
             Dispatcher.UIThread.RunJobs();
             Assert.True(vm.ShowMouseOption);
             Assert.False(vm.ShowKeymapDelay);
-
-            var unrolling = reveals.Single(r => r.Classes.Contains(SectionUnroll.UnrollClass));
-            Assert.NotSame(delayReveal, unrolling);
-            Assert.True(unrolling.IsVisible, "摊开态分区体不可见: 状态机与 IsVisible 脱钩");
+            // 旧卡当帧即进入卷起态, 且**当帧不得隐藏** (退场动画要跑完才隐藏); 新卡的摊开被串行闸
+            // 推迟到卷起跑完 (见 s_rollupGate) ⇒ 这两条断言必须在等闸之前
             Assert.Contains(SectionUnroll.RollUpClass, delayReveal.Classes);
             Assert.True(delayReveal.IsVisible,
                 "卷起动画尚未跑完就 IsVisible=false: 退场被硬切 (SectionUnroll 应等动画结束)");
+            // 串行闸的回归锁: 换卡当帧只允许旧卡卷起, 新卡的摊开必须等闸 (去掉闸这条必红)
+            Assert.DoesNotContain(reveals, r => r.Classes.Contains(SectionUnroll.UnrollClass));
+
+            var unrolling = WaitForUnroll(reveals);
+            Assert.NotSame(delayReveal, unrolling);
+            Assert.True(unrolling.IsVisible, "摊开态分区体不可见: 状态机与 IsVisible 脱钩");
 
             // 7 个分区逐一展开: 每次都必须是**另一个**揭示层亮起 —— 端到端证明 7 张卡全部接线
             string[] keys = ["language", "customhotkeys", "mouse", "layout", "delay", "skin", "pathvars"];
@@ -127,7 +131,7 @@ public sealed class MotionSmokeTests
             {
                 vm.ToggleSectionCommand.Execute(key);
                 Dispatcher.UIThread.RunJobs();
-                var lit = reveals.Single(r => r.Classes.Contains(SectionUnroll.UnrollClass));
+                var lit = WaitForUnroll(reveals);
                 Assert.True(lit.IsVisible, $"「{key}」摊开的分区体不可见");
                 Assert.True(seen.Add(lit), $"「{key}」与其它分区共用同一揭示层: 手风琴串台");
             }
@@ -192,7 +196,7 @@ public sealed class MotionSmokeTests
             var toggleAt = Stopwatch.StartNew();
             vm.ToggleSectionCommand.Execute("mouse");
             Dispatcher.UIThread.RunJobs();
-            var target = reveals.Single(r => r.Classes.Contains(SectionUnroll.UnrollClass));
+            var target = WaitForUnroll(reveals);
 
             var grown = SampleUntilClassGone(target, SectionUnroll.UnrollClass);
             toggleAt.Stop();
@@ -233,6 +237,26 @@ public sealed class MotionSmokeTests
         {
             window.Close();
         }
+    }
+
+    /// <summary>
+    /// 等"某一张卡真的进入摊开态"。换卡时摊开被串行闸推迟 (先等旧卡卷起跑完), 故不能当帧断言;
+    /// 同时它也顺带守住"闸不会永远不放行" (超时即红)。
+    /// </summary>
+    private static Border WaitForUnroll(List<Border> reveals)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            var hit = reveals.Where(r => r.Classes.Contains(SectionUnroll.UnrollClass)).ToList();
+            if (hit.Count == 1) return hit[0];
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Dispatcher.UIThread.RunJobs();
+            System.Threading.Thread.Sleep(5);
+        }
+
+        Assert.Fail("等待摊开态超时: 串行闸可能没放行 (或无卡进入摊开)");
+        return null!;
     }
 
     /// <summary>
