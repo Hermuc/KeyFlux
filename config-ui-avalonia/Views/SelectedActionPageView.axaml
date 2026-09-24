@@ -421,10 +421,6 @@
 
     <!-- 添加映射弹窗 (页内 overlay, 非独立窗口)
          动效: DialogMotion.IsOpen 驱动入场姿势 (弹簧浮起 + 内容分层), 与独立弹窗同一套配方;
-         ⚠ 附加属性挂在**外层透明宿主**上 (它是静态声明的、稳定; 内层模板随 AddPanel 数据重建,
-         挂不稳)。真正的动效主体由 DialogMotion.ResolveOverlayBody 向下定位到标了 dlgPanel
-         类名的那层可见容器 —— 若让动效作用在透明宿主上, 用户视觉上完全看不到动画
-         (2026-09-24 用户报障"单击卡片直接弹出、没有动画", 探针实测宿主姿势确实被改写但不可见)。
          ⚠ 退场保持 IsVisible 绑定立即隐藏 (不托管可见性) —— 页内浮层有 ModalBlur 背景模糊
          同步恢复, 观感已足够完整; 而托管 IsVisible 需要改 VM 的派生属性契约, 收益不值。 -->
     <Border Grid.RowSpan="2" IsVisible="{Binding IsAddPanelOpen}" Background="Transparent"
@@ -433,8 +429,7 @@
       <ContentControl Content="{Binding AddPanel}" HorizontalAlignment="Center" VerticalAlignment="Center">
         <ContentControl.DataTemplates>
           <DataTemplate x:DataType="vm:AddMappingVm">
-            <!-- Classes="dlgPanel" = 动效主体标记 (见上方注释) -->
-            <Border Classes="dlgPanel" MaxWidth="560" MinWidth="440" HorizontalAlignment="Left"
+            <Border MaxWidth="560" MinWidth="440" HorizontalAlignment="Left"
                     Background="{DynamicResource ClaudeIvoryBrush}" CornerRadius="{StaticResource ClaudeRadiusCard}" Padding="20" Margin="20"
                     BoxShadow="0 8 24 rgba(0,0,0,0.25)">
               <StackPanel Spacing="12">
