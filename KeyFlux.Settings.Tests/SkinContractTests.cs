@@ -498,4 +498,29 @@ public sealed class SkinContractTests
             Assert.False(app.TryFindResource(gone, out _), $"毛玻璃令牌应已删除: {gone}");
         }
     }
+
+    /// <summary>
+    /// 契约: 默认渲染管线必须仍是**软件渲染**。这是 2026-09-12 的瞬峰治理冻结决策
+    /// (Program.cs 注释写明"勿删此配置"+"换回 GPU 渲染需回归瞬峰/内存实测")。
+    /// 2026-09-24 为动效流畅度新增的 <c>KEYFLUX_RENDER_GPU</c> 只是实测/试用开关 —— GPU 档
+    /// 能解决"重卡逐帧重光栅导致的掉帧", 但会带回启动瞬峰, 故**不得顺手改默认值**:
+    /// 该切换需要真机启动设置面板采样内存, 属独立回归项。
+    /// </summary>
+    [Fact]
+    public void Program_Default_Render_Mode_Stays_Software()
+    {
+        var previous = Environment.GetEnvironmentVariable("KEYFLUX_RENDER_GPU");
+        try
+        {
+            Environment.SetEnvironmentVariable("KEYFLUX_RENDER_GPU", null);
+            Assert.False(Program.UseGpuRendering, "默认必须走软件渲染 (瞬峰契约)");
+
+            Environment.SetEnvironmentVariable("KEYFLUX_RENDER_GPU", "1");
+            Assert.True(Program.UseGpuRendering, "置 KEYFLUX_RENDER_GPU=1 应切到 GPU 档");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KEYFLUX_RENDER_GPU", previous);
+        }
+    }
 }

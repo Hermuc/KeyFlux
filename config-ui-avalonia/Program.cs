@@ -61,10 +61,32 @@ internal static class Program
     /// FontFallbacks: 让未拆段的零星 emoji 字符可回退到 Segoe UI Emoji 取到字形
     /// (文本栈仅单色; 彩色渲染由 MarkdownRenderer 的 Skia 位图方案负责)。
     /// </summary>
+    /// <summary>
+    /// 渲染管线开关 (2026-09-24, 动效流畅度优化引入)。<b>默认仍是软件渲染</b> —— 见下方 2026-09-12
+    /// 的瞬峰治理理由与"勿删此配置"契约。
+    ///
+    /// <para><b>为什么现在需要这个开关。</b> 2026-09-12 那条决策的前提是"设置面板为静态内容, 软件渲染
+    /// 视觉无差"。⚠ 该前提自 2026-09-24 起不再成立: 选项页新增了「卷轴摊开」布局动画 (揭示层
+    /// <c>MaxHeight</c> 0→内容自然高), 每帧都要重画整张卡的内容。实测 (真 Skia 软件光栅, 逐帧探针):
+    /// 轻卡 (约 50 个视觉元素) 每帧中位 1.4ms; 重卡 (命令框皮肤卡, 511 个元素) 每帧 <b>20~30ms</b>
+    /// (Debug 构建; Release 约快 3~5×) ⇒ 60Hz 的 16.6ms 预算被单帧吃穿 ⇒ 掉帧即"卡顿"。
+    /// 消融实验 (摘投影 / 摘裁剪 / 摘卷曲带) 都不改变量级 ⇒ 成本在"整卡内容逐帧重光栅"本身,
+    /// 是渲染管线属性, 不是动画代码可优化的 ⇒ 唯一有效杠杆是换 GPU 渲染。</para>
+    ///
+    /// <para><b>用法与边界。</b> 置环境变量 <c>KEYFLUX_RENDER_GPU=1</c> ⇒ GPU 光栅 (ANGLE/D3D) +
+    /// WinUI 合成, 各留软件回落; 不置则完全维持原行为。**在完成"瞬峰/内存回归实测"之前不得改默认值**
+    /// (契约要求, 该实测需要真机启动设置面板采样内存, 故留开关先供试用/测量)。</para>
+    /// </summary>
+    internal static bool UseGpuRendering =>
+        Environment.GetEnvironmentVariable("KEYFLUX_RENDER_GPU") == "1";
+
     public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .With(new Win32PlatformOptions
+    {
+        var builder = AppBuilder.Configure<App>().UsePlatformDetect();
+
+        if (!UseGpuRendering)
+        {
+            builder = builder.With(new Win32PlatformOptions
             {
                 // 2026-09-12 启动瞬峰治理 (dotnet-counters 剖析: GC 托管堆仅 ~15MB、分配速率
                 // ~1.2MB/s, 私有提交却冲 400-650MB —— 大头是 GPU 渲染管线在进程内的
@@ -74,7 +96,23 @@ internal static class Program
                 // ⚠ 渲染契约: 换回 GPU 渲染需回归瞬峰/内存实测; 勿删此配置。
                 RenderingMode = new[] { Win32RenderingMode.Software },
                 CompositionMode = new[] { Win32CompositionMode.RedirectionSurface },
-            })
+            });
+        }
+        else
+        {
+            // GPU 档: 显式写出"GPU 优先 + 软件兜底", 不用平台默认值以免将来默认值变化时行为漂移
+            builder = builder.With(new Win32PlatformOptions
+            {
+                RenderingMode = new[] { Win32RenderingMode.AngleEgl, Win32RenderingMode.Software },
+                CompositionMode = new[]
+                {
+                    Win32CompositionMode.WinUIComposition,
+                    Win32CompositionMode.RedirectionSurface,
+                },
+            });
+        }
+
+        return builder
             .With(new FontManagerOptions
             {
                 FontFallbacks = new[]
@@ -83,6 +121,7 @@ internal static class Program
                 }
             })
             .LogToTrace();
+    }
 
     // ----------------------------------------------------------- 窗口激活 (P/Invoke)
 
