@@ -41,8 +41,8 @@ public partial class PluginSettingsDialogWindow : Window
     }
 
     /// <summary>
-    /// 打开对话框 —— <b>先把设置项加载完, 再在"窗口整体透明"的状态下让尺寸落定, 最后显形</b>。
-    /// 调用方据此替代裸的 <c>ShowDialog(owner)</c>。
+    /// 打开对话框 —— <b>先把设置项加载完、把窗口高度量准, 再让窗口可见</b>; 调用方据此
+    /// 替代裸的 <c>ShowDialog(owner)</c>。
     ///
     /// <para><b>⚠ 为什么不能"先 Show 再在 Opened 里 LoadAsync" (2026-09-24 用户报障
     /// "打开弹窗一瞬间出现大片未绘制的黑块")。</b>本窗口是
@@ -54,26 +54,22 @@ public partial class PluginSettingsDialogWindow : Window
     /// <code>
     /// Show()          → 620   (SizeToContent 先按 MaxHeight 上屏)
     /// Opened          → 620
-    /// 布局落定         → 108   (表单未展开时的残缺高度; 真机更高)
+    /// 布局落定         → 108   (只有 4 行设置项时的真实高度)
     /// </code></para>
     ///
-    /// <para><b>⚠ 为什么不用"手动 Measure 定尺寸" (第一版修法, 已废弃)。</b>
-    /// 试过在 <c>Show</c> 前 <c>Measure/Arrange</c> 内容根取 <c>DesiredSize</c> 再设死
-    /// <c>Height</c>。实测两处硬伤: ① 表单区由 <c>IsVisible="{Binding ShowForm}"</c> 驱动,
-    /// <c>Show</c> 前绑定尚未把表单展开出来, 探针读到 <c>ScrollViewer.IsVisible=False</c>、
-    /// <c>ItemsControl</c> 根本不存在 ⇒ 量出的高度 <b>严重偏小</b>; ② 据此设死 <c>Height</c>
-    /// 会把表单<b>裁掉</b> (用户报障"弹窗显示不完整": 取消/保存按钮浮在输入框上且被底边切掉)。
-    /// 结论: 内容由异步绑定驱动时, 手动测量不可靠。</para>
+    /// <para><b>修法: 让窗口第一次可见时尺寸就是最终值, 全程不触发 SetWindowPos。</b>
+    /// 两步 ——<br/>
+    /// ① <b>预加载</b>: <see cref="PluginSettingsDialogViewModel.LoadAsync"/> 只做一次后端请求
+    ///    与填充 <c>Rows</c>, <b>不触碰视觉树</b> (无 TopLevel/Screens/Dispatcher 依赖), 故可在
+    ///    <c>Show</c> 之前调用。<br/>
+    /// ② <b>预测量</b>: 布局在 <c>Show</c> 前不会自动跑, 但可以手动
+    ///    <c>Measure</c>/<c>Arrange</c> 内容根拿到真实 <c>DesiredSize</c>
+    ///    (探针实测: <c>Measure(520, ∞) -&gt; 172 x 108</c>, 与最终落定高度 <b>108 完全一致</b>)。
+    ///    据此显式设 <c>Height</c> 并清掉 <c>SizeToContent</c> —— 窗口首帧即终态尺寸。
+    ///    保留 <c>MaxHeight</c> 语义: 内容超高时取 620 封顶 (此时由 ScrollViewer 滚动)。</para>
     ///
-    /// <para><b>现在的修法: 把"尺寸落定"整段搬进窗口不可见的时期。</b>
-    /// 顺序 —— ① 预加载 (<c>LoadAsync</c> 不触碰视觉树, 可在 <c>Show</c> 前调用);
-    /// ② <c>Opacity = 0</c> (窗口级, 作用于整个窗口表面);
-    /// ③ <c>ShowDialog</c> —— 窗口真的出现了, 但用户看不到; 此时 <c>SizeToContent</c>
-    ///    与绑定会照常完成尺寸落定, <b>黑块与跳变全部发生在透明期</b>;
-    /// ④ 等一轮布局排空 + <c>CenterToOwner</c> 定位到最终尺寸对应的位置;
-    /// ⑤ <c>Opacity = 1</c> 显形 —— 此刻尺寸已稳定, 不再有任何 <c>SetWindowPos</c>。
-    /// 窗口级 <c>Opacity</c> 与 <see cref="DialogMotion"/> 的 body 级 <c>Opacity</c> 互不干扰,
-    /// 显形后 body 动效照常从起点播放入场。</para>
+    /// <para>代价仅是"弹窗晚一个请求往返出现" —— 本地回环请求通常 &lt;50ms, 用户不可感知,
+    /// 远优于必现的黑色撕裂。</para>
     ///
     /// <para>加载失败不阻断显示: VM 的 <c>LoadError</c> 会把原因呈现在窗口里 (与旧行为一致)。</para>
     /// </summary>
@@ -86,19 +82,52 @@ public partial class PluginSettingsDialogWindow : Window
             catch { /* 加载失败已由 VM 的 LoadError 呈现 */ }
         }
 
-        // 全程不可见地完成尺寸落定 (黑块/跳变都在透明期发生)
-        Opacity = 0;
-        var shown = ShowDialog(owner);
-
-        // 先让绑定与布局彻底排空 (SizeToContent 会在这里改到最终尺寸), 再定位与显形。
-        // 用连续两跳: 第一跳让布局生效, 第二跳确保尺寸变更带来的重定位也已完成。
-        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
-        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
-        Services.Win32.DialogPlacer.CenterToOwner(this);
-        Opacity = 1;
-
-        await shown;
+        SettleHeightBeforeShow();
+        await ShowDialog(owner);
     }
+
+    /// <summary>
+    /// 显示前把窗口高度量准并固化 —— 消掉 <c>SizeToContent</c> 上屏后的尺寸跳变
+    /// (黑块根因, 见 <see cref="ShowDialogWhenReadyAsync"/> 注释)。
+    ///
+    /// <para>算法: 让内容根以窗口宽度手动跑一次 Measure/Arrange, 取其 <c>DesiredSize.Height</c>
+    /// 作为目标高度, 再用 <c>MaxHeight</c> 封顶 (NaN 视为不限), 最后设 <c>Height</c> 并清空
+    /// <c>SizeToContent</c>。清理 <c>SizeToContent</c> 是必须的: 否则窗口显示后内容一旦再变,
+    /// 又会回到"改尺寸 ⇒ 新区域未绘制"的老路。</para>
+    ///
+    /// <para>无法测量时 (Content 非 Control / 宽度未定) 原样返回, 退化为旧行为 —— 宁可维持
+    /// 原观感也不要把窗口尺寸设成 0。</para>
+    /// </summary>
+    private void SettleHeightBeforeShow()
+    {
+        if (Content is not Control content)
+        {
+            return;
+        }
+
+        var width = double.IsNaN(Width) ? 0 : Width;
+        if (width <= 0)
+        {
+            return;
+        }
+
+        content.Measure(new Size(width, double.PositiveInfinity));
+        var desired = content.DesiredSize.Height;
+        if (desired <= 0 || double.IsNaN(desired) || double.IsInfinity(desired))
+        {
+            return;
+        }
+
+        var target = double.IsNaN(MaxHeight) ? desired : Math.Min(desired, MaxHeight);
+        content.Arrange(new Rect(0, 0, width, target));
+
+        Height = target;
+        SizeToContent = SizeToContent.Manual;
+    }
+
+    /// <summary>测试缝: 从测试工程触发"显示前定尺寸"(等价于 <see cref="ShowDialogWhenReadyAsync"/>
+    /// 在 <c>ShowDialog</c> 之前执行的那一步, 但不等后端)。</summary>
+    internal void SettleHeightBeforeShowForProbe() => SettleHeightBeforeShow();
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
 
