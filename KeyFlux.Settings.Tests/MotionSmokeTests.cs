@@ -283,6 +283,14 @@ public sealed class MotionSmokeTests
 
         foreach (var a in unrollAnims.Concat(rollAnims)) Assert.IsType<SineEaseInOut>(a.Easing);
 
+        // C# 侧曲线 (RevealHeightMotion.Ease, 驱动 MaxHeight) 必须与 XAML 侧 4 条动画同型同参:
+        // 两处曲线一旦漂移, 一摊一卷就是两套手感 (跨文件契约, 只锁类型不锁实例)。
+        Assert.IsType<SineEaseInOut>(RevealHeightMotion.Ease);
+        foreach (var a in unrollAnims.Concat(rollAnims))
+        {
+            Assert.Equal(RevealHeightMotion.Ease.Ease(0.37), a.Easing!.Ease(0.37), 9);
+        }
+
         // 内容落平: 摊开 = 抬起 → 归位; 卷起 = 归位 → 抬起 (同姿态反向走)
         var bodyUnroll = unrollAnims.Single(a => a.Children.Any(HasRenderTransform));
         var poses = bodyUnroll.Children.Select(RenderTransformOf).ToList();
@@ -306,19 +314,61 @@ public sealed class MotionSmokeTests
         Assert.InRange(half.M32, -2.999, -0.001);
 
         // 缓动对称性: SineEaseInOut 起止都柔, 一摊一卷共用它才有连贯手感
-        var e = SectionUnroll.Ease;
-        Assert.IsType<SineEaseInOut>(e);
+        var e = RevealHeightMotion.Ease;
         Assert.Equal(1d - e.Ease(0.25), e.Ease(0.75), 4);
 
         // 揭示动画的"到位保持": 0% → 90% (达终值) → 100% (保持终值)。末两帧等值 ⇒ 撤类把
         // MaxHeight 落回 ∞ 时残差恒为 0, 不会出现高度跳变 (2026-09-24 修闪烁的硬约束之二)。
-        var reveal = SectionUnroll.BuildRevealAnimation(0, 540, ClaudeMotion.Unroll);
+        var reveal = RevealHeightMotion.BuildAnimation(0, 540, ClaudeMotion.Unroll);
         Assert.Equal(ClaudeMotion.Unroll, reveal.Duration);
         Assert.Equal([0d, 0.9, 1d], reveal.Children.Select(k => k.Cue.CueValue).ToList());
         var heights = reveal.Children
             .Select(k => (double)k.Setters.OfType<Setter>()
                 .Single(s => s.Property == Layoutable.MaxHeightProperty).Value!).ToList();
         Assert.Equal([0d, 540d, 540d], heights);
+    }
+
+    /// <summary>
+    /// 跨文件契约: 状态机里的类名常量必须与 XAML 选择器里的锚点类逐字对应。
+    /// 动机 (模块化): 类名是 C# 与 XAML 之间**唯一**的接线方式, 却以裸字符串存在两处 ——
+    /// 改常量而忘了改选择器, 动画会静默失效 (类挂上了但没人监听), 界面上只剩"没有卷曲带"这种
+    /// 症状不明的缺陷。此处把两侧对账钉死。
+    /// </summary>
+    [AvaloniaFact]
+    public void SectionUnroll_Class_Names_Match_Xaml_Selectors()
+    {
+        var view = new SettingsPageView();
+        var selectorTexts = view.Styles.OfType<Style>()
+            .Select(s => s.Selector?.ToString() ?? string.Empty)
+            .Where(t => t.Length > 0)
+            .ToList();
+
+        foreach (var cls in new[] { SectionUnroll.UnrollClass, SectionUnroll.RollUpClass, "reveal", "curl", "sectionBody" })
+        {
+            Assert.True(selectorTexts.Any(t => t.Contains(cls, StringComparison.Ordinal)),
+                $"XAML 样式里找不到锚点类「{cls}」: 类名常量与选择器脱钩。已见选择器: {string.Join(" | ", selectorTexts)}");
+        }
+    }
+
+    /// <summary>
+    /// 输入校验 (安全面): 高度驱动只接受有限且落在合理区间的值 —— 非有限值会让 <c>Measure</c> 抛
+    /// (异常在属性变更回调里抛出会顺绑定系统外溢), 病态超大值会让 400ms 高度动画变成逐帧全页布局。
+    /// 另外确认"量不到"这一负路径返回 0 而不是抛。
+    /// </summary>
+    [AvaloniaFact]
+    public void RevealHeightMotion_Validation_Rejects_Unusable_Heights()
+    {
+        Assert.False(RevealHeightMotion.CanDrive(0));
+        Assert.False(RevealHeightMotion.CanDrive(1));
+        Assert.False(RevealHeightMotion.CanDrive(-5));
+        Assert.False(RevealHeightMotion.CanDrive(double.NaN));
+        Assert.False(RevealHeightMotion.CanDrive(double.PositiveInfinity));
+        Assert.False(RevealHeightMotion.CanDrive(20001)); // 病态超大: 拒绝动画、直落终态
+        Assert.True(RevealHeightMotion.CanDrive(540));
+        Assert.True(RevealHeightMotion.CanDrive(20000));
+
+        // 未挂树/无父级 ⇒ 量不到自然高 ⇒ 返回 0 (调用方据此走直落终态, 而不是抛)
+        Assert.Equal(0, RevealHeightMotion.MeasureNaturalHeight(new Border()));
     }
 
     private static bool HasRenderTransform(KeyFrame kf)
