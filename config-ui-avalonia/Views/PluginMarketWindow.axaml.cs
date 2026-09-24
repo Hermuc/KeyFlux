@@ -15,7 +15,7 @@ public partial class PluginMarketWindow : Window
     {
         InitializeComponent();
         ComponentFocusRing.Attach(this); // 焦点环最内层转移 (替代 :focus-within)
-        Services.Win32.DialogChrome.Apply(this, Services.DialogMotion.Profile.Large);
+        Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => UnsubscribeLanguage();
         Services.Win32.DialogPlacer.AttachAutoCenter(this); // 统一定位: 异步内容长高后自动重居中
         I18n.Changed += OnLanguageChanged;
