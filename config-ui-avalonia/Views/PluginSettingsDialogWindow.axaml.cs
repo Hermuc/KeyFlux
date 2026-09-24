@@ -41,63 +41,85 @@ public partial class PluginSettingsDialogWindow : Window
     }
 
     /// <summary>
-    /// 打开对话框 —— <b>先把设置项加载完, 再在"窗口整体透明"的状态下让尺寸落定, 最后显形</b>。
-    /// 调用方据此替代裸的 <c>ShowDialog(owner)</c>。
+    /// 显示前的准备 —— 预加载设置项, 并把窗口尺寸<b>在首次可见之前锚定</b>。
     ///
-    /// <para><b>⚠ 为什么不能"先 Show 再在 Opened 里 LoadAsync" (2026-09-24 用户报障
-    /// "打开弹窗一瞬间出现大片未绘制的黑块")。</b>本窗口是
-    /// <c>SizeToContent="Height"</c> + <c>MaxHeight="620"</c>, 设置项要等 <c>LoadAsync</c>
-    /// 走完一次后端往返才知道有几行。窗口一旦以某个尺寸上屏, 之后内容变化会让
-    /// <c>SizeToContent</c> 调 <c>SetWindowPos</c> 改窗口大小, 而<b>新暴露的区域在首帧绘制
-    /// 完成前是未绘制的窗口表面 (清屏色, 观感即黑块)</b>; <c>DialogPlacer</c> 再按新尺寸挪位,
-    /// 叠加成"跳一下"。headless 探针实测尺寸轨迹 (520 宽固定, 高度):
-    /// <code>
-    /// Show()          → 620   (SizeToContent 先按 MaxHeight 上屏)
-    /// Opened          → 620
-    /// 布局落定         → 108   (表单未展开时的残缺高度; 真机更高)
-    /// </code></para>
+    /// <para><b>⚠ 尺寸跳变/黑块的三种写法 (2026-09-24, 前两种均被用户报障证伪, 勿重蹈)。</b>
+    /// 本窗口是 <c>SizeToContent="Height"</c> + <c>MaxHeight="620"</c>, 设置项要等一次后端
+    /// 往返才知道有几行。窗口内容变化会让 <c>SizeToContent</c> 调 <c>SetWindowPos</c> 改尺寸,
+    /// 而<b>新暴露区域在首帧绘制完成前是未绘制的窗口表面 (观感即黑块)</b>。</para>
     ///
-    /// <para><b>⚠ 为什么不用"手动 Measure 定尺寸" (第一版修法, 已废弃)。</b>
-    /// 试过在 <c>Show</c> 前 <c>Measure/Arrange</c> 内容根取 <c>DesiredSize</c> 再设死
-    /// <c>Height</c>。实测两处硬伤: ① 表单区由 <c>IsVisible="{Binding ShowForm}"</c> 驱动,
-    /// <c>Show</c> 前绑定尚未把表单展开出来, 探针读到 <c>ScrollViewer.IsVisible=False</c>、
-    /// <c>ItemsControl</c> 根本不存在 ⇒ 量出的高度 <b>严重偏小</b>; ② 据此设死 <c>Height</c>
-    /// 会把表单<b>裁掉</b> (用户报障"弹窗显示不完整": 取消/保存按钮浮在输入框上且被底边切掉)。
-    /// 结论: 内容由异步绑定驱动时, 手动测量不可靠。</para>
+    /// <para><b>写法 A: "Show 前量一次, 设死 Height + 清 SizeToContent" —— 失败。</b>
+    /// 在 <c>Rows</c> 还空时量: 表单区由 <c>IsVisible="{Binding ShowForm}"</c> 驱动,
+    /// 此刻 <c>ScrollViewer.IsVisible=False</c>、<c>ItemsControl</c> 不存在 ⇒ 量到的是
+    /// "标题 + 空态"的残缺值, 设死后把表单<b>裁掉</b> (用户报障"显示不完整")。
+    /// 教训: <b>量得准的前提是数据先就绪</b>, 而不是 Measure 本身不可用。</para>
     ///
-    /// <para><b>现在的修法: 把"尺寸落定"整段搬进窗口不可见的时期。</b>
-    /// 顺序 —— ① 预加载 (<c>LoadAsync</c> 不触碰视觉树, 可在 <c>Show</c> 前调用);
-    /// ② <c>Opacity = 0</c> (窗口级, 作用于整个窗口表面);
-    /// ③ <c>ShowDialog</c> —— 窗口真的出现了, 但用户看不到; 此时 <c>SizeToContent</c>
-    ///    与绑定会照常完成尺寸落定, <b>黑块与跳变全部发生在透明期</b>;
-    /// ④ 等一轮布局排空 + <c>CenterToOwner</c> 定位到最终尺寸对应的位置;
-    /// ⑤ <c>Opacity = 1</c> 显形 —— 此刻尺寸已稳定, 不再有任何 <c>SetWindowPos</c>。
-    /// 窗口级 <c>Opacity</c> 与 <see cref="DialogMotion"/> 的 body 级 <c>Opacity</c> 互不干扰,
-    /// 显形后 body 动效照常从起点播放入场。</para>
+    /// <para><b>写法 B: "窗口级 Opacity=0 → ShowDialog → 等几跳 → Opacity=1" —— 失败。</b>
+    /// 实测更糟: 窗口全透明期间合成器不绘制内容, 恢复 <c>Opacity=1</c> 时布局/绘制尚未就绪
+    /// ⇒ 窗口以 <b>620 高的持续黑块</b>呈现 (用户报障, 比原先"一闪"更严重)。</para>
     ///
-    /// <para>加载失败不阻断显示: VM 的 <c>LoadError</c> 会把原因呈现在窗口里 (与旧行为一致)。</para>
+    /// <para><b>写法 C: "数据就绪后 Measure" —— 也不可行。</b>真机探针实测: <b>窗口首次
+    /// <c>Show</c> 之前, <c>ScrollViewer</c> 的内容 <c>ItemsControl</c> 从未进入视觉树</b>
+    /// (<c>IC=无</c>、<c>TextBox=0</c>), 无论 <c>Rows</c> 有几行, 量出的高恒为 <c>~107</c>。
+    /// 这是 Avalonia 窗口管线固有的 (项容器要等首个渲染周期), 显式
+    /// <c>ApplyTemplate</c>/<c>Arrange</c> 都无法绕过。</para>
+    ///
+    /// <para><b>写法 D (现行): "首帧即终帧" —— 不量高度, 把窗口锚定到 <c>MaxHeight</c>。</b>
+    /// 黑块的成因是"<b>首帧尺寸 ≠ 后续尺寸</b>": <c>SizeToContent</c> 让窗口以 <c>MaxHeight</c>
+    /// 建立表面, 布局落定后再 <c>SetWindowPos</c> 缩小, 新暴露区域未绘制。既然量不准真实高度,
+    /// 那就让<b>第一帧就已经是最终尺寸</b> —— 见 <see cref="DialogMotion.ReserveHeightBeforeShow"/>
+    /// (设 <c>Height = MaxHeight</c> + <c>SizeToContent = Manual</c>, 全程不透明)。
+    /// 真机实测: <c>SizeChanged: 0x0 -> 520x620</c> 单条, 无 620→130 塌缩。
+    /// 入场结束后 <see cref="DialogMotion"/> 再把 <c>SizeToContent</c> 还回去, 窗口收到真实高度
+    /// (那时内容已绘制完成, 收缩不产生黑块)。</para>
+    ///
+    /// <para>加载失败不阻断显示: VM 的 <c>LoadError</c> 会把原因呈现在窗口里, 此时表单为空、
+    /// 锚定照常进行 (黑块与数据无关)。</para>
     /// </summary>
-    public async Task ShowDialogWhenReadyAsync(Window owner)
+    /// <returns>是否成功锚定尺寸 (false = 退化为 SizeToContent 自然工作, 仍可显示)。</returns>
+    public async Task<bool> PrepareForShowBeforeShowAsync()
     {
         if (DataContext is PluginSettingsDialogViewModel vm)
         {
             Title = vm.DisplayName;
-            try { await vm.LoadAsync(); }
+            try
+            {
+                if (_loadStep is { } step)
+                {
+                    await step();
+                }
+                else
+                {
+                    await vm.LoadAsync();
+                }
+            }
             catch { /* 加载失败已由 VM 的 LoadError 呈现 */ }
         }
 
-        // 全程不可见地完成尺寸落定 (黑块/跳变都在透明期发生)
-        Opacity = 0;
-        var shown = ShowDialog(owner);
+        // 数据是否就绪不再影响本步: 现行方案不量内容高, 只把窗口锚定到 MaxHeight。
+        // 预加载仍保留 —— 让入场的弹簧动画期间内容就是最终形态, 不出现"动画中长高"。
+        return DialogMotion.ReserveHeightBeforeShow(this);
+    }
 
-        // 先让绑定与布局彻底排空 (SizeToContent 会在这里改到最终尺寸), 再定位与显形。
-        // 用连续两跳: 第一跳让布局生效, 第二跳确保尺寸变更带来的重定位也已完成。
-        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
-        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
-        Services.Win32.DialogPlacer.CenterToOwner(this);
-        Opacity = 1;
+    /// <summary>
+    /// 加载步骤 —— 抽成方法以便测试替换 (VM 是密封类, 无法用子类桩注入"数据已就绪"状态)。
+    /// 生产路径就是 <see cref="PluginSettingsDialogViewModel.LoadAsync"/>。
+    /// </summary>
+    private Func<Task>? _loadStep;
 
-        await shown;
+    /// <summary>
+    /// 替换加载步骤的测试缝 (public 而非 internal —— 真机探针工程不是 friend assembly,
+    /// 而"有数据时窗口首帧是否稳定"恰恰只能在真机验证, 不能只靠 headless)。
+    /// </summary>
+    public void SetLoadStepForProbe(Func<Task>? step) => _loadStep = step;
+
+    /// <summary>
+    /// 打开对话框 (完整流程) —— 先锚定尺寸再显示, 消除首帧与最终尺寸不一致造成的黑块。
+    /// </summary>
+    public async Task ShowDialogWhenReadyAsync(Window owner)
+    {
+        await PrepareForShowBeforeShowAsync();
+        await ShowDialog(owner);
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();

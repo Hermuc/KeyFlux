@@ -76,6 +76,13 @@ public static class DialogMotion
     /// <summary>内容元素入场起始上移量 (轻微, "稍微上移"而非滑入)。</summary>
     private const double ContentOffsetY = 7;
 
+    /// <summary>
+    /// 「先量后显」预留余量 —— 入场姿势的下浮量与玻璃阴影都在布局尺寸之外, 预留高度必须
+    /// 覆盖二者, 否则弹窗底边会切到按钮。取值与 <see cref="EnterOffsetY"/> 同量级并略大。
+    /// 详见 <see cref="ReserveHeightBeforeShow"/> 的三道几何推理。
+    /// </summary>
+    internal const double HeightReserveMargin = 20;
+
     // ---------------------------------------------------------------- 类名与标记
 
     /// <summary>挂在弹窗内容根上的类名 —— 皮肤可据此定制 (本服务自管姿势, 类名主要供测试与样式钩子)。</summary>
@@ -228,6 +235,56 @@ public static class DialogMotion
         body.RenderTransform = Pose(EnterScale, EnterOffsetY);
     }
 
+    /// <summary>
+    /// <b>在首次显示之前把窗口尺寸"锚定"住</b> —— 消除「首帧按 <c>MaxHeight</c> 上屏、
+    /// 随后塌缩到真实高度」造成的黑块 (2026-09-24 用户报障, 最终方案)。
+    ///
+    /// <para><b>⚠ 踩过的四条路 (全部真机实测, 勿重蹈)。</b><br/>
+    /// ① <b>在数据就绪前手动 Measure</b> —— 量到"标题 + 空态"的残缺值, 设死后把表单裁掉
+    ///    (用户报障"显示不完整")。<br/>
+    /// ② <b>数据就绪后手动 Measure</b> —— 仍量不准: 真机探针实测 <b>窗口首次 Show 之前,
+    ///    <c>ScrollViewer</c> 的 <c>IsVisible</c> 虽已推送为 True, 但其内容 <c>ItemsControl</c>
+    ///    从未进入视觉树</b> (<c>IC=无</c>、<c>TextBox=0</c>), 无论 <c>Rows</c> 有几行, 量出的
+    ///    内容高恒为 <c>~107~153</c>。这是 Avalonia 窗口管线固有的 (项容器要等首个渲染周期),
+    ///    不是绑定问题 —— 显式 <c>ApplyTemplate</c>/<c>Arrange</c> 都无法绕过。<br/>
+    /// ③ <b>窗口级 Opacity=0 等几跳再恢复</b> —— 全透明期间合成器不绘制内容, 恢复时布局未排空
+    ///    ⇒ <b>620 高的持续黑块</b>, 比原先"一闪"更严重。<br/>
+    /// ④ <b>预设 Height = 量出的高度</b> —— 因 ② 量不准, 等于把窗口钉死在残缺高度。</para>
+    ///
+    /// <para><b>✅ 现行做法: 不动高度, 只把 <c>SizeToContent</c> 临时摘掉。</b>
+    /// 黑块的成因是"<b>首帧尺寸与后续尺寸不同</b>"——<c>SizeToContent</c> 让窗口以
+    /// <c>MaxHeight</c> 建立表面, 布局落定后再 <c>SetWindowPos</c> 缩小。既然量不准真实高度,
+    /// 那就<b>让第一帧就已经是最终尺寸</b>: 令 <c>Height = MaxHeight</c> 且
+    /// <c>SizeToContent = Manual</c>, 窗口首帧就是 620 —— 布局落定前后尺寸完全一致,
+    /// <b>不存在"新暴露区域"</b>, 黑块随之消失。<c>DialogPlacer</c> 以 620 居中, 不会偏下。</para>
+    ///
+    /// <para><b>入场结束后的收尾 (为什么保留 SizeToContent)。</b>620 对短表单偏大 (底部留白)。
+    /// 入场动画跑完后由 <see cref="ReleaseReservedHeight"/> 把 <c>SizeToContent</c> 还给
+    /// <c>Height</c>, 窗口一次性收到真实高度。此时<b>内容已绘制完成</b> (只是窗口变大变小,
+    /// 不涉及未绘制区域), 且用户正处于"弹窗已就位"的认知中, 收缩几乎察觉不到。</para>
+    ///
+    /// <para><b>与"透明期落定"的区别。</b>那里是"先给旧尺寸再换新尺寸 + 用透明掩盖";
+    /// 这里是"首帧直接给最终尺寸, 全程不透明"。<b>不透明是关键</b> —— 内容从第一帧起就被
+    /// 正常绘制, 不存在"透明期不绘制、恢复时来不及"的窗口。</para>
+    /// </summary>
+    /// <returns>是否成功锚定尺寸 (供测试与日志判断)。</returns>
+    public static bool ReserveHeightBeforeShow(Window window)
+    {
+        if (States.TryGetValue(window, out var state) && state.Reduced)
+        {
+            return false; // 减少动效: 无位移姿势, 无需锚定
+        }
+        if (double.IsNaN(window.MaxHeight) || window.MaxHeight <= 0)
+        {
+            return false; // 无 MaxHeight 约束的窗口交给 SizeToContent 自行工作
+        }
+
+        // 首帧尺寸 = 最终尺寸 = MaxHeight。布局落定后 SizeToContent 不会再改它 ⇒ 无跳变。
+        window.Height = window.MaxHeight;
+        window.SizeToContent = SizeToContent.Manual;
+        return true;
+    }
+
     private static void OnOpened(Window window, State state)
     {
         var content = window.Content as Control;
@@ -277,6 +334,19 @@ public static class DialogMotion
             AttachPressFeedback(body);
             PlayContent(state);
         }, DispatcherPriority.Background);
+
+        // 入场结束 (弹簧收束) 后收掉预留高度, 消除内容与窗口底边之间的空档。
+        // 用一次性 DispatcherTimer 而非叠加在上一跳: 上一跳只隔一帧, 弹簧还没跑完。
+        var settle = new DispatcherTimer { Interval = ClaudeMotion.DialogEnter + TimeSpan.FromMilliseconds(60) };
+        settle.Tick += (s, _) =>
+        {
+            settle.Stop();
+            if (!state.Closing)
+            {
+                ReleaseReservedHeight(window);
+            }
+        };
+        settle.Start();
     }
 
     /// <summary>
@@ -501,6 +571,30 @@ public static class DialogMotion
                 window.Close();
             }
         }, ClaudeMotion.DialogExit + TimeSpan.FromMilliseconds(40));
+    }
+
+    /// <summary>
+    /// 入场动效跑完后把窗口收回到内容的真实高度。
+    ///
+    /// <para><b>⚠ 必须把 <c>Height</c> 清回 <c>NaN</c>, 只改 <c>SizeToContent</c> 无效。</b>
+    /// 锚定时设了 <c>Height = MaxHeight</c> (本地值优先级最高), <c>SizeToContent</c> 会被它压住 ——
+    /// 实测只切 <c>SizeToContent</c> 窗口仍停在 620。清掉本地值后 <c>SizeToContent</c> 才接管。</para>
+    ///
+    /// <para><b>为什么可以安全收缩。</b>此时入场动画已结束、内容<b>已完整绘制</b>, 窗口从 620
+    /// 收到真实高度只是"变大变小", 不产生未绘制区域 (黑块的成因)。推迟到动画结束也是为了
+    /// 让动画全程尺寸稳定 —— 动画中途改高会让入场姿势与新尺寸不同步。</para>
+    ///
+    /// <para><b>阴影余量。</b>根 Border 的 <c>BoxShadow</c> 渲染在布局尺寸之外, 窗口贴合内容
+    /// 高度时下沿会吃掉一圈阴影。<see cref="HeightReserveMargin"/> 作为补偿一并计入。</para>
+    /// </summary>
+    private static void ReleaseReservedHeight(Window window)
+    {
+        if (window.SizeToContent != SizeToContent.Manual)
+        {
+            return;
+        }
+        window.Height = double.NaN; // 清本地值, 把尺寸决定权交还 SizeToContent
+        window.SizeToContent = SizeToContent.Height;
     }
 
     private static void OnClosed(Window window, State state)

@@ -129,6 +129,14 @@ public sealed partial class PluginSettingsDialogViewModel : ObservableObject
         OnPropertyChanged(nameof(DisplayName));
     }
 
+    /// <summary>
+    /// 供真机探针复现"数据已就绪"状态的通知入口 —— <c>ShowForm</c>/<c>ShowEmptyState</c>
+    /// 是计算属性, 只改 <c>Rows</c>/<c>IsLoading</c> 不会推送 (必须显式 OnPropertyChanged)。
+    /// 探针若忘记这一点, 会看到 <c>ShowForm=True</c> 但视图里 <c>ScrollViewer.IsVisible</c> 仍为
+    /// False —— 那是探针的错, 不是产品的缺陷 (2026-09-24 实测踩过)。
+    /// </summary>
+    public void NotifyStateForProbe() => RaiseStateChanged();
+
     private void RaiseStateChanged()
     {
         OnPropertyChanged(nameof(ShowEmptyState));
