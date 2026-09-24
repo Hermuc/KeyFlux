@@ -310,19 +310,30 @@ public sealed class SkinContractTests
     }
 
     /// <summary>
-    /// 契约: 动效时长令牌 (<see cref="ClaudeMotion"/>, C# 强类型真源) 必须 ≤300ms
-    /// (生产率工具基线) 且按 按压 &lt; 悬停微交互 &lt; 标准过渡 &lt; 入场 递增。
+    /// 契约: 动效时长令牌 (<see cref="ClaudeMotion"/>, C# 强类型真源) 分两类锁界
+    /// (2026-09-24 拆分为两类, 起因 = 用户裁定分区体要"卷轴缓缓摊开", 240ms 级读不出体量感):
+    /// · 交互反馈类 Press/Micro/Standard/Enter — ≤300ms (生产率工具基线),
+    ///   且按 按压 &lt; 微交互 &lt; 标准过渡 &lt; 入场 递增;
+    /// · 内容揭示类 Roll/Unroll — ≤600ms (超过"可感知卡顿"线即不可接受), Roll &lt; Unroll,
+    ///   且不短于交互类长者 (揭示是低频大动作, 必须比交互反馈慢才读得出"缓缓")。
     /// </summary>
     [AvaloniaFact]
     public void Skin_Contract_Motion_Tokens_Are_Ordered_And_Bounded()
     {
-        var values = new[]
+        var interaction = new[]
         {
             ClaudeMotion.Press, ClaudeMotion.Micro, ClaudeMotion.Standard, ClaudeMotion.Enter,
         };
-        Assert.All(values, v => Assert.InRange(v.TotalMilliseconds, 10, 300));
-        Assert.True(values.SequenceEqual(values.OrderBy(v => v)),
-            $"动效时长令牌必须按 按压<微交互<标准<入场 递增, 实际: {string.Join(", ", values)}");
+        Assert.All(interaction, v => Assert.InRange(v.TotalMilliseconds, 10, 300));
+        Assert.True(interaction.SequenceEqual(interaction.OrderBy(v => v)),
+            $"交互反馈类令牌必须按 按压<微交互<标准<入场 递增, 实际: {string.Join(", ", interaction)}");
+
+        var reveal = new[] { ClaudeMotion.Roll, ClaudeMotion.Unroll };
+        Assert.All(reveal, v => Assert.InRange(v.TotalMilliseconds, 10, 600));
+        Assert.True(reveal.SequenceEqual(reveal.OrderBy(v => v)),
+            $"内容揭示类令牌必须按 卷起<摊开 递增, 实际: {string.Join(", ", reveal)}");
+        Assert.True(interaction.Max() <= reveal.Min(),
+            "内容揭示类令牌不得短于交互反馈类 (否则「缓缓摊开」的体量感无从谈起)");
     }
 
     /// <summary>

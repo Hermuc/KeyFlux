@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:KeyFlux.Settings.ViewModels"
              xmlns:controls="using:KeyFlux.Settings.Controls"
+             xmlns:services="using:KeyFlux.Settings.Services"
              xmlns:models="using:KeyFlux.Settings.Models"
              x:Class="KeyFlux.Settings.Views.SettingsPageView"
              x:Name="Root"
@@ -134,13 +135,14 @@
       <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
     </Style>
 
-    <!-- ===================== 动效 (2026-09-13) =====================
+    <!-- ===================== 动效 (2026-09-13; 2026-09-24 改分区体为"卷轴摊开") =====================
          .motion 类由 code-behind 挂载, 设环境变量 KEYFLUX_NO_MOTION=1 可整体关闭
          (默认播放; 不查系统 SPI 动画标志的裁定见 MotionPreferences):
-         下面全部入场/展开动画失配跳过, 界面保持即时刻。
-         原则: 只动 Opacity / RenderTransform / 画刷 (渲染层属性, 零布局参与);
-         卡片级联刻意只做淡入、不做位移 (RenderTransform 会进变换链, 位移值污染布局),
-         RenderTransform 会进变换链, 位移值会污染几何断言 -->
+         下面全部入场/摊开动画失配跳过, 界面保持即时刻。
+         原则: 入场/悬停/按压类只动 Opacity / RenderTransform / 画刷 (渲染层属性, 零布局参与);
+         **唯一例外 = 分区体摊开 (③)**: 按物理语义它必须真的占据空间, 用揭示层 MaxHeight
+         0→内容自然高 做真·布局增长 (机制/兜底/Viewbox 安全边界见 Services/SectionUnroll.cs)。
+         卡片级联仍刻意只做淡入、不做位移 (RenderTransform 会进变换链, 位移值会污染几何断言) -->
     <!-- ① 左列大卡: 页面挂载时随首批卡片淡入 -->
     <Style Selector="UserControl.motion Border.leftPanel">
       <Style.Animations>
@@ -237,19 +239,93 @@
         </Animation>
       </Style.Animations>
     </Style>
-    <!-- ③ 分区展开入场: Classes.open 随 ShowX 绑定同步翻转 (手风琴), 展开淡入 + 8px 上滑收位
-         (从标题下方"展开"的读感)。收起 = IsVisible 立即 false, 无退场 —— IsVisible 不可动画,
-         做退场需常驻占位, 违背手风琴布局语义, 保留瞬时收起 -->
-    <Style Selector="UserControl.motion StackPanel.sectionBody.open">
+    <!-- ③ 分区体「卷轴摊开」(2026-09-24 二版, 取代一版"淡入 + 8px 上滑")。
+         结构 (每张卡的分区体都由三层组成, 见各卡里的 Border.reveal 包裹):
+           Border.reveal  ← 揭示层: ClipToBounds, MaxHeight 0↔内容自然高 (状态机按实测高驱动,
+                            见 Services/SectionUnroll.cs); 内容被"纸张边缘"逐行露出来
+             └ Grid
+                 ├ StackPanel.sectionBody ← 内容: 落平微动 (位移/缩放, 见下)
+                 └ Border.curl          ← 前缘卷曲光影带: 贴在被揭示边缘 (VerticalAlignment=Bottom
+                                          免费跟随, 无需第二条动画追)
+         时序 (令牌真源 ClaudeMotion):
+           摊开 420ms SineEaseInOut  MaxHeight 0→H (90% 处即到位并保持到 100%, 见下注)
+                                                      |  内容 translateY -3px → 归位 (落平)
+                                                      |  卷曲带透明度 0 → .9 (28%) → .9 (82%) → 0
+           卷起 300ms SineEaseInOut  MaxHeight H→0  |  内容 归位 → translateY -3px
+                                                      |  卷曲带同上 (卷回去时纸边同样在卷)
+         为什么两向各挂一个类 (.unroll / .rollup): XAML 的 Animation 时长写死, 而两向时长不同
+         (420 / 300), 用两个类让两向各自取自己的令牌 —— 类名与状态机里的常量一一对应。
+         为什么内容落平用 XAML 而不是代码: 代码构造的 Animation 只对基元属性有动画器兜底,
+         RenderTransform 会抛 (实测 "No animator registered for the property RenderTransform"),
+         XAML 关键帧由编译器替 setter 注册动画器 ⇒ 位移/缩放必须留在 XAML。
+
+         ⚠ 落到"到位瞬间不闪"的两条硬约束 (2026-09-24 修):
+         ① 内容落平**只做位移, 不做缩放**。缩放会改变内容的实际高度, 而揭示层是按内容自然高
+            裁切的 ⇒ 动画末段会出现"内容已无更多可露、裁切边还在长"的空档, 归位那一刻补上,
+            就是一次可见跳动。位移不改变高度, 且幅度 3px 被 16px 卷曲带完全盖住。
+         ② 类动画与揭示动画是两个时钟, 撤类必须等满 令牌时长 + 余量 (状态机里做), 否则会把
+            卷曲带的收尾淡出掐断, 表现为到位瞬间一闪。 -->
+    <Style Selector="Border.reveal">
+      <Setter Property="ClipToBounds" Value="True" />
+      <Setter Property="MaxHeight" Value="0" />
+    </Style>
+    <!-- 卷曲光影带: 暖陶土色渐变 (纸面被顶起处的阴影) + 1px 纸边线; 不透明无笔画时是纯色, 故用渐变 -->
+    <Style Selector="Border.curl">
+      <Setter Property="Height" Value="16" />
+      <Setter Property="VerticalAlignment" Value="Bottom" />
+      <Setter Property="IsHitTestVisible" Value="False" />
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="BorderBrush" Value="#59c96442" />
+      <Setter Property="Background">
+        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+          <GradientStop Offset="0" Color="#00c96442" />
+          <GradientStop Offset="0.55" Color="#1ac96442" />
+          <GradientStop Offset="1" Color="#47c96442" />
+        </LinearGradientBrush>
+      </Setter>
+    </Style>
+    <!-- 摊开: 卷曲带淡入 → 保持 → 收尾淡出 (纸摊平后卷边消失) -->
+    <Style Selector="UserControl.motion Border.reveal.unroll Border.curl">
       <Style.Animations>
-        <Animation Duration="{x:Static vm:ClaudeMotion.Standard}" Easing="CubicEaseOut">
+        <Animation Duration="{x:Static vm:ClaudeMotion.Unroll}" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+          <KeyFrame Cue="28%"><Setter Property="Opacity" Value="0.9" /></KeyFrame>
+          <KeyFrame Cue="82%"><Setter Property="Opacity" Value="0.9" /></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="UserControl.motion Border.reveal.unroll StackPanel.sectionBody">
+      <Style.Animations>
+        <Animation Duration="{x:Static vm:ClaudeMotion.Unroll}" Easing="SineEaseInOut">
           <KeyFrame Cue="0%">
-            <Setter Property="Opacity" Value="0" />
-            <Setter Property="RenderTransform" Value="translateY(-8px)" />
+            <Setter Property="RenderTransform" Value="translateY(-3px)" />
           </KeyFrame>
           <KeyFrame Cue="100%">
-            <Setter Property="Opacity" Value="1" />
-            <Setter Property="RenderTransform" Value="none" />
+            <Setter Property="RenderTransform" Value="translateY(0px)" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <!-- 卷起: 同一套姿态反向走 (归位 → 压平); 卷曲带同上 (纸边一直卷着, 直到收完) -->
+    <Style Selector="UserControl.motion Border.reveal.rollup Border.curl">
+      <Style.Animations>
+        <Animation Duration="{x:Static vm:ClaudeMotion.Roll}" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+          <KeyFrame Cue="22%"><Setter Property="Opacity" Value="0.9" /></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0" /></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="UserControl.motion Border.reveal.rollup StackPanel.sectionBody">
+      <Style.Animations>
+        <Animation Duration="{x:Static vm:ClaudeMotion.Roll}" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%">
+            <Setter Property="RenderTransform" Value="translateY(0px)" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="RenderTransform" Value="translateY(-3px)" />
           </KeyFrame>
         </Animation>
       </Style.Animations>
@@ -422,17 +498,21 @@
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=781}"
                          FontWeight="SemiBold" />
             </Button>
-            <StackPanel Classes="sectionBody" Classes.open="{Binding ShowLanguageOption}"
-                        IsVisible="{Binding ShowLanguageOption}">
-              <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}"
-                        MinWidth="180">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:LanguageOption">
-                    <TextBlock Text="{Binding Title}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
+            <Border Classes="reveal" services:SectionUnroll.IsOpen="{Binding ShowLanguageOption}">
+              <Grid>
+                <StackPanel Classes="sectionBody">
+                  <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}"
+                            MinWidth="180">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:LanguageOption">
+                        <TextBlock Text="{Binding Title}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </StackPanel>
+                <Border Classes="curl" />
+              </Grid>
+            </Border>
           </StackPanel>
         </Border>
 
@@ -455,46 +535,50 @@
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1116}"
                          FontWeight="SemiBold" />
             </Button>
-            <StackPanel Classes="sectionBody" Classes.open="{Binding ShowCustomHotkeys}"
-                        IsVisible="{Binding ShowCustomHotkeys}" Spacing="8">
-              <Grid ColumnDefinitions="100,*,26" Margin="0,0,0,2">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=404}"
-                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-                <TextBlock Grid.Column="1" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1117}"
-                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+            <Border Classes="reveal" services:SectionUnroll.IsOpen="{Binding ShowCustomHotkeys}">
+              <Grid>
+                <StackPanel Classes="sectionBody" Spacing="8">
+                  <Grid ColumnDefinitions="100,*,26" Margin="0,0,0,2">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=404}"
+                               Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+                    <TextBlock Grid.Column="1" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1117}"
+                               Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+                  </Grid>
+                  <ItemsControl ItemsSource="{Binding CustomHotkeys.Rows}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:CustomHotkeyRowVm">
+                        <Grid ColumnDefinitions="100,*,26" Margin="0,1"
+                              Background="{Binding RowBackground}">
+                          <!-- 热键: 点击聚焦即选中该行, 失焦提交 (复刻 v-text-field @change) -->
+                          <TextBox Text="{Binding Hotkey}" LostFocus="OnCustomHotkeyLostFocus"
+                                   GotFocus="OnCustomHotkeyRowFocused"
+                                   Watermark="{Binding #Root.((vm:SettingsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=957}"
+                                   Padding="6,4" FontSize="13" />
+                          <!-- 功能 (原备注): 点击弹出动作编辑面板窗口 -->
+                          <Button Grid.Column="1" Click="OnCustomHotkeyCommentClick"
+                                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                  Background="Transparent" Padding="8,4">
+                            <TextBlock Text="{Binding Comment}" TextTrimming="CharacterEllipsis"
+                                       FontSize="13" />
+                          </Button>
+                          <!-- 删除: 背退格键形按钮 -->
+                          <Button Grid.Column="2" Theme="{StaticResource DeleteKey}"
+                                  Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).CustomHotkeys.RemoveRowCommand}"
+                                  CommandParameter="{Binding}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Button Command="{Binding CustomHotkeys.AddRowCommand}"
+                          HorizontalAlignment="Left" Margin="0,4,0,0"
+                          Background="Transparent" BorderBrush="{StaticResource ClaudeMutedGreenBrush}" BorderThickness="1"
+                          Foreground="{StaticResource ClaudeMutedGreenBrush}" Padding="12,5" CornerRadius="{StaticResource ClaudeRadiusMd}">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1118}" />
+                  </Button>
+                </StackPanel>
+                <Border Classes="curl" />
               </Grid>
-              <ItemsControl ItemsSource="{Binding CustomHotkeys.Rows}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:CustomHotkeyRowVm">
-                    <Grid ColumnDefinitions="100,*,26" Margin="0,1"
-                          Background="{Binding RowBackground}">
-                      <!-- 热键: 点击聚焦即选中该行, 失焦提交 (复刻 v-text-field @change) -->
-                      <TextBox Text="{Binding Hotkey}" LostFocus="OnCustomHotkeyLostFocus"
-                               GotFocus="OnCustomHotkeyRowFocused"
-                               Watermark="{Binding #Root.((vm:SettingsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=957}"
-                               Padding="6,4" FontSize="13" />
-                      <!-- 功能 (原备注): 点击弹出动作编辑面板窗口 -->
-                      <Button Grid.Column="1" Click="OnCustomHotkeyCommentClick"
-                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                              Background="Transparent" Padding="8,4">
-                        <TextBlock Text="{Binding Comment}" TextTrimming="CharacterEllipsis"
-                                   FontSize="13" />
-                      </Button>
-                      <!-- 删除: 背退格键形按钮 -->
-                      <Button Grid.Column="2" Theme="{StaticResource DeleteKey}"
-                              Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).CustomHotkeys.RemoveRowCommand}"
-                              CommandParameter="{Binding}" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <Button Command="{Binding CustomHotkeys.AddRowCommand}"
-                      HorizontalAlignment="Left" Margin="0,4,0,0"
-                      Background="Transparent" BorderBrush="{StaticResource ClaudeMutedGreenBrush}" BorderThickness="1"
-                      Foreground="{StaticResource ClaudeMutedGreenBrush}" Padding="12,5" CornerRadius="{StaticResource ClaudeRadiusMd}">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=1118}" />
-              </Button>
-            </StackPanel>
+            </Border>
           </StackPanel>
         </Border>
 
@@ -505,59 +589,63 @@
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=701}"
                          FontWeight="SemiBold" />
             </Button>
-            <StackPanel Classes="sectionBody" Classes.open="{Binding ShowMouseOption}"
-                        IsVisible="{Binding ShowMouseOption}" Spacing="8">
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=702}"
-                         FontWeight="SemiBold" Foreground="{StaticResource ClaudeTerracottaBrush}" />
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=703}" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1" Text="{Binding MouseOpts.Delay1}" />
-              </Grid>
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=704}" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1" Text="{Binding MouseOpts.Delay2}" />
-              </Grid>
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=705}" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1" Text="{Binding MouseOpts.FastSingle}" />
-              </Grid>
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=706}" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1" Text="{Binding MouseOpts.FastRepeat}" />
-              </Grid>
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=707}" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1" Text="{Binding MouseOpts.SlowSingle}" />
-              </Grid>
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=708}" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1" Text="{Binding MouseOpts.SlowRepeat}" />
-              </Grid>
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=709}" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1" Text="{Binding MouseOpts.TipSymbol}" />
-              </Grid>
-              <CheckBox IsChecked="{Binding MouseOpts.ShowTip}"
-                        Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=710}" />
-              <CheckBox IsChecked="{Binding MouseOpts.KeepMouseMode}"
-                        Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=711}" />
+            <Border Classes="reveal" services:SectionUnroll.IsOpen="{Binding ShowMouseOption}">
+              <Grid>
+                <StackPanel Classes="sectionBody" Spacing="8">
+                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=702}"
+                             FontWeight="SemiBold" Foreground="{StaticResource ClaudeTerracottaBrush}" />
+                  <Grid ColumnDefinitions="176,*">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=703}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding MouseOpts.Delay1}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="176,*">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=704}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding MouseOpts.Delay2}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="176,*">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=705}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding MouseOpts.FastSingle}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="176,*">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=706}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding MouseOpts.FastRepeat}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="176,*">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=707}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding MouseOpts.SlowSingle}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="176,*">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=708}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding MouseOpts.SlowRepeat}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="176,*">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=709}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding MouseOpts.TipSymbol}" />
+                  </Grid>
+                  <CheckBox IsChecked="{Binding MouseOpts.ShowTip}"
+                            Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=710}" />
+                  <CheckBox IsChecked="{Binding MouseOpts.KeepMouseMode}"
+                            Content="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=711}" />
 
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=712}"
-                         FontWeight="SemiBold" Foreground="{StaticResource ClaudeTerracottaBrush}" Margin="0,8,0,0" />
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=713}" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1" Text="{Binding ScrollOpts.Delay1}" />
+                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=712}"
+                             FontWeight="SemiBold" Foreground="{StaticResource ClaudeTerracottaBrush}" Margin="0,8,0,0" />
+                  <Grid ColumnDefinitions="176,*">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=713}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding ScrollOpts.Delay1}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="176,*">
+                    <!-- 714 文案约 230px 超 176 列宽, 加 Wrap 换行显示防溢出 -->
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=714}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <TextBox Grid.Column="1" Text="{Binding ScrollOpts.Delay2}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="176,*">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=715}" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Text="{Binding ScrollOpts.OnceLineCount}" />
+                  </Grid>
+                </StackPanel>
+                <Border Classes="curl" />
               </Grid>
-              <Grid ColumnDefinitions="176,*">
-                <!-- 714 文案约 230px 超 176 列宽, 加 Wrap 换行显示防溢出 -->
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=714}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                <TextBox Grid.Column="1" Text="{Binding ScrollOpts.Delay2}" />
-              </Grid>
-              <Grid ColumnDefinitions="176,*">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=715}" VerticalAlignment="Center" />
-                <TextBox Grid.Column="1" Text="{Binding ScrollOpts.OnceLineCount}" />
-              </Grid>
-            </StackPanel>
+            </Border>
           </StackPanel>
         </Border>
 
@@ -568,29 +656,33 @@
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=721}"
                          FontWeight="SemiBold" />
             </Button>
-            <StackPanel Classes="sectionBody" Classes.open="{Binding ShowKeyboardLayout}"
-                        IsVisible="{Binding ShowKeyboardLayout}" Spacing="10">
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=722}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-              <TextBox Text="{Binding Options.KeyboardLayout}" AcceptsReturn="True" AcceptsTab="True"
-                       MinHeight="180" FontFamily="Consolas,Courier New" FontSize="13"
-                       TextWrapping="Wrap" /><!-- Wrap: NoWrap 时右列锁宽下只能横向滚动查看, 换行后窄卡内完整可读且测量宽被钳制稳定 -->
-              <!-- WrapPanel: 窄卡放不下时换行而不是溢出卡片边框 (2026-09-23 用户报障);
-                   间距改用 Margin (WrapPanel 无 Spacing 属性) -->
-              <WrapPanel>
-                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="0" Padding="10,5" Margin="0,0,8,8">
-                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=723}" />
-                </Button>
-                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="74" Padding="10,5" Margin="0,0,8,8">
-                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=724}" />
-                </Button>
-                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="104" Padding="10,5" Margin="0,0,8,8">
-                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=725}" />
-                </Button>
-                <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="1" Padding="10,5" Margin="0,0,8,8">
-                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=726}" />
-                </Button>
-              </WrapPanel>
-            </StackPanel>
+            <Border Classes="reveal" services:SectionUnroll.IsOpen="{Binding ShowKeyboardLayout}">
+              <Grid>
+                <StackPanel Classes="sectionBody" Spacing="10">
+                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=722}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+                  <TextBox Text="{Binding Options.KeyboardLayout}" AcceptsReturn="True" AcceptsTab="True"
+                           MinHeight="180" FontFamily="Consolas,Courier New" FontSize="13"
+                           TextWrapping="Wrap" /><!-- Wrap: NoWrap 时右列锁宽下只能横向滚动查看, 换行后窄卡内完整可读且测量宽被钳制稳定 -->
+                  <!-- WrapPanel: 窄卡放不下时换行而不是溢出卡片边框 (2026-09-23 用户报障);
+                       间距改用 Margin (WrapPanel 无 Spacing 属性) -->
+                  <WrapPanel>
+                    <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="0" Padding="10,5" Margin="0,0,8,8">
+                      <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=723}" />
+                    </Button>
+                    <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="74" Padding="10,5" Margin="0,0,8,8">
+                      <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=724}" />
+                    </Button>
+                    <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="104" Padding="10,5" Margin="0,0,8,8">
+                      <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=725}" />
+                    </Button>
+                    <Button Command="{Binding ResetKeyboardLayoutCommand}" CommandParameter="1" Padding="10,5" Margin="0,0,8,8">
+                      <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=726}" />
+                    </Button>
+                  </WrapPanel>
+                </StackPanel>
+                <Border Classes="curl" />
+              </Grid>
+            </Border>
           </StackPanel>
         </Border>
 
@@ -601,22 +693,26 @@
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=761}"
                          FontWeight="SemiBold" />
             </Button>
-            <StackPanel Classes="sectionBody" Classes.open="{Binding ShowKeymapDelay}"
-                        IsVisible="{Binding ShowKeymapDelay}" Spacing="8">
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=762}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=763}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" TextWrapping="Wrap" />
-              <ItemsControl ItemsSource="{Binding CustomKeymaps}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="models:Keymap">
-                    <Grid ColumnDefinitions="176,96" Margin="0,2">
-                      <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                      <TextBox Grid.Column="1" Text="{Binding Delay, Converter={StaticResource IntStr}}"
-                               Padding="6,4" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
+            <Border Classes="reveal" services:SectionUnroll.IsOpen="{Binding ShowKeymapDelay}">
+              <Grid>
+                <StackPanel Classes="sectionBody" Spacing="8">
+                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=762}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=763}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" TextWrapping="Wrap" />
+                  <ItemsControl ItemsSource="{Binding CustomKeymaps}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="models:Keymap">
+                        <Grid ColumnDefinitions="176,96" Margin="0,2">
+                          <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <TextBox Grid.Column="1" Text="{Binding Delay, Converter={StaticResource IntStr}}"
+                                   Padding="6,4" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+                <Border Classes="curl" />
+              </Grid>
+            </Border>
           </StackPanel>
         </Border>
 
@@ -627,86 +723,90 @@
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=741}"
                          FontWeight="SemiBold" />
             </Button>
-            <StackPanel Classes="sectionBody" Classes.open="{Binding ShowSkin}"
-                        IsVisible="{Binding ShowSkin}" Spacing="10">
-              <ItemsControl ItemsSource="{Binding SkinFields}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:SkinFieldViewModel">
-                    <Grid ColumnDefinitions="220,*" Margin="0,2">
-                      <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                      <TextBox Grid.Column="1" Text="{Binding Value}" Padding="6,4" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+            <Border Classes="reveal" services:SectionUnroll.IsOpen="{Binding ShowSkin}">
+              <Grid>
+                <StackPanel Classes="sectionBody" Spacing="10">
+                  <ItemsControl ItemsSource="{Binding SkinFields}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:SkinFieldViewModel">
+                        <Grid ColumnDefinitions="220,*" Margin="0,2">
+                          <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <TextBox Grid.Column="1" Text="{Binding Value}" Padding="6,4" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
 
-              <!-- ── 字体小节 (2026-09-21 由独立卡片并入本卡) ──
-                   为何并入: 皮肤 18 键与字体同属「命令框外观」, 且**生效条件完全相同**
-                   (exe 只在进程启动时读一次 `CommandInputSkin.txt` 与 `font/font.ttf`,
-                   故两者都必须重启命令框进程才可见 —— 保存端已按此统一处理:
-                   任一段变化即结束命令框进程)。分成两张卡会让用户以为生效时机不同。
-                   细分隔线做视觉分组, 不做折叠 (本卡整体由 header 手风琴控制)。 -->
-              <Border Height="1" Margin="0,4"
-                      Background="{StaticResource ClaudeBorderCreamBrush}" />
+                  <!-- ── 字体小节 (2026-09-21 由独立卡片并入本卡) ──
+                       为何并入: 皮肤 18 键与字体同属「命令框外观」, 且**生效条件完全相同**
+                       (exe 只在进程启动时读一次 `CommandInputSkin.txt` 与 `font/font.ttf`,
+                       故两者都必须重启命令框进程才可见 —— 保存端已按此统一处理:
+                       任一段变化即结束命令框进程)。分成两张卡会让用户以为生效时机不同。
+                       细分隔线做视觉分组, 不做折叠 (本卡整体由 header 手风琴控制)。 -->
+                  <Border Height="1" Margin="0,4"
+                          Background="{StaticResource ClaudeBorderCreamBrush}" />
 
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2503}"
-                         FontWeight="SemiBold" FontSize="12"
-                         Foreground="{StaticResource ClaudeStoneGrayBrush}" />
-
-              <!-- ── 字重档位 (置于字体文件之前: 2026-09-21 起它真实生效, 是主要的粗细控制) ──
-                   exe 恒定请求 BOLD(700) 且元数据已精确匹配 ⇒ 无合成加粗, 笔画粗细 100% 由
-                   落地字形决定 ⇒ 换档 = 换一个预烘焙的变体文件 (见 §3.11.1「字重档位机制」)。
-                   出厂默认 = 半粗 (ConfigReadDefaults.DefaultCommandFontWeight)。 -->
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2508}"
-                           VerticalAlignment="Center" />
-                <ComboBox Grid.Column="1" MinWidth="140"
-                          ItemsSource="{Binding FontWeights}" SelectedItem="{Binding SelectedFontWeight}">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:FontWeightOption">
-                      <TextBlock Text="{Binding Title}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </Grid>
-
-              <!-- 字体文件: 只读文本框显示当前路径 + 「选择…」弹系统文件选择器 -->
-              <StackPanel Spacing="4">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2504}"
-                           Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-                <Grid ColumnDefinitions="*,Auto,Auto">
-                  <TextBox Text="{Binding CommandFontDisplay, Mode=OneWay}" IsReadOnly="True"
-                           Padding="6,4" ToolTip.Tip="{Binding CommandFontPath}" />
-                  <Button Grid.Column="1" Margin="6,0,0,0" Padding="10,5"
-                          Click="OnPickCommandFont"
-                          Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}"
-                          BorderThickness="1" Foreground="{StaticResource ClaudeTerracottaBrush}"
-                          CornerRadius="{StaticResource ClaudeRadiusMd}">
-                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2582}" />
-                  </Button>
-                  <Button Grid.Column="2" Margin="6,0,0,0" Padding="10,5"
-                          Command="{Binding ResetCommandFontCommand}"
-                          Background="Transparent" BorderBrush="{StaticResource ClaudeBorderCreamBrush}"
-                          BorderThickness="1" Foreground="{StaticResource ClaudeStoneGrayBrush}"
-                          CornerRadius="{StaticResource ClaudeRadiusMd}">
-                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2507}" />
-                  </Button>
-                </Grid>
-
-                <!-- 即时校验提示条: 只在用户主动选择字体后出现。
-                     存在意义 = 把生成端的"静默跳过"前移到选择时刻 —— 用户选中超限/不支持
-                     的文件时当场看到原因, 而不是"选了没反应"。
-                     Classes.err 随 CommandFontNoticeIsError 翻转 (同 sectionBody 的 Classes.open
-                     写法), 错误态用暖红描边, 提醒态用中性米色。 -->
-                <Border IsVisible="{Binding HasCommandFontNotice}"
-                        Classes="noticeBanner" Classes.err="{Binding CommandFontNoticeIsError}"
-                        CornerRadius="{StaticResource ClaudeRadiusMd}"
-                        Padding="8,6" BorderThickness="1">
-                  <TextBlock Text="{Binding CommandFontNotice}" TextWrapping="Wrap" FontSize="12"
+                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2503}"
+                             FontWeight="SemiBold" FontSize="12"
                              Foreground="{StaticResource ClaudeStoneGrayBrush}" />
-                </Border>
-              </StackPanel>
-            </StackPanel>
+
+                  <!-- ── 字重档位 (置于字体文件之前: 2026-09-21 起它真实生效, 是主要的粗细控制) ──
+                       exe 恒定请求 BOLD(700) 且元数据已精确匹配 ⇒ 无合成加粗, 笔画粗细 100% 由
+                       落地字形决定 ⇒ 换档 = 换一个预烘焙的变体文件 (见 §3.11.1「字重档位机制」)。
+                       出厂默认 = 半粗 (ConfigReadDefaults.DefaultCommandFontWeight)。 -->
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2508}"
+                               VerticalAlignment="Center" />
+                    <ComboBox Grid.Column="1" MinWidth="140"
+                              ItemsSource="{Binding FontWeights}" SelectedItem="{Binding SelectedFontWeight}">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FontWeightOption">
+                          <TextBlock Text="{Binding Title}" />
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </Grid>
+
+                  <!-- 字体文件: 只读文本框显示当前路径 + 「选择…」弹系统文件选择器 -->
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2504}"
+                               Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                      <TextBox Text="{Binding CommandFontDisplay, Mode=OneWay}" IsReadOnly="True"
+                               Padding="6,4" ToolTip.Tip="{Binding CommandFontPath}" />
+                      <Button Grid.Column="1" Margin="6,0,0,0" Padding="10,5"
+                              Click="OnPickCommandFont"
+                              Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}"
+                              BorderThickness="1" Foreground="{StaticResource ClaudeTerracottaBrush}"
+                              CornerRadius="{StaticResource ClaudeRadiusMd}">
+                        <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2582}" />
+                      </Button>
+                      <Button Grid.Column="2" Margin="6,0,0,0" Padding="10,5"
+                              Command="{Binding ResetCommandFontCommand}"
+                              Background="Transparent" BorderBrush="{StaticResource ClaudeBorderCreamBrush}"
+                              BorderThickness="1" Foreground="{StaticResource ClaudeStoneGrayBrush}"
+                              CornerRadius="{StaticResource ClaudeRadiusMd}">
+                        <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2507}" />
+                      </Button>
+                    </Grid>
+
+                    <!-- 即时校验提示条: 只在用户主动选择字体后出现。
+                         存在意义 = 把生成端的"静默跳过"前移到选择时刻 —— 用户选中超限/不支持
+                         的文件时当场看到原因, 而不是"选了没反应"。
+                         Classes.err 随 CommandFontNoticeIsError 翻转 (同 sectionBody 的 Classes.open
+                         写法), 错误态用暖红描边, 提醒态用中性米色。 -->
+                    <Border IsVisible="{Binding HasCommandFontNotice}"
+                            Classes="noticeBanner" Classes.err="{Binding CommandFontNoticeIsError}"
+                            CornerRadius="{StaticResource ClaudeRadiusMd}"
+                            Padding="8,6" BorderThickness="1">
+                      <TextBlock Text="{Binding CommandFontNotice}" TextWrapping="Wrap" FontSize="12"
+                                 Foreground="{StaticResource ClaudeStoneGrayBrush}" />
+                    </Border>
+                  </StackPanel>
+                </StackPanel>
+                <Border Classes="curl" />
+              </Grid>
+            </Border>
           </StackPanel>
         </Border>
 
@@ -717,34 +817,38 @@
               <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=907}"
                          FontWeight="SemiBold" />
             </Button>
-            <StackPanel Classes="sectionBody" Classes.open="{Binding ShowPathVariables}"
-                        IsVisible="{Binding ShowPathVariables}" Spacing="8">
-              <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=911}"
-                         Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" TextWrapping="Wrap" />
-              <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,4">
-                <TextBlock Width="112" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=909}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-                <TextBlock Width="192" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=910}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-              </StackPanel>
-              <ItemsControl ItemsSource="{Binding PathVariables}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="models:PathVariable">
-                    <Grid ColumnDefinitions="112,192,*" Margin="0,2">
-                      <TextBox Text="{Binding Name}" Margin="0,0,6,0" Padding="6,4" />
-                      <TextBox Grid.Column="1" Text="{Binding Value}" Padding="6,4" />
-                      <Button Grid.Column="2" Theme="{StaticResource DeleteKey}" Margin="6,0,0,0"
-                              Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).RemovePathVariableCommand}"
-                              CommandParameter="{Binding}"
-                              ToolTip.Tip="{Binding #Root.((vm:SettingsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=912}" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <Button Command="{Binding AddPathVariableCommand}"
-                      Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}" BorderThickness="1"
-                      Foreground="{StaticResource ClaudeTerracottaBrush}" Padding="8,5" CornerRadius="{StaticResource ClaudeRadiusMd}" HorizontalAlignment="Left">
-                <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=933}" />
-              </Button>
-            </StackPanel>
+            <Border Classes="reveal" services:SectionUnroll.IsOpen="{Binding ShowPathVariables}">
+              <Grid>
+                <StackPanel Classes="sectionBody" Spacing="8">
+                  <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=911}"
+                             Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" TextWrapping="Wrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,4">
+                    <TextBlock Width="112" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=909}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+                    <TextBlock Width="192" Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=910}" Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
+                  </StackPanel>
+                  <ItemsControl ItemsSource="{Binding PathVariables}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="models:PathVariable">
+                        <Grid ColumnDefinitions="112,192,*" Margin="0,2">
+                          <TextBox Text="{Binding Name}" Margin="0,0,6,0" Padding="6,4" />
+                          <TextBox Grid.Column="1" Text="{Binding Value}" Padding="6,4" />
+                          <Button Grid.Column="2" Theme="{StaticResource DeleteKey}" Margin="6,0,0,0"
+                                  Command="{Binding #Root.((vm:SettingsPageViewModel)DataContext).RemovePathVariableCommand}"
+                                  CommandParameter="{Binding}"
+                                  ToolTip.Tip="{Binding #Root.((vm:SettingsPageViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=912}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Button Command="{Binding AddPathVariableCommand}"
+                          Background="Transparent" BorderBrush="{StaticResource ClaudeTerracottaBrush}" BorderThickness="1"
+                          Foreground="{StaticResource ClaudeTerracottaBrush}" Padding="8,5" CornerRadius="{StaticResource ClaudeRadiusMd}" HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding LanguageTick, Converter={StaticResource Tr}, ConverterParameter=933}" />
+                  </Button>
+                </StackPanel>
+                <Border Classes="curl" />
+              </Grid>
+            </Border>
           </StackPanel>
         </Border>
 

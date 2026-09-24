@@ -297,13 +297,15 @@
          键名为皮肤契约锁定保留 (历史语义"衬线"已不存在, 勿据名猜测用途) -->
     <FontFamily x:Key="ClaudeSerifFont">avares://KeyFlux.Settings/Assets/Fonts/#MiSans, Microsoft YaHei UI</FontFamily>
 
-    <!-- ── 动效时长令牌 (4) ── C# 强类型真源 = ViewModels/ClaudeMotion.cs (与色值真源
+    <!-- ── 动效时长令牌 (6) ── C# 强类型真源 = ViewModels/ClaudeMotion.cs (与色值真源
          ClaudePalette.cs 同一先例; TimeSpan 无法作 XAML 资源元素实例化, AVLN2000 实测),
          XAML 一律经 {x:Static vm:ClaudeMotion.*} 引用。皮肤动效个性的单一真源:
          新皮肤按自身气质整组替换 (例: 高效皮肤整体减半)。
-         基线取生产率工具档 (design-motion-principles): 全部 ≤300ms;
-         频率闸门 = 按压/悬停 (高频) 最短, 页面级 (低频) 最长。
-         减少动效: 环境变量 KEYFLUX_NO_MOTION=1 时设置页整体跳过入场/展开 (MotionPreferences)。 -->
+         两类令牌 (SkinContractTests 分别锁界):
+           交互反馈类 Press/Micro/Standard/Enter ≤300ms, 递增序 = 按压<微交互<标准<入场;
+           内容揭示类 Roll/Unroll ≤600ms, 递增序 = 卷起<摊开 (2026-09-24 用户裁定「卷轴缓缓摊开」,
+           240ms 级读不出体量感, 故摊开 420ms; 两向共用 SineEaseInOut 保证节奏对称连贯)。
+         减少动效: 环境变量 KEYFLUX_NO_MOTION=1 时设置页整体跳过入场/摊开 (MotionPreferences)。 -->
 
 
   <!-- ToolTip 无动画直显 (2026-09-13 用户报: 淡入动画结束才显示完整文字)。覆盖 Fluent
