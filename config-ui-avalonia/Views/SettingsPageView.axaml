@@ -248,13 +248,13 @@
                  └ Border.curl          ← 前缘卷曲光影带: 贴在被揭示边缘 (VerticalAlignment=Bottom
                                           免费跟随, 无需第二条动画追)
          时序 (令牌真源 ClaudeMotion):
-           摊开 200ms SineEaseInOut  MaxHeight 0→H (90% 处即到位并保持到 100%, 见下注)
+           摊开 100ms SineEaseInOut  MaxHeight 0→H (90% 处即到位并保持到 100%, 见下注)
                                                       |  内容 translateY -3px → 归位 (落平)
                                                       |  卷曲带透明度 0 → .9 (28%) → .9 (82%) → 0
-           卷起 160ms SineEaseInOut  MaxHeight H→0  |  内容 归位 → translateY -3px
+           卷起 80ms SineEaseInOut  MaxHeight H→0  |  内容 归位 → translateY -3px
                                                       |  卷曲带同上 (卷回去时纸边同样在卷)
          为什么两向各挂一个类 (.unroll / .rollup): XAML 的 Animation 时长写死, 而两向时长不同
-         (200 / 160), 用两个类让两向各自取自己的令牌 —— 类名与状态机里的常量一一对应。
+         (100 / 80), 用两个类让两向各自取自己的令牌 —— 类名与状态机里的常量一一对应。
          为什么内容落平用 XAML 而不是代码: 代码构造的 Animation 只对基元属性有动画器兜底,
          RenderTransform 会抛 (实测 "No animator registered for the property RenderTransform"),
          XAML 关键帧由编译器替 setter 注册动画器 ⇒ 位移/缩放必须留在 XAML。

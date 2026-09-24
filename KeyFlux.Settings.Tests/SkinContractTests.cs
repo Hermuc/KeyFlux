@@ -311,12 +311,13 @@ public sealed class SkinContractTests
 
     /// <summary>
     /// 契约: 动效时长令牌 (<see cref="ClaudeMotion"/>, C# 强类型真源) 分两类锁界
-    /// (2026-09-24 拆分为两类; 同日用户两轮提速把揭示类压到 200/160ms):
+    /// (2026-09-24 拆分为两类; 同日用户多轮提速把揭示类压到 100/80ms):
     /// · 交互反馈类 Press/Micro/Standard/Enter — ≤300ms (生产率工具基线), 且类内按
     ///   按压 &lt; 微交互 &lt; 标准过渡 &lt; 入场 递增;
-    /// · 内容揭示类 Roll/Unroll — ≤600ms (超过"可感知卡顿"线即不可接受), 且类内 Roll &lt; Unroll。
-    /// 注意**跨类不再互相单调**: 提速后 Roll=160 落在 Micro 与 Standard 之间、Unroll=200 与
-    /// Standard 同值 —— 这是用户明确指定 200ms 的既定形态, 故契约只保证"类内有序 + 上限",
+    /// · 内容揭示类 Roll/Unroll — ≤600ms (超过"可感知卡顿"线即不可接受), 且类内 Roll &lt; Unroll
+    ///   (2026-09-24 用户点名把摊开压到 100ms ⇒ 卷起按 5:4 跟到 80ms, 类内序仍成立)。
+    /// 注意**跨类不再互相单调**: 提速后 Roll=80 与 Press 同值、Unroll=100 落在 Micro 与
+    /// Standard 之间 —— 这是用户明确指定 100ms 的既定形态, 故契约只保证"类内有序 + 上限",
     /// 不再约束"揭示必须比交互慢"。
     /// </summary>
     [AvaloniaFact]
