@@ -245,9 +245,16 @@ public sealed class DialogMotionTests
         {
             // ⚠ 顺序要求: OverlayMotion 标记必须先于 IsOpen 置位 —— 变化回调里会读它决定是否接管;
             //   且两者都必须在**挂树之后**设置 (挂树前 SetValue 的状态机拿不到视觉根)。
+            //
+            // ⚠ 本用例用「裸 Border 作浮层」验证的是**回退路径**: 没有 dlgPanel 后代时,
+            //   ResolveOverlayBody 退回宿主自身 ⇒ 动效挂在宿主上 (此处断言即锁这条兜底)。
+            //   真实结构下"动效必须落在内层可见弹层、不得改宿主"由
+            //   OverlayMotionContractTests 覆盖 (那才是用户报障的那个场景)。
             DialogMotion.SetOverlayMotion(overlay, true);
             Dispatcher.UIThread.RunJobs();
             DialogMotion.SetIsOpen(overlay, true);
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             Dispatcher.UIThread.RunJobs();
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             Dispatcher.UIThread.RunJobs();

@@ -96,6 +96,23 @@ public static class DialogMotion
     {
         public Control? Body;
         public bool Closing;
+
+        /// <summary>
+        /// 放行标志 —— 退场跑完后由延时回调置 true, 表示"这次 Closing 是最后一次, 直接放行"。
+        ///
+        /// <para><b>⚠ 为什么必须与 <see cref="Closing"/> 分开 (2026-09-24 用户报障"关闭按钮要按两次")。</b>
+        /// 早期实现用 <c>state.Closing = false</c> 表示放行, 但 <see cref="OnClosing"/> 的守卫是
+        /// <c>if (state.Closing) return;</c> —— <b>false 恰好不满足该守卫</b>, 于是放行触发的
+        /// 第二次 <c>Close()</c> 重入 <c>OnClosing</c> 时又走了完整拦截流程 (再播一次退场 +
+        /// 注册新计时器), 窗口依然不关; 直到用户第二次点关闭按钮, 此时 <c>Closing</c> 为 true
+        /// 才被守卫直接放行。用户感知即"要按两次"。语义上"正在退场"与"该放行了"本就是两件事,
+        /// 必须用两个标志表达。</para>
+        /// </summary>
+        public bool Forced;
+
+        /// <summary>页内浮层的宿主 (挂附加属性的透明入口层; 仅作钩子与主体查找起点)。</summary>
+        public Control? OverlayHost;
+
         public CancellationTokenSource? CloseCts;
         public int ContentPlayed;
         public bool Reduced;
@@ -129,12 +146,12 @@ public static class DialogMotion
     {
         IsOpenProperty.Changed.AddClassHandler<Visual>((v, e) =>
         {
-            if (!GetOverlayMotion(v) || v is not Control body)
+            if (!GetOverlayMotion(v) || v is not Control host)
             {
                 return;
             }
-            // 触发元素自身就是动效主体 (页内浮层的附加属性挂在浮层根上)
-            var state = GetOrCreateOverlayState(v, body);
+            // 宿主只是钩子 (附加属性挂在稳定声明的透明入口上); 动效主体在 PlayEnter 时解析
+            var state = GetOrCreateOverlayState(v, host);
             var open = e.NewValue is true;
             if (open)
             {
@@ -387,8 +404,19 @@ public static class DialogMotion
 
     private static void OnClosing(Window window, State state, WindowClosingEventArgs e)
     {
+        // 放行通道: 退场已跑完, 这次是真关 —— 必须放在 `Closing` 守卫之前,
+        // 否则又会被完整拦截一遍 (见 State.Forced 注释里的"要按两次"根因)
+        if (state.Forced)
+        {
+            state.CloseCts?.Cancel();
+            state.CloseCts = null;
+            return;
+        }
+
         if (state.Closing)
         {
+            // 退场中的重复 Close(): 拦下即可, 但不重复编排 (幂等)
+            e.Cancel = true;
             return;
         }
         state.Closing = true;
@@ -414,13 +442,13 @@ public static class DialogMotion
         state.CloseCts = cts;
         DispatcherTimer.RunOnce(() =>
         {
-            if (cts.IsCancellationRequested)
+            if (cts.IsCancellationRequested || state.Forced)
             {
                 return;
             }
             if (window.IsVisible)
             {
-                state.Closing = false; // 放行本次真关
+                state.Forced = true; // 放行下次 Closing (与 Closing 分开, 见 State.Forced 注释)
                 window.Close();
             }
         }, ClaudeMotion.DialogExit + TimeSpan.FromMilliseconds(40));
@@ -430,6 +458,8 @@ public static class DialogMotion
     {
         state.CloseCts?.Cancel();
         state.CloseCts = null;
+        state.Closing = false;
+        state.Forced = false;
         // 遮罩退场已在 OnClosing 编排 (此处窗口已不可见, 再触发会重复计数)
         States.Remove(window);
     }
@@ -439,42 +469,109 @@ public static class DialogMotion
     // 页内浮层状态: 弱持有 —— 浮层元素随页面销毁, 强引用字典会永久持有 (泄漏)
     private static readonly ConditionalWeakTable<Visual, State> OverlayStates = new();
 
-    private static State GetOrCreateOverlayState(Visual v, Control body)
+    private static State GetOrCreateOverlayState(Visual v, Control host)
     {
         var s = OverlayStates.GetOrCreateValue(v);
-        if (s.Body is null)
-        {
-            s.Reduced = !MotionPreferences.AnimationsEnabled;
-            s.Body = body;
-        }
+        s.Reduced = !MotionPreferences.AnimationsEnabled;
+        s.OverlayHost = host;
         return s;
+    }
+
+    /// <summary>
+    /// 页内浮层「动效主体类名」—— 标在浮层里<b>真正可见</b>的那层容器上。
+    /// </summary>
+    public const string PanelClass = "dlgPanel";
+
+    /// <summary>
+    /// 把动效主体从"挂附加属性的宿主"下沉到<b>真正可见的浮层容器</b>。
+    ///
+    /// <para><b>⚠ 为什么必须下沉 (2026-09-24 用户报障"单击卡片直接弹出、没有动画")。</b>
+    /// 页内浮层在 XAML 里是三明治结构: 最外层是<b>透明的输入拦截 Border</b> (Background=Transparent,
+    /// 占满整页、负责点外部关闭), 附加属性 <c>IsOpen</c>/<c>OverlayMotion</c> 挂在它身上;
+    /// 真正可见的弹层是内层 <c>ContentControl</c> 的数据模板根 (带背色/圆角/阴影的 Border)。
+    /// 早期实现直接拿宿主当动效主体, 于是弹簧缩放/淡入全作用在一个<b>完全透明的容器</b>上 ——
+    /// 动效确实在跑 (探针实测: 宿主 Opacity/Transform/Transitions 均已被改写), 但用户
+    /// <b>视觉上什么都看不到</b>, 感知就是"直接弹出、没有动画"。</para>
+    ///
+    /// <para>解法定为"服务自己向下找主体"而不是"把附加属性挂到内层" —— 内层模板由
+    /// 数据对象 (<c>AddMappingVm</c>) 驱动、随类型切换重建, 附加属性挂不稳; 而宿主是 XAML 里
+    /// 静态声明的, 天然稳定。故保留宿主的钩子职责, 主体改为向下查找: 优先找标了
+    /// <see cref="PanelClass"/> 的后代, 找不到则回退到"第一个可见且有渲染内容的子级"
+    /// (兜底: 至少不是透明容器), 再不行才退回宿主自身。</para>
+    /// </summary>
+    private static Control ResolveOverlayBody(Control host)
+    {
+        foreach (var c in host.GetVisualDescendants().OfType<Control>())
+        {
+            if (c.Classes.Contains(PanelClass))
+            {
+                return c;
+            }
+        }
+        // 兜底: 第一个"自身有视觉呈现"的后代 (排除透明/无子级的中间层)
+        foreach (var c in host.GetVisualDescendants().OfType<Control>())
+        {
+            if (c is Border { Child: not null } b && b.Background is not null)
+            {
+                return c;
+            }
+        }
+        return host;
     }
 
     private static void PlayEnter(State state)
     {
-        if (state.Reduced || state.Body is null)
+        if (state.Reduced || state.OverlayHost is null)
         {
             return;
         }
-        var body = state.Body;
-        body.Classes.Add(MotionClass);
-        body.Opacity = 0;
-        body.RenderTransform = Pose(EnterScale, EnterOffsetY);
+        var host = state.OverlayHost;
+
+        // ⚠ 主体解析必须推迟到 dispatcher 回调里 (不能在此刻同步解析): IsOpen 回调触发时
+        // <c>AddPanel</c> 刚被赋值, ContentControl 的数据模板还没展开 —— 此刻
+        // GetVisualDescendants() 拿不到内层 Border (探针实测: 同步期后代为 0, 布局后才有)。
+        // 故整段「解析主体 → 落起始姿势 → 推终值」都在提交后才做。
         Dispatcher.UIThread.Post(() =>
         {
-            body.Transitions = PoseTransitions(ClaudeMotion.DialogEnter, Spring());
-            body.Opacity = 1;
-            body.RenderTransform = Pose(1, 0);
-        }, DispatcherPriority.Background);
+            if (state.Reduced)
+            {
+                return;
+            }
+            var body = ResolveOverlayBody(host);
+            state.Body = body;
+
+            // 起始姿势 (先落起点, 再在下一跳推终值 —— 见下方注释)
+            body.Classes.Add(MotionClass);
+            body.Opacity = 0;
+            body.RenderTransform = Pose(EnterScale, EnterOffsetY);
+
+            // 起始姿势必须"先被渲染一帧"再推终值, 否则过渡没有起点可言 —— 页内浮层尤其敏感:
+            // 宿主 IsVisible 由绑定在同批属性变更里翻 true, 若终值也落在同一批, 起点姿势被合并掉,
+            // 观感就是"直接弹出、没有动画" (2026-09-24 用户报障)。
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (state.Reduced || !ReferenceEquals(state.Body, body))
+                {
+                    return;
+                }
+                body.Transitions = PoseTransitions(ClaudeMotion.DialogEnter, Spring());
+                body.Opacity = 1;
+                body.RenderTransform = Pose(1, 0);
+            }, DispatcherPriority.Background);
+        }, DispatcherPriority.Render);
     }
 
     private static void PlayOverlayExit(State state)
     {
-        if (state.Reduced || state.Body is null)
+        if (state.Reduced)
         {
             return;
         }
         var body = state.Body;
+        if (body is null)
+        {
+            return;
+        }
         body.Transitions = PoseTransitions(ClaudeMotion.DialogExit, new CubicEaseIn());
         body.Opacity = 0;
         body.RenderTransform = Pose(ExitScale, 0);
@@ -536,6 +633,35 @@ public static class DialogMotion
     /// <summary>测试缝: 读某窗口当前是否处于"退场中"。</summary>
     internal static bool IsClosing(Window window) =>
         States.TryGetValue(window, out var s) && s.Closing;
+
+    /// <summary>
+    /// 测试缝: 模拟"退场延时到期" —— 把该窗口推进到放行状态并真正 <c>Close()</c>。
+    ///
+    /// <para>存在的理由: 退场由 <see cref="DispatcherTimer"/> 驱动, 而 headless 宿主不推进
+    /// 真实时钟 (<c>ForceRenderTimerTick</c> 只走渲染计时器, 不驱动 dispatcher 计时器) ——
+    /// 探针实测 <c>Closing</c> 全程只触发 1 次, 延时回调永不执行。要让"关一次就真关"这条
+    /// 契约可测, 必须有办法绕过计时器直接走到回调体的等价位置。</para>
+    /// </summary>
+    internal static void ForceExitDelayElapsed(Window window)
+    {
+        if (!States.TryGetValue(window, out var s))
+        {
+            return;
+        }
+        if (s.CloseCts?.IsCancellationRequested != false || s.Forced)
+        {
+            return;
+        }
+        if (window.IsVisible)
+        {
+            s.Forced = true;
+            window.Close();
+        }
+    }
+
+    /// <summary>测试缝: 读窗口是否已被放行 (退场延时已到期)。</summary>
+    internal static bool IsForced(Window window) =>
+        States.TryGetValue(window, out var s) && s.Forced;
 
     /// <summary>测试缝: 读某窗口是否被本服务接管。</summary>
     internal static bool IsAttached(Window window) => States.ContainsKey(window);
