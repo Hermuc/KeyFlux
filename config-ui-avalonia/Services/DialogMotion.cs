@@ -169,20 +169,6 @@ public static class DialogMotion
     /// <summary>
     /// 挂载弹窗动效。<see cref="Win32.DialogChrome.Apply"/> 首行调用 (统一入口, 8 窗零改动接入)。
     /// 幂等: 同一窗口重复调用不重复挂。
-    ///
-    /// <para><b>⚠ 为什么起始姿势在这里落、而不是在 <c>Opened</c> 里落 (2026-09-24 用户报障
-    /// "打开弹窗时文字会闪一下")。</b>实测 (headless 探针 + 反编译双重确认):
-    /// <c>Window.ShowCore</c> 先把 <c>IsVisible = true</c>, 之后才由 <c>IsVisibleChanged</c> 触发
-    /// <c>Opened</c> —— 即 <b>Opened 触发时窗口已经以"不透明、原尺寸"渲染过至少一帧</b>
-    /// (探针读回: <c>IsVisible -> True</c> 先于 <c>Opened</c>, 且 Opened 进入时
-    /// <c>body.Opacity == 1</c>)。若在 Opened 里才设 <c>Opacity = 0</c>, 那一帧的完整内容已被
-    /// 用户看见 ⇒ 观感即"闪一下"。探针同时确认: <b>Show 之前设 Opacity=0, Opened 时读回仍是 0</b>
-    /// ⇒ 起始姿势必须在 Show 之前落好。</para>
-    ///
-    /// <para>时机可行性: <see cref="Win32.DialogChrome.Apply"/> 在弹窗构造期、紧跟
-    /// <c>InitializeComponent()</c> 之后调用, 此刻 <c>window.Content</c> 已由 XAML 就位
-    /// (探针实测: Content 非空、IsInitialized=true、VisualRoot=null)。VisualRoot 为 null 意味着
-    /// 此时设的只是本地值、不参与渲染 —— 零副作用。</para>
     /// </summary>
     public static void Attach(Window window)
     {
@@ -201,31 +187,9 @@ public static class DialogMotion
             return;
         }
 
-        // 构造期预落起始姿势: 必须在窗口首次可见【之前】就位, 否则首帧以不透明渲染 ⇒ 闪一下。
-        // 此时 Content 已就位但未挂视觉树, 设的是纯本地值。
-        PoseBeforeShow(window, state);
-
         window.Opened += (_, _) => OnOpened(window, state);
         window.Closing += (_, e) => OnClosing(window, state, e);
         window.Closed += (_, _) => OnClosed(window, state);
-    }
-
-    /// <summary>
-    /// 构造期预落起始姿势 (略小 + 略下 + 透明)。若此刻 <c>Content</c> 还没就位 (少数弹窗在
-    /// 构造后才设 Content), 则留到 <see cref="OnOpened"/> 兜底 —— 那种情况仍会闪一下,
-    /// 但属于"内容本就晚于窗口出现", 不是本动效引入的问题。
-    /// </summary>
-    private static void PoseBeforeShow(Window window, State state)
-    {
-        if (window.Content is not Control content)
-        {
-            return;
-        }
-        var body = EnsureGlassShell(content);
-        state.Body = body;
-        body.Classes.Add(MotionClass);
-        body.Opacity = 0;
-        body.RenderTransform = Pose(EnterScale, EnterOffsetY);
     }
 
     private static void OnOpened(Window window, State state)
@@ -236,13 +200,11 @@ public static class DialogMotion
             return;
         }
 
-        // 兜底: 构造期 Content 未就位时在这里补落姿势 (正常路径已在 Attach 落好, 此处幂等)
-        var body = state.Body ?? EnsureGlassShell(content);
+        var body = EnsureGlassShell(content);
         state.Body = body;
-        if (!body.Classes.Contains(MotionClass))
-        {
-            body.Classes.Add(MotionClass);
-        }
+        body.Classes.Add(MotionClass);
+
+        // 落起始姿势 (无过渡): 略小 + 略下 + 透明
         body.Opacity = 0;
         body.RenderTransform = Pose(EnterScale, EnterOffsetY);
 
@@ -465,11 +427,7 @@ public static class DialogMotion
         var body = state.Body;
         if (body is not null)
         {
-            // ⚠ includeOpacity: true 不可省 (2026-09-24 用户报障"内容先消失, 窗口再关闭")。
-            // 早期传默认 false ⇒ 过渡只含 RenderTransform, `Opacity = 0` 于是**瞬时生效**:
-            // 内容"啪"地消失, 而缩放还在跑 200ms, 再加 40ms pad 才关窗 ⇒ 用户看到一段
-            // 空窗口停留 (即"滞后一下")。透明度必须与缩放同一段过渡一起走完。
-            body.Transitions = PoseTransitions(ClaudeMotion.DialogExit, new CubicEaseIn(), includeOpacity: true);
+            body.Transitions = PoseTransitions(ClaudeMotion.DialogExit, new CubicEaseIn());
             body.Opacity = 0;
             body.RenderTransform = Pose(ExitScale, 0);
         }
@@ -614,11 +572,10 @@ public static class DialogMotion
         {
             return;
         }
-        body.Transitions = PoseTransitions(ClaudeMotion.DialogExit, new CubicEaseIn(), includeOpacity: true);
+        body.Transitions = PoseTransitions(ClaudeMotion.DialogExit, new CubicEaseIn());
         body.Opacity = 0;
         body.RenderTransform = Pose(ExitScale, 0);
         // 内容根由绑定控制 IsVisible, 退场后由绑定侧收起; 这里只负责过渡姿势
-        // (includeOpacity 同样不可省, 理由见 OnClosing 的同名注释)
     }
 
     // ---------------------------------------------------------------- 姿势与过渡
