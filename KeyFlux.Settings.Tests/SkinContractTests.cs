@@ -310,13 +310,16 @@ public sealed class SkinContractTests
     }
 
     /// <summary>
-    /// 契约: 动效时长令牌 (<see cref="ClaudeMotion"/>, C# 强类型真源) 分两类锁界
-    /// (2026-09-24 拆分为两类; 同日用户多轮提速把揭示类压到 100/100ms):
+    /// 契约: 动效时长令牌 (<see cref="ClaudeMotion"/>, C# 强类型真源) 分三类锁界
+    /// (2026-09-24 拆分为两类; 同日用户多轮提速把揭示类压到 100/100ms;
+    ///  同日新增弹窗类, 见下):
     /// · 交互反馈类 Press/Micro/Standard/Enter — ≤300ms (生产率工具基线), 且类内按
     ///   按压 &lt; 微交互 &lt; 标准过渡 &lt; 入场 递增;
     /// · 内容揭示类 Roll/Unroll — ≤600ms (超过"可感知卡顿"线即不可接受), 且类内 Roll ≤ Unroll
     ///   (2026-09-24 用户点名把摊开压到 100ms; 修「折叠比展开卡」时把卷起也提到 100ms ——
     ///   软件光栅下每帧成本相同, 收势更短只会帧更少更跳, 二者等长手感才一致)。
+    /// · 弹窗类 DialogExit/DialogEnter/DialogContent — ≤700ms, 类内退场 &lt; 入场 &lt; 分层内容。
+    ///   单开一类的理由: 苹果式入场是"弹簧惯性"长尾曲线, 天然长于交互类 300ms 上限。
     /// 注意**跨类不再互相单调**: 提速后 Roll=Unroll=100 落在 Micro(120) 与 Standard(200) 之间 —— 这是用户明确指定 100ms 的既定形态, 故契约只保证"类内有序 + 上限",
     /// 不再约束"揭示必须比交互慢"。
     /// </summary>
@@ -335,6 +338,34 @@ public sealed class SkinContractTests
         Assert.All(reveal, v => Assert.InRange(v.TotalMilliseconds, 10, 600));
         Assert.True(reveal.SequenceEqual(reveal.OrderBy(v => v)),
             $"内容揭示类令牌必须按 卷起<摊开 递增, 实际: {string.Join(", ", reveal)}");
+
+        // 弹窗类 (2026-09-24 苹果式弹窗动效批次): 单开一类, 不进交互反馈类 ——
+        // 苹果式入场是"先快后慢 + 弹簧惯性"的长尾曲线, 天然长于交互类 ≤300ms 上限。
+        // 类内有序语义: 退场 < **分层内容** < 入场 ——
+        //   · 退场最短 (用户要求"消失比出现更干脆迅速");
+        //   · 分层内容 (240) 短于容器入场 (360): 内容是在容器弹簧还没收完时就跑完的**子动作**,
+        //     它起步晚 (错峰 90ms) 但结束得早, 这样才有"容器先浮起、内容跟着沉降到位"的层次,
+        //     若内容比容器还长, 弹簧落定时内容仍在动, 观感会散;
+        //   · 入场最长 (含弹簧余韵)。
+        var dialog = new[]
+        {
+            ClaudeMotion.DialogExit, ClaudeMotion.DialogContent, ClaudeMotion.DialogEnter,
+        };
+        Assert.All(dialog, v => Assert.InRange(v.TotalMilliseconds, 10, 700));
+        Assert.True(dialog.SequenceEqual(dialog.OrderBy(v => v)),
+            $"弹窗类令牌必须按 退场<分层内容<入场 递增, 实际: {string.Join(", ", dialog)}");
+
+        // ⚠ 弹窗退场**允许**比入场短 (用户明确要求"消失比出现更干脆"), 与揭示类"刻意等长"
+        //   的结论并存: 揭示类无遮罩兜底, 收势快会暴露"画面突然空掉"; 弹窗有遮罩层承接
+        //   (遮罩稍晚淡出), 快退场是安全的。本断言把这条差异显式锁死, 防将来被"统一等长"改掉。
+        Assert.True(ClaudeMotion.DialogExit < ClaudeMotion.DialogEnter,
+            "弹窗退场必须快于入场 (用户要求: 消失比出现更干脆迅速)");
+
+        // 遮罩后撤必须晚于弹窗退场结束 —— 否则弹窗还在收缩、遮罩已撤, 画面会"空一瞬"
+        var scrimTail = ClaudeMotion.ScrimExitDelay + ClaudeMotion.ScrimFadeOut;
+        Assert.True(scrimTail > ClaudeMotion.DialogExit,
+            $"遮罩总后撤时长 ({scrimTail.TotalMilliseconds}ms) 必须长于弹窗退场 " +
+            $"({ClaudeMotion.DialogExit.TotalMilliseconds}ms), 否则画面会突然空掉");
     }
 
     /// <summary>

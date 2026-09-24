@@ -24,9 +24,16 @@ internal static class DialogChrome
     /// <summary>
     /// 构造函数中调用。句柄在构造期尚不存在, 实际着色延迟到 Opened 事件 (Show 之后)。
     /// 幂等: 每窗口实例至多生效一次。
+    ///
+    /// <para>本方法同时是<b>弹窗动效的唯一挂载点</b> (2026-09-24 苹果式弹窗批次): 首行
+    /// <see cref="DialogMotion.Attach"/> 接管入场/退场姿势与遮罩编排, 8 个弹窗经各自
+    /// code-behind 的同一行调用零改动接入。新增弹窗若走本方法即自动获得动效
+    /// (有守卫测试遍历全部弹窗断言这点)。</para>
     /// </summary>
     public static void Apply(Window window)
     {
+        DialogMotion.Attach(window);
+
         var caption = Color.Parse("#f5f4ed"); // Parchment 回退
         if (Application.Current?.TryGetResource(SurfaceBrushKey, out var value) == true
             && value is ISolidColorBrush brush)

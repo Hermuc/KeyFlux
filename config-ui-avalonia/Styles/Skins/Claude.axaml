@@ -221,6 +221,25 @@
            ③ 最大弥散 ≥ 静止档 (减重靠"摊薄"而非"收紧", 否则边缘生硬)。 -->
     <BoxShadows x:Key="ClaudeShadowCardDeep">0 2 10 0 #18000000, 0 10 26 0 #2b000000</BoxShadows>
 
+    <!-- ══════════ 弹窗玻璃材质 (2026-09-24 苹果式弹窗动效批次) ══════════
+         "像有重量的半透明玻璃从背景中浮到前景" —— 三件套:
+           · 连续圆角: ClaudeRadiusXl (16px), 比页面卡片 (14) 大一档, 强调"独立浮起的面板"
+           · 柔和阴影: ClaudeShadowDialog —— 三层结构 (贴边 / 中层 / 大弥散),
+             层数比 Card 家族多一层, 因为弹窗要压过"已被遮罩压暗 + 模糊"的背景才有浮起感
+           · 细微边缘高光: ClaudeDialogEdgeHighlight 画刷 —— 顶边一道浅暖白细线,
+             模拟玻璃上沿受光 (这是"玻璃感"最廉价也最有效的一笔)
+
+         ⚠ 层数契约 (同 Halo 家族的教训): 若将来给弹窗阴影加过渡动画, BoxShadowsAnimator
+           在 progress<1 时按 oldValue.Count 输出层数 ⇒ 参与动画的影档必须层数相等,
+           否则多出的层会在动画结束帧突然出现 (表现为"投影两段跳")。当前弹窗阴影不做过渡
+           (入场用 RenderTransform + Opacity, 不碰 BoxShadow), 故暂无此约束;
+           一旦引入, 请照 Halo 家族的做法用 alpha=0 占位层对齐。 -->
+    <BoxShadows x:Key="ClaudeShadowDialog">0 1 2 0 #1f000000, 0 8 20 0 #1c000000, 0 20 48 0 #24000000</BoxShadows>
+
+    <!-- 玻璃边缘高光: 顶边一道浅暖白 1px (受光面), 与实体描边叠加形成"厚度感"。
+         取 0.55 alpha 的暖白 —— 再高会读成"白边", 再低看不出。 -->
+    <SolidColorBrush x:Key="ClaudeDialogEdgeHighlightBrush" Color="#8cffffff" />
+
     <!-- ── 组件框悬停光圈 (ClaudeShadowCardHalo 家族, 2026-09-17 新增) ──
          需求: 三页 (选中动作 / 插件 / Settings) 的组件框悬停时周围显示"一圈光圈"。
          硬约束: **不能是纯线条**; 颜色优先橙色, 由实现方判断取最协调者。
@@ -745,6 +764,42 @@
   <!-- 焦点环须最后声明 (:pressed 与 :focus-visible 同写 BoxShadow, 靠声明顺序定胜负; 见 1.2 坑 2) -->
   <Style Selector="ListBox.claudeList ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+  </Style>
+
+  <!-- ══════════════════ 弹窗玻璃材质 (2026-09-24 苹果式弹窗动效批次) ══════════════════
+       .dlgMotion 由 Services/DialogMotion.cs 在弹窗 Opened 时挂到 window.Content 上
+       (不是包层 —— 包层会打破既有布局断言, 见该文件注释)。此处只负责"材质", 姿势
+       (缩放/位移/透明度) 由 C# 侧跨帧驱动, 两者互不干扰。
+
+       ▶ 为什么圆角/阴影写在皮肤而不是 DialogMotion.cs
+         材质是"皮肤个性"的一部分 (换肤应整体替换), 与色值/圆角/阴影令牌同源;
+         动效时序才是行为, 留在 C# 真源。这条分工与 ClaudeMotion/ClaudePalette 的既定先例一致。 -->
+  <!-- 弹窗玻璃材质 (圆角/阴影) **不在皮肤里设** —— 各弹窗内容根类型不一 (Border / DockPanel /
+       ScrollViewer 包裹的命名空间标签), 而 CornerRadius/BoxShadow 只有 Border 具备,
+       用选择器适配会碎成一堆类型分支。改由 Services/DialogMotion.cs 在代码侧统一设置:
+       若内容根是 Border 则直接设材质; 否则包一层 Border (仅这一情形, 且只在代码侧,
+       不改 XAML 结构)。此处只保留与类型无关的两条。 -->
+
+  <!-- 顶边受光高光 (细微边缘高光): 一条 1px 半透明暖白细线, 模拟玻璃上沿受光。
+       由 DialogMotion 在包层时同步注入, 类名 .dlgEdge 仅作标记与测试缝。 -->
+  <Style Selector="Border.dlgEdge">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{StaticResource ClaudeDialogEdgeHighlightBrush}" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Margin" Value="12,0,12,0" />
+    <Setter Property="CornerRadius" Value="1,1,0,0" />
+  </Style>
+
+  <!-- 按钮按下轻微缩放反馈 (用户要求"按钮按下有轻微缩放反馈")。
+       ⚠ 选择器限定 .dlgMotion 后代 ⇒ 只对**弹窗内**按钮生效, 不给主界面全部按钮引入
+       额外的 RenderTransform 通道 (主界面按钮已有各自的 :pressed 底色反馈)。
+       过渡由 Services/DialogMotion.cs 的 AttachPressFeedback 在代码侧挂
+       (XAML 里 Setter 内嵌 <Transitions> 复合元素需 x:SetterTargetType, 故不走 XAML)。 -->
+  <Style Selector="Button.dlgPress">
+    <Setter Property="RenderTransform" Value="scale(1)" />
+  </Style>
+  <Style Selector="Button.dlgPress:pressed">
+    <Setter Property="RenderTransform" Value="scale(0.97)" />
   </Style>
 
 </Styles>

@@ -106,7 +106,13 @@
   <Border Background="{StaticResource ClaudeParchmentBrush}"
           BorderBrush="{StaticResource ClaudeBorderWarmBrush}"
           BorderThickness="1">
-   <Grid RowDefinitions="36,*" ColumnDefinitions="264,*">
+   <!-- 顶层 Grid: 遮罩层 (scrim) 叠在主界面之上, 两者是兄弟而非父子 —— 这样遮罩淡入时
+        不需要改动主界面的层级结构, 且遮罩可独立于主界面做透明度动画。
+        背景缩放 (Scrim 驱动) 作用在 #appRoot 上, 遮罩本身不参与缩放 (否则遮罩跟着缩会露边)。 -->
+   <Grid>
+    <!-- 弹窗遮罩 + 背景容器: 弹窗打开时变暗 + 略微缩小 (Services/Scrim.cs 驱动) -->
+    <Border x:Name="appRoot" controls:Scrim.IsBackdrop="True">
+     <Grid RowDefinitions="36,*" ColumnDefinitions="264,*">
 
     <!-- ===================== 左侧导航 (复刻 NavigationDrawer.vue) ===================== -->
     <!-- RowSpan=2: 侧栏背景顶到窗口顶 (用户报: 上部有 36px 空隙); 头部 Margin 顶避让标题条 -->
@@ -236,6 +242,14 @@
         <Button Classes="caption captionClose" Content="✕" Click="OnCloseClick" />
       </StackPanel>
     </Grid>
+     </Grid>
+    </Border>
+
+    <!-- 弹窗遮罩: 覆盖整窗 (含侧栏 —— 变暗是全局的; 模糊仍只在内容区, 按既有 ModalBlur 设计)。
+         初始不可见且不吃输入, 由 Services/Scrim.cs 在弹窗开合时驱动。
+         IsHitTestVisible=true 是性能契约的前提: 遮罩拦截输入 ⇒ 背景静止 ⇒ 模糊不必逐帧重算。 -->
+    <Border x:Name="dlgScrim" IsVisible="False" IsHitTestVisible="False"
+            Background="#66000000" />
    </Grid>
   </Border>
 
