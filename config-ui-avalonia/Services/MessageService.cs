@@ -65,9 +65,6 @@ public sealed class DialogMessageService : IMessageService
                     CanResize = false,
                     Content = panel,
                 };
-                // 代码构造的提示窗不走 DialogChrome.Apply, 此处单独接弹窗动效
-                // (内容根是 DockPanel, 故无玻璃材质, 只有入场/退场姿势 + 遮罩编排)
-                KeyFlux.Settings.Services.DialogMotion.Attach(dialog);
                 okButton.Click += (_, _) => dialog.Close();
 
                 await dialog.ShowDialog(Owner);

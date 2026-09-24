@@ -419,13 +419,8 @@
       </StackPanel>
     </ScrollViewer>
 
-    <!-- 添加映射弹窗 (页内 overlay, 非独立窗口)
-         动效: DialogMotion.IsOpen 驱动入场姿势 (弹簧浮起 + 内容分层), 与独立弹窗同一套配方;
-         ⚠ 退场保持 IsVisible 绑定立即隐藏 (不托管可见性) —— 页内浮层有 ModalBlur 背景模糊
-         同步恢复, 观感已足够完整; 而托管 IsVisible 需要改 VM 的派生属性契约, 收益不值。 -->
-    <Border Grid.RowSpan="2" IsVisible="{Binding IsAddPanelOpen}" Background="Transparent"
-            services:DialogMotion.IsOpen="{Binding IsAddPanelOpen}"
-            services:DialogMotion.OverlayMotion="True">
+    <!-- 添加映射弹窗 (页内 overlay, 非独立窗口) -->
+    <Border Grid.RowSpan="2" IsVisible="{Binding IsAddPanelOpen}" Background="Transparent">
       <ContentControl Content="{Binding AddPanel}" HorizontalAlignment="Center" VerticalAlignment="Center">
         <ContentControl.DataTemplates>
           <DataTemplate x:DataType="vm:AddMappingVm">
