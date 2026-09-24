@@ -67,6 +67,9 @@ public sealed class DialogMessageService : IMessageService
                 };
                 okButton.Click += (_, _) => dialog.Close();
 
+                // 统一入口: 标题栏着色 + 弹窗动效 (高频档 —— 保存失败提示属短命弹窗)
+                Win32.DialogChrome.Apply(dialog, DialogMotion.Profile.Quick);
+
                 await dialog.ShowDialog(Owner);
             }
             catch (Exception)
