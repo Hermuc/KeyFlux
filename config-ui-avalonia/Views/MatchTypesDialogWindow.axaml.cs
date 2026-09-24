@@ -19,6 +19,6 @@ public partial class MatchTypesDialogWindow : Window
         Title = I18n.T("2519");
         // 弹窗必备: DWM 标题栏着色 + owner 背景模糊 (ModalBlur) 的统一入口。
         // 漏调会让本窗口标题栏保持冷白、且打开时没有背景模糊 (2026-09-15 实测缺陷)。
-        KeyFlux.Settings.Services.Win32.DialogChrome.Apply(this);
+        KeyFlux.Settings.Services.Win32.DialogChrome.Apply(this, Services.DialogMotion.Profile.Large);
     }
 }

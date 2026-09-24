@@ -420,7 +420,10 @@
     </ScrollViewer>
 
     <!-- 添加映射弹窗 (页内 overlay, 非独立窗口) -->
-    <Border Grid.RowSpan="2" IsVisible="{Binding IsAddPanelOpen}" Background="Transparent">
+    <!-- 页内浮层动效 (方案 B「生长」): 可见性交给 DialogMotion 状态机, 退场跑完才隐藏;
+         IsVisible=False 是兜底 —— DataContext 到位前绑定无值, 不能让整页透明层挡点击 -->
+    <Border Grid.RowSpan="2" IsVisible="False" Background="Transparent"
+            services:DialogMotion.IsOpen="{Binding IsAddPanelOpen}">
       <ContentControl Content="{Binding AddPanel}" HorizontalAlignment="Center" VerticalAlignment="Center">
         <ContentControl.DataTemplates>
           <DataTemplate x:DataType="vm:AddMappingVm">
