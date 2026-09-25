@@ -37,7 +37,8 @@ public static class MarkdownRenderer
     private static readonly FontFamily DocFontFamily =
         new FontFamily("avares://KeyFlux.Settings/Assets/Fonts/#MiSans, Microsoft YaHei UI");
 
-    /// <summary>链接文字基线补偿 (14px 字号实测校准): 段落行高 24 用 15.4, 列表行高 23 用 15.2。</summary>
+    /// <summary>链接文字基线补偿 (14px 字号实测): 段落行高 24 用 15.4, 列表行高 23 用 15.2。
+/// MiSans 全局换字体后复测链接-正文基线错位仅 0.38px (抗锯齿噪声级), 数值沿用。</summary>
     private const double ParagraphLinkOffset = 15.4;
     private const double ListLinkOffset = 15.2;
 
