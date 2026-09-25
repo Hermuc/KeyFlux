@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using KeyFlux.Settings.Services;
 using KeyFlux.Settings.ViewModels;
@@ -31,6 +32,13 @@ public partial class QuickSwitchDialogWindow : Window
     {
         if (DataContext is QuickSwitchDialogViewModel vm) vm.LanguageTick++;
         Title = I18n.T("2408");
+    }
+
+    /// <summary>标题行拖动移动窗口 (扩展客户区后无系统拖动区, 09-23 移除最小化/最大化钮)。</summary>
+    private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            BeginMoveDrag(e);
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();

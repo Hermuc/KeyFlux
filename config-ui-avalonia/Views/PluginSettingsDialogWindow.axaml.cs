@@ -1,5 +1,6 @@
 using System;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using KeyFlux.Settings.Services;
@@ -37,6 +38,13 @@ public partial class PluginSettingsDialogWindow : Window
     private void OnLanguageChanged()
     {
         if (DataContext is PluginSettingsDialogViewModel vm) vm.OnLanguageChanged();
+    }
+
+    /// <summary>标题行拖动移动窗口 (扩展客户区后无系统拖动区, 09-23 移除最小化/最大化钮)。</summary>
+    private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            BeginMoveDrag(e);
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
