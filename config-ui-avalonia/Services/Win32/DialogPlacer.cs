@@ -1,6 +1,8 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
 
 namespace KeyFlux.Settings.Services.Win32;
 
@@ -64,5 +66,34 @@ internal static class DialogPlacer
         void OnSizeChanged(object? sender, SizeChangedEventArgs e) => CenterToOwner(dialog);
         dialog.SizeChanged += OnSizeChanged;
         dialog.Closed += (_, _) => dialog.SizeChanged -= OnSizeChanged;
+    }
+
+    /// <summary>
+    /// 隐身开门 (2026-09-23 插件弹窗白/黑帧修复): 构造期调用, 把 Opacity 置 0 ——
+    /// 打开瞬间的「首帧未呈现」(整窗白) 与 SizeToContent 异步长高后的「未绘区」(黑)
+    /// 都发生在隐身期; 内容就绪后调 <see cref="RevealWhenRendered"/> 显形。
+    /// 三处 placer 弹窗 (插件设置/市场/QuickSwitch) 共用。
+    /// </summary>
+    public static void HideUntilRevealed(Window dialog) => dialog.Opacity = 0;
+
+    /// <summary>
+    /// 渲染排空后显形 (配 <see cref="HideUntilRevealed"/>): 两轮 Render 优先级排空 +
+    /// 30ms 缓冲 (≈2 帧), 让首帧与长高后的未绘区完成呈现再整体显形, 用户全程看不到白/黑帧。
+    /// </summary>
+    /// <param name="dialog">目标窗口。</param>
+    /// <param name="gate">可选的异步内容加载任务 (如市场目录拉取) —— 显形至多等它
+    /// capMs 毫秒 (网络差时带着加载态显形, 不让窗口无限隐身); 传 null 只等渲染排空。</param>
+    /// <param name="capMs">gate 的最长隐身等待 (默认 1500ms)。</param>
+    /// <param name="graceMs">渲染排空后的额外缓冲 (默认 30ms ≈ 2 帧)。</param>
+    public static async Task RevealWhenRendered(Window dialog, Task? gate = null, int capMs = 1500, int graceMs = 30)
+    {
+        if (gate is not null)
+        {
+            await Task.WhenAny(gate, Task.Delay(capMs));
+        }
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+        await Task.Delay(graceMs);
+        dialog.Opacity = 1;
     }
 }

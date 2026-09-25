@@ -23,6 +23,8 @@ public partial class QuickSwitchDialogWindow : Window
         TitleBarIconSuppressor.Attach(this);
         Title = I18n.T("2408");
         Services.Win32.DialogPlacer.AttachAutoCenter(this); // 统一定位: 异步内容长高后自动重居中
+        Services.Win32.DialogPlacer.HideUntilRevealed(this); // 隐身开门: 挡住打开瞬间的白帧 (09-23)
+        Opened += async (_, _) => await Services.Win32.DialogPlacer.RevealWhenRendered(this);
         I18n.Changed += OnLanguageChanged;
         Closed += (_, _) => I18n.Changed -= OnLanguageChanged;
     }

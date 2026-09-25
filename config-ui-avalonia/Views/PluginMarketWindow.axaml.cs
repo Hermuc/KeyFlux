@@ -11,6 +11,9 @@ namespace KeyFlux.Settings.Views;
 /// </summary>
 public partial class PluginMarketWindow : Window
 {
+    /// <summary>目录拉取任务 (OnDataContextChanged 启动; Opened 显形时作 gate, 网络差最多隐身 1.5s)。</summary>
+    private Task? _loadTask;
+
     public PluginMarketWindow()
     {
         InitializeComponent();
@@ -18,6 +21,7 @@ public partial class PluginMarketWindow : Window
         Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => UnsubscribeLanguage();
         Services.Win32.DialogPlacer.AttachAutoCenter(this); // 统一定位: 异步内容长高后自动重居中
+        Services.Win32.DialogPlacer.HideUntilRevealed(this); // 隐身开门: 挡住打开瞬间的白帧与目录长高后的黑帧 (09-23)
         I18n.Changed += OnLanguageChanged;
     }
 
@@ -38,8 +42,15 @@ public partial class PluginMarketWindow : Window
         base.OnDataContextChanged(e);
         if (DataContext is PluginMarketViewModel vm)
         {
-            _ = vm.LoadAsync();
+            _loadTask = vm.LoadAsync();
         }
+    }
+
+    /// <summary>Opened 显形: 至多等目录拉取 1.5s (网络差时带着加载态显形, 不无限隐身)。</summary>
+    protected override async void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        await Services.Win32.DialogPlacer.RevealWhenRendered(this, _loadTask);
     }
 
     private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();
