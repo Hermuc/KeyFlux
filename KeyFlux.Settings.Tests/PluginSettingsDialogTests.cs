@@ -67,10 +67,11 @@ public sealed class PluginSettingsDialogTests
         Assert.Equal("es.exe", byKey["esPath"].Filter);
 
         // 条数上限: number + 闭区间 (界面据此显示区间徽标, 后端据此校验)
+        // 2026-09-25 上限 100 → 300 (用户要求下拉能展示更多; 列表 30 行可见 + 滚动)
         Assert.Equal(PluginSettingTypes.Number, byKey["limit"].Type);
         Assert.Equal("20", byKey["limit"].Default);
         Assert.Equal(1, byKey["limit"].Min);
-        Assert.Equal(100, byKey["limit"].Max);
+        Assert.Equal(300, byKey["limit"].Max);
 
         // 每个键都要有中英标签与提示 —— 界面渲染直接吃这四个字段
         foreach (var s in m.Settings)

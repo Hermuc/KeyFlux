@@ -142,11 +142,12 @@ public sealed class EditorCardHaloTests
     }
 
     /// <summary>
-    /// 未配置档不亮描边 (2026-09-25 用户要求): 动作类型下拉处于「未配置」档
-    /// (未绑定动作/类型0) 时, 悬停不出现橙色线条; 配置后 (类型1) 悬停恢复正常描边。
+    /// 禁用态不亮描边 (2026-09-25 用户要求, 同日二次细化): 未选键时类型下拉深灰禁用,
+    /// 悬停不出现橙色线条; 已选键后 (无论类型是「未配置」还是已配置) 下拉框白色可点,
+    /// 悬停照常亮描边 —— 与其他子选项框一致。
     /// </summary>
     [AvaloniaFact]
-    public void EditorPanel_Hover_Unconfigured_Type_Combo_Shows_No_Ring()
+    public void EditorPanel_Hover_Disabled_Type_Combo_Shows_No_Ring()
     {
         var main = new MainViewModel(new BackendSessionOptions());
         main.Config = ConfigReadDefaults.Apply(new Config());
@@ -164,8 +165,8 @@ public sealed class EditorCardHaloTests
         var typeWrapper = panel.GetVisualDescendants().OfType<Border>()
             .Last(b => b.Classes.Contains("comboHalo"));
 
-        // ① 未配置档 (未绑定动作 → IsTypeUnconfigured=true): 悬停不亮描边
-        Assert.True(core.Editor.IsTypeUnconfigured, "未绑定动作应为未配置档");
+        // ① 禁用态 (未绑定动作 → IsTypeDisabled=true, 深灰不可点): 悬停不亮描边
+        Assert.True(core.Editor.IsTypeDisabled, "未绑定动作时类型下拉应为禁用态");
         var pt = Avalonia.VisualExtensions.TranslatePoint(
             typeCombo, new Point(typeCombo.Bounds.Width / 2, typeCombo.Bounds.Height / 2), window)!.Value;
         window.MouseMove(pt);
@@ -173,10 +174,19 @@ public sealed class EditorCardHaloTests
         Assert.True(typeWrapper.IsPointerOver, "悬停应命中类型下拉框");
         Assert.Equal(Colors.Transparent, ((ISolidColorBrush)typeWrapper.BorderBrush!).Color);
 
-        // ② 配置后 (类型1): 悬停恢复橙色描边
+        // ② 已选键且配置后 (类型1): 悬停恢复橙色描边
         core.Editor.BindTo(new Models.Action { WindowGroupId = 0, TypeId = 1 });
         Dispatcher.UIThread.RunJobs();
-        Assert.False(core.Editor.IsTypeUnconfigured, "绑定类型1后应非未配置档");
+        Assert.False(core.Editor.IsTypeDisabled, "绑定类型1后应非禁用态");
+        window.MouseMove(pt);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)typeWrapper.BorderBrush!).Color);
+
+        // ③ 已选键但类型仍为「未配置」(类型0, 白/可点): 悬停照常亮描边
+        //    (2026-09-25 用户二次细化: 只有深灰禁用态才让位)
+        core.Editor.BindTo(new Models.Action { WindowGroupId = 0, TypeId = 0 });
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(core.Editor.IsTypeDisabled, "已选键后应非禁用态 (即使类型为未配置)");
         window.MouseMove(pt);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)typeWrapper.BorderBrush!).Color);

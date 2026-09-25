@@ -76,10 +76,11 @@ public sealed partial class ActionEditorViewModel : ObservableObject
     private bool _hasHotkey;
 
     /// <summary>
-    /// 动作类型下拉是否处于「未配置」档 (未选键 / 未绑定动作 / 类型0) ——
-    /// 供 comboHalo 悬停描边让位判定 (2026-09-25 用户要求: 未配置态悬停不亮橙圈)。
+    /// 动作类型下拉是否处于禁用态 (未选键 → 深灰不可点) —— 供 comboHalo 悬停描边让位判定。
+    /// 2026-09-25 用户二次细化: 仅禁用态悬停不亮橙圈; 已选键但类型为「未配置」时下拉框
+    /// 白/可点, 悬停照常亮圈 (与其他子选项框一致)。
     /// </summary>
-    public bool IsTypeUnconfigured => SelectedType is null || SelectedType.Id == 0 || !HasHotkey;
+    public bool IsTypeDisabled => !HasHotkey;
 
     /// <summary>语言切换刻度: 面板内 ConverterParameter 文案 (watermark/标签) 重算。</summary>
     [ObservableProperty]
@@ -115,7 +116,6 @@ public sealed partial class ActionEditorViewModel : ObservableObject
     /// </summary>
     partial void OnSelectedTypeChanged(ActionTypeOption? value)
     {
-        OnPropertyChanged(nameof(IsTypeUnconfigured)); // 先于 early-return: 任何切换都要刷新让位判定
         if (_suppressTypeChange || value is null || CurrentAction is null) return;
         var a = CurrentAction;
         if (a.TypeId == value.Id) return;
@@ -146,7 +146,7 @@ public sealed partial class ActionEditorViewModel : ObservableObject
         _core.NotifyDataChanged();
     }
 
-    partial void OnHasHotkeyChanged(bool value) => OnPropertyChanged(nameof(IsTypeUnconfigured));
+    partial void OnHasHotkeyChanged(bool value) => OnPropertyChanged(nameof(IsTypeDisabled));
 
     /// <summary>绑定到解析出的动作 (来自 core 的选中态变化)。</summary>
     public void BindTo(Models.Action? action)

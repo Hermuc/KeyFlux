@@ -114,9 +114,10 @@
                     SelectedItem="{Binding SelectedGroup}"
                     HorizontalAlignment="Stretch" />
         </Border>
-        <!-- haloOff = 动作类型处于「未配置」档 (VM.IsTypeUnconfigured): 悬停不亮描边
-             (用户要求; 类绑定随选中态实时切换)。⚠ 让位样式须排在 comboHalo:pointerover 之后 -->
-        <Border Grid.Column="1" Classes="comboHalo" Classes.haloOff="{Binding IsTypeUnconfigured}">
+        <!-- haloOff = 动作类型下拉处于禁用态 (未选键, VM.IsTypeDisabled): 悬停不亮描边
+             (2026-09-25 用户二次细化: 仅深灰不可点态让位; 白色可点态照常亮圈)。
+             类绑定随 HasHotkey 实时切换。⚠ 让位样式须排在 comboHalo:pointerover 之后 -->
+        <Border Grid.Column="1" Classes="comboHalo" Classes.haloOff="{Binding IsTypeDisabled}">
           <ComboBox Classes="claudeInput"
                     ItemsSource="{Binding TypeOptions}"
                     SelectedItem="{Binding SelectedType}"
