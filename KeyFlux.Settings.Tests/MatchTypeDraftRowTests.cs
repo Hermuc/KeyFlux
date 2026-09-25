@@ -16,13 +16,13 @@ namespace KeyFlux.Settings.Tests;
 [Collection("I18nSerial")]
 public sealed class MatchTypeDraftRowTests
 {
-    private static MatchTypesPageViewModel CreateVm()
+    private static MatchTypesDialogViewModel CreateVm()
     {
         var main = new MainViewModel(new BackendSessionOptions())
         {
             Config = new Config { Options = new Options() },
         };
-        return new MatchTypesPageViewModel(main);
+        return new MatchTypesDialogViewModel(main);
     }
 
     [Fact]

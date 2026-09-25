@@ -13,11 +13,11 @@ namespace KeyFlux.Settings.Views;
 /// <summary>
 /// 匹配类型页视图 (左侧导航「匹配类型」)。
 /// 视图职责: 打开/关闭编辑面板、行内编辑与删除转发、删除确认对话框 (需 Window owner)。
-/// 业务逻辑全部在 <see cref="MatchTypesPageViewModel"/>。
+/// 业务逻辑全部在 <see cref="MatchTypesDialogViewModel"/>。
 /// </summary>
-public partial class MatchTypesPageView : UserControl
+public partial class MatchTypesDialogView : UserControl
 {
-    public MatchTypesPageView()
+    public MatchTypesDialogView()
     {
         InitializeComponent();
         Loaded += OnLoaded;
@@ -26,7 +26,7 @@ public partial class MatchTypesPageView : UserControl
     /// <summary>每次导航进入时重拉行为目录 (专属行为数依赖它; DataTemplate 会重建视图)。</summary>
     private async void OnLoaded(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not MatchTypesPageViewModel vm) return;
+        if (DataContext is not MatchTypesDialogViewModel vm) return;
         vm.ConfirmAsync = ShowConfirmAsync;
         try { await vm.ReloadAsync(); }
         catch { /* 后端未就绪: 保持列表现状, 由页面状态提示兜底 */ }
@@ -35,13 +35,13 @@ public partial class MatchTypesPageView : UserControl
     /// <summary>「新建匹配类型」(2522)。</summary>
     private async void OnCreate(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MatchTypesPageViewModel vm) await vm.OpenCreateCommand.ExecuteAsync(null);
+        if (DataContext is MatchTypesDialogViewModel vm) await vm.OpenCreateCommand.ExecuteAsync(null);
     }
 
     /// <summary>底部「编辑」(2546): 对当前选中行打开面板, 标识锁定 (仅自定义类型可点)。</summary>
     private void OnEditSelected(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MatchTypesPageViewModel { SelectedRow: { } row } vm)
+        if (DataContext is MatchTypesDialogViewModel { SelectedRow: { } row } vm)
         {
             vm.OpenEditCommand.Execute(row);
         }
@@ -50,7 +50,7 @@ public partial class MatchTypesPageView : UserControl
     /// <summary>底部「删除」(2536): 确认后落配置并级联删除同名专属行为包 (仅自定义类型可点)。</summary>
     private async void OnDeleteSelected(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MatchTypesPageViewModel vm)
+        if (DataContext is MatchTypesDialogViewModel vm)
         {
             await vm.AskRemoveAsync(vm.SelectedRow);
         }
@@ -62,7 +62,7 @@ public partial class MatchTypesPageView : UserControl
     /// </summary>
     private async void OnRowDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (DataContext is not MatchTypesPageViewModel vm) return;
+        if (DataContext is not MatchTypesDialogViewModel vm) return;
         if (vm.CanEditSelected)
         {
             vm.OpenEditCommand.Execute(vm.SelectedRow);
@@ -80,7 +80,7 @@ public partial class MatchTypesPageView : UserControl
     /// </summary>
     private async Task OpenBehaviorLibraryAsync()
     {
-        if (TopLevel.GetTopLevel(this) is not Window owner || DataContext is not MatchTypesPageViewModel vm)
+        if (TopLevel.GetTopLevel(this) is not Window owner || DataContext is not MatchTypesDialogViewModel vm)
         {
             return;
         }
@@ -92,7 +92,7 @@ public partial class MatchTypesPageView : UserControl
     /// <summary>「添加规则」(2527)。</summary>
     private void OnAddRule(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MatchTypesPageViewModel { Editor: { } editor })
+        if (DataContext is MatchTypesDialogViewModel { Editor: { } editor })
         {
             editor.AddRuleCommand.Execute(null);
         }
@@ -101,7 +101,7 @@ public partial class MatchTypesPageView : UserControl
     /// <summary>规则行 ✕ (至少保留一条)。</summary>
     private void OnRemoveRule(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MatchTypesPageViewModel { Editor: { } editor } && sender is Button { DataContext: MatchRuleRowVm row })
+        if (DataContext is MatchTypesDialogViewModel { Editor: { } editor } && sender is Button { DataContext: MatchRuleRowVm row })
         {
             editor.RemoveRuleCommand.Execute(row);
         }

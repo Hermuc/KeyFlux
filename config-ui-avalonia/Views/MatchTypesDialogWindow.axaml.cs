@@ -4,11 +4,11 @@ using KeyFlux.Settings.Services;
 namespace KeyFlux.Settings.Views;
 
 /// <summary>
-/// 匹配类型弹窗外壳 (内容为 <see cref="MatchTypesPageView"/>)。
+/// 匹配类型弹窗外壳 (内容为 <see cref="MatchTypesDialogView"/>)。
 /// 与其余弹窗一致: 保留系统标题栏与原生三键, 但经
 /// <see cref="KeyFlux.Settings.Services.Win32.DialogChrome"/> 把标题栏染成暖色表面色,
 /// 并在弹窗打开期间开启 owner 的背景模糊 (ModalBlur)。
-/// 调用方在关闭后读 <c>MatchTypesPageViewModel.LastCreatedTypeId</c> 决定是否自动选中新类型。
+/// 调用方在关闭后读 <c>MatchTypesDialogViewModel.LastCreatedTypeId</c> 决定是否自动选中新类型。
 /// </summary>
 public partial class MatchTypesDialogWindow : Window
 {

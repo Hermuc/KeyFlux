@@ -75,7 +75,7 @@ public partial class SelectedActionPageView : UserControl
         {
             return null;
         }
-        var dialogVm = new MatchTypesPageViewModel(vm.Main);
+        var dialogVm = new MatchTypesDialogViewModel(vm.Main);
         var win = new MatchTypesDialogWindow { DataContext = dialogVm };
         await win.ShowDialog(owner);
         await vm.ReloadBehaviorCatalogAsync();

@@ -3,7 +3,7 @@
         xmlns:vm="using:KeyFlux.Settings.ViewModels"
         xmlns:views="using:KeyFlux.Settings.Views"
         x:Class="KeyFlux.Settings.Views.MatchTypesDialogWindow"
-        x:DataType="vm:MatchTypesPageViewModel"
+        x:DataType="vm:MatchTypesDialogViewModel"
         Title="Setting"
         Width="1000" Height="680" MinWidth="840" MinHeight="560"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
@@ -17,8 +17,8 @@
         ② 在 Opened/Closed 上开关 owner 的 ModalBlur (即"弹窗背后的背景模糊")。
         漏调 = 标题栏冷白 + 背景不模糊 (2026-09-15 实测即此因)。
       · 系统标题栏与原生 ─ □ ✕ 保留, 不做无边框自绘 (项目既有设计决策)。
-    内容 = MatchTypesPageView (顶部说明 / 主从布局 / 底部按钮栏, 与行为库同构)。
+    内容 = MatchTypesDialogView (顶部说明 / 主从布局 / 底部按钮栏, 与行为库同构)。
   -->
 
-  <views:MatchTypesPageView />
+  <views:MatchTypesDialogView />
 </Window>

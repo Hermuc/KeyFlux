@@ -106,7 +106,7 @@ public sealed partial class MatchTypeRowVm : ObservableObject
 /// </summary>
 public sealed partial class MatchTypeEditorVm : ObservableObject
 {
-    private readonly MatchTypesPageViewModel _page;
+    private readonly MatchTypesDialogViewModel _page;
 
     /// <summary>自动设置代号期间抑制"用户已手改"标记。</summary>
     private bool _autoSettingId;
@@ -114,7 +114,7 @@ public sealed partial class MatchTypeEditorVm : ObservableObject
     /// <summary>用户是否在高级选项里手改过代号 (手改后不再跟随名称自动生成)。</summary>
     private bool _idTouched;
 
-    public MatchTypeEditorVm(MatchTypesPageViewModel page, MatchType? existing)
+    public MatchTypeEditorVm(MatchTypesDialogViewModel page, MatchType? existing)
     {
         _page = page;
         IsEdit = existing is not null;
@@ -296,7 +296,7 @@ public sealed partial class MatchTypeEditorVm : ObservableObject
         };
         if (IsFileExt)
         {
-            draft.Exts = MatchTypesPageViewModel.NormalizeExts(ExtsText);
+            draft.Exts = MatchTypesDialogViewModel.NormalizeExts(ExtsText);
         }
         else
         {
@@ -408,7 +408,7 @@ public sealed partial class MatchTypeEditorVm : ObservableObject
 
         if (IsFileExt)
         {
-            var exts = MatchTypesPageViewModel.NormalizeExts(ExtsText);
+            var exts = MatchTypesDialogViewModel.NormalizeExts(ExtsText);
             if (exts.Count == 0)
             {
                 Error = I18n.T("2544");
@@ -509,11 +509,11 @@ public sealed partial class MatchTypeEditorVm : ObservableObject
 /// 匹配类型弹窗 VM。数据真源 = Config.MatchTypes (自定义) + 后端内置文本特征注册表
 /// (behaviors/textfeatures.go, 界面侧镜像 = ActionSchemeCatalog.TextTypes, 顺序须一致)。
 /// </summary>
-public sealed partial class MatchTypesPageViewModel : ObservableObject, ILanguageRefresh
+public sealed partial class MatchTypesDialogViewModel : ObservableObject, ILanguageRefresh
 {
     private readonly MainViewModel _main;
 
-    public MatchTypesPageViewModel(MainViewModel main)
+    public MatchTypesDialogViewModel(MainViewModel main)
     {
         _main = main;
         ReloadRows();

@@ -19,13 +19,13 @@ namespace KeyFlux.Settings.Tests;
 [Collection("I18nSerial")]
 public sealed class MatchTypesLayoutTests
 {
-    private static (MatchTypesDialogWindow Window, MatchTypesPageViewModel Vm) Create(double width, double height)
+    private static (MatchTypesDialogWindow Window, MatchTypesDialogViewModel Vm) Create(double width, double height)
     {
         var main = new MainViewModel(new BackendSessionOptions())
         {
             Config = new Config { Options = new Options() },
         };
-        var vm = new MatchTypesPageViewModel(main);
+        var vm = new MatchTypesDialogViewModel(main);
         var win = new MatchTypesDialogWindow { DataContext = vm, Width = width, Height = height };
         win.Show();
         Dispatcher.UIThread.RunJobs();
@@ -39,7 +39,7 @@ public sealed class MatchTypesLayoutTests
         var (win, _) = Create(840, 560);
         try
         {
-            var view = Assert.IsType<MatchTypesPageView>(win.Content);
+            var view = Assert.IsType<MatchTypesDialogView>(win.Content);
             var list = view.FindControl<Border>("RowListCard");
             var detail = view.FindControl<Border>("DetailCard");
             Assert.NotNull(list);
@@ -66,7 +66,7 @@ public sealed class MatchTypesLayoutTests
         double smallWidth;
         try
         {
-            var view = Assert.IsType<MatchTypesPageView>(small.Content);
+            var view = Assert.IsType<MatchTypesDialogView>(small.Content);
             smallWidth = view.FindControl<Border>("DetailCard")!.Bounds.Width;
         }
         finally
@@ -77,7 +77,7 @@ public sealed class MatchTypesLayoutTests
         var (large, _) = Create(1280, 820);
         try
         {
-            var view = Assert.IsType<MatchTypesPageView>(large.Content);
+            var view = Assert.IsType<MatchTypesDialogView>(large.Content);
             var largeWidth = view.FindControl<Border>("DetailCard")!.Bounds.Width;
             Assert.True(largeWidth > smallWidth + 100,
                 $"窗口放大后右列未变宽 (small={smallWidth}, large={largeWidth}) —— 列宽应弹性分配");
@@ -100,7 +100,7 @@ public sealed class MatchTypesLayoutTests
             vm.OpenCreateCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
 
-            var view = Assert.IsType<MatchTypesPageView>(win.Content);
+            var view = Assert.IsType<MatchTypesDialogView>(win.Content);
             var scroll = view.FindControl<ScrollViewer>("FormScroll");
             var actions = view.FindControl<StackPanel>("FormActions");
             Assert.NotNull(scroll);

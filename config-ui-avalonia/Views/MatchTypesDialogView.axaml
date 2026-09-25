@@ -2,9 +2,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:KeyFlux.Settings.ViewModels"
              xmlns:services="using:KeyFlux.Settings.Services"
-             x:Class="KeyFlux.Settings.Views.MatchTypesPageView"
+             x:Class="KeyFlux.Settings.Views.MatchTypesDialogView"
              x:Name="PageRoot"
-             x:DataType="vm:MatchTypesPageViewModel">
+             x:DataType="vm:MatchTypesDialogViewModel">
 
   <!--
     匹配类型弹窗内容 —— 与行为库同构, 且**新建/编辑表单内联在本窗右侧详情区** (2026-09-15 用户要求):
@@ -138,7 +138,7 @@
                               </ComboBox.ItemTemplate>
                             </ComboBox>
                             <TextBox Grid.Column="1" Classes="claudeInput" Margin="8,0" Text="{Binding Value, Mode=TwoWay}"
-                                     Watermark="{Binding $parent[UserControl].((vm:MatchTypesPageViewModel)DataContext).Editor.LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2550}" />
+                                     Watermark="{Binding $parent[UserControl].((vm:MatchTypesDialogViewModel)DataContext).Editor.LanguageTick, Converter={StaticResource Tr}, ConverterParameter=2550}" />
                             <Button Grid.Column="2" Classes="claudeGhost" Padding="8,4" Margin="0"
                                     Click="OnRemoveRule" CommandParameter="{Binding}" Content="✕" />
                           </Grid>
