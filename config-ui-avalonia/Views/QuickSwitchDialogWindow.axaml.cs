@@ -22,8 +22,7 @@ public partial class QuickSwitchDialogWindow : Window
         Services.Win32.DialogChrome.Apply(this);
         TitleBarIconSuppressor.Attach(this);
         Title = I18n.T("2408");
-        Services.Win32.DialogPlacer.AttachAutoCenter(this); // 统一定位: 异步内容长高后自动重居中
-        Services.Win32.DialogPlacer.HideUntilRevealed(this); // 隐身开门: 挡住打开瞬间的白帧 (09-23)
+        Services.Win32.DialogPlacer.OpenOffscreen(this); // 屏幕外开门: 挡住打开瞬间的白帧 (09-23, 勿改回 Opacity 门)
         Opened += async (_, _) => await Services.Win32.DialogPlacer.RevealWhenRendered(this);
         I18n.Changed += OnLanguageChanged;
         Closed += (_, _) => I18n.Changed -= OnLanguageChanged;

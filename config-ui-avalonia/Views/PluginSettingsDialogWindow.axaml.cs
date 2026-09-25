@@ -32,10 +32,10 @@ public partial class PluginSettingsDialogWindow : Window
         // SizeToContent=Height + CenterOwner 的组合缺陷: 打开瞬间按「未加载表单的小高度」
         // 居中, LoadAsync 之后窗口向下长高、锚点不动 ⇒ 弹窗严重偏下 (2026-09-23 用户报障)。
         // 对策: 统一定位模块 (DialogPlacer) —— 加载后的尺寸变化自动重居中。
-        Services.Win32.DialogPlacer.AttachAutoCenter(this);
-        // 隐身开门 (2026-09-23 用户报障: 打开瞬间整窗白帧 + LoadAsync 长高后底部黑帧):
-        // Opacity=0 挡住首帧未呈现与长高未绘区, OnOpened 末尾渲染排空后再显形。
-        Services.Win32.DialogPlacer.HideUntilRevealed(this);
+        // 屏幕外开门 (同日第二报: 打开瞬间整窗白帧 + 长高后底部黑帧): 窗口先开在屏幕外,
+        // LoadAsync 与渲染落定后由 RevealWhenRendered 移入屏幕 (v1 的 Opacity 门在本应用
+        // 软件渲染+重定向表面管线下诱发持久黑块, 已废弃, 见 DialogPlacer 注释)。
+        Services.Win32.DialogPlacer.OpenOffscreen(this);
     }
 
     private void OnLanguageChanged()
@@ -50,11 +50,8 @@ public partial class PluginSettingsDialogWindow : Window
             Title = vm.DisplayName;
             try { await vm.LoadAsync(); }
             catch { /* 加载失败已由 VM 的 LoadError 呈现 */ }
-            // 等布局把表单行撑开后再居中一次 (RunJobs 让布局排空; 后续变化由 AttachAutoCenter 兜底)
-            await Dispatcher.UIThread.InvokeAsync(() => { });
-            Services.Win32.DialogPlacer.CenterToOwner(this);
         }
-        // 无条件显形: 即使加载异常/无 DataContext, 也不能让窗口隐身卡死
+        // 渲染排空后移入屏幕并挂自动重居中; 无条件执行 (加载异常/无 DataContext 也不能让窗口离屏卡死)
         await Services.Win32.DialogPlacer.RevealWhenRendered(this);
     }
 

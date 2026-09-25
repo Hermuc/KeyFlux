@@ -20,8 +20,7 @@ public partial class PluginMarketWindow : Window
         ComponentFocusRing.Attach(this); // 焦点环最内层转移 (替代 :focus-within)
         Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => UnsubscribeLanguage();
-        Services.Win32.DialogPlacer.AttachAutoCenter(this); // 统一定位: 异步内容长高后自动重居中
-        Services.Win32.DialogPlacer.HideUntilRevealed(this); // 隐身开门: 挡住打开瞬间的白帧与目录长高后的黑帧 (09-23)
+        Services.Win32.DialogPlacer.OpenOffscreen(this); // 屏幕外开门: 挡住打开瞬间的白帧与目录长高后的黑帧 (09-23)
         I18n.Changed += OnLanguageChanged;
     }
 
