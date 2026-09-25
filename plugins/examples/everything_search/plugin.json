@@ -2,7 +2,7 @@
   "id": "everything_search",
   "name": "Everything 搜索",
   "nameEn": "Everything Search",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "specVersion": 1,
   "description": "在命令框里按下前置键 (默认空格), 用 Everything 搜索当前选中的文字; 搜索结果在命令框正下方以下拉列表展示, 可用 ↑↓ 选择、回车打开。Everything 未运行时自动拉起。",
   "author": "KeyFlux",
@@ -45,9 +45,9 @@
       "labelEn": "Max results",
       "default": "20",
       "min": 1,
-      "max": 100,
-      "hint": "下拉列表最多展示多少条 (1-100)。",
-      "hintEn": "Maximum number of rows shown in the dropdown (1-100)."
+      "max": 300,
+      "hint": "下拉列表最多展示多少条 (1-300, 列表可滚动)。",
+      "hintEn": "Maximum number of rows shown in the dropdown (1-300, scrollable)."
     }
   ]
 }

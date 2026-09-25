@@ -181,6 +181,14 @@ Everything 有四条可编程通道，可用性与可移植性差异很大：
 
 本机 Everything 版本：**1.5.0.1418**。
 
+### 结果排序与 Everything 主界面一致（v1.0.1）
+
+es.exe 查询会读取 Everything.ini 的 `sort=` / `sort_ascending=`（便携版在 everything.exe 旁，安装版在 `%APPDATA%` + `\Everything`），映射为 `-sort` 参数传给查询 —— 命令框下拉列表与 Everything 主界面同序（在 GUI 点列头改排序后，下一次查询即跟随，无需重启）。排序名按白名单映射（`Date Modified` → `date-modified` 等 13 种），未知排序名不传 `-sort`，走 es 默认（名称升序）。解析整体 try/catch，任何意外退回默认，不影响查询本身。
+
+2026-09-25 用户报障背景：GUI 排序为 `Date Modified` 降序时，同一查询命令框展示的文件与 GUI 完全不同（es 默认名称升序 + `-n` 截断放大差异）。
+
+---
+
 ---
 
 ## 6. 设置与热重载

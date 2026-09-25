@@ -61,7 +61,7 @@ class EverythingEsProvider extends EverythingProvider {
 
   Search(query, limit) {
     out := this._OutFile()
-    cmd := '"' this.exe '" -timeout 4000 -n ' limit ' -export-txt "' out '"' this._QuerySuffix(query)
+    cmd := '"' this.exe '" -timeout 4000 -n ' limit this._SortArgs() ' -export-txt "' out '"' this._QuerySuffix(query)
     code := 0
     try {
       code := RunWait(cmd, , "Hide")
@@ -116,6 +116,73 @@ class EverythingEsProvider extends EverythingProvider {
   }
 
   ; ---- 内部 ----
+
+  ; ---- 排序对齐 (2026-09-25 用户报障: 命令框结果与 Everything GUI 不一致) ----
+  ; GUI 的结果列表按其当前排序展示 (本机实测 Everything.ini: sort=Date Modified +
+  ; sort_ascending=0 = 最近修改优先), 而 es.exe 不传 -sort 时按名称升序返回 —— 同一
+  ; 查询两组文件的前 N 条完全不同 (-n 截断放大差异)。故读 ini 的 sort=/sort_ascending=
+  ; 映射成 es 的 -sort 参数, 让下拉列表与 GUI 同序。
+  ;
+  ; 🔴 实现纪律 (v1.0.1 首版事故教训): 第一版用「类静态 Map 初始化器」做查表, 在引擎
+  ;    AHK 运行时里静态属性未实例化 → 每次查询抛 PropertyError 被会话吞掉 → 无任何
+  ;    搜索结果 + 命令框退回命令匹配 (引擎日志 command_input_hooks.log 实录)。故本版:
+  ;    ① 不引入任何**加载期求值**的代码 (无类静态初始化器, 白名单改为方法内 switch);
+  ;    ② 整体 try/catch —— 任何意外 (编码/权限/解析) 都退回 es 默认排序, 绝不让查询
+  ;    路径抛异常。
+
+  /**
+   * 组装 -sort 参数 (镜像 GUI 当前排序):
+   * ini 位置: 便携版在 everything.exe 旁 (本机 app_data=0); 安装版在 %APPDATA%\Everything。
+   * 方向: sort_ascending=0 → -sort-descending (本机 Date Modified 即此档 = 最近修改优先),
+   *       否则 -sort-ascending; ini/键缺失 → 返回 "" (es 默认名称升序)。
+   * 每次查询重读 ini: 用户在 GUI 点列头改排序后无需重启, 下一次查询即跟随。
+   */
+  _SortArgs() {
+    try {
+      ini := this._EverythingIni()
+      if (ini = "")
+        return ""
+      text := FileRead(ini, "UTF-8")
+      if (!RegExMatch(text, "m)^sort=(.*)$", &m))
+        return ""
+      sortKey := StrLower(Trim(m[1]))
+      es := ""
+      switch sortKey {
+        case "name": es := "name"
+        case "path": es := "path"
+        case "size": es := "size"
+        case "date modified": es := "date-modified"
+        case "date created": es := "date-created"
+        case "extension": es := "extension"
+        case "date recently changed": es := "date-recently-changed"
+        case "run count": es := "run-count"
+        case "date run": es := "date-run"
+        case "attributes": es := "attributes"
+        case "file list filename": es := "file-list-filename"
+        case "availability": es := "availability"
+        case "type": es := "type"
+      }
+      if (es = "")
+        return ""
+      asc := RegExMatch(text, "m)^sort_ascending=(.*)$", &a) ? Trim(a[1]) : "1"
+      return " -sort " es ((asc = "0") ? " -sort-descending" : " -sort-ascending")
+    } catch {
+      return ""  ; 任何意外 (编码/权限/解析) 都不破坏查询 —— 退回 es 默认排序
+    }
+  }
+
+  /** Everything.ini 落点: 便携版 (app_data=0) 在 everything.exe 旁; 否则 %APPDATA%\Everything。 */
+  _EverythingIni() {
+    exe := EverythingSettings.EverythingPath
+    if (exe != "") {
+      SplitPath(exe, , &dir)
+      cand := dir "\Everything.ini"
+      if FileExist(cand)
+        return cand
+    }
+    cand := A_AppData "\Everything\Everything.ini"
+    return FileExist(cand) ? cand : ""
+  }
 
   _OutFile() {
     ; 注意: TempDir 是静态属性, 实例方法里必须经类名访问 (AHK 静态属性不在实例上)
