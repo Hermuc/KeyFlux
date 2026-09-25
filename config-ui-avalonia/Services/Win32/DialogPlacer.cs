@@ -18,6 +18,9 @@ namespace KeyFlux.Settings.Services.Win32;
 //      都会重新居中; 用户拖动窗口不改尺寸, 不会被拉回; 窗口 Closed 自动解绑。
 //   4) 时序约定 (2026-09-23 白/黑帧修复定稿): 内容就绪后才 ShowDialog (插件设置弹窗的
 //      LoadAsync 已移到调用方) —— 勿再引入开窗后异步长高的形态 (白帧/黑帧/离屏门均已被否)。
+//      2026-09-25 追记: 「内容就绪后开窗」只消掉了 SizeToContent 的大跳, 开窗瞬间仍有
+//      首帧前的白帧 + 微小尺寸变动引发的重定位 —— 由 DialogReveal (分层窗口首帧门) 统一
+//      收尾; 本类只负责「在哪」, 不再掺和「何时可见」。
 //
 // 新增插件弹窗的使用方式 (无需重复配置):
 //   构造函数里 AttachAutoCenter(this); 内容异步加载完成后可再 CenterToOwner(this) 兜底。
@@ -34,25 +37,30 @@ internal static class DialogPlacer
     /// </summary>
     public static void CenterToOwner(Window dialog)
     {
-        var w = dialog.Bounds.Width;
-        var h = dialog.Bounds.Height;
+        // 2026-09-25 DPI 修复: 旧实现把 DIP 差值 (Bounds) 直接加进物理坐标 (Position/
+        // WorkingArea 均为物理像素), 125% DPI 下偏移量被少乘 1.25 —— 弹窗系统性左偏/上偏
+        // (用户截图实测: 宿主宽 ~1094 DIP、弹窗 520 DIP 时左偏 ~72 物理像素, 与两帧位置差
+        // ~90px 吻合)。改为: 客户区物理原点经 PointToScreen 取得, 尺寸按各自 RenderScaling
+        // 换算, 全程物理像素运算。
+        var dw = dialog.Bounds.Width * dialog.RenderScaling;
+        var dh = dialog.Bounds.Height * dialog.RenderScaling;
         PixelPoint target;
         if (dialog.Owner is Window owner)
         {
-            var op = owner.Position;
-            var ow = owner.Bounds.Width;
-            var oh = owner.Bounds.Height;
-            var x = op.X + (ow - w) / 2;
-            var y = Math.Max(op.Y + MinTopGap, op.Y + (oh - h) / 2);
+            var origin = owner.PointToScreen(new Point(0, 0)); // 客户区左上角 (物理像素)
+            var ow = owner.Bounds.Width * owner.RenderScaling;
+            var oh = owner.Bounds.Height * owner.RenderScaling;
+            var x = origin.X + (ow - dw) / 2;
+            var y = Math.Max(origin.Y + MinTopGap * dialog.RenderScaling, origin.Y + (oh - dh) / 2);
             target = new PixelPoint((int)Math.Round(x), (int)Math.Round(y));
         }
         else
         {
             var screen = dialog.Screens.ScreenFromWindow(dialog) ?? dialog.Screens.Primary;
-            var wa = screen.WorkingArea;
+            var wa = screen.WorkingArea; // 物理像素
             target = new PixelPoint(
-                (int)Math.Round(wa.X + (wa.Width - w) / 2),
-                (int)Math.Round(wa.Y + (wa.Height - h) / 2));
+                (int)Math.Round(wa.X + (wa.Width - dw) / 2),
+                (int)Math.Round(wa.Y + (wa.Height - dh) / 2));
         }
         dialog.Position = target;
     }
@@ -60,6 +68,7 @@ internal static class DialogPlacer
     /// <summary>
     /// 挂接自动重居中: SizeChanged (异步内容加载/语言切换导致的尺寸变化) → 重居中;
     /// 窗口 Closed 自动解绑。重复调用安全 (解绑逻辑保证只挂一份)。
+    /// 与 <see cref="DialogReveal"/> 配合: 开窗首帧前的重定位发生在不可见期, 用户无感。
     /// </summary>
     public static void AttachAutoCenter(Window dialog)
     {

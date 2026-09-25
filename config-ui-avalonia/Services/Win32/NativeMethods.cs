@@ -54,6 +54,9 @@ internal static class NativeMethods
     public const uint WS_EX_LAYERED = 0x00080000;
     public const uint WS_EX_NOACTIVATE = 0x08000000;
 
+    /// <summary>窗口扩展样式槽 (Get/SetWindowLong 的 nIndex; 见 DialogReveal 首帧门)。</summary>
+    public const int GWL_EXSTYLE = -20;
+
     // ------------------------------------------------------------------ 常量: SetWindowPos
     public const uint SWP_NOSIZE = 0x0001;
     public const uint SWP_NOMOVE = 0x0002;
@@ -258,6 +261,28 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
+    // ------------------------------------------------------------------ 组4.1: 窗口长整型存取 (DialogReveal 首帧门)
+    // Get/SetWindowLongPtrW 仅 64 位 user32 提供, 32 位进程回落 Get/SetWindowLongW (经典双口径封装)。
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    private static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    public static IntPtr GetWindowLong(IntPtr hWnd, int nIndex) =>
+        IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, nIndex) : new IntPtr(GetWindowLong32(hWnd, nIndex));
+
+    public static IntPtr SetWindowLong(IntPtr hWnd, int nIndex, IntPtr dwNewLong) =>
+        IntPtr.Size == 8
+            ? SetWindowLongPtr64(hWnd, nIndex, dwNewLong)
+            : new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
 
     [DllImport("gdi32.dll")]
     public static extern IntPtr CreateRectRgn(int x1, int y1, int x2, int y2);

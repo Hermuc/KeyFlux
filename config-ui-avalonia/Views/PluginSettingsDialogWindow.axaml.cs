@@ -23,6 +23,9 @@ public partial class PluginSettingsDialogWindow : Window
     public PluginSettingsDialogWindow()
     {
         InitializeComponent();
+        // 首帧门 (2026-09-25 用户报障): 开窗瞬间的白帧/移位/上色发生在窗口可见之后,
+        // 分层窗口 alpha 门把它们全部藏进不可见期, 首帧上屏后以最终形态淡入 (见 DialogReveal)
+        Services.Win32.DialogReveal.Attach(this);
         Services.Win32.DialogChrome.Apply(this);
         TitleBarIconSuppressor.Attach(this);
         I18n.Changed += OnLanguageChanged;

@@ -15,6 +15,7 @@ public partial class PluginMarketWindow : Window
     {
         InitializeComponent();
         ComponentFocusRing.Attach(this); // 焦点环最内层转移 (替代 :focus-within)
+        Services.Win32.DialogReveal.Attach(this); // 首帧门: 白帧/移位藏进不可见期, 首帧后淡入 (与插件设置弹窗同款)
         Services.Win32.DialogChrome.Apply(this);
         Closed += (_, _) => UnsubscribeLanguage();
         Services.Win32.DialogPlacer.AttachAutoCenter(this); // 统一定位: 异步内容长高后自动重居中

@@ -20,6 +20,7 @@ public partial class QuickSwitchDialogWindow : Window
     public QuickSwitchDialogWindow()
     {
         InitializeComponent();
+        Services.Win32.DialogReveal.Attach(this); // 首帧门: 白帧/移位藏进不可见期, 首帧后淡入 (与插件设置弹窗同款)
         Services.Win32.DialogChrome.Apply(this);
         TitleBarIconSuppressor.Attach(this);
         Title = I18n.T("2408");

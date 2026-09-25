@@ -75,6 +75,8 @@ public partial class PluginsPageView : UserControl
 
         // 表单就绪后才开窗 (与 QuickSwitch 弹窗同款时序): SizeToContent 一次到位,
         // 无「打开瞬间白帧 + 异步长高黑帧」(2026-09-23 用户报障, 曾两版修复失败);
+        // 2026-09-25 追记: 开窗瞬间的残余白帧/移位由弹窗自身的 DialogReveal 首帧门
+        // 藏进不可见期, 首帧上屏后以最终形态淡入 —— 调用方无需额外处理。
         // 加载失败也照常开窗 (LoadError 红字在弹窗内呈现)
         var settingsVm = new PluginSettingsDialogViewModel(vm.Main, card.Manifest);
         var pluginDialog = new PluginSettingsDialogWindow
