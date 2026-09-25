@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using KeyFlux.Settings.ViewModels;
@@ -9,12 +10,56 @@ namespace KeyFlux.Settings.Views.Controls;
 
 /// <summary>
 /// 动作编辑面板 (复刻 actions/Action.vue): 窗口分组 + 动作类型下拉 + 按类型分发编辑器。
+/// 悬停光圈让位 (2026-09-25 用户要求): 指针悬到可交互子控件 (下拉框/芯片/输入框/按钮) 时,
+/// 外圈 haloRing 熄灭让位给子框自己的橙圈 (下拉框 = comboHalo 环; 芯片自带悬停描边);
+/// 指针回到卡面非交互区/环带时外圈恢复。
 /// </summary>
 public partial class ActionEditorPanel : UserControl
 {
     private ActionEditorViewModel? _hooked;
+    private Border? _haloFar;
 
-    public ActionEditorPanel() => InitializeComponent();
+    public ActionEditorPanel()
+    {
+        InitializeComponent();
+        PointerMoved += OnPanelPointerMoved;
+        PointerExited += OnPanelPointerExited;
+    }
+
+    /// <summary>
+    /// 悬停让位判定: 指针命中测试后向根上溯, 在到达面板自身之前出现 Focusable 元素
+    /// (下拉框/芯片/输入框/按钮 —— 卡面空白区与环带均非 Focusable) 即为悬停子控件。
+    /// </summary>
+    private void OnPanelPointerMoved(object? sender, PointerEventArgs e)
+    {
+        // 环层懒查找 (视觉树在挂树后才存在); childHover 类驱动 far/near 的让位样式
+        _haloFar ??= this.GetVisualDescendants()
+            .OfType<Border>()
+            .FirstOrDefault(b => b.Classes.Contains("haloRing") && b.Classes.Contains("far"));
+        if (_haloFar is null) return;
+
+        var hit = this.InputHitTest(e.GetCurrentPoint(this).Position);
+        var childHover = false;
+        for (var v = hit as Visual; v is not null; v = v.GetVisualParent())
+        {
+            if (ReferenceEquals(v, this)) break; // 上溯到面板自身仍无 Focusable ⇒ 悬停在卡面/环带
+            if (v is InputElement { Focusable: true })
+            {
+                childHover = true;
+                break;
+            }
+        }
+        SetChildHover(childHover);
+    }
+
+    private void OnPanelPointerExited(object? sender, PointerEventArgs e) => SetChildHover(false);
+
+    private void SetChildHover(bool on)
+    {
+        if (_haloFar is null) return;
+        if (on) _haloFar.Classes.Add("childHover");
+        else _haloFar.Classes.Remove("childHover");
+    }
 
     /// <summary>类型 8 示例下拉选中 -> 填入 ahkCode (复刻 v-combobox items)。</summary>
     private void OnAhkExampleSelected(object? sender, SelectionChangedEventArgs e)

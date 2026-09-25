@@ -6,30 +6,123 @@
              x:Name="PanelRoot"
              x:DataType="vm:ActionEditorViewModel">
 
+  <!-- Fluent ComboBox 悬停/按压态边框是模板内 DynamicResource (无视控件 BorderBrush),
+       默认深灰 → 用户报「橙圈内还有黑圈」。面板级资源覆盖 = 只影响本面板的下拉框
+       (DynamicResource 沿逻辑树查找, 面板级优先于主题; ScrollBarSize 同款机制)。
+       覆盖为奶油色 = 悬停时下拉框自身边框与静止态一致, 唯一反馈是外圈橙色线条 -->
+  <UserControl.Resources>
+    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">#f0eee6</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxBorderBrushPressed">#f0eee6</SolidColorBrush>
+  </UserControl.Resources>
+
   <!-- 动作编辑面板 (复刻 actions/Action.vue 卡片: 分组下拉 + 类型下拉 + 按类型分发编辑器);
        宽度由使用处指定 (KeymapPage/CustomHotkey 720, AbbrPage 动态同步 chips 最宽行), 控件内不设 Width;
        Border 必须 Stretch 铺满使用处给定宽度 —— Left 会使白卡片收缩为内容最小期望宽 (动态方案下窄于 W)。
+       ⚠ 2026-09-25 悬停光圈引入嵌套环 (见下方注释): 最外环 = 使用处给定宽, 白卡片 = 外框 −10px
+       (AbbrPage 580 / ActionEditorWindow 522 已 +10 补偿, 卡片可视宽度不变; KeymapPage 外框随
+       键盘网格同步, 卡片随之外缩 10px, 可接受)。
        高度必须固定 (Height 而非 MinHeight): 本面板位于 Viewbox Uniform 缩放页内, 编辑器出现时
        若自然高度变化 (实测类型 3/7 = 422 > 空态 380), 缩放比随之变小, 整页 (键盘网格+编辑框)
        被等比缩小 (点选键后页面抖动 bug)。固定 430 = 最高编辑器 422 + 字体度量余量;
        编辑器内容区包 ScrollViewer 兜底, 超出时滚动而非撑高, 保证缩放比恒定 -->
-  <Border Background="{DynamicResource ClaudeIvoryBrush}"
-          CornerRadius="{StaticResource ClaudeRadiusCard}"
-          BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
-          Height="430" Padding="16,12" HorizontalAlignment="Stretch">
+  <!-- 悬停光圈 (2026-09-25 用户要求, 同日数轮迭代): 与插件页 pluginCard / 选中动作页 actionCard /
+       选项页 settingsCard 组件框同款的陶土色光圈。⚠ 本面板位于 Viewbox 分数缩放页内, 两种
+       常规画法实测损坏 (用户截图「四角暗斑/组件框变方」): ① BoxShadow 三层档 → 四角方角暗斑;
+       ② 负 Margin 外扩环 → Viewbox 下负边距被吞, 只剩角部弧斑。故改为**嵌套 Padding 双层环**
+       (环 = 卡的祖先 Border, 光圈 = 各环 Padding 露出带, 全部填充+圆角, 经 Viewbox 缩放稳定):
+         near(内) Padding2 半径16 / far(外) Padding3 半径19, 陶土 #c96442 阶梯 30%/15%
+         (三环 35%/19%/9% 版用户反馈「橙圈外还有好几圈线圈」已精简), 悬停经 :pointerover 换
+         Background (BrushTransition 120ms = ClaudeMotion.Micro 淡入, 皮肤同款过渡器)。
+         ㊉ 不能用 Opacity 淡入: 环是卡的祖先, 祖先 Opacity=0 会连卡片一起藏掉。
+         悬停让位: 指针悬到可交互子控件 (下拉框/芯片/输入框/按钮) 时外圈熄灭让位
+         (childHover 类由 code-behind 指针命中测试切换); 下拉框自己的橙圈 = comboHalo。
+         代价: 外框比卡片大 10px (使用处 Width 已 +10 补偿, 卡片可视尺寸不变)。 -->
+  <UserControl.Styles>
+    <Style Selector="Border.haloRing">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.haloRing.near">
+      <Setter Property="CornerRadius" Value="16,16,16,16" />
+      <Setter Property="Padding" Value="2" />
+    </Style>
+    <Style Selector="Border.haloRing.far">
+      <Setter Property="CornerRadius" Value="19,19,19,19" />
+      <Setter Property="Padding" Value="3" />
+    </Style>
+    <Style Selector="Border.haloRing.far:pointerover">
+      <Setter Property="Background" Value="#26c96442" />
+    </Style>
+    <Style Selector="Border.haloRing.far:pointerover Border.haloRing.near">
+      <Setter Property="Background" Value="#4dc96442" />
+    </Style>
+    <!-- 子控件悬停让位 (2026-09-25 用户要求): childHover 类由 code-behind 指针命中测试切换。
+         ⚠ 必须排在上面 :pointerover 档之后 (同集合内后应用的样式覆盖先应用的) -->
+    <Style Selector="Border.haloRing.far.childHover">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.haloRing.far.childHover Border.haloRing.near">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <!-- 下拉框悬停描边 (2026-09-25 用户裁定: 不要整框变色, 只要边框外一圈橙色线条):
+         环层自身 BorderThickness=1 + BorderBrush 透明→陶土 (BrushTransition 120ms),
+         Padding 2 = 线条悬在边框外 2px; 半径 = claudeInput 的 RadiusMd(8) + 2 -->
+    <Style Selector="Border.comboHalo">
+      <Setter Property="CornerRadius" Value="10,10,10,10" />
+      <Setter Property="Padding" Value="2" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="BorderBrush" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.comboHalo:pointerover">
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
+    </Style>
+    <!-- 未配置档让位: 描边保持透明 (⚠ 排在 :pointerover 之后以覆盖) -->
+    <Style Selector="Border.comboHalo.haloOff">
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.comboHalo.haloOff:pointerover">
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Classes="haloRing far">
+    <Border Classes="haloRing near">
+        <Border Classes="editorCard"
+                Background="{DynamicResource ClaudeIvoryBrush}"
+                CornerRadius="{StaticResource ClaudeRadiusCard}"
+                BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
+                Height="430" Padding="16,12" HorizontalAlignment="Stretch">
     <DockPanel>
 
-      <!-- 头部: 窗口分组 (5/12) + 动作类型 (7/12); claudeInput = White 底+Cream 边+焦点 Coral -->
+      <!-- 头部: 窗口分组 (5/12) + 动作类型 (7/12); claudeInput = White 底+Cream 边+焦点 Coral。
+           comboHalo = 下拉框自己的悬停橙圈 (2026-09-25 用户要求: 指针悬到子选项框时外圈光圈
+           让位到子框 —— 让位由 code-behind 指针命中测试挂 childHover 类实现, 见 far.childHover) -->
       <Grid DockPanel.Dock="Top" ColumnDefinitions="5*,7*" Margin="0,0,0,10">
-        <ComboBox Classes="claudeInput"
-                  ItemsSource="{Binding GroupOptions}"
-                  SelectedItem="{Binding SelectedGroup}"
-                  HorizontalAlignment="Stretch" Margin="0,0,10,0" />
-        <ComboBox Grid.Column="1" Classes="claudeInput"
-                  ItemsSource="{Binding TypeOptions}"
-                  SelectedItem="{Binding SelectedType}"
-                  IsEnabled="{Binding HasHotkey}"
-                  HorizontalAlignment="Stretch" />
+        <Border Classes="comboHalo" Margin="0,0,10,0">
+          <ComboBox Classes="claudeInput"
+                    ItemsSource="{Binding GroupOptions}"
+                    SelectedItem="{Binding SelectedGroup}"
+                    HorizontalAlignment="Stretch" />
+        </Border>
+        <!-- haloOff = 动作类型处于「未配置」档 (VM.IsTypeUnconfigured): 悬停不亮描边
+             (用户要求; 类绑定随选中态实时切换)。⚠ 让位样式须排在 comboHalo:pointerover 之后 -->
+        <Border Grid.Column="1" Classes="comboHalo" Classes.haloOff="{Binding IsTypeUnconfigured}">
+          <ComboBox Classes="claudeInput"
+                    ItemsSource="{Binding TypeOptions}"
+                    SelectedItem="{Binding SelectedType}"
+                    IsEnabled="{Binding HasHotkey}"
+                    HorizontalAlignment="Stretch" />
+        </Border>
       </Grid>
 
       <!-- 按编辑器 VM 类型分发 (类型 0 时 Editor 为 null); ScrollViewer 兜底: 内容超过固定高度时滚动;
@@ -185,5 +278,7 @@
         </ContentControl>
       </ScrollViewer>
     </DockPanel>
+  </Border>
+  </Border>
   </Border>
 </UserControl>

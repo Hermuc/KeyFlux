@@ -261,10 +261,12 @@
              L2 = 光圈层 (静止 alpha=0 → 悬停 18% → 按下/聚焦回落 0)
            改本族任何一个 alpha / blur 时, **四个键必须一起看**, 并保持层数一致。
 
-         ▶ 接线位置 (三页, 2026-09-17)
+         ▶ 接线位置 (三页, 2026-09-17; 2026-09-25 起四处)
            SelectedActionPageView `Border.actionCard` (含 row-card) / PluginsPageView
            `Border.pluginCard` / SettingsPageView `Border.settingsCard` + `Border.leftPanel`,
            均为 `:pointerover` → HaloHover + `BoxShadowsTransition` (ClaudeMotion.Micro 120ms)。
+           2026-09-25 新增: Controls/ActionEditorPanel `Border.editorCard` (动作编辑面板,
+           用户要求与三页组件框同款悬停光圈) —— 同样 `:pointerover` → HaloHover。
            页面内不再出现旧的 :pointerover 加深接线; 旧档 CardHover / CardDeep 仍无消费方。 -->
     <BoxShadows x:Key="ClaudeShadowCardHalo">0 2 4 0 #1c000000, 0 6 18 0 #14000000, 0 0 16 2 #00c96442</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowCardHaloHover">0 2 4 0 #1c000000, 0 6 18 0 #14000000, 0 0 16 2 #4dc96442</BoxShadows>
