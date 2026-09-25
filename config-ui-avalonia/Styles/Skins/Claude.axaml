@@ -615,6 +615,32 @@
     <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
   </Style>
 
+  <!-- 弹窗关闭钮 (2026-09-23): 自绘标题行专用 (插件设置/QuickSwitch 弹窗扩展客户区配方)。
+       基态透明 OliveGray / 悬停 Error 底 Ivory; 三态都压模板部件 (坑 13)。 -->
+  <Style Selector="Button.dialogClose">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="26" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusSm}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.dialogClose /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
+  </Style>
+  <Style Selector="Button.dialogClose:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource ClaudeErrorBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
+  </Style>
+  <Style Selector="Button.dialogClose:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource ClaudeErrorBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
+  </Style>
+
   <!-- 危险按钮: 透明底 + Error Crimson 字 -->
   <Style Selector="Button.claudeDanger">
     <Setter Property="Background" Value="Transparent" />

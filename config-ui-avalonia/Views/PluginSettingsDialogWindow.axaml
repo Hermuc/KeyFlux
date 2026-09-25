@@ -17,33 +17,6 @@
        故新增插件不需要改本文件 (这也是「声明式设置」相对硬编码表单的价值)。
        四类编辑器: char=单字符输入框 / file=输入框+浏览 / number=数字输入框 / text=文本输入框;
        后端按同一份声明校验, 前端的即时校验只是省一次往返。 -->
-  <Window.Styles>
-    <!-- 自绘关闭钮 (最小化/最大化已按用户要求移除): 基态/悬停/按下都压模板部件 (坑 13) -->
-    <Style Selector="Button.dialogClose">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Width" Value="36" />
-      <Setter Property="Height" Value="26" />
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusSm}" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Button.dialogClose /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
-    </Style>
-    <Style Selector="Button.dialogClose:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource ClaudeErrorBrush}" />
-      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
-    </Style>
-    <Style Selector="Button.dialogClose:pressed /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource ClaudeErrorBrush}" />
-      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
-    </Style>
-  </Window.Styles>
-
   <Panel>
     <!-- 自绘标题行 (2026-09-23 用户要求移除最小化/最大化钮): 拖动区 (BeginMoveDrag) + 标题 -->
     <Panel Height="36" Background="Transparent" PointerPressed="OnTitleBarPointerPressed">

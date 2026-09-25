@@ -13,33 +13,6 @@
         ExtendClientAreaTitleBarHeightHint="36">
 
   <!-- 插件页 QuickSwitch 配置对话框 (逻辑自 Settings 页「快速切换」分区迁入; 副本编辑, 保存才落盘) -->
-  <Window.Styles>
-    <!-- 自绘关闭钮 (最小化/最大化已按用户要求移除): 基态/悬停/按下都压模板部件 (坑 13) -->
-    <Style Selector="Button.dialogClose">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Width" Value="36" />
-      <Setter Property="Height" Value="26" />
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusSm}" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Button.dialogClose /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{StaticResource ClaudeOliveGrayBrush}" />
-    </Style>
-    <Style Selector="Button.dialogClose:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource ClaudeErrorBrush}" />
-      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
-    </Style>
-    <Style Selector="Button.dialogClose:pressed /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource ClaudeErrorBrush}" />
-      <Setter Property="Foreground" Value="{StaticResource ClaudeIvoryBrush}" />
-    </Style>
-  </Window.Styles>
-
   <Panel>
     <!-- 自绘标题行 (2026-09-23 用户要求移除最小化/最大化钮): 拖动区 (BeginMoveDrag) + 标题 -->
     <Panel Height="36" Background="Transparent" PointerPressed="OnTitleBarPointerPressed">
