@@ -5,7 +5,7 @@
         Background="{StaticResource ClaudeParchmentBrush}"
         x:Name="DlgRoot"
         x:DataType="vm:PluginSettingsDialogViewModel"
-        Title="Setting"
+        Title="{Binding DisplayName}"
         Width="520" SizeToContent="Height" MaxHeight="620"
         WindowStartupLocation="CenterOwner">
 

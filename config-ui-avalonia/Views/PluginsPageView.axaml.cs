@@ -73,10 +73,16 @@ public partial class PluginsPageView : UserControl
             return;
         }
 
+        // 表单就绪后才开窗 (与 QuickSwitch 弹窗同款时序): SizeToContent 一次到位,
+        // 无「打开瞬间白帧 + 异步长高黑帧」(2026-09-23 用户报障, 曾两版修复失败);
+        // 加载失败也照常开窗 (LoadError 红字在弹窗内呈现)
+        var settingsVm = new PluginSettingsDialogViewModel(vm.Main, card.Manifest);
         var pluginDialog = new PluginSettingsDialogWindow
         {
-            DataContext = new PluginSettingsDialogViewModel(vm.Main, card.Manifest),
+            DataContext = settingsVm,
         };
+        try { await settingsVm.LoadAsync(); }
+        catch { /* 加载失败已由 VM 的 LoadError 呈现 */ }
         await pluginDialog.ShowDialog(owner);
     }
 

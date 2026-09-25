@@ -1,9 +1,7 @@
 using System;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using Avalonia.Threading;
 using KeyFlux.Settings.Services;
 using KeyFlux.Settings.ViewModels;
 
@@ -13,6 +11,7 @@ namespace KeyFlux.Settings.Views;
 /// 用户插件设置对话框 (插件页点击卡片打开; 内置 QuickSwitch 走 QuickSwitchDialogWindow)。
 /// 表单由 manifest.settings 驱动, 逻辑全在 <see cref="PluginSettingsDialogViewModel"/>;
 /// 本文件只保留必须由视图承担的两件事: 窗口外观钩子与文件选择器 (需 StorageProvider)。
+/// 时序约定: LoadAsync 由调用方在 ShowDialog 之前完成 (表单就绪后才开窗, 无白帧/黑帧)。
 /// </summary>
 public partial class PluginSettingsDialogWindow : Window
 {
@@ -28,31 +27,16 @@ public partial class PluginSettingsDialogWindow : Window
         TitleBarIconSuppressor.Attach(this);
         I18n.Changed += OnLanguageChanged;
         Closed += (_, _) => I18n.Changed -= OnLanguageChanged;
-        Opened += OnOpened;
         // SizeToContent=Height + CenterOwner 的组合缺陷: 打开瞬间按「未加载表单的小高度」
         // 居中, LoadAsync 之后窗口向下长高、锚点不动 ⇒ 弹窗严重偏下 (2026-09-23 用户报障)。
-        // 对策: 统一定位模块 (DialogPlacer) —— 加载后的尺寸变化自动重居中。
-        // 屏幕外开门 (同日第二报: 打开瞬间整窗白帧 + 长高后底部黑帧): 窗口先开在屏幕外,
-        // LoadAsync 与渲染落定后由 RevealWhenRendered 移入屏幕 (v1 的 Opacity 门在本应用
-        // 软件渲染+重定向表面管线下诱发持久黑块, 已废弃, 见 DialogPlacer 注释)。
-        Services.Win32.DialogPlacer.OpenOffscreen(this);
+        // 对策: LoadAsync 已移到调用方 ShowDialog 之前 (内容先就绪后开窗), 打开即最终尺寸;
+        // AttachAutoCenter 留作语言切换等后续尺寸变化的安全网 (与 QuickSwitch 同款)。
+        Services.Win32.DialogPlacer.AttachAutoCenter(this);
     }
 
     private void OnLanguageChanged()
     {
         if (DataContext is PluginSettingsDialogViewModel vm) vm.OnLanguageChanged();
-    }
-
-    private async void OnOpened(object? sender, EventArgs e)
-    {
-        if (DataContext is PluginSettingsDialogViewModel vm)
-        {
-            Title = vm.DisplayName;
-            try { await vm.LoadAsync(); }
-            catch { /* 加载失败已由 VM 的 LoadError 呈现 */ }
-        }
-        // 渲染排空后移入屏幕并挂自动重居中; 无条件执行 (加载异常/无 DataContext 也不能让窗口离屏卡死)
-        await Services.Win32.DialogPlacer.RevealWhenRendered(this);
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
