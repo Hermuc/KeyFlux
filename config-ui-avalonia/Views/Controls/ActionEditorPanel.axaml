@@ -127,9 +127,15 @@
       </Grid>
 
       <!-- 按编辑器 VM 类型分发 (类型 0 时 Editor 为 null); ScrollViewer 兜底: 内容超过固定高度时滚动;
-           x:Name 供 code-behind 点选键格后把选中项滚动定位进可视区 -->
+           x:Name 供 code-behind 点选键格后把选中项滚动定位进可视区。
+           ⚠ ContentControl 右 Margin 3px (2026-09-26): 选中态焦点环 ClaudeShadowFocusRing =
+           0 0 0 2 向外扩散 BoxShadow, 而输入框右缘原本与 ScrollViewer 视口右缘齐平 ⇒ 环右侧
+           2px 被视口硬裁 (左有 10px 列距/上下有 6px 行距让位故唯独右边缺)。此为布局裁剪,
+           与渲染管线无关 (GPU 档实测依旧裁)。注意让位必须加在内容上 (Margin), 不能用
+           ScrollViewer Padding —— Fluent 模板里它是 ScrollContentPresenter 的 Margin,
+           裁剪边界随内容一起内缩, 齐平依旧。 -->
       <ScrollViewer x:Name="EditorScroll" VerticalScrollBarVisibility="Auto">
-        <ContentControl Content="{Binding Editor}">
+        <ContentControl Margin="0,0,3,0" Content="{Binding Editor}">
         <ContentControl.DataTemplates>
 
           <!-- ===================== 类型 1: 启动程序或激活窗口 ===================== -->
@@ -149,7 +155,7 @@
               <Grid ColumnDefinitions="140,*" ColumnSpacing="10" Margin="0,6,0,0">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=302}"
                            Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
-                <AutoCompleteBox Grid.Column="1" Text="{Binding Target, Mode=TwoWay}"
+                <AutoCompleteBox Grid.Column="1" Classes="claudeInput" Text="{Binding Target, Mode=TwoWay}"
                                  ItemsSource="{Binding Shortcuts}"
                                  Padding="8,6" />
               </Grid>

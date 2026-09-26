@@ -713,6 +713,33 @@
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
   </Style>
 
+  <!-- AutoCompleteBox.claudeInput (2026-09-26 用户报「启动目标框与其他三个输入框样式不一致」):
+       Fluent 默认 AutoCompleteBox 半径/边框与 claudeInput TextBox 不一致, 且其模板是 Panel 内嵌
+       TextBox#PART_TextBox, 控件自身的 Background/BorderBrush 不落到内层框上 ⇒ 样式须穿透模板
+       直接设内层 TextBox; 焦点态对齐 TextBox.claudeInput (Coral 边 + PART_BorderElement 焦点环)。 -->
+  <Style Selector="AutoCompleteBox.claudeInput">
+    <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Padding" Value="8,6" />
+  </Style>
+  <Style Selector="AutoCompleteBox.claudeInput /template/ TextBox#PART_TextBox">
+    <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Padding" Value="8,6" />
+  </Style>
+  <Style Selector="AutoCompleteBox.claudeInput /template/ TextBox#PART_TextBox:focus">
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
+  </Style>
+  <Style Selector="AutoCompleteBox.claudeInput /template/ TextBox#PART_TextBox:focus /template/ Border#PART_BorderElement">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+  </Style>
+
   <!-- 全局开关状态文字 ON/OFF (2026-09-13 用户要求全大写统一): 未显式设置 OnContent/OffContent
        的 ToggleSwitch (设置页毛玻璃卡等) 由此生效; 行内 rowSwitch (x:Null) 与
        插件页 compact (x:Null+独立 TextBlock) 局部样式优先级更高, 不受影响 -->

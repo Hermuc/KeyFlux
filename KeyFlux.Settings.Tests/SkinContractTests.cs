@@ -501,11 +501,10 @@ public sealed class SkinContractTests
     }
 
     /// <summary>
-    /// 契约: 默认渲染管线必须仍是**软件渲染**。这是 2026-09-12 的瞬峰治理冻结决策
-    /// (Program.cs 注释写明"勿删此配置"+"换回 GPU 渲染需回归瞬峰/内存实测")。
-    /// 2026-09-24 为动效流畅度新增的 <c>KEYFLUX_RENDER_GPU</c> 只是实测/试用开关 —— GPU 档
-    /// 能解决"重卡逐帧重光栅导致的掉帧", 但会带回启动瞬峰, 故**不得顺手改默认值**:
-    /// 该切换需要真机启动设置面板采样内存, 属独立回归项。
+    /// 契约: 默认渲染管线为**软件渲染** (2026-09-12 瞬峰治理决策)。2026-09-26 曾为排查
+    /// 描边右缘缺失短暂切 GPU 默认, 实测确认右缘缺失是布局裁剪 (ActionEditorPanel 已修)
+    /// 与管线无关后, 同日恢复软件默认。<c>KEYFLUX_RENDER_GPU=1</c> 保留为 GPU 档开关
+    /// (解决重卡逐帧重光栅掉帧, 代价是启动瞬峰/内存回升, 切换属独立回归项)。
     /// </summary>
     [Fact]
     public void Program_Default_Render_Mode_Stays_Software()
