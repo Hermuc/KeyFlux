@@ -699,9 +699,16 @@
   </Style>
   <Style Selector="TextBox.claudeInput:focus-visible">
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
+    <!-- 焦点指示 = 内描边自身变色加粗 (2026-09-26 用户裁定「只保留内层线」): 原叠加的 2px 向外
+         扩散 BoxShadow (a) 右侧压在 ScrollViewer 视口裁剪边界上被裁 (双环时期外环右缘缺失根因),
+         (b) 两套图元在圆角处 AA 叠加显厚、弧段与直边衔接生硬。改为单一内描边 1.6 设计像素:
+         在自身边界内渲染永不裁切, 弧段墨量充足延续直边虚边, 过渡自然、四边等宽。
+         ⚠ 厚度须同时设 /template/ Border#PART_BorderElement —— 控件属性会被主题对部件的
+         样式值压掉 (SettingsPageView:383 同款坑) -->
+    <Setter Property="BorderThickness" Value="1.6" />
   </Style>
   <Style Selector="TextBox.claudeInput:focus-visible /template/ Border#PART_BorderElement">
-    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+    <Setter Property="BorderThickness" Value="1.6" />
   </Style>
   <Style Selector="ComboBox.claudeInput">
     <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
@@ -735,9 +742,11 @@
   </Style>
   <Style Selector="AutoCompleteBox.claudeInput /template/ TextBox#PART_TextBox:focus">
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
+    <Setter Property="BorderThickness" Value="1.6" />
+    <!-- 与 TextBox.claudeInput 同款: 单一内描边, 不外扩、四边等宽 (厚度须设到部件上) -->
   </Style>
   <Style Selector="AutoCompleteBox.claudeInput /template/ TextBox#PART_TextBox:focus /template/ Border#PART_BorderElement">
-    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowFocusRing}" />
+    <Setter Property="BorderThickness" Value="1.6" />
   </Style>
 
   <!-- 全局开关状态文字 ON/OFF (2026-09-13 用户要求全大写统一): 未显式设置 OnContent/OffContent
