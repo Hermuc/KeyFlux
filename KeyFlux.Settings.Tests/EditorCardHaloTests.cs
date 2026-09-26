@@ -121,16 +121,16 @@ public sealed class EditorCardHaloTests
         window.MouseMove(pt);
         Dispatcher.UIThread.RunJobs();
         Assert.True(combo.IsPointerOver, "悬停应命中下拉框");
-        // Fluent 模板 :pointerover 边框经面板级资源覆盖为奶油色 (消除默认深灰"黑圈")
+        // Fluent 模板 :pointerover 边框经面板级资源覆盖为透明 (消除默认深灰"黑圈";
+        // 2026-09-26 二次细化: 悬停边框直接透明, 白色内部直抵外圈橙色环带)
         var templateBorder = panel.GetVisualDescendants().OfType<Border>()
             .First(b => b.Name == "Background");
-        Assert.Equal(Color.FromArgb(0xff, 0xf0, 0xee, 0xe6), ((ISolidColorBrush)templateBorder.BorderBrush!).Color);
+        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)templateBorder.BorderBrush!).Color);
         _output.WriteLine($"DEBUG: far.Classes=[{string.Join(",", far.Classes)}], far.IsPointerOver={far.IsPointerOver}, " +
                           $"combo.IsPointerOver={combo.IsPointerOver}, panel.IsPointerOver={panel.IsPointerOver}");
         Assert.Equal(Colors.Transparent, ((ISolidColorBrush)far.Background!).Color);
-        // comboHalo = 边框外一圈橙色线条 (BorderBrush 变陶土, 非整框填充)
-        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)wrapper.BorderBrush!).Color);
-        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)wrapper.Background!).Color);
+        // comboHalo = 环带填充 (陶土 30%), 直接贴合下拉框边框
+        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)wrapper.Background!).Color);
 
         // ② 移回卡面空白区 (底部): 外圈恢复 (两环版 far 悬停档 = 30%), 下拉框环熄灭
         var pt2 = Avalonia.VisualExtensions.TranslatePoint(
@@ -138,7 +138,7 @@ public sealed class EditorCardHaloTests
         window.MouseMove(pt2);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(hoverFar, ((ISolidColorBrush)far.Background!).Color);
-        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)wrapper.BorderBrush!).Color);
+        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)wrapper.Background!).Color);
     }
 
     /// <summary>
@@ -162,8 +162,7 @@ public sealed class EditorCardHaloTests
             b.Transitions = null;
 
         var typeCombo = panel.GetVisualDescendants().OfType<ComboBox>().Last(); // 第二个 = 动作类型
-        var typeWrapper = panel.GetVisualDescendants().OfType<Border>()
-            .Last(b => b.Classes.Contains("comboHalo"));
+        var typeWrapper = Assert.IsType<Border>(typeCombo.GetVisualParent());
 
         // ① 禁用态 (未绑定动作 → IsTypeDisabled=true, 深灰不可点): 悬停不亮描边
         Assert.True(core.Editor.IsTypeDisabled, "未绑定动作时类型下拉应为禁用态");
@@ -172,7 +171,7 @@ public sealed class EditorCardHaloTests
         window.MouseMove(pt);
         Dispatcher.UIThread.RunJobs();
         Assert.True(typeWrapper.IsPointerOver, "悬停应命中类型下拉框");
-        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)typeWrapper.BorderBrush!).Color);
+        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)typeWrapper.Background!).Color);
 
         // ② 已选键且配置后 (类型1): 悬停恢复橙色描边
         core.Editor.BindTo(new Models.Action { WindowGroupId = 0, TypeId = 1 });
@@ -180,7 +179,7 @@ public sealed class EditorCardHaloTests
         Assert.False(core.Editor.IsTypeDisabled, "绑定类型1后应非禁用态");
         window.MouseMove(pt);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)typeWrapper.BorderBrush!).Color);
+        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)typeWrapper.Background!).Color);
 
         // ③ 已选键但类型仍为「未配置」(类型0, 白/可点): 悬停照常亮描边
         //    (2026-09-25 用户二次细化: 只有深灰禁用态才让位)
@@ -189,6 +188,6 @@ public sealed class EditorCardHaloTests
         Assert.False(core.Editor.IsTypeDisabled, "已选键后应非禁用态 (即使类型为未配置)");
         window.MouseMove(pt);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)typeWrapper.BorderBrush!).Color);
+        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)typeWrapper.Background!).Color);
     }
 }

@@ -52,7 +52,8 @@
                  BorderBrush="{StaticResource ClaudeWarmSilverBrush}" BorderThickness="1.5"
                  Margin="2,16,0,0" Padding="8,6" />
 
-        <controls:ActionEditorPanel x:Name="EditorPanel" Width="580" Margin="0,18,0,0" DataContext="{Binding Editor}" />
+        <!-- Margin 右 14: 同 KeymapPage —— 面板外圈光环带离开 Viewbox 缩放内容右边界 -->
+        <controls:ActionEditorPanel x:Name="EditorPanel" Width="580" Margin="0,18,14,0" DataContext="{Binding Editor}" />
         </StackPanel>
       </Viewbox>
 

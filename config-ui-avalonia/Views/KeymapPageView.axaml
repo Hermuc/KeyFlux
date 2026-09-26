@@ -86,7 +86,10 @@
              左右各内缩 2, 不贴按钮 (仅模式页生效, 不改共享的 ActionEditorPanel);
              左列占位 = 最宽行实际宽度 (不再右补偿: 实测 UIA 补偿 Margin 经 Viewbox 缩放
              在网格↔备注列间放大成百余物理像素空白); top Margin 12 保持网格↔面板垂直间距 -->
-        <Border x:Name="EditorFrame" Width="620" Padding="2,0" Margin="0,12,0,0">
+        <!-- Margin 右 14 (2026-09-26 用户报「橙圈右缘被切割」): 面板外圈光环带的右段原本
+             正好压在 Viewbox 缩放内容的右边界上, 边界外半像素被裁 → 右段比左段细。内容右侧
+             内缩 14px 后环带整体离开边界, 四段等宽。 -->
+        <Border x:Name="EditorFrame" Width="620" Padding="2,0" Margin="0,12,14,0">
           <controls:ActionEditorPanel x:Name="EditorPanel" DataContext="{Binding Editor}" />
         </Border>
         </StackPanel>
