@@ -11,14 +11,23 @@
        (DynamicResource 沿逻辑树查找, 面板级优先于主题; ScrollBarSize 同款机制)。
        覆盖为奶油色 = 悬停时下拉框自身边框与静止态一致, 唯一反馈是外圈橙色线条 -->
   <UserControl.Resources>
-    <!-- 悬停反馈 = 输入框自己的边框变陶土色 (2026-09-26 用户多轮迭代后的最终方案):
-         弃独立环带层 (填充环带在 Viewbox 分数缩放下右段被裁、与子框边框叠加成双圈),
-         改为悬停时输入框自身 BorderBrush → 陶土。覆盖两个主题资源 (Fluent 模板的
-         :pointerover 状态直接用它们渲染模板边框, 无视控件 claudeInput 的设置):
-         ComboBoxBorderBrushPointerOver (下拉框) / TextControlBorderBrushPointerOver
-         (文本框/补全框)。面板级覆盖只影响本面板 -->
-    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">#c96442</SolidColorBrush>
-    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver">#c96442</SolidColorBrush>
+    <!-- Fluent ComboBox 悬停/按压态的边框(深灰)与背景(半透明白)都是模板内 DynamicResource
+         (无视控件 claudeInput 的设置) —— 面板级覆盖: 悬停/按压时下拉框保持不透明白底 +
+         奶油边, 悬停反馈只由外圈 comboHalo 环带承担 (DynamicResource 沿逻辑树查找,
+         面板级优先于主题; ScrollBarSize 同款机制) -->
+    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">Transparent</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxBorderBrushPressed">#f0eee6</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver">#ffffff</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxBackgroundPressed">#ffffff</SolidColorBrush>
+    <!-- Fluent TextBox 的 :pointerover/:focus 状态背景 = 半透明白 (TextControlBackground*
+         系列, 为毛玻璃底设计) —— 补全框内嵌 TextBox 悬停/聚焦时整框透出底层环带 (泛粉)。
+         覆盖为不透明白: 悬停/输入时框内保持纯白, 悬停反馈只由外圈环带承担 -->
+    <SolidColorBrush x:Key="TextControlBackgroundPointerOver">#ffffff</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlBackgroundFocused">#ffffff</SolidColorBrush>
+    <!-- Fluent TextBox 悬停态边框 (App 级覆盖 = 灰 #c9c7bd) —— 面板内覆盖为奶油色
+         (与静止态一致): 悬停反馈只由外圈橙色环带承担, 框自身边框不变灰 (用户报「橙圈内
+         还有灰圈」= 橙色环带 + 灰色悬停边框相邻成双圈) -->
+    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver">#f0eee6</SolidColorBrush>
   </UserControl.Resources>
 
   <!-- 动作编辑面板 (复刻 actions/Action.vue 卡片: 分组下拉 + 类型下拉 + 按类型分发编辑器);
@@ -84,13 +93,36 @@
     <Style Selector="Border.editorCard AutoCompleteBox.claudeInput">
       <Setter Property="BorderThickness" Value="2" />
     </Style>
-    <Style Selector="Border.editorCard ComboBox.claudeInput">
+    <Style Selector="Border.comboHalo ComboBox.claudeInput">
       <Setter Property="BorderThickness" Value="2" />
     </Style>
-    <!-- 未选键的禁用态下拉框 (深灰不可点): 悬停不变陶土 (用户二次细化)。
-         ⚠ 排在 pointerover 覆盖之后以生效 -->
-    <Style Selector="ComboBox.claudeInput:disabled">
-      <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
+
+    <!-- 下拉框悬停环带 (2026-09-26 用户反馈线条不贴框+右缘细, 弃线条改填充环带):
+         环层 Background 透明→陶土 30% (BrushTransition 120ms), Padding 2 = 环带宽 2px 且
+         **直接贴合**子框边框 (填充填满 Padding 区, 无线条悬空间隙); 子框自身背景不透明
+         (claudeInput 白), 环带不会透进内部 —— 「整框变色」不会复现。
+         🔴 弃 BorderBrush 线条: Viewbox 分数缩放下细线条渲染浓度不均/悬空
+         (用户两轮截图实测), 填充+圆角经缩放稳定 (与外圈 haloRing 同源画法);
+         半径 11 = 子框边框外缘 + 环带宽 3 -->
+    <Style Selector="Border.comboHalo">
+      <Setter Property="CornerRadius" Value="11,11,11,11" />
+      <Setter Property="Padding" Value="3" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.comboHalo:pointerover">
+      <Setter Property="Background" Value="{StaticResource ClaudeTerracottaBrush}" />
+    </Style>
+    <!-- 未配置+禁用档让位: 环带保持透明 (⚠ 排在 :pointerover 之后以覆盖) -->
+    <Style Selector="Border.comboHalo.haloOff">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.comboHalo.haloOff:pointerover">
+      <Setter Property="Background" Value="Transparent" />
     </Style>
   </UserControl.Styles>
 
@@ -106,19 +138,23 @@
       <!-- 头部: 窗口分组 (5/12) + 动作类型 (7/12); claudeInput = White 底+Cream 边+焦点 Coral。
            comboHalo = 下拉框自己的悬停橙圈 (2026-09-25 用户要求: 指针悬到子选项框时外圈光圈
            让位到子框 —— 让位由 code-behind 指针命中测试挂 childHover 类实现, 见 far.childHover) -->
-      <!-- 头部: 窗口分组 (5/12) + 动作类型 (7/12); claudeInput = White 底+Cream 边+焦点 Coral。
-           悬停反馈 = 输入框自己的边框变陶土 (见 UserControl.Styles 的 pointerover 覆盖)。
-           haloOff = 未选键的禁用态 (VM.IsTypeDisabled): 悬停不变陶土 (用户二次细化) -->
       <Grid DockPanel.Dock="Top" ColumnDefinitions="5*,7*" Margin="0,0,0,10">
-        <ComboBox Classes="claudeInput"
-                  ItemsSource="{Binding GroupOptions}"
-                  SelectedItem="{Binding SelectedGroup}"
-                  HorizontalAlignment="Stretch" Margin="0,0,10,0" />
-        <ComboBox Grid.Column="1" Classes="claudeInput" Classes.haloOff="{Binding IsTypeDisabled}"
-                  ItemsSource="{Binding TypeOptions}"
-                  SelectedItem="{Binding SelectedType}"
-                  IsEnabled="{Binding HasHotkey}"
-                  HorizontalAlignment="Stretch" />
+        <Border Classes="comboHalo" Margin="0,0,10,0">
+          <ComboBox Classes="claudeInput"
+                    ItemsSource="{Binding GroupOptions}"
+                    SelectedItem="{Binding SelectedGroup}"
+                    HorizontalAlignment="Stretch" />
+        </Border>
+        <!-- haloOff = 动作类型下拉处于禁用态 (未选键, VM.IsTypeDisabled): 悬停不亮描边
+             (2026-09-25 用户二次细化: 仅深灰不可点态让位; 白色可点态照常亮圈)。
+             类绑定随 HasHotkey 实时切换。⚠ 让位样式须排在 comboHalo:pointerover 之后 -->
+        <Border Grid.Column="1" Classes="comboHalo" Classes.haloOff="{Binding IsTypeDisabled}">
+          <ComboBox Classes="claudeInput"
+                    ItemsSource="{Binding TypeOptions}"
+                    SelectedItem="{Binding SelectedType}"
+                    IsEnabled="{Binding HasHotkey}"
+                    HorizontalAlignment="Stretch" />
+        </Border>
       </Grid>
 
       <!-- 按编辑器 VM 类型分发 (类型 0 时 Editor 为 null); ScrollViewer 兜底: 内容超过固定高度时滚动;
@@ -150,9 +186,12 @@
               <Grid ColumnDefinitions="140,*" ColumnSpacing="10" Margin="0,6,0,0">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=302}"
                            Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
-                <AutoCompleteBox Classes="claudeInput" Grid.Column="1" Text="{Binding Target, Mode=TwoWay}"
-                                 ItemsSource="{Binding Shortcuts}"
-                                 Padding="8,6" />
+                <!-- comboHalo 环带: 与下拉框同款悬停反馈 (右缘细 = 同一渲染问题, 填充环带修正) -->
+                <Border Classes="comboHalo" Grid.Column="1">
+                  <AutoCompleteBox Classes="claudeInput" Text="{Binding Target, Mode=TwoWay}"
+                                   ItemsSource="{Binding Shortcuts}"
+                                   Padding="8,6" />
+                </Border>
               </Grid>
 
               <Grid ColumnDefinitions="140,*" ColumnSpacing="10" Margin="0,6,0,0">

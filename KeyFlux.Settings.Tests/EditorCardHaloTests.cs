@@ -1,6 +1,7 @@
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Animation;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
@@ -16,72 +17,137 @@ using Xunit.Abstractions;
 namespace KeyFlux.Settings.Tests;
 
 /// <summary>
-/// 动作编辑面板悬停反馈守护 (2026-09-25/26 多轮迭代后的最终形态):
-///   · 悬停反馈 = 输入框自己的边框变陶土色 2px (ComboBoxBorderBrushPointerOver /
-///     TextControlBorderBrushPointerOver 面板级资源覆盖), 移出回落奶油色;
-///   · 外圈光圈 (haloRing far/near 双层填充环): 指针在卡面空白区/环带上点亮, 悬停
-///     可交互子控件时熄灭让位 (childHover 类, code-behind 指针命中测试切换);
-///   · 未选键的禁用态类型下拉: 不可命中 → 悬停无反馈 (边框保持奶油色)。
-/// Viewbox 分数缩放页内弃用 BoxShadow/负 Margin 画法 (渲染损坏, 见 git 历史)。
+/// 动作编辑面板悬停光圈守护 (2026-09-25): 用户要求与插件页/选中动作页/选项页组件框
+/// 同款陶土色悬停光圈。⚠ 面板位于 Viewbox 分数缩放页内, BoxShadow (含负 Margin 环)
+/// 在真实软件渲染管线 + Viewbox 组合下渲染损坏 (用户实测「四角暗斑/组件框变方」),
+/// 故面板弃用 BoxShadow, 改为**嵌套 Padding 填充环**: far/near 双环为卡的祖先
+/// Border, 静止 Background=Transparent, 悬停经 :pointerover 换陶土色阶梯 (35%/19%/9%),
+/// BrushTransition (120ms = ClaudeMotion.Micro) 淡入。环是卡的祖先 ⇒ 不能用 Opacity
+/// 淡入 (祖先 Opacity 会连卡片一起藏掉), 故必须走画刷换色。
+/// 断言: 静止三环透明; 悬停三环分别命中三档陶土色; 过渡接线为 BrushTransition(Micro)。
 /// </summary>
 public sealed class EditorCardHaloTests
 {
     private readonly ITestOutputHelper _output;
     public EditorCardHaloTests(ITestOutputHelper output) => _output = output;
 
-    private static readonly Color Cream = Color.FromArgb(0xff, 0xf0, 0xee, 0xe6);
-    private static readonly Color Terracotta = Color.FromArgb(0xff, 0xc9, 0x64, 0x42);
-    private static readonly Color BandHover = Color.FromArgb(0x26, 0xc9, 0x64, 0x42);
-
-    /// <summary>摘掉画刷过渡 (headless 时钟不推进, 直达终点态; 同 SettingsCardEffectTests)。</summary>
-    private static void DetachTransitions(ActionEditorPanel panel)
-    {
-        foreach (var b in panel.GetVisualDescendants().OfType<Border>())
-            b.Transitions = null;
-    }
-
     [AvaloniaFact]
-    public void EditorPanel_Hover_Combo_Border_Turns_Terracotta_And_Outer_Halo_Yields()
+    public void EditorPanel_Hover_Halo_Rings_Swap_Brushes()
     {
         var main = new MainViewModel(new BackendSessionOptions());
         main.Config = ConfigReadDefaults.Apply(new Config());
-        var core = new KeymapEditorCore(main, new Models.Keymap { Id = 10, Hotkey = "F", Enable = true });
-        core.Editor.BindTo(new Models.Action { WindowGroupId = 0, TypeId = 1, Target = "shortcuts-WeChat.link" });
-        var panel = new ActionEditorPanel { Width = 580, DataContext = core.Editor };
-        var window = new Window { Width = 800, Height = 900, Content = panel, Background = Brushes.White };
+        var panel = new ActionEditorPanel { Width = 588 };
+        var window = new Window { Width = 800, Height = 700, Content = panel, Background = Brushes.White };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        DetachTransitions(panel);
+
+        var rings = panel.GetVisualDescendants().OfType<Border>()
+            .Where(b => b.Classes.Contains("haloRing")).ToList();
+        var far = Assert.Single(rings, b => b.Classes.Contains("far"));
+        var near = Assert.Single(rings, b => b.Classes.Contains("near"));
+
+        // ⓪ 过渡接线 (摘除前断言): 每环必须有 BrushTransition (120ms = ClaudeMotion.Micro)
+        foreach (var ring in rings)
+        {
+            var t = Assert.Single(ring.Transitions!.OfType<BrushTransition>());
+            Assert.Equal("Background", t.Property!.Name);
+            Assert.Equal(ViewModels.ClaudeMotion.Micro, t.Duration);
+        }
+
+        // headless 不推动画时钟: 摘掉过渡使 :pointerover 换色直达终点态 (同 SettingsCardEffectTests)
+        foreach (var ring in rings) ring.Transitions = null;
+
+        var terracotta = new byte[] { 0xc9, 0x64, 0x42 }; // #c96442 RGB
+        var rest = Colors.Transparent; // 静止态 = 透明 (样式字面量 "Transparent")
+        var hoverNear = Color.FromArgb(0x4d, terracotta[0], terracotta[1], terracotta[2]);
+        var hoverFar = Color.FromArgb(0x26, terracotta[0], terracotta[1], terracotta[2]);
+
+        // ① 静止态: 双环全透明
+        Assert.Equal(rest, ((ISolidColorBrush)far.Background!).Color);
+        Assert.Equal(rest, ((ISolidColorBrush)near.Background!).Color);
+
+        // ② 悬停: 指针落在卡片内 → 三环分别换三档陶土色 (外淡内浓阶梯)
+        var card = panel.GetVisualDescendants().OfType<Border>()
+            .First(b => b.Classes.Contains("editorCard"));
+        var pt = Avalonia.VisualExtensions.TranslatePoint(
+            card, new Point(card.Bounds.Width / 2, card.Bounds.Height / 2), window)!.Value;
+        window.MouseMove(pt);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(far.IsPointerOver, "悬停应命中面板 (far 环为卡片祖先)");
+        Assert.Equal(hoverFar, ((ISolidColorBrush)far.Background!).Color);
+        Assert.Equal(hoverNear, ((ISolidColorBrush)near.Background!).Color);
+
+        // ④ 移出复位: 双环回到透明
+        window.MouseMove(new Point(1, 1));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(rest, ((ISolidColorBrush)far.Background!).Color);
+        Assert.Equal(rest, ((ISolidColorBrush)near.Background!).Color);
+    }
+
+    /// <summary>
+    /// 悬停让位 (2026-09-25 用户要求): 指针悬到子选项框 (Global 下拉) 时, 外圈光圈熄灭、
+    /// 下拉框自己的 comboHalo 橙色线条描边点亮 (仅边框外一线, 非整框变色);
+    /// 指针移回卡面空白区时反向恢复。
+    /// </summary>
+    [AvaloniaFact]
+    public void EditorPanel_Hover_Combo_Suppresses_Outer_Halo_And_Lights_Combo_Ring()
+    {
+        var main = new MainViewModel(new BackendSessionOptions());
+        main.Config = ConfigReadDefaults.Apply(new Config());
+        var panel = new ActionEditorPanel { Width = 588 };
+        var window = new Window { Width = 800, Height = 700, Content = panel, Background = Brushes.White };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
 
         var far = panel.GetVisualDescendants().OfType<Border>()
             .First(b => b.Classes.Contains("haloRing") && b.Classes.Contains("far"));
+        var wrapper = panel.GetVisualDescendants().OfType<Border>()
+            .First(b => b.Classes.Contains("comboHalo"));
+        // 两个下拉框 (窗口分组/动作类型) 均适用; 取第一个 (Global) 断言
         var combo = panel.GetVisualDescendants().OfType<ComboBox>().First();
-        // 悬停变色发生在模板边框上 (Fluent ComboBox 模板的 Border#Background)
-        var templateBorder = panel.GetVisualDescendants().OfType<Border>()
-            .First(b => b.Name == "Background");
+
+        // headless 不推动画时钟: 摘掉画刷过渡直达终点态
+        foreach (var b in panel.GetVisualDescendants().OfType<Border>()
+                     .Where(b => b.Classes.Contains("haloRing") || b.Classes.Contains("comboHalo")))
+            b.Transitions = null;
+
         var card = panel.GetVisualDescendants().OfType<Border>()
             .First(b => b.Classes.Contains("editorCard"));
+        var hoverFar = Color.FromArgb(0x26, 0xc9, 0x64, 0x42); // far 悬停档 (两环版 30%)
 
-        // ① 悬停下拉框: 自己的边框变陶土 (2px); 外圈光圈熄灭让位
+        // ① 悬停下拉框: 外圈让位 (透明), comboHalo 橙色描边点亮
         var pt = Avalonia.VisualExtensions.TranslatePoint(
             combo, new Point(combo.Bounds.Width / 2, combo.Bounds.Height / 2), window)!.Value;
         window.MouseMove(pt);
         Dispatcher.UIThread.RunJobs();
         Assert.True(combo.IsPointerOver, "悬停应命中下拉框");
-        Assert.Equal(Terracotta, ((ISolidColorBrush)templateBorder.BorderBrush!).Color);
+        // Fluent 模板 :pointerover 边框经面板级资源覆盖为透明 (消除默认深灰"黑圈";
+        // 2026-09-26 二次细化: 悬停边框直接透明, 白色内部直抵外圈橙色环带)
+        var templateBorder = panel.GetVisualDescendants().OfType<Border>()
+            .First(b => b.Name == "Background");
+        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)templateBorder.BorderBrush!).Color);
+        _output.WriteLine($"DEBUG: far.Classes=[{string.Join(",", far.Classes)}], far.IsPointerOver={far.IsPointerOver}, " +
+                          $"combo.IsPointerOver={combo.IsPointerOver}, panel.IsPointerOver={panel.IsPointerOver}");
         Assert.Equal(Colors.Transparent, ((ISolidColorBrush)far.Background!).Color);
+        // comboHalo = 环带填充 (陶土 30%), 直接贴合下拉框边框
+        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)wrapper.Background!).Color);
 
-        // ② 指针移回卡面空白区: 边框回落奶油色, 外圈光圈恢复
+        // ② 移回卡面空白区 (底部): 外圈恢复 (两环版 far 悬停档 = 30%), 下拉框环熄灭
         var pt2 = Avalonia.VisualExtensions.TranslatePoint(
             card, new Point(card.Bounds.Width / 2, card.Bounds.Height - 30), window)!.Value;
         window.MouseMove(pt2);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(Cream, ((ISolidColorBrush)templateBorder.BorderBrush!).Color);
-        Assert.Equal(BandHover, ((ISolidColorBrush)far.Background!).Color);
+        Assert.Equal(hoverFar, ((ISolidColorBrush)far.Background!).Color);
+        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)wrapper.Background!).Color);
     }
 
+    /// <summary>
+    /// 禁用态不亮描边 (2026-09-25 用户要求, 同日二次细化): 未选键时类型下拉深灰禁用,
+    /// 悬停不出现橙色线条; 已选键后 (无论类型是「未配置」还是已配置) 下拉框白色可点,
+    /// 悬停照常亮描边 —— 与其他子选项框一致。
+    /// </summary>
     [AvaloniaFact]
-    public void EditorPanel_Disabled_Type_Combo_Shows_No_Ring_And_Enabled_Shows()
+    public void EditorPanel_Hover_Disabled_Type_Combo_Shows_No_Ring()
     {
         var main = new MainViewModel(new BackendSessionOptions());
         main.Config = ConfigReadDefaults.Apply(new Config());
@@ -90,33 +156,38 @@ public sealed class EditorCardHaloTests
         var window = new Window { Width = 800, Height = 700, Content = panel, Background = Brushes.White };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        DetachTransitions(panel);
+
+        foreach (var b in panel.GetVisualDescendants().OfType<Border>()
+                     .Where(b => b.Classes.Contains("haloRing") || b.Classes.Contains("comboHalo")))
+            b.Transitions = null;
 
         var typeCombo = panel.GetVisualDescendants().OfType<ComboBox>().Last(); // 第二个 = 动作类型
-        var typeTemplateBorder = panel.GetVisualDescendants().OfType<Border>()
-            .Last(b => b.Name == "Background");
+        var typeWrapper = Assert.IsType<Border>(typeCombo.GetVisualParent());
 
-        // ① 未选键: 类型下拉禁用 (深灰不可点) → 边框保持奶油色 (无悬停反馈)
+        // ① 禁用态 (未绑定动作 → IsTypeDisabled=true, 深灰不可点): 悬停不亮描边
         Assert.True(core.Editor.IsTypeDisabled, "未绑定动作时类型下拉应为禁用态");
-        Assert.Equal(Cream, ((ISolidColorBrush)typeCombo.BorderBrush!).Color);
-
-        // ② 绑定动作 (类型1) → 启用: 悬停边框变陶土
-        core.Editor.BindTo(new Models.Action { WindowGroupId = 0, TypeId = 1 });
-        Dispatcher.UIThread.RunJobs();
-        Assert.False(core.Editor.IsTypeDisabled, "绑定类型1后应非禁用态");
         var pt = Avalonia.VisualExtensions.TranslatePoint(
             typeCombo, new Point(typeCombo.Bounds.Width / 2, typeCombo.Bounds.Height / 2), window)!.Value;
         window.MouseMove(pt);
         Dispatcher.UIThread.RunJobs();
-        Assert.True(typeCombo.IsPointerOver, "悬停应命中类型下拉框");
-        Assert.Equal(Terracotta, ((ISolidColorBrush)typeTemplateBorder.BorderBrush!).Color);
+        Assert.True(typeWrapper.IsPointerOver, "悬停应命中类型下拉框");
+        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)typeWrapper.Background!).Color);
 
-        // ③ 已选键但类型仍为「未配置」(类型0, 白/可点): 悬停照常变陶土
+        // ② 已选键且配置后 (类型1): 悬停恢复橙色描边
+        core.Editor.BindTo(new Models.Action { WindowGroupId = 0, TypeId = 1 });
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(core.Editor.IsTypeDisabled, "绑定类型1后应非禁用态");
+        window.MouseMove(pt);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)typeWrapper.Background!).Color);
+
+        // ③ 已选键但类型仍为「未配置」(类型0, 白/可点): 悬停照常亮描边
+        //    (2026-09-25 用户二次细化: 只有深灰禁用态才让位)
         core.Editor.BindTo(new Models.Action { WindowGroupId = 0, TypeId = 0 });
         Dispatcher.UIThread.RunJobs();
         Assert.False(core.Editor.IsTypeDisabled, "已选键后应非禁用态 (即使类型为未配置)");
         window.MouseMove(pt);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(Terracotta, ((ISolidColorBrush)typeTemplateBorder.BorderBrush!).Color);
+        Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)typeWrapper.Background!).Color);
     }
 }
