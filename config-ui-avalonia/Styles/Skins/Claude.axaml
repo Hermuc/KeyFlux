@@ -709,16 +709,6 @@
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
   </Style>
-  <!-- AutoCompleteBox.claudeInput (2026-09-25): 与 TextBox/ComboBox 同族 —— 动作编辑面板的
-       「目标 = 程序/文件夹/URL」与「重映射按键」两个补全框此前无类, 渲染 Fluent 默认画刷
-       (#99000000 深灰边 + #66ffffff 半透明白底), 用户报「黑圈/缺失右缘」。模板把
-       Background/BorderBrush/CornerRadius TemplateBinding 进内部输入框, 故与 TextBox 同法。 -->
-  <Style Selector="AutoCompleteBox.claudeInput">
-    <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
-    <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
-    <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
-    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
-  </Style>
   <Style Selector="ComboBox.claudeInput:focus-visible">
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
   </Style>

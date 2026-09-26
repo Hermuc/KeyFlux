@@ -11,23 +11,8 @@
        (DynamicResource 沿逻辑树查找, 面板级优先于主题; ScrollBarSize 同款机制)。
        覆盖为奶油色 = 悬停时下拉框自身边框与静止态一致, 唯一反馈是外圈橙色线条 -->
   <UserControl.Resources>
-    <!-- Fluent ComboBox 悬停/按压态的边框(深灰)与背景(半透明白)都是模板内 DynamicResource
-         (无视控件 claudeInput 的设置) —— 面板级覆盖: 悬停/按压时下拉框保持不透明白底 +
-         奶油边, 悬停反馈只由外圈 comboHalo 环带承担 (DynamicResource 沿逻辑树查找,
-         面板级优先于主题; ScrollBarSize 同款机制) -->
-    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">Transparent</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">#f0eee6</SolidColorBrush>
     <SolidColorBrush x:Key="ComboBoxBorderBrushPressed">#f0eee6</SolidColorBrush>
-    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver">#ffffff</SolidColorBrush>
-    <SolidColorBrush x:Key="ComboBoxBackgroundPressed">#ffffff</SolidColorBrush>
-    <!-- Fluent TextBox 的 :pointerover/:focus 状态背景 = 半透明白 (TextControlBackground*
-         系列, 为毛玻璃底设计) —— 补全框内嵌 TextBox 悬停/聚焦时整框透出底层环带 (泛粉)。
-         覆盖为不透明白: 悬停/输入时框内保持纯白, 悬停反馈只由外圈环带承担 -->
-    <SolidColorBrush x:Key="TextControlBackgroundPointerOver">#ffffff</SolidColorBrush>
-    <SolidColorBrush x:Key="TextControlBackgroundFocused">#ffffff</SolidColorBrush>
-    <!-- Fluent TextBox 悬停态边框 (App 级覆盖 = 灰 #c9c7bd) —— 面板内覆盖为奶油色
-         (与静止态一致): 悬停反馈只由外圈橙色环带承担, 框自身边框不变灰 (用户报「橙圈内
-         还有灰圈」= 橙色环带 + 灰色悬停边框相邻成双圈) -->
-    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver">#f0eee6</SolidColorBrush>
   </UserControl.Resources>
 
   <!-- 动作编辑面板 (复刻 actions/Action.vue 卡片: 分组下拉 + 类型下拉 + 按类型分发编辑器);
@@ -83,46 +68,30 @@
     <Style Selector="Border.haloRing.far.childHover Border.haloRing.near">
       <Setter Property="Background" Value="Transparent" />
     </Style>
-    <!-- 输入框边框 2px (2026-09-26 用户报「灰框左右比上下细」, 1.5px 仍差一点): 面板位于
-         Viewbox 分数缩放页内, 1px 边框经缩放后左右/上下渲染浓度不均 (亚像素位置取舍),
-         2px 使四边都落在 ≥2.5 物理像素上 (AbbrPageView 外框 1.5px 同款先例的加强版)。
-         ⚠ 需排在本文件样式末尾, 覆盖 claudeInput 的默认 1px -->
-    <Style Selector="Border.editorCard TextBox.claudeInput">
-      <Setter Property="BorderThickness" Value="2" />
-    </Style>
-    <Style Selector="Border.editorCard AutoCompleteBox.claudeInput">
-      <Setter Property="BorderThickness" Value="2" />
-    </Style>
-    <Style Selector="Border.comboHalo ComboBox.claudeInput">
-      <Setter Property="BorderThickness" Value="2" />
-    </Style>
-
-    <!-- 下拉框悬停环带 (2026-09-26 用户反馈线条不贴框+右缘细, 弃线条改填充环带):
-         环层 Background 透明→陶土 30% (BrushTransition 120ms), Padding 2 = 环带宽 2px 且
-         **直接贴合**子框边框 (填充填满 Padding 区, 无线条悬空间隙); 子框自身背景不透明
-         (claudeInput 白), 环带不会透进内部 —— 「整框变色」不会复现。
-         🔴 弃 BorderBrush 线条: Viewbox 分数缩放下细线条渲染浓度不均/悬空
-         (用户两轮截图实测), 填充+圆角经缩放稳定 (与外圈 haloRing 同源画法);
-         半径 11 = 子框边框外缘 + 环带宽 3 -->
+    <!-- 下拉框悬停描边 (2026-09-25 用户裁定: 不要整框变色, 只要边框外一圈橙色线条):
+         环层自身 BorderThickness=1 + BorderBrush 透明→陶土 (BrushTransition 120ms),
+         Padding 2 = 线条悬在边框外 2px; 半径 = claudeInput 的 RadiusMd(8) + 2 -->
     <Style Selector="Border.comboHalo">
-      <Setter Property="CornerRadius" Value="11,11,11,11" />
-      <Setter Property="Padding" Value="3" />
+      <Setter Property="CornerRadius" Value="10,10,10,10" />
+      <Setter Property="Padding" Value="2" />
       <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="Transitions">
         <Transitions>
-          <BrushTransition Property="Background" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+          <BrushTransition Property="BorderBrush" Duration="{x:Static vm:ClaudeMotion.Micro}" />
         </Transitions>
       </Setter>
     </Style>
     <Style Selector="Border.comboHalo:pointerover">
-      <Setter Property="Background" Value="{StaticResource ClaudeTerracottaBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
     </Style>
-    <!-- 未配置+禁用档让位: 环带保持透明 (⚠ 排在 :pointerover 之后以覆盖) -->
+    <!-- 未配置档让位: 描边保持透明 (⚠ 排在 :pointerover 之后以覆盖) -->
     <Style Selector="Border.comboHalo.haloOff">
-      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
     <Style Selector="Border.comboHalo.haloOff:pointerover">
-      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
   </UserControl.Styles>
 
@@ -159,14 +128,8 @@
 
       <!-- 按编辑器 VM 类型分发 (类型 0 时 Editor 为 null); ScrollViewer 兜底: 内容超过固定高度时滚动;
            x:Name 供 code-behind 点选键格后把选中项滚动定位进可视区 -->
-      <!-- 滚动条隐藏 (2026-09-25 用户要求): 内容超高时不再显示竖向滚动条, 滚轮/方向键仍可滚动。
-           Padding 右 3px (2026-09-25 用户报「右边框缺了一点」): 输入框右缘原本正好贴在滚动视口
-           的裁剪边界上, 边框外侧半像素被 presenter 裁掉 → 右缘渲染成半截。内容内缩 3px 后
-           边框整体落在裁剪线内, 四边完整。 -->
-      <ScrollViewer x:Name="EditorScroll" VerticalScrollBarVisibility="Hidden" Padding="0,0,3,0">
-        <!-- Margin 右 3px: 内容右缘内缩, 输入框右边框离开滚动视口裁剪边界 (否则被裁半截,
-             用户报「右边框缺失」); 2026-09-26 实测 ScrollViewer.Padding 不内缩内容, 故挂此处 -->
-        <ContentControl Margin="0,0,3,0" Content="{Binding Editor}">
+      <ScrollViewer x:Name="EditorScroll" VerticalScrollBarVisibility="Auto">
+        <ContentControl Content="{Binding Editor}">
         <ContentControl.DataTemplates>
 
           <!-- ===================== 类型 1: 启动程序或激活窗口 ===================== -->
@@ -186,12 +149,9 @@
               <Grid ColumnDefinitions="140,*" ColumnSpacing="10" Margin="0,6,0,0">
                 <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=302}"
                            Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
-                <!-- comboHalo 环带: 与下拉框同款悬停反馈 (右缘细 = 同一渲染问题, 填充环带修正) -->
-                <Border Classes="comboHalo" Grid.Column="1">
-                  <AutoCompleteBox Classes="claudeInput" Text="{Binding Target, Mode=TwoWay}"
-                                   ItemsSource="{Binding Shortcuts}"
-                                   Padding="8,6" />
-                </Border>
+                <AutoCompleteBox Grid.Column="1" Text="{Binding Target, Mode=TwoWay}"
+                                 ItemsSource="{Binding Shortcuts}"
+                                 Padding="8,6" />
               </Grid>
 
               <Grid ColumnDefinitions="140,*" ColumnSpacing="10" Margin="0,6,0,0">
@@ -267,7 +227,7 @@
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding #PanelRoot.((vm:ActionEditorViewModel)DataContext).LanguageTick, Converter={StaticResource Tr}, ConverterParameter=401}"
                          Foreground="{StaticResource ClaudeStoneGrayBrush}" FontSize="12" />
-              <AutoCompleteBox Classes="claudeInput" Text="{Binding RemapToKey, Mode=TwoWay}"
+              <AutoCompleteBox Text="{Binding RemapToKey, Mode=TwoWay}"
                                ItemsSource="{Binding Items}"
                                IsEnabled="{Binding !IsSinglePress}"
                                Padding="8,6" />
