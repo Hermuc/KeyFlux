@@ -97,7 +97,9 @@
 
   <Border Classes="haloRing far">
     <Border Classes="haloRing near">
-        <Border Classes="editorCard"
+        <!-- UseLayoutRounding: 编辑器整树布局边界强制对齐物理像素 (DPI 1.25 下 0.8 设计像素一档),
+             聚焦描边左右/上下边缘随之落到整数像素, 四边宽度严格相等 (2026-09-26 用户要求)。 -->
+        <Border Classes="editorCard" UseLayoutRounding="True"
                 Background="{DynamicResource ClaudeIvoryBrush}"
                 CornerRadius="{StaticResource ClaudeRadiusCard}"
                 BorderBrush="{StaticResource ClaudeBorderCreamBrush}" BorderThickness="1"
@@ -128,14 +130,15 @@
 
       <!-- 按编辑器 VM 类型分发 (类型 0 时 Editor 为 null); ScrollViewer 兜底: 内容超过固定高度时滚动;
            x:Name 供 code-behind 点选键格后把选中项滚动定位进可视区。
-           ⚠ ContentControl 右 Margin 3px (2026-09-26): 选中态焦点环 ClaudeShadowFocusRing =
-           0 0 0 2 向外扩散 BoxShadow, 而输入框右缘原本与 ScrollViewer 视口右缘齐平 ⇒ 环右侧
-           2px 被视口硬裁 (左有 10px 列距/上下有 6px 行距让位故唯独右边缺)。此为布局裁剪,
-           与渲染管线无关 (GPU 档实测依旧裁)。注意让位必须加在内容上 (Margin), 不能用
-           ScrollViewer Padding —— Fluent 模板里它是 ScrollContentPresenter 的 Margin,
-           裁剪边界随内容一起内缩, 齐平依旧。 -->
+           ContentControl 右 Margin 1px (2026-09-26 用户方案「左缘固定, 右缘左移收窄」):
+           聚焦描边 (内描边, 见 Claude.axaml) 的右缘原本落在 x.5 半相位 —— 物理分辨率逐像素
+           实测: 左缘相位 0 渲染 1.5px 实线, 右缘相位 0.5 只渲染 0.5px 半强度线 (用户报
+           「右边缘缺失」)。收窄 1px 让右缘落到整数物理像素相位, 描边完整且与左缘等宽。
+           (实测扫描: 右让 0-15px 中 1/7/15 等档位相位最优, 15→7→1 逐档验证后取最小值 1)
+           ⚠ 让位必须加在内容 Margin 上, 不能用 ScrollViewer Padding —— Fluent 模板里它是
+           ScrollContentPresenter 的 Margin, 裁剪/相位边界随内容一起内缩, 齐平依旧。 -->
       <ScrollViewer x:Name="EditorScroll" VerticalScrollBarVisibility="Auto">
-        <ContentControl Margin="0,0,3,0" Content="{Binding Editor}">
+        <ContentControl Margin="0,0,1,0" Content="{Binding Editor}">
         <ContentControl.DataTemplates>
 
           <!-- ===================== 类型 1: 启动程序或激活窗口 ===================== -->
