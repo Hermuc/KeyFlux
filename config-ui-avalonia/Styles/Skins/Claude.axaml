@@ -720,6 +720,25 @@
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
   </Style>
 
+  <!-- 下拉框悬停/聚焦 (2026-09-26 用户裁定「边框颜色直接变为橙色, 在框边缘以内」):
+       Fluent ComboBox 模板有两层边框部件 —— Border#Background (随 TemplateBinding) 与
+       Border#HighlightBackground (叠在其上, 主题按 unfocused/focused 换色)。改控件自身
+       BorderBrush 会被主题 :pointerover 部件样式压掉 ⇒ 必须用 /template/ 直打部件:
+       悬停 Background→陶土 且 HighlightBackground→透明 (不遮色)。禁用态未配置档
+       不触发 :pointerover, 天然让位 -->
+  <Style Selector="ComboBox.claudeInput:pointerover /template/ Border#Background">
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
+  </Style>
+  <Style Selector="ComboBox.claudeInput:pointerover /template/ Border#HighlightBackground">
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="ComboBox.claudeInput:focus-visible /template/ Border#Background">
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
+  </Style>
+  <Style Selector="ComboBox.claudeInput:focus-visible /template/ Border#HighlightBackground">
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+
   <!-- AutoCompleteBox.claudeInput (2026-09-26 用户报「启动目标框与其他三个输入框样式不一致」):
        Fluent 默认 AutoCompleteBox 半径/边框与 claudeInput TextBox 不一致, 且其模板是 Panel 内嵌
        TextBox#PART_TextBox, 控件自身的 Background/BorderBrush 不落到内层框上 ⇒ 样式须穿透模板
