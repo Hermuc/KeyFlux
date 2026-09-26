@@ -1,0 +1,22 @@
+{
+  "id": "search",
+  "name": "搜索",
+  "nameEn": "Search the web",
+  "version": "1.0.0",
+  "specVersion": 1,
+  "description": "把 %selected% 作为关键词搜索, 如 https://bing.com/search?q=%selected%",
+  "appliesTo": [
+    {
+      "type": "textType",
+      "value": "plain",
+      "default": true
+    }
+  ],
+  "entry": {
+    "kind": "builtin",
+    "action": "search",
+    "params": {
+      "actionValue": "https://bing.com/search?q=%selected%"
+    }
+  }
+}

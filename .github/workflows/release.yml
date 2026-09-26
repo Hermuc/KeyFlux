@@ -1,0 +1,162 @@
+name: release
+
+# 打 tag (v*) 才构建并发布正式 Release; workflow_dispatch 用于手动验证构建 (可跳过发布)。
+# 产物: KeyFlux-<version>.7z (自包含, 解压即用)。
+# 注意: Oracle 对账脚本 (tools/oracle.ps1) 内含本机硬编码路径, 不在 CI 运行;
+#       生成契约由 golden 快照测试 + /Validate 覆盖。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (不含前缀 v, 如 2.0-beta34)'
+        required: false
+        default: '1.0-beta1-dev'
+      skip_release:
+        description: '只构建验证, 不发布 Release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Derive version (tag v2.0-beta34 -> 2.0-beta34)
+        id: ver
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: config-server/go.mod
+          cache-dependency-path: config-server/go.sum
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Go unit tests
+        working-directory: config-server
+        run: go test ./...
+
+      - name: Build settings.exe (version injected via ldflags)
+        run: |
+          go build -C ./config-server -tags=nomsgpack \
+            -ldflags "-s -w -X settings/internal/script.KeyfluxVersion=${{ steps.ver.outputs.version }}" \
+            -o ../bin/settings.exe ./cmd/settings
+
+      - name: Stage headless backend for C# endpoint tests
+        shell: bash
+        run: |
+          mkdir -p "$TEMP/mk_settings_headless"
+          cp bin/settings.exe "$TEMP/mk_settings_headless/settings.exe"
+
+      - name: C# unit tests
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet test KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --nologo --logger trx 2>&1 | tee "$TEMP/citest.log"
+
+      - name: Dump test failures as annotations
+        if: failure()
+        shell: bash
+        run: |
+          grep -E "失败 [A-Za-z_]|Failed [A-Za-z_]|错误消息|Assert\.?[A-Za-z]* Failure|Expected|Actual" "$TEMP/citest.log" | head -12 | while IFS= read -r l; do
+            echo "::error::${l:0:180}"
+          done
+          ls -la "$TEMP"/*.trx 2>/dev/null | head -3
+      - name: Upload trx on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            **/TestResults/*.trx
+            ${{ runner.temp }}/citest.log
+
+      - name: Generate + validate AHK script (/Validate)
+        run: |
+          bin/settings.exe GenerateAHK ./data/config.json ./config-server/templates/keyflux.tmpl ./bin/KeyFlux.ahk
+          MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate ./bin/KeyFlux.ahk
+
+      - name: Sync templates (buildServer 后半段)
+        run: |
+          rm -rf bin/templates
+          cp -r config-server/templates bin/templates
+
+      # 2026-09-12 裁剪+R2R: 发布调优统一收进 KeyFlux.Settings.csproj (Trimmed/TrimMode/
+      # R2R/TrimmerRoots/STJ 反射开关), 此处不传 -p: 覆盖项 (命令行 -p 会压过 csproj)
+      - name: Publish Avalonia UI (self-contained win-x64, trim+R2R per csproj)
+        shell: pwsh
+        run: |
+          $out = dotnet publish config-ui-avalonia/KeyFlux.Settings.csproj -c Release -r win-x64 --self-contained true -o bin/ui --nologo -v q 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) {
+            $tail = ($out -split "`r?`n" | Where-Object { $_ -ne '' } | Select-Object -Last 20) -join "`n"
+            Write-Output ("::error::publish failed%0A" + ($tail -replace "%", "%25" -replace "`n", "%0A"))
+            Set-Content -Path "$env:GITHUB_WORKSPACE/publish-error.log" -Value $out
+            exit 1
+          }
+
+      - name: Assert i18n loose resource hash
+        shell: bash
+        run: cmp config-ui-avalonia/Resources/i18n.json bin/ui/Resources/i18n.json
+
+      - name: Stamp version into sample config
+        working-directory: bin
+        run: ./settings.exe ChangeVersion "${{ steps.ver.outputs.version }}"
+
+      - name: Assemble release folder
+        shell: bash
+        run: |
+          FOLDER="KeyFlux-${{ steps.ver.outputs.version }}"
+          rm -rf "$FOLDER"
+          mkdir -p "$FOLDER/shortcuts"
+          rm -rf bin/site && cp -r site-assets bin/site
+          cp -r data "$FOLDER/"
+          cp -r bin "$FOLDER/"
+          cp -r tools "$FOLDER/"
+          rm -f "$FOLDER/tools/oracle.ps1"
+          cp KeyFlux.exe "$FOLDER/"
+          cp -- *.bat "$FOLDER/"
+
+      - name: Install 7-Zip
+        run: choco install 7zip -y --no-progress
+
+      - name: Pack 7z
+        shell: bash
+        run: |
+          SEVENZIP="$(command -v 7z.exe || echo '/c/Program Files/7-Zip/7z.exe')"
+          "$SEVENZIP" a "KeyFlux-${{ steps.ver.outputs.version }}.7z" "KeyFlux-${{ steps.ver.outputs.version }}"
+
+      - name: Upload build artifact (workflow_dispatch 验证用)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: KeyFlux-${{ steps.ver.outputs.version }}
+          path: KeyFlux-*.7z
+
+      - name: Publish release
+        if: ${{ github.event_name == 'push' || inputs.skip_release == false }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: KeyFlux-*.7z
+          generate_release_notes: true

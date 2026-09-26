@@ -1,0 +1,24 @@
+{
+  "id": "copy",
+  "name": "复制",
+  "nameEn": "Copy",
+  "version": "1.0.0",
+  "specVersion": 1,
+  "description": "把 %selected% 替换后的文本写入剪贴板",
+  "appliesTo": [
+    {
+      "type": "textType",
+      "value": "plain"
+    },
+    {
+      "type": "fileExt",
+      "exts": [
+        "*"
+      ]
+    }
+  ],
+  "entry": {
+    "kind": "builtin",
+    "action": "copy"
+  }
+}

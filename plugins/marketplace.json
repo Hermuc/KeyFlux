@@ -1,0 +1,14 @@
+{
+  "name": "KeyFlux Plugin Marketplace",
+  "plugins": [
+    {
+      "id": "quick_switch",
+      "name": "快速切换",
+      "nameEn": "Quick Switch",
+      "version": "1.0",
+      "description": "在文件对话框里一键跳转到最近使用或历史记录中的文件夹。",
+      "author": "KeyFlux",
+      "url": "builtin://quick_switch"
+    }
+  ]
+}

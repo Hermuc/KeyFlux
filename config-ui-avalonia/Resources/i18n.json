@@ -1,0 +1,1594 @@
+{
+  "1": {
+    "zh": "关闭窗口",
+    "en": "Close"
+  },
+  "2": {
+    "zh": "切换到上一个窗口",
+    "en": "Previous window"
+  },
+  "3": {
+    "zh": "在当前程序的窗口间轮换",
+    "en": "Cycle through app windows"
+  },
+  "4": {
+    "zh": "窗口管理 (EDSF切换X关闭,空格选择)",
+    "en": "Task switcher (EDSF=↑↓←→,X=Delete"
+  },
+  "5": {
+    "zh": "上一个虚拟桌面",
+    "en": "Previous virtual desktop"
+  },
+  "6": {
+    "zh": "下一个虚拟桌面",
+    "en": "Next virtual desktop"
+  },
+  "7": {
+    "zh": "移动窗口到下一个显示器",
+    "en": "Move window to next monitor"
+  },
+  "8": {
+    "zh": "关闭窗口 (杀进程)",
+    "en": "Kill the active process"
+  },
+  "9": {
+    "zh": "关闭同类窗口",
+    "en": "Close all app windows"
+  },
+  "10": {
+    "zh": "窗口最小化",
+    "en": "Minimize"
+  },
+  "11": {
+    "zh": "窗口最大化或还原",
+    "en": "Maximize"
+  },
+  "12": {
+    "zh": "窗口居中 (1200x800)",
+    "en": "Center (1200x800)"
+  },
+  "13": {
+    "zh": "窗口居中 (1370x930)",
+    "en": "Center (1370x930)"
+  },
+  "14": {
+    "zh": "切换窗口置顶状态",
+    "en": "Always on top"
+  },
+  "15": {
+    "zh": "让窗口随鼠标拖动",
+    "en": "Drag window"
+  },
+  "16": {
+    "zh": "绑定当前窗口 (长按绑定,短按激活)",
+    "en": "Bind window by long press"
+  },
+  "17": {
+    "zh": "锁屏",
+    "en": "Lock the screen"
+  },
+  "18": {
+    "zh": "睡眠",
+    "en": "Sleep"
+  },
+  "19": {
+    "zh": "关机",
+    "en": "Shutdown"
+  },
+  "20": {
+    "zh": "重启",
+    "en": "Reboot"
+  },
+  "21": {
+    "zh": "音量调节",
+    "en": "Volume control"
+  },
+  "22": {
+    "zh": "显示器亮度调节",
+    "en": "Monitor brightness control"
+  },
+  "23": {
+    "zh": "重启文件资源管理器",
+    "en": "Restart explorer.exe"
+  },
+  "24": {
+    "zh": "复制文件路径或纯文本",
+    "en": "Copy full path of a file"
+  },
+  "2401": {
+    "zh": "静音当前应用",
+    "en": "Mute active app"
+  },
+  "2402": {
+    "zh": "打开当前程序所在目录",
+    "en": "Show active process in folder"
+  },
+  "2404": {
+    "zh": "恢复默认",
+    "en": "Restore Default"
+  },
+  "2405": {
+    "zh": "支持 Markdown 语法: # 标题、- 列表、[文字](链接)、![图片](地址)、`代码`; 保存后立即生效, 清空内容并保存可恢复默认文档",
+    "en": "Markdown supported: # heading, - list, [text](link), ![image](url), `code`; takes effect after save; clear and save to restore the default document"
+  },
+  "2406": {
+    "zh": "编辑使用指南",
+    "en": "Edit Guide"
+  },
+  "2407": {
+    "zh": "点击此区域编辑使用指南",
+    "en": "Click here to edit the guide"
+  },
+  "25": {
+    "zh": "鼠标上移",
+    "en": "Mouse up"
+  },
+  "26": {
+    "zh": "鼠标下移",
+    "en": "Mouse down"
+  },
+  "27": {
+    "zh": "鼠标左移",
+    "en": "Mouse left"
+  },
+  "28": {
+    "zh": "鼠标右移",
+    "en": "Mouse right"
+  },
+  "29": {
+    "zh": "滚轮上滑",
+    "en": "Wheel up"
+  },
+  "30": {
+    "zh": "滚轮下滑",
+    "en": "Wheel down"
+  },
+  "31": {
+    "zh": "滚轮左滑",
+    "en": "Wheel left"
+  },
+  "32": {
+    "zh": "滚轮右滑",
+    "en": "Wheel right"
+  },
+  "33": {
+    "zh": "鼠标左键",
+    "en": "Left button"
+  },
+  "34": {
+    "zh": "鼠标右键",
+    "en": "Right button"
+  },
+  "35": {
+    "zh": "鼠标中键",
+    "en": "Middle button"
+  },
+  "36": {
+    "zh": "鼠标左键按下 (之后按空格松开)",
+    "en": "Left button down ( Space=Release )"
+  },
+  "37": {
+    "zh": "移动鼠标到活动窗口",
+    "en": "Move mouse to active window"
+  },
+  "38": {
+    "zh": "光标 - 上移",
+    "en": "Up"
+  },
+  "39": {
+    "zh": "光标 - 下移",
+    "en": "Down"
+  },
+  "40": {
+    "zh": "光标 - 左移",
+    "en": "Left"
+  },
+  "41": {
+    "zh": "光标 - 右移",
+    "en": "Right"
+  },
+  "42": {
+    "zh": "光标 - 跳到行首",
+    "en": "Home"
+  },
+  "43": {
+    "zh": "光标 - 跳到行尾",
+    "en": "End"
+  },
+  "44": {
+    "zh": "光标 - 上一单词",
+    "en": "Ctrl + Left"
+  },
+  "45": {
+    "zh": "光标 - 下一单词",
+    "en": "Ctrl + Right"
+  },
+  "46": {
+    "zh": "选择 - 往上",
+    "en": "Shift + Up"
+  },
+  "47": {
+    "zh": "选择 - 往下",
+    "en": "Shift + Down"
+  },
+  "48": {
+    "zh": "选择 - 往左",
+    "en": "Shift + Left"
+  },
+  "49": {
+    "zh": "选择 - 往右",
+    "en": "Shift + Right"
+  },
+  "50": {
+    "zh": "选择 - 选到行首",
+    "en": "Shift + Home"
+  },
+  "51": {
+    "zh": "选择 - 选到行尾",
+    "en": "Shift + End"
+  },
+  "52": {
+    "zh": "选择 - 上一单词",
+    "en": "Ctrl+Shift+Left"
+  },
+  "53": {
+    "zh": "选择 - 下一单词",
+    "en": "Ctrl+Shift+Right"
+  },
+  "54": {
+    "zh": "右键菜单",
+    "en": "Menu key"
+  },
+  "55": {
+    "zh": "删除一行文本",
+    "en": "Delete a line"
+  },
+  "56": {
+    "zh": "删除一个单词",
+    "en": "Delete a word"
+  },
+  "57": {
+    "zh": "Shift 键",
+    "en": "Shift"
+  },
+  "58": {
+    "zh": "Ctrl 键",
+    "en": "Ctrl"
+  },
+  "59": {
+    "zh": "Alt 键",
+    "en": "Alt"
+  },
+  "60": {
+    "zh": "Win 键",
+    "en": "Win"
+  },
+  "61": {
+    "zh": "中英文之间加空格",
+    "en": "中英文间加空格"
+  },
+  "62": {
+    "zh": null,
+    "en": "Esc"
+  },
+  "63": {
+    "zh": null,
+    "en": "Backspace"
+  },
+  "64": {
+    "zh": null,
+    "en": "Enter"
+  },
+  "65": {
+    "zh": null,
+    "en": "Delete"
+  },
+  "66": {
+    "zh": null,
+    "en": "Insert"
+  },
+  "67": {
+    "zh": null,
+    "en": "Tab"
+  },
+  "68": {
+    "zh": null,
+    "en": "Ctrl + Tab"
+  },
+  "69": {
+    "zh": null,
+    "en": "Shift + Tab"
+  },
+  "70": {
+    "zh": null,
+    "en": "Ctrl+Shift+Tab"
+  },
+  "71": {
+    "zh": "暂停 KeyFlux",
+    "en": "Pause"
+  },
+  "72": {
+    "zh": "重启 KeyFlux",
+    "en": "Reload"
+  },
+  "73": {
+    "zh": "退出 KeyFlux",
+    "en": "Exit"
+  },
+  "74": {
+    "zh": "打开 KeyFlux 设置",
+    "en": "Settings"
+  },
+  "75": {
+    "zh": "触发 Abbreviation",
+    "en": "Abbreviation"
+  },
+  "76": {
+    "zh": "触发 Command",
+    "en": "Command"
+  },
+  "77": {
+    "zh": "切换 CapsLock 大小写",
+    "en": "CapsLock"
+  },
+  "78": {
+    "zh": "锁定当前模式 (免去按住触发键)",
+    "en": "Hold down/release the modifier key"
+  },
+  "200": {
+    "zh": "⛔ 未配置",
+    "en": "⛔ Undefined"
+  },
+  "201": {
+    "zh": "🚀 启动程序或激活窗口",
+    "en": "🚀 App Launcher"
+  },
+  "202": {
+    "zh": "🖥️ 系统控制",
+    "en": "🖥️ System"
+  },
+  "203": {
+    "zh": "🏠 窗口操作",
+    "en": "🏠 Window"
+  },
+  "204": {
+    "zh": " 鼠标操作",
+    "en": " Mouse"
+  },
+  "205": {
+    "zh": "🅰️ 重映射按键",
+    "en": "🅰️ Remap Keys"
+  },
+  "206": {
+    "zh": "🅰️ 输入按键或文本",
+    "en": "🅰️ Send Keys"
+  },
+  "207": {
+    "zh": "📚 文字编辑相关",
+    "en": "📚 Edit"
+  },
+  "208": {
+    "zh": "⚛️ 自定义函数",
+    "en": "⚛️ Custom Functions"
+  },
+  "209": {
+    "zh": "⚙️ KeyFlux 相关",
+    "en": "⚙️ KeyFlux"
+  },
+  "301": {
+    "zh": "要激活的窗口 (进程匹配用 ahk_exe 程序名.exe)",
+    "en": "The window to activate (use ahk_exe for processes)"
+  },
+  "301err": {
+    "zh": "以 .exe 结尾会被当作窗口标题匹配而永远失败, 应写 ahk_exe 程序名.exe",
+    "en": "A trailing .exe is treated as a window title and never matches. Use ahk_exe app.exe"
+  },
+  "301hint": {
+    "zh": "窗口标题会变化的软件 (如聊天软件频道页) 不要用标题匹配, 应使用 ahk_exe 进程匹配",
+    "en": "Apps with changing titles (e.g. chat channels) should use ahk_exe, not a title match"
+  },
+  "302": {
+    "zh": "当窗口不存在时要启动的: 程序 / 文件夹 / URL",
+    "en": "Target"
+  },
+  "303": {
+    "zh": "命令行参数",
+    "en": "Arguments"
+  },
+  "304": {
+    "zh": "工作目录",
+    "en": "Working directory"
+  },
+  "305": {
+    "zh": "备注",
+    "en": "Comment"
+  },
+  "306": {
+    "zh": "以管理员运行",
+    "en": "Admin"
+  },
+  "307": {
+    "zh": "后台运行",
+    "en": "Hide"
+  },
+  "308": {
+    "zh": "检测隐藏窗口",
+    "en": "Detect hidden windows"
+  },
+  "309": {
+    "zh": "🔍 查看窗口标识符",
+    "en": "🔍 Window Spy"
+  },
+  "401": {
+    "zh": "重映射为",
+    "en": "Remap to"
+  },
+  "402": {
+    "zh": "要输入的按键或文本",
+    "en": "Keys"
+  },
+  "403": {
+    "zh": "代码",
+    "en": "Code"
+  },
+  "404": {
+    "zh": "热键",
+    "en": "Hotkey"
+  },
+  "405": {
+    "zh": "新增一个",
+    "en": "Add"
+  },
+  "406": {
+    "zh": "输入ab按回车添加/切换到ab, del ab删除ab, rn cd重命名当前为cd",
+    "en": "Input 'ab' and Enter to add a new item. Delete => del ab. Rename => rn cd."
+  },
+  "501": {
+    "zh": "名称",
+    "en": "Name"
+  },
+  "502": {
+    "zh": "触发键",
+    "en": "Modifer"
+  },
+  "503": {
+    "zh": "上层",
+    "en": "Parent"
+  },
+  "504": {
+    "zh": "开关",
+    "en": ""
+  },
+  "505": {
+    "zh": "其他设置",
+    "en": "Other"
+  },
+  "506": {
+    "zh": "开机自启",
+    "en": "Run on system startup"
+  },
+  "507": {
+    "zh": "保存配置（CTRL+S）",
+    "en": "Save（CTRL+S）"
+  },
+  "601": {
+    "zh": "编辑程序分组",
+    "en": "Window Groups"
+  },
+  "602": {
+    "zh": "组名",
+    "en": "Group Name"
+  },
+  "603": {
+    "zh": "窗口标识符",
+    "en": "Window List"
+  },
+  "604": {
+    "zh": "条件",
+    "en": "Condition"
+  },
+  "605": {
+    "zh": "是前台窗口",
+    "en": "is active"
+  },
+  "606": {
+    "zh": "这些窗口存在",
+    "en": "exist"
+  },
+  "607": {
+    "zh": "不是前台窗口",
+    "en": "not active"
+  },
+  "608": {
+    "zh": "这些窗口不存在",
+    "en": "not exist"
+  },
+  "609": {
+    "zh": "添加一行",
+    "en": "Add"
+  },
+  "610": {
+    "zh": "保存",
+    "en": "Save"
+  },
+  "611": {
+    "zh": "取消",
+    "en": "Cancel"
+  },
+  "612": {
+    "zh": "注意: KeyFlux 的所有热键在 Exclude 组中会被禁用",
+    "en": "Note: KeyFlux will be disabled in the \"Exclude\" group."
+  },
+  "701": {
+    "zh": "修改鼠标参数",
+    "en": "Mouse Options"
+  },
+  "702": {
+    "zh": "鼠标移动相关参数",
+    "en": "Mouse Options"
+  },
+  "703": {
+    "zh": "进入连续移动前的延时(秒)",
+    "en": "Delay 1"
+  },
+  "704": {
+    "zh": "两次移动的间隔时间(秒)",
+    "en": "Delay 2"
+  },
+  "705": {
+    "zh": "快速模式步长(像素)",
+    "en": "Length 1"
+  },
+  "706": {
+    "zh": "快速模式首步长(像素)",
+    "en": "Length 2"
+  },
+  "707": {
+    "zh": "慢速模式步长(像素)",
+    "en": "Length 3"
+  },
+  "708": {
+    "zh": "慢速模式首步长(像素)",
+    "en": "Length 4"
+  },
+  "709": {
+    "zh": "鼠标模式的提示符",
+    "en": "Prompt"
+  },
+  "710": {
+    "zh": "提示进入了鼠标模式",
+    "en": "Show prompt"
+  },
+  "711": {
+    "zh": "点击鼠标后不退出鼠标模式",
+    "en": "Use only the space key to exit"
+  },
+  "712": {
+    "zh": "滚轮相关参数",
+    "en": "Scroll Wheel Options"
+  },
+  "713": {
+    "zh": "进入连续滚动前的延时 (秒)",
+    "en": "Delay 1"
+  },
+  "714": {
+    "zh": "两次滚动的间隔时间 (越小滚动速度越快)",
+    "en": "Delay 2"
+  },
+  "715": {
+    "zh": "一次滚动的行数",
+    "en": "Lines to scroll at a time"
+  },
+  "721": {
+    "zh": "修改键盘布局",
+    "en": "Keyboard Layout"
+  },
+  "722": {
+    "zh": "键盘布局",
+    "en": "Keyboard Layout"
+  },
+  "723": {
+    "zh": "默认值",
+    "en": "Default"
+  },
+  "724": {
+    "zh": "74 键",
+    "en": "74 Key"
+  },
+  "725": {
+    "zh": "104 键",
+    "en": "104 Key"
+  },
+  "726": {
+    "zh": "添加鼠标按钮",
+    "en": "Add Mouse Buttons"
+  },
+  "741": {
+    "zh": "命令框皮肤",
+    "en": "Command Window"
+  },
+  "743": {
+    "zh": "窗口宽度",
+    "en": "Width"
+  },
+  "744": {
+    "zh": "窗口 Y 轴位置 (百分比)",
+    "en": "Y pos"
+  },
+  "745": {
+    "zh": "窗口圆角大小",
+    "en": "Border radius"
+  },
+  "746": {
+    "zh": "窗口动画持续时间",
+    "en": "Animation duration"
+  },
+  "747": {
+    "zh": "窗口背景色",
+    "en": "Background color"
+  },
+  "748": {
+    "zh": "透明度",
+    "en": "Opacity"
+  },
+  "749": {
+    "zh": "网格线颜色",
+    "en": "Gridline color"
+  },
+  "750": {
+    "zh": "边框宽度",
+    "en": "Border width"
+  },
+  "751": {
+    "zh": "边框颜色",
+    "en": "Border color"
+  },
+  "752": {
+    "zh": "按键颜色",
+    "en": "Key color"
+  },
+  "753": {
+    "zh": "四角颜色",
+    "en": "Corner color"
+  },
+  "754": {
+    "zh": "窗口阴影大小",
+    "en": "Drop shadow size"
+  },
+  "755": {
+    "zh": "窗口阴影颜色",
+    "en": "Drop shadow color"
+  },
+  "761": {
+    "zh": "设置触发延时",
+    "en": "Modifer Delay"
+  },
+  "762": {
+    "zh": "触发延时 (毫秒)",
+    "en": "Modifer Delay (ms)"
+  },
+  "763": {
+    "zh": "一般推荐设为 0，让模式立刻生效。",
+    "en": "If delay > 0, you need long press to use the keymap."
+  },
+  "781": {
+    "zh": "切换语言",
+    "en": "Change Language"
+  },
+  "901": {
+    "zh": "隐藏按键矩阵",
+    "en": "Hide key matrix"
+  },
+  "902": {
+    "zh": "隐藏悬浮按键矩阵窗口 (headless 场景/低打扰需求)",
+    "en": "Hide the floating key-matrix window"
+  },
+  "907": {
+    "zh": "编辑路径变量",
+    "en": "Path Variables"
+  },
+  "909": {
+    "zh": "变量名",
+    "en": "Name"
+  },
+  "910": {
+    "zh": "路径",
+    "en": "Path"
+  },
+  "911": {
+    "zh": "先定义一个 programs 变量，值为 C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\，然后就能在「程序路径」中使用 ahk-expression: programs \"Microsoft Edge.lnk\" 表示完整路径",
+    "en": "Define a 'programs' variable pointing to the Start Menu Programs folder, then use ahk-expression: programs \"Microsoft Edge.lnk\" in action paths."
+  },
+  "912": {
+    "zh": "删除",
+    "en": "Delete"
+  },
+  "913": {
+    "zh": "使用指南",
+    "en": "Guide"
+  },
+  "914": {
+    "zh": "选中动作",
+    "en": "Selected Action"
+  },
+  "915": {
+    "zh": "快捷键方案",
+    "en": "Keymaps"
+  },
+  "917": {
+    "zh": "连接后端中…",
+    "en": "Connecting to backend…"
+  },
+  "918": {
+    "zh": "加载配置中…",
+    "en": "Loading config…"
+  },
+  "919": {
+    "zh": "无法连接到 KeyFlux 设置后端",
+    "en": "Cannot reach the KeyFlux settings backend"
+  },
+  "920": {
+    "zh": "重试",
+    "en": "Retry"
+  },
+  "922": {
+    "zh": "保存失败，可能设置程序被关了",
+    "en": "Save failed, the settings server may have exited"
+  },
+  "928": {
+    "zh": "已保存",
+    "en": "Saved"
+  },
+  "929": {
+    "zh": "保存",
+    "en": "Save"
+  },
+  "931": {
+    "zh": "使用指南内容来自 config_doc.md (后端静态站点); 点击下方编辑区可自定义",
+    "en": "Guide content comes from config_doc.md (backend static site); click the edit zone below to customize"
+  },
+  "932": {
+    "zh": "帮助文档暂不可用 (后端未提供 config_doc.md)",
+    "en": "Help document unavailable (backend has no config_doc.md)"
+  },
+  "933": {
+    "zh": "新增",
+    "en": "Add"
+  },
+  "934": {
+    "zh": "KeyFlux 是一个按键层工具: 按住触发键进入某个模式, 该模式下普通按键被映射为自定义动作。",
+    "en": "KeyFlux is a key-layer tool: hold a modifier key to enter a layer where plain keys are remapped to custom actions."
+  },
+  "935": {
+    "zh": "快速上手",
+    "en": "Quick start"
+  },
+  "936": {
+    "zh": "左侧导航列出已启用的快捷键方案, 点击进入对应方案; 使用指南内容可在页面底部编辑区自定义。",
+    "en": "The left navigation lists enabled keymaps. Click one to open it; the guide can be customized via the edit zone at the bottom of the page."
+  },
+  "937": {
+    "zh": "在「选项」页可调整鼠标参数、命令框皮肤、触发延时、键盘布局、开机自启等。",
+    "en": "On the Options page you can tune mouse options, command-window skin, modifier delay, keyboard layout, startup, etc."
+  },
+  "938": {
+    "zh": "按 Ctrl+S 或点击左下角「保存配置」把改动写回 config.json。",
+    "en": "Press Ctrl+S or click Save to write changes back to config.json."
+  },
+  "939": {
+    "zh": "使用指南",
+    "en": "Guide"
+  },
+  "950": {
+    "zh": "开启时不允许删除",
+    "en": "Cannot delete while enabled"
+  },
+  "951": {
+    "zh": "被依赖时不允许删除",
+    "en": "Cannot delete while referenced as parent"
+  },
+  "954": {
+    "zh": "当前键不支持「 重映射 」，请使用「 输入文本或按键 」",
+    "en": "This key does not support Remap. Use \"Send Keys\" instead."
+  },
+  "955": {
+    "zh": "(1) 自定义函数可放到 data\\custom_functions.ahk，然后在此处调用",
+    "en": "(1) Put custom functions in data\\custom_functions.ahk, then call them here."
+  },
+  "956": {
+    "zh": "(2) 复杂的脚本推荐做成独立的 ahk 文件，然后用 KeyFlux 启动那个 ahk 文件",
+    "en": "(2) For complex scripts, make a standalone .ahk file and let KeyFlux launch it."
+  },
+  "957": {
+    "zh": "此处修改",
+    "en": "Edit here"
+  },
+  "960": {
+    "zh": "在任意窗口选中文本或文件后按下方案的快捷键, 即可触发预设行为。变量 %selected% 表示当前选中的内容。",
+    "en": "Select text or files in any window, then press the scheme's hotkey to trigger its action. %selected% stands for the selection."
+  },
+  "964": {
+    "zh": "启用",
+    "en": "On"
+  },
+  "965": {
+    "zh": "关闭",
+    "en": "Off"
+  },
+  "967": {
+    "zh": "删除",
+    "en": "Delete"
+  },
+  "970": {
+    "zh": "取消",
+    "en": "Cancel"
+  },
+  "976": {
+    "zh": "尚未设置快捷键, 保存后方案不会生效。",
+    "en": "No hotkey is set; the scheme won't take effect after saving."
+  },
+  "978": {
+    "zh": "匹配优先级: 从上到下, 第一个命中的规则生效",
+    "en": "Matching priority: top to bottom, first match wins"
+  },
+  "990": {
+    "zh": "测试",
+    "en": "Test"
+  },
+  "992": {
+    "zh": "测试失败: ",
+    "en": "Test failed: "
+  },
+  "999": {
+    "zh": "(未设置)",
+    "en": "(not set)"
+  },
+  "1004": {
+    "zh": "匹配类型",
+    "en": "Match Type"
+  },
+  "1005": {
+    "zh": "条件值",
+    "en": "Condition Value"
+  },
+  "1006": {
+    "zh": "常用分组快捷填入",
+    "en": "File-group Quick Fill"
+  },
+  "1008": {
+    "zh": "无",
+    "en": "None"
+  },
+  "1011": {
+    "zh": "行为类型",
+    "en": "Action Type"
+  },
+  "1012": {
+    "zh": "目标命令 / URL / 脚本",
+    "en": "Target command / URL / script"
+  },
+  "1013": {
+    "zh": "该行为直接作用于选中内容",
+    "en": "This action applies directly to the selection"
+  },
+  "1014": {
+    "zh": ", 无需配置命令模板。",
+    "en": "; no command template needed."
+  },
+  "1015": {
+    "zh": "工作目录 (可选)",
+    "en": "Working directory (optional)"
+  },
+  "1016": {
+    "zh": "执行后复制选中内容到剪贴板",
+    "en": "Copy the selection to the clipboard after running"
+  },
+  "1017": {
+    "zh": "执行后清空选中",
+    "en": "Clear the selection after running"
+  },
+  "1018": {
+    "zh": "执行前显示确认提示",
+    "en": "Show a confirmation prompt before running"
+  },
+  "1025": {
+    "zh": "该快捷键与现有设置冲突",
+    "en": "This hotkey conflicts with an existing one"
+  },
+  "1026": {
+    "zh": "请按下快捷键...",
+    "en": "Press the hotkey..."
+  },
+  "1027": {
+    "zh": "点击后按下快捷键",
+    "en": "Click, then press the hotkey"
+  },
+  "1031": {
+    "zh": "文件后缀",
+    "en": "File Extensions"
+  },
+  "1032": {
+    "zh": "文本特征",
+    "en": "Text Feature"
+  },
+  "1034": {
+    "zh": "如 .txt 或 txt,md (逗号分隔多个), * 匹配任意文件",
+    "en": "e.g. .txt or txt,md (comma-separated); * matches any file"
+  },
+  "1035": {
+    "zh": "url (链接) / path (路径) / magnet (磁力链接) / plain (纯文本)",
+    "en": "url / path / magnet / plain"
+  },
+  "1059": {
+    "zh": "链接",
+    "en": "URL"
+  },
+  "1060": {
+    "zh": "路径",
+    "en": "Path"
+  },
+  "1061": {
+    "zh": "磁力链接",
+    "en": "Magnet Link"
+  },
+  "1062": {
+    "zh": "纯文本",
+    "en": "Plain Text"
+  },
+  "1063": {
+    "zh": "快捷键",
+    "en": "Hotkey"
+  },
+  "1077": {
+    "zh": "热键已修改, 点击「保存」后才会生效",
+    "en": "Hotkey changed; click \"Save\" to apply"
+  },
+  "1078": {
+    "zh": "已保存, 但 KeyFlux 重启失败",
+    "en": "Saved, but KeyFlux failed to restart"
+  },
+  "1079": {
+    "zh": "改动已写入配置, 但 KeyFlux 进程重启失败, 新热键暂不生效。请通过托盘菜单「重载」手动生效。",
+    "en": "Changes were written to config, but KeyFlux failed to restart, so the new hotkey is not active yet. Use the tray menu \"Reload\" to apply it."
+  },
+  "1080": {
+    "zh": "拾取窗口：点击后移动准星到目标窗口并单击填入；Esc 或右键取消",
+    "en": "Pick window: click, then move the crosshair onto the target window and click to fill it in; Esc or right-click cancels"
+  },
+  "1081": {
+    "zh": "无法识别该窗口，请以管理员身份运行设置界面后重试",
+    "en": "Cannot identify this window. Run the Settings UI as administrator and try again."
+  },
+  "1082": {
+    "zh": "未识别到窗口，请重新瞄准目标窗口",
+    "en": "No window recognized — aim at the target window and click again"
+  },
+  "1083": {
+    "zh": "管理行为…",
+    "en": "Manage behaviors…"
+  },
+  "1085": {
+    "zh": "新建行为",
+    "en": "New Behavior"
+  },
+  "1086": {
+    "zh": "编辑行为",
+    "en": "Edit Behavior"
+  },
+  "1087": {
+    "zh": "标识 (ID)",
+    "en": "ID"
+  },
+  "1088": {
+    "zh": "生效前提",
+    "en": "Preconditions"
+  },
+  "1089": {
+    "zh": "基础行为",
+    "en": "Base Action"
+  },
+  "1090": {
+    "zh": "命令模板",
+    "en": "Command Template"
+  },
+  "1091": {
+    "zh": "工作目录",
+    "en": "Working Directory"
+  },
+  "1092": {
+    "zh": "内置",
+    "en": "Built-in"
+  },
+  "1093": {
+    "zh": "自定义",
+    "en": "Custom"
+  },
+  "1094": {
+    "zh": "立即生效 (重启 KeyFlux)",
+    "en": "Apply Now (restarts KeyFlux)"
+  },
+  "1095": {
+    "zh": "行为的增删改在此管理; 变更需重启 KeyFlux 后生效 (点「立即生效」或保存设置)",
+    "en": "Manage behaviors here; changes take effect after KeyFlux restarts (click Apply Now or save settings)"
+  },
+  "1096": {
+    "zh": "删除",
+    "en": "Delete"
+  },
+  "1097": {
+    "zh": "名称",
+    "en": "Name"
+  },
+  "1098": {
+    "zh": "描述",
+    "en": "Description"
+  },
+  "1099": {
+    "zh": "添加前提",
+    "en": "Add Precondition"
+  },
+  "1101_applied": {
+    "zh": "重启指令已发送; 若引擎未恢复, 请从托盘「重载」KeyFlux",
+    "en": "Restart requested; if the engine does not recover, reload KeyFlux from the tray"
+  },
+  "1102_deleted": {
+    "zh": "已删除: {0}",
+    "en": "Deleted: {0}"
+  },
+  "1103": {
+    "zh": "文件后缀",
+    "en": "File Extensions"
+  },
+  "1103_only": {
+    "zh": "仅自定义行为可编辑或删除",
+    "en": "Only custom behaviors can be edited or deleted"
+  },
+  "1104": {
+    "zh": "文本特征",
+    "en": "Text Type"
+  },
+  "1104_any": {
+    "zh": "任意文件",
+    "en": "Any file"
+  },
+  "1105": {
+    "zh": "添加规则",
+    "en": "Add Rule"
+  },
+  "1106": {
+    "zh": "添加行为",
+    "en": "Add Action"
+  },
+  "1107": {
+    "zh": "每条规则最多 9 个行为",
+    "en": "Up to 9 actions per rule"
+  },
+  "1108": {
+    "zh": "至少保留一个行为",
+    "en": "Keep at least one action"
+  },
+  "1109": {
+    "zh": "确定删除规则「{0}」吗? 删除后会立即保存。",
+    "en": "Delete rule \"{0}\"? This saves immediately."
+  },
+  "1111": {
+    "zh": "选择类型、填写条件值, 再勾选要放进菜单的行为 (按勾选顺序编号, 最多 9 个)。",
+    "en": "Pick a type, fill in the value, then check the actions for the menu (numbered by check order, up to 9)."
+  },
+  "1112": {
+    "zh": "还没有规则",
+    "en": "No rules yet"
+  },
+  "1113": {
+    "zh": "点击「添加规则」创建第一条规则",
+    "en": "Click \"Add Rule\" to create the first one"
+  },
+  "1114": {
+    "zh": "添加",
+    "en": "Add"
+  },
+  "1115": {
+    "zh": "该匹配条件已存在, 无需重复添加",
+    "en": "This match condition already exists"
+  },
+  "1116": {
+    "zh": "自定义热键",
+    "en": "Custom Hotkeys"
+  },
+  "1117": {
+    "zh": "功能",
+    "en": "Function"
+  },
+  "1118": {
+    "zh": "新建",
+    "en": "New"
+  },
+  "1119": {
+    "zh": "该匹配类型的可用行为都已添加，无法重复添加",
+    "en": "All available behaviors for this match type have been added"
+  },
+  "1120": {
+    "zh": "删除当前选中的类型（确认后立即保存）",
+    "en": "Delete the selected type (asks first, saves immediately)"
+  },
+  "1121": {
+    "zh": "删除该方案",
+    "en": "Delete this keymap"
+  },
+  "2408": {
+    "zh": "快速切换",
+    "en": "Quick Switch"
+  },
+  "2409": {
+    "zh": "完全禁用采集",
+    "en": "Disable all folder collection"
+  },
+  "2410": {
+    "zh": "自动显示候选浮层",
+    "en": "Auto-show suggestion overlay"
+  },
+  "2411": {
+    "zh": "自动跳转: 打开对话框",
+    "en": "Auto-jump: open dialog"
+  },
+  "2412": {
+    "zh": "自动跳转: 保存对话框",
+    "en": "Auto-jump: save dialog"
+  },
+  "2413": {
+    "zh": "历史保留条数上限",
+    "en": "Max saved history entries"
+  },
+  "2414": {
+    "zh": "排除目录 (路径前缀)",
+    "en": "Excluded folders (path prefixes)"
+  },
+  "2415": {
+    "zh": "添加排除目录",
+    "en": "Add excluded folder"
+  },
+  "2416": {
+    "zh": "清空历史",
+    "en": "Clear history"
+  },
+  "2417": {
+    "zh": "操作失败",
+    "en": "Operation failed"
+  },
+  "2418": {
+    "zh": "插件",
+    "en": "Plugins"
+  },
+  "2421": {
+    "zh": "第三方插件",
+    "en": "Third-party"
+  },
+  "2422": {
+    "zh": "在文件对话框里一键跳转到最近使用或历史记录中的文件夹。",
+    "en": "Jump to a recently used or historical folder in one keystroke inside a file dialog."
+  },
+  "2423": {
+    "zh": "ON",
+    "en": "ON"
+  },
+  "2424": {
+    "zh": "OFF",
+    "en": "OFF"
+  },
+  "2425": {
+    "zh": "第三方插件由插件作者提供：导入后在引擎启动时加载，可随时停用或删除。有配置项的插件，点击卡片即可调整。",
+    "en": "Third-party plugins come from their authors: imported plugins load when the engine starts, and can be disabled or removed at any time. Plugins with settings can be configured by clicking the card."
+  },
+  "2426": {
+    "zh": "点击卡片即可调整该插件的配置。",
+    "en": "Click the card to adjust this plugin's settings."
+  },
+  "2427": {
+    "zh": "导入插件",
+    "en": "Import plugin"
+  },
+  "2428": {
+    "zh": "插件市场",
+    "en": "Plugin marketplace"
+  },
+  "2429": {
+    "zh": "还没有导入插件",
+    "en": "No plugins imported yet"
+  },
+  "2430": {
+    "zh": "从插件市场安装，或导入本地插件包（.zip，内含 plugin.json）。",
+    "en": "Install from the plugin marketplace, or import a local plugin package (.zip containing plugin.json)."
+  },
+  "2431": {
+    "zh": "已导入「{0}」",
+    "en": "\"{0}\" imported"
+  },
+  "2432": {
+    "zh": "导入失败",
+    "en": "Import failed"
+  },
+  "2433": {
+    "zh": "无法加载插件市场目录",
+    "en": "Failed to load the marketplace catalog"
+  },
+  "2434": {
+    "zh": "安装",
+    "en": "Install"
+  },
+  "2435": {
+    "zh": "已安装",
+    "en": "Installed"
+  },
+  "2436": {
+    "zh": "删除插件失败",
+    "en": "Failed to remove the plugin"
+  },
+  "2437": {
+    "zh": "KeyFlux 插件包",
+    "en": "KeyFlux plugin package"
+  },
+  "2438": {
+    "zh": "市场暂无上架插件",
+    "en": "No plugins listed in the marketplace yet"
+  },
+  "2439": {
+    "zh": "加载中…",
+    "en": "Loading…"
+  },
+  "2517": {
+    "zh": "该类型暂无专属行为，当前可用行为来自通用文本类型",
+    "en": "No behavior is set for this type yet. The list below comes from general text."
+  },
+  "2518": {
+    "zh": "创建专属行为",
+    "en": "Add one"
+  },
+  "2519": {
+    "zh": "匹配类型",
+    "en": "Match types"
+  },
+  "2520": {
+    "zh": "文本特征",
+    "en": "Text features"
+  },
+  "2521": {
+    "zh": "自定义文件类型",
+    "en": "Custom file types"
+  },
+  "2522": {
+    "zh": "新建匹配类型",
+    "en": "New match type"
+  },
+  "2523": {
+    "zh": "名称",
+    "en": "Name"
+  },
+  "2524": {
+    "zh": "内部标识（自动生成，通常无需修改）",
+    "en": "Internal ID (filled in for you)"
+  },
+  "2525": {
+    "zh": "匹配内容",
+    "en": "Content to match"
+  },
+  "2527": {
+    "zh": "添加条件",
+    "en": "Add condition"
+  },
+  "2528": {
+    "zh": "文件扩展名",
+    "en": "File extensions"
+  },
+  "2529": {
+    "zh": "保存并创建专属行为",
+    "en": "Save and add a behavior"
+  },
+  "2530": {
+    "zh": "行为名称",
+    "en": "Behavior name"
+  },
+  "2531": {
+    "zh": "执行动作",
+    "en": "Action"
+  },
+  "2532": {
+    "zh": "命令模板（可选）",
+    "en": "Command (optional)"
+  },
+  "2533": {
+    "zh": "工作目录（可选）",
+    "en": "Folder to run in (optional)"
+  },
+  "2534": {
+    "zh": "保存",
+    "en": "Save"
+  },
+  "2535": {
+    "zh": "取消",
+    "en": "Cancel"
+  },
+  "2536": {
+    "zh": "删除",
+    "en": "Delete"
+  },
+  "2537": {
+    "zh": "未配置行为",
+    "en": "No behavior set"
+  },
+  "2538": {
+    "zh": "已配置行为",
+    "en": "Behaviors set"
+  },
+  "2539": {
+    "zh": "内置",
+    "en": "Built-in"
+  },
+  "2540": {
+    "zh": "内部标识格式不正确：需以小写字母开头，仅含小写字母、数字与下划线（最多 24 个字符）",
+    "en": "Use a short ID: lowercase letters, numbers or _ only, and it must start with a letter (max 24)."
+  },
+  "2541": {
+    "zh": "该内部标识已被占用，请更换",
+    "en": "That ID is already used. Try another."
+  },
+  "2542": {
+    "zh": "名称不能为空",
+    "en": "Please enter a name."
+  },
+  "2543": {
+    "zh": "至少需填写一条匹配内容",
+    "en": "Add at least one piece of text to match."
+  },
+  "2544": {
+    "zh": "文件扩展名不能为空",
+    "en": "Enter at least one file extension."
+  },
+  "2545": {
+    "zh": "确认删除匹配类型「{0}」？引用该类型的映射将不再生效。",
+    "en": "Delete \"{0}\"? Rules using it will stop working."
+  },
+  "2546": {
+    "zh": "编辑",
+    "en": "Edit"
+  },
+  "2547": {
+    "zh": "暂无自定义匹配类型",
+    "en": "No custom match types yet"
+  },
+  "2548": {
+    "zh": "匹配类型用于定义「选中什么时」触发，例如「网盘链接」这类文本特征，或自定义的文件扩展名类型。",
+    "en": "Match types define when a selection triggers — for example a netdisk link, or your own file extension type."
+  },
+  "2550": {
+    "zh": "匹配文字（示例：pan.baidu.com）",
+    "en": "Text to look for (e.g. pan.baidu.com)"
+  },
+  "2551": {
+    "zh": "按文件类型匹配",
+    "en": "Files of these types"
+  },
+  "2552": {
+    "zh": "已存在同名专属行为，请在行为库中修改",
+    "en": "A behavior with this name already exists. Edit it in the Behavior Library."
+  },
+  "2553": {
+    "zh": "＋ 新建匹配类型",
+    "en": "＋ New match type"
+  },
+  "2512": {
+    "zh": "完全相同",
+    "en": "Exact match"
+  },
+  "2513": {
+    "zh": "以该文字开头",
+    "en": "Starts with"
+  },
+  "2514": {
+    "zh": "以该文字结尾",
+    "en": "Ends with"
+  },
+  "2515": {
+    "zh": "包含该文字",
+    "en": "Contains"
+  },
+  "2554": {
+    "zh": "仅在此设置界面中显示，可自定义",
+    "en": "Only shown here. Any name works."
+  },
+  "2555": {
+    "zh": "匹配条件",
+    "en": "When to match"
+  },
+  "2556": {
+    "zh": "按文本内容匹配",
+    "en": "Text contains"
+  },
+  "2557": {
+    "zh": "输入示例内容",
+    "en": "Paste or type an example"
+  },
+  "2558": {
+    "zh": "匹配成功",
+    "en": "Match found"
+  },
+  "2559": {
+    "zh": "未匹配",
+    "en": "No match"
+  },
+  "2560": {
+    "zh": "测试匹配",
+    "en": "Test"
+  },
+  "2561": {
+    "zh": "多个扩展名以逗号分隔，如 psd, ai",
+    "en": "Separate with commas, e.g. psd, ai"
+  },
+  "2562": {
+    "zh": "选中内容包含所填文字时匹配成功",
+    "en": "It matches when the selected text contains these words."
+  },
+  "2563": {
+    "zh": "选中文件的扩展名在列表内时匹配成功",
+    "en": "It matches when a selected file has one of these types."
+  },
+  "2564": {
+    "zh": "匹配后执行的动作",
+    "en": "What happens next"
+  },
+  "2565": {
+    "zh": "仅保存类型，稍后配置行为",
+    "en": "Save type only"
+  },
+  "2566": {
+    "zh": "高级设置",
+    "en": "Advanced"
+  },
+  "2567": {
+    "zh": "英文名称（可选）",
+    "en": "English name (optional)"
+  },
+  "2568": {
+    "zh": "行为名称",
+    "en": "Behavior name"
+  },
+  "2569": {
+    "zh": "配置行为",
+    "en": "Set up"
+  },
+  "2570": {
+    "zh": "请先输入示例内容",
+    "en": "Type an example first."
+  },
+  "2571": {
+    "zh": "网盘链接",
+    "en": "Netdisk link"
+  },
+  "2572": {
+    "zh": "GitHub 仓库",
+    "en": "GitHub repo"
+  },
+  "2573": {
+    "zh": "哔哩哔哩视频",
+    "en": "Bilibili video"
+  },
+  "2574": {
+    "zh": "图片文件",
+    "en": "Images"
+  },
+  "2575": {
+    "zh": "压缩包",
+    "en": "Archives"
+  },
+  "2576": {
+    "zh": "代码文件",
+    "en": "Code files"
+  },
+  "2577": {
+    "zh": "仅自定义类型可编辑或删除",
+    "en": "Only custom types can be edited or deleted."
+  },
+  "2578": {
+    "zh": "新建中",
+    "en": "Creating…"
+  },
+  "2579": {
+    "zh": "尚未填写",
+    "en": "Not filled in yet"
+  },
+  "2580": {
+    "zh": "B 站",
+    "en": "Bilibili"
+  },
+  "2581": {
+    "zh": "选项",
+    "en": "Options"
+  },
+  "2582": {
+    "zh": "浏览",
+    "en": "Browse"
+  },
+  "2583": {
+    "zh": "选择文件",
+    "en": "Choose a file"
+  },
+  "2584": {
+    "zh": "设置加载失败",
+    "en": "Failed to load settings"
+  },
+  "2585": {
+    "zh": "保存失败",
+    "en": "Failed to save settings"
+  },
+  "2586": {
+    "zh": "该插件没有可配置的选项。",
+    "en": "This plugin has no configurable options."
+  },
+  "2587": {
+    "zh": "当前为空格",
+    "en": "Current value: Space"
+  },
+  "2588": {
+    "zh": "该文件超过 32 MB，命令框会忽略它并沿用当前字体。请改用体积更小的字体文件。",
+    "en": "This file exceeds 32 MB; the command box ignores it and keeps the current font. Please use a smaller font file."
+  },
+  "2589": {
+    "zh": "该文件的字形格式不受支持（仅接受 TrueType 轮廓）。.otf 等 CFF 轮廓字体无法用于命令框。",
+    "en": "This file's outline format is unsupported (only TrueType outlines are accepted). CFF-based fonts such as .otf cannot be used in the command box."
+  },
+  "2590": {
+    "zh": "已选择「{0}」，该字体集合同时包含多个语言版本；命令框只会使用其中的第一个版本。",
+    "en": "Selected \"{0}\". This font collection bundles several language variants; only the first one is used by the command box."
+  },
+  "2591": {
+    "zh": "字体已选定，重启命令框后生效。",
+    "en": "Font selected. Restart the command box to apply."
+  },
+  "2592": {
+    "zh": "无法读取该文件，可能已损坏或不是字体文件。",
+    "en": "Cannot read this file; it may be corrupted or not a font file."
+  },
+  "2503": {
+    "zh": "命令框字体",
+    "en": "Command box font"
+  },
+  "2504": {
+    "zh": "字体文件",
+    "en": "Font file"
+  },
+  "2505": {
+    "zh": "选择本地字体文件 (.ttf / .otf / .ttc)",
+    "en": "Choose a local font file (.ttf / .otf / .ttc)"
+  },
+  "2506": {
+    "zh": "未选择（沿用当前字体）",
+    "en": "Not set (keep the current font)"
+  },
+  "2507": {
+    "zh": "恢复默认",
+    "en": "Reset"
+  },
+  "2508": {
+    "zh": "字重",
+    "en": "Weight"
+  },
+  "2509": {
+    "zh": "常规",
+    "en": "Regular"
+  },
+  "2511": {
+    "zh": "半粗",
+    "en": "Semibold"
+  },
+  "2516": {
+    "zh": "粗体",
+    "en": "Bold"
+  },
+  "2526": {
+    "zh": "极细",
+    "en": "Thin"
+  },
+  "2549": {
+    "zh": "细",
+    "en": "Light"
+  }
+}

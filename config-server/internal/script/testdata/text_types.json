@@ -1,0 +1,454 @@
+{
+  "version": 1,
+  "description": "内置文本特征 (url/path/magnet/bilibili/plain) 的双端一致性向量: Go (config-server/internal/script) 与 AHK (bin/lib/rules/SelectedAction.ahk) 必须给出完全相同的命中集合。expectTypes = 该 content 下**全部**命中特征 (按 types 顺序排列); plain 为兜底特征 —— 其余具名特征全不命中时才命中。",
+  "types": [
+    "url",
+    "path",
+    "magnet",
+    "bilibili",
+    "plain"
+  ],
+  "cases": [
+    {
+      "content": "https://github.com/Hermuc/KeyFlux",
+      "expectTypes": [
+        "url"
+      ],
+      "note": "标准 https"
+    },
+    {
+      "content": "http://a",
+      "expectTypes": [
+        "url"
+      ],
+      "note": "最短 http"
+    },
+    {
+      "content": "ftp://example.com/x",
+      "expectTypes": [
+        "url"
+      ],
+      "note": "ftp 协议属 url 分支"
+    },
+    {
+      "content": "HTTPS://EXAMPLE.COM",
+      "expectTypes": [
+        "url"
+      ],
+      "note": "协议大小写不敏感 (i 标志)"
+    },
+    {
+      "content": "FtP://x",
+      "expectTypes": [
+        "url"
+      ],
+      "note": "混合大小写协议"
+    },
+    {
+      "content": "https://",
+      "expectTypes": [
+        "url"
+      ],
+      "note": "仅协议头也命中前缀锚定"
+    },
+    {
+      "content": "https://www.bilibili.com/video/BV1xx411c7mD",
+      "expectTypes": [
+        "url"
+      ],
+      "note": "完整 B 站链接归 url, 不侵占 bilibili 特征"
+    },
+    {
+      "content": "https://x\n",
+      "expectTypes": [
+        "url"
+      ],
+      "note": "尾换行不影响前缀锚定"
+    },
+    {
+      "content": "https://a\nBV1xx411c7mD",
+      "expectTypes": [
+        "url"
+      ],
+      "note": "首行是链接即归 url (多行选中)"
+    },
+    {
+      "content": "httpx://a",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "非白名单协议"
+    },
+    {
+      "content": "//example.com",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "协议相对地址不命中"
+    },
+    {
+      "content": "https:/a",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "仅一个斜杠不命中 (需 //)"
+    },
+    {
+      "content": "  https://a",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "前导空白不 Trim (锚定口径)"
+    },
+    {
+      "content": "mailto:x@y.z",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "mailto 不在词表"
+    },
+    {
+      "content": "C:\\Windows\\explorer.exe",
+      "expectTypes": [
+        "path"
+      ],
+      "note": "盘符 + 反斜杠"
+    },
+    {
+      "content": "c:\\x",
+      "expectTypes": [
+        "path"
+      ],
+      "note": "小写盘符"
+    },
+    {
+      "content": "C:\\",
+      "expectTypes": [
+        "path"
+      ],
+      "note": "仅盘符根"
+    },
+    {
+      "content": "C:",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "盘符无反斜杠不命中"
+    },
+    {
+      "content": "\\\\server\\share",
+      "expectTypes": [
+        "path"
+      ],
+      "note": "UNC 两段"
+    },
+    {
+      "content": "\\\\server\\share\\a.txt",
+      "expectTypes": [
+        "path"
+      ],
+      "note": "UNC 多段"
+    },
+    {
+      "content": "\\\\server",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "UNC 仅主机名 (需两段)"
+    },
+    {
+      "content": "C:/Windows",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "正斜杠盘符路径不命中"
+    },
+    {
+      "content": "/usr/bin",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "POSIX 路径不命中"
+    },
+    {
+      "content": "magnet:?xt=urn:btih:abc",
+      "expectTypes": [
+        "magnet"
+      ],
+      "note": "标准磁力链接"
+    },
+    {
+      "content": "MAGNET:?xt=1",
+      "expectTypes": [
+        "magnet"
+      ],
+      "note": "协议大小写不敏感"
+    },
+    {
+      "content": "magnet:?xt=urn:btih:av170001",
+      "expectTypes": [
+        "magnet"
+      ],
+      "note": "含 av 片段仍归 magnet (前缀优先)"
+    },
+    {
+      "content": "magnet:av170001",
+      "expectTypes": [
+        "magnet"
+      ],
+      "note": "前缀即命中, 不关心后续内容"
+    },
+    {
+      "content": "magnet",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "缺冒号不命中"
+    },
+    {
+      "content": "av170001",
+      "expectTypes": [
+        "bilibili"
+      ],
+      "note": "标准 AV 号"
+    },
+    {
+      "content": "AV170001",
+      "expectTypes": [
+        "bilibili"
+      ],
+      "note": "AV 大写"
+    },
+    {
+      "content": "av2",
+      "expectTypes": [
+        "bilibili"
+      ],
+      "note": "最短 AV 号"
+    },
+    {
+      "content": "av0",
+      "expectTypes": [
+        "bilibili"
+      ],
+      "note": "AV 号零"
+    },
+    {
+      "content": "BV1xx411c7mD",
+      "expectTypes": [
+        "bilibili"
+      ],
+      "note": "标准 BV 号"
+    },
+    {
+      "content": "bv1xx411c7md",
+      "expectTypes": [
+        "bilibili"
+      ],
+      "note": "BV 小写"
+    },
+    {
+      "content": "BV1xx411c7m0",
+      "expectTypes": [
+        "bilibili"
+      ],
+      "note": "BV 尾数字"
+    },
+    {
+      "content": "av89123456789012345678",
+      "expectTypes": [
+        "bilibili"
+      ],
+      "note": "超长 AV 号 (数字不限长)"
+    },
+    {
+      "content": "av",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "缺数字"
+    },
+    {
+      "content": "av12x",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "混字母"
+    },
+    {
+      "content": "av 170001",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "含空格"
+    },
+    {
+      "content": "BV1xx411c7m",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "BV 后仅 9 位"
+    },
+    {
+      "content": "BV1xx411c7mDx",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "BV 后 11 位"
+    },
+    {
+      "content": "BV1xx411c7m_",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "下划线不在 [0-9A-Za-z]"
+    },
+    {
+      "content": "1xx411c7mD",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "缺 BV 前缀"
+    },
+    {
+      "content": "av170001 BV1xx411c",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "两个号拼接"
+    },
+    {
+      "content": "AV17-0001",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "含连字符"
+    },
+    {
+      "content": " av170001",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "前导空格"
+    },
+    {
+      "content": "av170001 ",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "尾随空格"
+    },
+    {
+      "content": "av170001\n",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "尾换行: 用 \\z 钉死 (若改用 $ 则 PCRE2 会命中而 RE2 不会)"
+    },
+    {
+      "content": "\nav170001",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "前导换行: ^ 只认文本起始"
+    },
+    {
+      "content": "av170001\nBV1xx411c7mE",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "首行 AV + 次行 BV, 整串不命中"
+    },
+    {
+      "content": "av170001\nextra",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "AV 号后接内容不命中"
+    },
+    {
+      "content": "BV1xx411c7mD\nBV1xx411c7mE",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "两行 BV 号不命中"
+    },
+    {
+      "content": "bv1xx411c7",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "BV 后仅 8 位"
+    },
+    {
+      "content": "av170001av170001",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "两段 AV 拼接"
+    },
+    {
+      "content": "av17000１",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "末位全角数字不命中"
+    },
+    {
+      "content": "hello world",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "普通文本"
+    },
+    {
+      "content": "",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "空串: 具名特征全不命中, 归 plain"
+    },
+    {
+      "content": "这是一段纯文本",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "CJK 文本"
+    },
+    {
+      "content": "12345",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "纯数字"
+    },
+    {
+      "content": "\t",
+      "expectTypes": [
+        "plain"
+      ],
+      "note": "仅制表符"
+    },
+    {
+      "content": "C:\\av170001",
+      "expectTypes": [
+        "path"
+      ],
+      "note": "路径含 AV 号片段 -> path 优先, 不误判 bilibili"
+    },
+    {
+      "content": "\\\\server\\share\\av170001",
+      "expectTypes": [
+        "path"
+      ],
+      "note": "UNC 含 AV 号片段 -> path"
+    },
+    {
+      "content": "magnet:?xt=urn:btih:abc\nBV1xx411c7mD",
+      "expectTypes": [
+        "magnet"
+      ],
+      "note": "首行磁力链 + 次行 BV -> magnet"
+    }
+  ]
+}

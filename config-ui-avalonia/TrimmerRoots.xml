@@ -1,0 +1,8 @@
+<linker>
+  <!-- 裁剪根: 本程序集全保留。
+       System.Text.Json 反射序列化 (ConfigSaver 深拷贝 / SettingsApiClient 契约端点 /
+       I18n 文案表 / PluginMarket 目录 / SelectedAction 快照) 依赖模型属性元数据,
+       IL 裁剪会剥掉"未被直接引用"的属性 → 必须整体根植;
+       配合 csproj 的 JsonSerializerIsReflectionEnabledByDefault=true 使用。 -->
+  <assembly fullname="KeyFlux.Settings" preserve="all" />
+</linker>

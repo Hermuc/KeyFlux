@@ -1,0 +1,255 @@
+﻿#Requires AutoHotkey v2.0
+#SingleInstance Force
+#UseHook true
+
+#include lib/translation.ahk
+#Include lib/Functions.ahk
+#Include lib/Actions.ahk
+#Include lib/KeymapManager.ahk
+#Include lib/InputTipWindow.ahk
+#Include lib/Utils.ahk
+#Include lib/SelectedAction.ahk
+
+; #WinActivateForce   ; 先关了遇到相关问题再打开试试
+; InstallKeybdHook    ; 这个可以重装 keyboard hook, 提高自己的 hook 优先级, 以后可能会用到
+; ListLines False     ; 也许能提升一点点性能 ( 别抱期待 ), 当有这个需求时再打开试试
+; #Warn All, Off      ; 也许能提升一点点性能 ( 别抱期待 ), 当有这个需求时再打开试试
+
+try DllCall("SetThreadDpiAwarenessContext", "ptr", -3, "ptr") ; 多显示器不同缩放比例会导致问题: https://www.autohotkey.com/boards/viewtopic.php?f=14&t=13810
+SetMouseDelay 0                                           ; SendInput 可能会降级为 SendEvent, 此时会有 10ms 的默认 delay
+SetWinDelay 0                                             ; 默认会在 activate, maximize, move 等窗口操作后睡眠 100ms
+A_MaxHotkeysPerInterval := 256                            ; 默认 70 可能有点低, 即使没有热键死循环也触发警告
+SendMode "Event"                                          ; 执行 SendInput 的期间会短暂卸载 Hook, 这时候松开引导键会丢失 up 事件, 所以 Event 模式更适合 MyKeymap
+SetKeyDelay 0                                             ; 默认 10 太慢了, https://www.reddit.com/r/AutoHotkey/comments/gd3z4o/possible_unreliable_detection_of_the_keyup_event/
+ProcessSetPriority "High"
+SetWorkingDir("../")
+InitTrayMenu()
+InitKeymap()
+OnExit(MyKeymapExit)
+#include ../data/custom_functions.ahk
+
+InitKeymap()
+{
+  taskSwitch := TaskSwitchKeymap("e", "d", "s", "f", "c", "space")
+  mouseTip := false
+  slow := MouseKeymap("slow mouse", false, mouseTip, 10, 13, "T0.13", "T0.01", 1, "T0.2", "T0.03")
+  fast := MouseKeymap("fast mouse", false, mouseTip, 110, 70, "T0.13", "T0.01", 1, "T0.2", "T0.03", slow)
+  slow.Map("*space", slow.LButtonUp())
+
+  capsHook := InputHook("", "{CapsLock}{Esc}", "cw,dl,dm,et,ex,fc,fe,gd,hm,jy,ka,kp,kzm,ls,ly,me,mm,ob,pd,pp,qq,rb,rd,re,sd,se,sl,steam,tb,tg,tm,tu,wt,wx,zg")
+  capsHook.KeyOpt("{CapsLock}", "S")
+  capsHook.KeyOpt("{Backspace}", "N")
+  capsHook.OnChar := PostCharToCaspAbbr
+  capsHook.OnKeyDown := PostBackspaceToCaspAbbr
+  Run("bin\MyKeymap-CommandInput.exe")
+
+
+  ; 路径变量
+  programs := "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\"
+
+  ; 窗口组
+  GroupAdd("MY_WINDOW_GROUP__1", "Stardew Valley ahk_class SDL_app")
+  GroupAdd("MY_WINDOW_GROUP__1", "ahk_exe Rune Factory 3 Special.exe")
+  GroupAdd("MY_WINDOW_GROUP_1", "ahk_exe chrome.exe")
+  GroupAdd("MY_WINDOW_GROUP_1", "ahk_exe msedge.exe")
+  GroupAdd("MY_WINDOW_GROUP_1", "ahk_exe firefox.exe")
+
+  KeymapManager.GlobalKeymap.DisabledAt := "ahk_group MY_WINDOW_GROUP__1"
+
+  ; CapsLock
+  km5 := KeymapManager.NewKeymap("*CapsLock", "CapsLock", "", "")
+  km := km5
+  km.Map("*c", _ => SoundControl())
+  km.Map("*z", _ => CopySelectedAsPlainText())
+  km.Map("*.", _ => MakeWindowDraggable())
+  km.Map("*a", _ => CenterAndResizeWindow(1370, 930))
+  km.Map("*b", _ => MinimizeWindow())
+  km.Map("*e", _ => Send("^!{tab}"), taskSwitch)
+  km.Map("*g", _ => ToggleWindowTopMost())
+  km.Map("*p", _ => GoToNextVirtualDesktop())
+  km.Map("*q", _ => MaximizeWindow())
+  km.Map("*r", _ => LoopRelatedWindows())
+  km.Map("*s", _ => CenterAndResizeWindow(1200, 800))
+  km.Map("*t", BindWindow())
+  km.Map("*v", _ => MoveWindowToNextMonitor())
+  km.Map("*w", _ => GoToLastWindow())
+  km.Map("*x", _ => SmartCloseWindow())
+  km.Map("*y", _ => GoToPreviousVirtualDesktop())
+  km.Map("*,", fast.LButtonDown()), slow.Map("*,", slow.LButtonDown())
+  km.Map("*/", _ => MoveMouseToCaret()), slow.Map("*/", _ => MoveMouseToCaret())
+  km.Map("*;", fast.ScrollWheelRight), slow.Map("*;", slow.ScrollWheelRight)
+  km.Map("*h", fast.ScrollWheelLeft), slow.Map("*h", slow.ScrollWheelLeft)
+  km.Map("*i", fast.MoveMouseUp, slow), slow.Map("*i", slow.MoveMouseUp)
+  km.Map("*j", fast.MoveMouseLeft, slow), slow.Map("*j", slow.MoveMouseLeft)
+  km.Map("*k", fast.MoveMouseDown, slow), slow.Map("*k", slow.MoveMouseDown)
+  km.Map("*l", fast.MoveMouseRight, slow), slow.Map("*l", slow.MoveMouseRight)
+  km.Map("*m", fast.RButton()), slow.Map("*m", slow.RButton())
+  km.Map("*n", fast.LButton()), slow.Map("*n", slow.LButton())
+  km.Map("*o", fast.ScrollWheelDown), slow.Map("*o", slow.ScrollWheelDown)
+  km.Map("*u", fast.ScrollWheelUp), slow.Map("*u", slow.ScrollWheelUp)
+  km.Map("*0", _ => (Send("{home}+{end}{backspace}"), Send("{text}i love homura and hikari"), Sleep(1000), Send("{enter}yes{enter}")))
+  km.Map("*d", _ => CenterAndResizeWindow(1740, 1000))
+  km.Map("singlePress", _ => EnterCapslockAbbr(capsHook))
+
+  ; J 模式
+  km8 := KeymapManager.NewKeymap("*j", "J 模式", "", "")
+  km := km8
+  km.Map("*i", _ => (Send("{blind}ji")))
+  km.Map("singlePress", _ => (Send("{blind}{j}")))
+  km.RemapKey(",", "delete")
+  km.RemapKey(".", "insert")
+  km.Map("*2", _ => (Send("^+{tab}")))
+  km.Map("*3", _ => (Send("^{tab}")))
+  km.RemapKey("a", "home")
+  km.Map("*b", _ => (Send("^{backspace}")))
+  km.RemapKey("c", "backspace")
+  km.Map("*d", _ => (Send("{blind}+{down}")))
+  km.Map("*e", _ => (Send("{blind}+{up}")))
+  km.Map("*f", _ => (Send("{blind}+{right}")))
+  km.RemapKey("g", "end")
+  km.Map("*k", _ => HoldDownModifierKey("LShift"))
+  km.RemapKey("q", "appskey")
+  km.RemapKey("r", "tab")
+  km.Map("*s", _ => (Send("{blind}+{left}")))
+  km.Map("*t", _ => (Send("{home}+{end}{backspace}")))
+  km.Map("*v", _ => (Send("{blind}^{right}")))
+  km.Map("*w", _ => (Send("{blind}+{tab}")))
+  km.RemapKey("x", "esc")
+  km.Map("*z", _ => (Send("{blind}^{left}")))
+  km.Map("*space", _ => (Send("{blind}{enter}")))
+
+  ; F 模式
+  km9 := KeymapManager.NewKeymap("f", "F 模式", "0.100", "")
+  km := km9
+  km.Map("singlePress", _ => (Send("{blind}{f}")))
+  km.RemapKey(",", "delete")
+  km.RemapKey(".", "insert")
+  km.RemapKey(";", "end")
+  km.RemapKey("b", "backspace")
+  km.RemapKey("e", "esc")
+  km.RemapKey("h", "home")
+  km.RemapKey("i", "up")
+  km.RemapKey("j", "left")
+  km.RemapKey("k", "down")
+  km.RemapKey("l", "right")
+  km.Map("*m", _ => (Send("{blind}^{right}")))
+  km.Map("*n", _ => (Send("{blind}^{left}")))
+  km.RemapKey("o", "tab")
+  km.Map("*p", _ => (Send("^{tab}")))
+  km.RemapKey("q", "appskey")
+  km.Map("*s", _ => HoldDownModifierKey("LShift"))
+  km.Map("*u", _ => (Send("{blind}+{tab}")))
+  km.Map("*w", _ => (Send("^{backspace}")))
+  km.Map("*y", _ => (Send("^+{tab}")))
+  km.Map("*space", _ => (Send("{blind}{enter}")))
+
+  ; Custom Hotkeys
+  km1 := KeymapManager.NewKeymap("customHotkeys", "Custom Hotkeys", "", "")
+  km := km1
+  km.Map("!'", _ => MyKeymapReload(), , , , "S")
+  km.Map("!+'", _ => MyKeymapToggleSuspend(), , , , "S")
+  km.Map("!f17", _ => MyKeymapReload(), , , , "S")
+  km.Map("#+F23", _ => ToggleCapslock())
+
+
+
+  KeymapManager.GlobalKeymap.Enable()
+}
+
+ExecCapslockAbbr(command) {
+  ; 路径变量
+  programs := "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\"
+
+  switch command {
+    case "cw":
+      SmartCloseWindow()
+    case "dl":
+      ActivateOrRun("", "shell:downloads")
+    case "dm":
+      ActivateOrRun("", A_WorkingDir)
+    case "et":
+      ActivateOrRun("Everything", "D:\PortableApps\Scoop\apps\tubatools\current\app\src\Tools\其他工具\Everything\everything.exe")
+    case "ex":
+      MyKeymapExit()
+    case "fc":
+      ActivateOrRun("ahk_exe FlClash.exe", "shortcuts\FlClash.lnk", "", "", false, true, false)
+    case "fe":
+      ActivateOrRun("ahk_exe explorer.exe", "shortcuts\File Explorer.lnk")
+    case "gd":
+      ActivateOrRun("Ghost Downloader", "shortcuts\Ghost Downloader 3.lnk")
+    case "hm":
+      ActivateOrRun("HypoMux", "shortcuts\HypoMux.lnk")
+    case "jy":
+      ActivateOrRun("剪映专业版", "D:\PortableApps\Unofficial\剪映专业版 v6.0.1\JianyingPro.exe")
+    case "ka":
+      ActivateOrRun("ahk_exe KugouAvaloniaPlayer.exe", "shortcuts\KugouAvaloniaPlayer.lnk")
+    case "kp":
+      CloseWindowProcesses()
+    case "kzm":
+      ActivateOrRun("Kazumi", "shortcuts\kazumi.lnk")
+    case "ls":
+      ActivateOrRun("Lossless Scaling", "D:\PortableApps\Unofficial\LS.v3.2.1\LosslessScaling.exe")
+    case "ly":
+      ActivateOrRun("", "ms-settings:bluetooth")
+    case "me":
+      ActivateOrRun("ahk_exe msedge.exe", "shortcuts\Microsoft Edge.lnk")
+    case "mm":
+      ActivateOrRun("MyKeymap2 - Visual Studio Code", "shortcuts\Visual Studio Code.lnk", "D:\MyFiles\MyKeymap2", "", false, false, false)
+    case "ob":
+      ActivateOrRun("ahk_exe Obsidian.exe", "shortcuts\Obsidian.lnk")
+    case "pd":
+      ShowActiveProcessInFolder()
+    case "pp":
+      ActivateOrRun("PiliPlus", "shortcuts\PiliPlus.lnk")
+    case "qq":
+      ActivateOrRun("QQ", "shortcuts\QQ.lnk")
+    case "rb":
+      ActivateOrRun("", "shell:RecycleBinFolder")
+    case "rd":
+      Send("#d")
+    case "re":
+      SystemRestartExplorer()
+    case "sd":
+      SystemShutdown()
+    case "se":
+      MyKeymapOpenSettings()
+    case "sl":
+      SystemSleep()
+    case "steam":
+      ActivateOrRun(" ahk_exe steamwebhelper.exe", "shortcuts\Steam.lnk")
+    case "tb":
+      ActivateOrRun("图吧工具箱", "D:\PortableApps\Scoop\apps\tubatools\current\app\src\TubaWinUi3.exe")
+    case "tg":
+      ActivateOrRun("ahk_exe AyuGram.exe", "shortcuts\AyuGram.lnk")
+    case "tm":
+      Send("^+{esc}")
+    case "tu":
+      ActivateOrRun("Total Uninstall 专业版", "D:\PortableApps\Unofficial\TotalUninstall\TUPortable.exe")
+    case "wt":
+      ActivateOrRun("ahk_exe WindowsTerminal.exe", "wt.exe", "-d `"{selected}`"", "", false, false, false)
+    case "wx":
+      ActivateOrRun("微信", "shortcuts\WeChat.lnk")
+    case "zg":
+      ActivateOrRun("ahk_class Zed::Window", "shortcuts\ZedG.lnk")
+  }
+}
+
+ExecSemicolonAbbr(command) {
+}
+
+InitTrayMenu() {
+  A_TrayMenu.Delete()
+  A_TrayMenu.Add(Translation().menu_pause, TrayMenuHandler)
+  A_TrayMenu.Add(Translation().menu_exit, TrayMenuHandler)
+  A_TrayMenu.Add(Translation().menu_reload, TrayMenuHandler)
+  A_TrayMenu.Add(Translation().menu_settings, TrayMenuHandler)
+  A_TrayMenu.Add(Translation().menu_window_spy, TrayMenuHandler)
+  A_TrayMenu.Default := Translation().menu_pause
+  A_TrayMenu.ClickCount := 1
+
+  A_IconTip := "MyKeymap 2.0-beta33 created by 咸鱼阿康"
+  TraySetIcon("./bin/icons/logo.ico", , true)
+}
+
+
+#HotIf

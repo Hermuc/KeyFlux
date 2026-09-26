@@ -1,0 +1,251 @@
+{
+  "version": 1,
+  "description": "自定义文本匹配类型算子一致性向量: Go (matchRuleOp) 与 AHK (MatchCustomRules/AsciiLower) 共用同一份, 锁死双端等价。作用域: equals/prefix 作用于 Trim(content) 首个非空行; suffix/contains 作用于整个 Trim(content)。大小写仅 ASCII 折叠 (asciiFold/AsciiLower, 仅 A-Z->a-z), 非 ASCII 原样比较。",
+  "cases": [
+    {
+      "op": "contains",
+      "value": "pan.baidu.com",
+      "content": "https://pan.baidu.com/s/abc",
+      "expect": true,
+      "note": "基础 contains: 网盘链接命中"
+    },
+    {
+      "op": "contains",
+      "value": "aliyundrive.com",
+      "content": "https://www.aliyundrive.com/share/x",
+      "expect": true,
+      "note": "contains: 阿里云盘命中"
+    },
+    {
+      "op": "contains",
+      "value": "pan.baidu.com",
+      "content": "https://example.com/x",
+      "expect": false,
+      "note": "contains 未命中"
+    },
+    {
+      "op": "equals",
+      "value": "exact match",
+      "content": "exact match",
+      "expect": true,
+      "note": "equals 整串(首行)完全相等"
+    },
+    {
+      "op": "equals",
+      "value": "foo bar",
+      "content": "Foo Bar",
+      "expect": true,
+      "note": "equals ASCII 大小写不敏感 (Foo=foo)"
+    },
+    {
+      "op": "equals",
+      "value": "foo bar",
+      "content": "foo baz",
+      "expect": false,
+      "note": "equals 不等"
+    },
+    {
+      "op": "equals",
+      "value": "line1",
+      "content": "line1\nline2",
+      "expect": true,
+      "note": "equals 取首个非空行 (line1)"
+    },
+    {
+      "op": "equals",
+      "value": "line1",
+      "content": "line1 extra",
+      "expect": false,
+      "note": "equals 是整行相等非前缀 (line1 extra != line1)"
+    },
+    {
+      "op": "equals",
+      "value": "real",
+      "content": "\n\nreal",
+      "expect": true,
+      "note": "equals 跳过前导空行取首个非空行"
+    },
+    {
+      "op": "prefix",
+      "value": "https://",
+      "content": "https://pan.baidu.com",
+      "expect": true,
+      "note": "prefix 首行以 https:// 开头"
+    },
+    {
+      "op": "prefix",
+      "value": "picture",
+      "content": "picture.jpg\nother",
+      "expect": true,
+      "note": "prefix 首行 (picture.jpg) 开头"
+    },
+    {
+      "op": "prefix",
+      "value": "picture",
+      "content": "foo\npicture.jpg",
+      "expect": false,
+      "note": "prefix 仅看首行(foo), 第二行的 picture 不计"
+    },
+    {
+      "op": "suffix",
+      "value": ".psd",
+      "content": "C:\u0007\b\file.PSD",
+      "expect": true,
+      "note": "suffix 整串 ASCII 不敏感 (.PSD=.psd)"
+    },
+    {
+      "op": "suffix",
+      "value": ".gz",
+      "content": "line1\nfile.tar.gz",
+      "expect": true,
+      "note": "suffix 作用于整串(含第二行)"
+    },
+    {
+      "op": "suffix",
+      "value": ".png",
+      "content": "file.psd",
+      "expect": false,
+      "note": "suffix 不匹配"
+    },
+    {
+      "op": "contains",
+      "value": "pan.baidu.com",
+      "content": "abc\ndef pan.baidu.com here",
+      "expect": true,
+      "note": "contains 跨行整串命中"
+    },
+    {
+      "op": "contains",
+      "value": "x",
+      "content": "",
+      "expect": false,
+      "note": "空 content contains 失败"
+    },
+    {
+      "op": "contains",
+      "value": "x",
+      "content": "   \t  ",
+      "expect": false,
+      "note": "纯空白 content contains 失败"
+    },
+    {
+      "op": "equals",
+      "value": "line1",
+      "content": "line1\r\nline2",
+      "expect": true,
+      "note": "CRLF: 首行去 \r 后等于 line1"
+    },
+    {
+      "op": "contains",
+      "value": "pan.baidu.com",
+      "content": "abc\r\ndef pan.baidu.com",
+      "expect": true,
+      "note": "CRLF 混合换行 contains 命中"
+    },
+    {
+      "op": "contains",
+      "value": "pan.baidu.com",
+      "content": "网盘链接 pan.baidu.com",
+      "expect": true,
+      "note": "CJK 内容中命中 ASCII 子串"
+    },
+    {
+      "op": "equals",
+      "value": "网盘",
+      "content": "网盘",
+      "expect": true,
+      "note": "CJK 值 equals 命中 (非 ASCII 原样比较)"
+    },
+    {
+      "op": "equals",
+      "value": "網盤",
+      "content": "网盘",
+      "expect": false,
+      "note": "CJK 繁简不同 -> 非 ASCII 不折叠, 不相等"
+    },
+    {
+      "op": "prefix",
+      "value": "foo",
+      "content": "ＦＯＯ",
+      "expect": false,
+      "note": "全角 ＦＯＯ 不被折叠为 foo -> prefix 失败"
+    },
+    {
+      "op": "contains",
+      "value": "link",
+      "content": "🔥link🔥",
+      "expect": true,
+      "note": "emoji 内容中包含 ASCII 子串"
+    },
+    {
+      "op": "equals",
+      "value": "🔥",
+      "content": "🔥",
+      "expect": true,
+      "note": "emoji 相等 (非 ASCII 原样)"
+    },
+    {
+      "op": "contains",
+      "value": "pan.baidu.com",
+      "content": "PAN.BAIDU.COM",
+      "expect": true,
+      "note": "value 大写 PAN 被折叠为小写, 与内容匹配"
+    },
+    {
+      "op": "contains",
+      "value": "pan.baidu.com",
+      "content": "x pan.baidu.com y",
+      "expect": true,
+      "note": "contains 中间子串"
+    },
+    {
+      "op": "equals",
+      "value": "pan.baidu.com is here",
+      "content": "pan.baidu.com",
+      "expect": false,
+      "note": "equals 与 contains 区分: 内容更短"
+    },
+    {
+      "op": "contains",
+      "value": "pan.baidu.com is here",
+      "content": "pan.baidu.com",
+      "expect": false,
+      "note": "contains 反例: 内容不含更长 value"
+    },
+    {
+      "op": "prefix",
+      "value": "a-b.c",
+      "content": "a-b.cd",
+      "expect": true,
+      "note": "value 含 . 与 - 前缀命中"
+    },
+    {
+      "op": "suffix",
+      "value": "-end",
+      "content": "abc-def-end",
+      "expect": true,
+      "note": "value 含 - 后缀命中"
+    },
+    {
+      "op": "contains",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "content": "startaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaend",
+      "expect": true,
+      "note": "恰好 256 字符 value 命中"
+    },
+    {
+      "op": "contains",
+      "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "content": "xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expect": true,
+      "note": "超长(300) value 仍按子串匹配"
+    },
+    {
+      "op": "equals",
+      "value": "url",
+      "content": " URL ",
+      "expect": true,
+      "note": "equals 首行去首尾空白后与 url 相等"
+    }
+  ]
+}

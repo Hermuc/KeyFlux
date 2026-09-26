@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="UTF-16"?>
+<!--
+  KeyFlux 鑷惎鍔ㄨ鍒掍换鍔℃ā鏉?(2026-09-10 璧?RunAtStartup 浣跨敤, 鏇夸唬娉ㄥ唽琛?Run 閿柟妗?
+  鍗犱綅绗? {{DIR}} = 瀹夎鏍圭洰褰?(鐢?bin/MiscTools.ahk CreateStartupTask 鍔ㄦ€佹浛鎹?
+  璁捐瑕佺偣 (绋冲畾鎬т紭鍏?:
+    - LogonTrigger + PT3S 寤惰繜: 鐧诲綍鍚庣瓑绐楀彛绔欏氨缁? 涓旀棭浜?explorer Run 閿壒娆?
+    - RunLevel Highest: 涓庢棫鎻愭潈閲嶅惎鏂规鏉冮檺绛変环 (High IL), bootstrap 鍏嶆彁鏉冪洿杈?
+    - 鐢垫睜涓ら」 false: 绗旇鏈數姹犲紑鏈轰篃鑳借嚜鍚?(浠诲姟璁″垝榛樿鎺ラ€氱數婧愭墠璺? 澶у潙)
+    - RestartOnFailure 1min x3: 鐧诲綍鏃╂湡鍋跺彂澶辫触鑷姩閲嶈瘯
+    - ExecutionTimeLimit PT0S: 涓嶉檺鏃?(榛樿 72h 浼氭潃甯搁┗寮曟搸, 鍏抽敭)
+    - IgnoreNew: 涓庢墜鍔ㄥ惎鍔ㄦ挒杞︽椂涓嶅瀹炰緥 (寮曟搸 #SingleInstance 浜岄亾鍏滃簳)
+-->
+<Task version="1.3" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>KeyFlux autostart (created by KeyFlux settings)</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <Delay>PT3S</Delay>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+    <RestartOnFailure>
+      <Interval>PT1M</Interval>
+      <Count>3</Count>
+    </RestartOnFailure>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>cmd.exe</Command>
+      <Arguments>/c if exist "{{DIR}}\KeyFlux.exe" start "" "{{DIR}}\KeyFlux.exe"</Arguments>
+      <WorkingDirectory>{{DIR}}</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>
