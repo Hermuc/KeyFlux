@@ -206,8 +206,6 @@
     <Style Selector="ComboBox /template/ Border#Background">
       <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
       <Setter Property="BorderBrush" Value="#c8c3b4" />
-      <!-- 深度档 (用户选定方案 B): 1px 实边 + 双层渐弱投影, 悬停/聚焦/展开态不重设影 ⇒ 全状态恒定 -->
-      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowInputDepth}" />
     </Style>
     <Style Selector="ComboBox:pointerover /template/ Border#Background">
       <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
@@ -222,12 +220,6 @@
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
     <Style Selector="ComboBox:dropdownopen /template/ Border#HighlightBackground">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="#c8c3b4" />
-    </Style>
-    <!-- 聚焦态同款压制 (2026-09-27): Fluent :focus-visible 会让 HighlightBackground 显形,
-         其边框色由 SystemAccent 派生 (暖橙) —— 不压制则聚焦瞬间边框闪橙 -->
-    <Style Selector="ComboBox:focus-visible /template/ Border#HighlightBackground">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
