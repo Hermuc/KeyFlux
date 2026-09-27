@@ -732,6 +732,16 @@
   <Style Selector="ComboBox.claudeInput:pointerover /template/ Border#HighlightBackground">
     <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
+  <!-- 按下态 (2026-09-26 用户裁定「按下后不要有阴影」): Fluent :pressed 会把背景换成
+       半透明深色 (视觉如阴影)。这两个下拉框按下即展开下拉列表, 按下态保持白底 +
+       陶土边 (与悬停一致); 阴影语义仅保留给禁用态的灰底 (无法展开) -->
+  <Style Selector="ComboBox.claudeInput:pressed /template/ Border#Background">
+    <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
+  </Style>
+  <Style Selector="ComboBox.claudeInput:pressed /template/ Border#HighlightBackground">
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
   <Style Selector="ComboBox.claudeInput:focus-visible /template/ Border#Background">
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
   </Style>
