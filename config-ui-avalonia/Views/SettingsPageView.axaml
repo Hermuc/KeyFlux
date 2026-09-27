@@ -56,10 +56,14 @@
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHalo}" />
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
-      <!-- 悬停光圈淡入 (120ms = 皮肤令牌 ClaudeMotion.Micro) -->
+      <!-- 悬停光圈淡入 (120ms = 皮肤令牌 ClaudeMotion.Micro) + 悬停微浮起 (transform-only 不触发布局) -->
+      <Setter Property="RenderTransform" Value="none" />
       <Setter Property="Transitions">
         <Transitions>
           <BoxShadowsTransition Property="BoxShadow" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+          <TransformOperationsTransition Property="RenderTransform"
+                                         Duration="{x:Static vm:ClaudeMotion.Micro}"
+                                         Easing="QuadraticEaseOut" />
         </Transitions>
       </Setter>
     </Style>
@@ -74,6 +78,7 @@
          并有像素级用例证明卡下暖色光圈真的亮了。 -->
     <Style Selector="Border.settingsCard:pointerover">
       <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowCardHaloHover}" />
+      <Setter Property="RenderTransform" Value="translateY(-1px)" />
     </Style>
     <!-- 焦点环 (2026-09-18 起由 ComponentFocusRing 挂 .ring 类, 取代 :focus-within ——
          后者会同时点亮所有祖先卡, 无法表达「最内层唯一/子框自饰则让位」) -->

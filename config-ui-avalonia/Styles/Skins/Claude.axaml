@@ -833,6 +833,14 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
   </Style>
+  <Style Selector="ListBox.claudeList ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <!-- 悬停/选中/按动的 Sand↔Parchment 换色 120ms 淡入 (与 MainWindow 导航条目同语汇) -->
+        <BrushTransition Property="Background" Duration="{x:Static vm:ClaudeMotion.Micro}" />
+      </Transitions>
+    </Setter>
+  </Style>
   <Style Selector="ListBox.claudeList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{StaticResource ClaudeSandBrush}" />
   </Style>

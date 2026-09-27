@@ -41,6 +41,56 @@
     <SolidColorBrush x:Key="SemiColorPrimaryLight" Opacity="0.2" Color="#c96442" />
     <SolidColorBrush x:Key="SemiColorPrimaryLightPointerover" Opacity="0.3" Color="#c96442" />
     <SolidColorBrush x:Key="SemiColorPrimaryLightActive" Opacity="0.4" Color="#c96442" />
+    <!-- ===================== Semi 暖灰阶梯 (2026-09-27 质感统一) =====================
+         Semi 默认灰阶 (SemiGrey0-9 = 冷蓝灰 #F9F9F9→#1C1F23) 派生出全部填充/边框/文字
+         (Fill0-2 / Border / Text0-3 均经 StaticResource 引用灰阶色) —— 冷调与 Claude 暖色
+         体系冲突。此处以暖灰画刷整体覆盖【画刷键】(模板经 DynamicResource 消费画刷;
+         其内部 StaticResource 的颜色键在解析期已固化, 覆盖颜色键无效 —— 必须覆盖画刷)。
+         阶梯锚点: Grey0=Ivory / Grey1=BorderCream / Grey3=StoneBorder / Grey5=StoneGray /
+         Grey9=NearBlack, 中间档线性插值 ⇒ Semi 全部控件的填充/边框/文字自动转暖。
+
+         效果清单 (派生消费方): 悬停填充 Fill0-2 (5%/9%/13% 暖深) / 控件边框 (暖发丝线) /
+         三级文字 (暖炭黑阶梯) / 禁用态 / 提示条等全部同步转暖, 无需逐控件改。
+
+         >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 << -->
+    <SolidColorBrush x:Key="SemiGrey0" Color="#faf9f5" />
+    <SolidColorBrush x:Key="SemiGrey1" Color="#f0eee6" />
+    <SolidColorBrush x:Key="SemiGrey2" Color="#e0ddd2" />
+    <SolidColorBrush x:Key="SemiGrey3" Color="#c8c3b4" />
+    <SolidColorBrush x:Key="SemiGrey4" Color="#a29d90" />
+    <SolidColorBrush x:Key="SemiGrey5" Color="#87867f" />
+    <SolidColorBrush x:Key="SemiGrey6" Color="#6f6b62" />
+    <SolidColorBrush x:Key="SemiGrey7" Color="#57534e" />
+    <SolidColorBrush x:Key="SemiGrey8" Color="#3a3733" />
+    <SolidColorBrush x:Key="SemiGrey9" Color="#262625" />
+    <!-- 派生消费方直写 (它们经 StaticResource 引用颜色键固化, 必须连画刷一起覆盖) -->
+    <SolidColorBrush x:Key="SemiColorFill0" Opacity="0.05" Color="#3a3733" />
+    <SolidColorBrush x:Key="SemiColorFill1" Opacity="0.09" Color="#3a3733" />
+    <SolidColorBrush x:Key="SemiColorFill2" Opacity="0.13" Color="#3a3733" />
+    <SolidColorBrush x:Key="SemiColorBorder" Opacity="0.08" Color="#262625" />
+    <SolidColorBrush x:Key="SemiColorText0" Color="#262625" />
+    <SolidColorBrush x:Key="SemiColorText1" Opacity="0.8" Color="#262625" />
+    <SolidColorBrush x:Key="SemiColorText2" Opacity="0.62" Color="#262625" />
+    <SolidColorBrush x:Key="SemiColorText3" Opacity="0.35" Color="#262625" />
+
+    <!-- ===================== Semi 焦点/选区/滚动条 暖色化 =====================
+         SemiColorFocusBorder 默认 SemiBlue5 (输入框聚焦描边, 冷蓝);
+         TextBoxSelectionBackground 默认 #0041C5@80% (选区, 冷蓝) —— 均与暖色冲突。
+         滚动条: Semi 自带模板 (Thumb 厚度/圆角/颜色全部资源驱动), 覆盖即得细圆条暖色,
+         替代退役的 Fluent 细条居中特性。 -->
+    <SolidColorBrush x:Key="SemiColorFocusBorder">#d97757</SolidColorBrush>
+    <SolidColorBrush x:Key="TextBoxSelectionBackground" Opacity="0.35" Color="#d97757" />
+    <SolidColorBrush x:Key="SemiColorHighlightBackground" Opacity="0.4" Color="#d97757" />
+    <SolidColorBrush x:Key="SemiColorHighlight">#faf9f5</SolidColorBrush>
+    <x:Double x:Key="ScrollBarThumbThickness">8</x:Double>
+    <CornerRadius x:Key="ScrollBarThumbCornerRadius">4,4,4,4</CornerRadius>
+    <SolidColorBrush x:Key="ScrollBarThumbForeground">#c8c3b4</SolidColorBrush>
+    <SolidColorBrush x:Key="ScrollBarThumbPointeroverForeground">#a29d90</SolidColorBrush>
+    <SolidColorBrush x:Key="ScrollBarButtonDefaultForeground">#87867f</SolidColorBrush>
+    <SolidColorBrush x:Key="ScrollBarButtonPointeroverForeground">#57534e</SolidColorBrush>
+    <!-- ComboBox 弹层暖化 (Semi 键): 底 = Ivory, 边 = BorderWarm (替代冷灰底) -->
+    <SolidColorBrush x:Key="ComboBoxPopupBackground">#faf9f5</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxPopupBorderBrush">#e8e6dc</SolidColorBrush>
   </Application.Resources>
 
   <!-- 应用级样式: 2026-09-27 起主题库由 Fluent 迁移至 Semi.Avalonia (用户裁定 1B:
