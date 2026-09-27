@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia.Controls;
@@ -38,7 +39,7 @@ namespace KeyFlux.Settings.Views.Controls;
 /// 业务状态; 无 IO; 反射仅订阅一个内部事件; 每 combo 一份状态 (ConditionalWeakTable,
 /// 与 SectionUnroll 同款弱持有, 页面重建不留悬挂引用)。</para>
 /// </summary>
-public static class ComboDropdownMotion
+public sealed class ComboDropdownMotion
 {
     private const string UnrollClass = "comboPopupUnroll";
     private const string RollUpClass = "comboPopupRollup";
@@ -48,40 +49,73 @@ public static class ComboDropdownMotion
     {
         public bool Wired;
         public bool IgnoreClose; // 我们主动 Popup.Close 的第二轮 Closing: 放行
+        public bool ClosingWired; // Closing 反射订阅只挂一次 (per popup 实例)
         public CancellationTokenSource? Cts;
+        public Popup? Popup;
         public Border? PopupBorder;
     }
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, State> States = new();
 
-    /// <summary>为下拉框接上展开/折叠动效 (幂等; 页面 OnLoaded 逐个调用)。</summary>
+    /// <summary>XAML 挂载开关: 置 True 即接上动效 (控件初始化期即订阅 DropDownOpened ——
+    /// OnLoaded/后代枚举方案在模板应用前拿不到下拉框, 实测静默失效, 故用附加属性)。</summary>
+    public static readonly AttachedProperty<bool> EnabledProperty =
+        AvaloniaProperty.RegisterAttached<ComboDropdownMotion, ComboBox, bool>("Enabled");
+
+    static ComboDropdownMotion()
+    {
+        EnabledProperty.Changed.AddClassHandler<ComboBox>(
+            (combo, e) => { if (e.GetNewValue<bool>()) Attach(combo); });
+    }
+
+    public static bool GetEnabled(ComboBox combo) => combo.GetValue(EnabledProperty);
+    public static void SetEnabled(ComboBox combo, bool value)
+{
+    combo.SetValue(EnabledProperty, value);
+}
+
+    /// <summary>为下拉框接上展开/折叠动效 (幂等)。</summary>
     public static void Attach(ComboBox combo)
     {
         var state = States.GetValue(combo, _ => new State());
         if (state.Wired) return;
         state.Wired = true;
 
-        combo.DropDownOpened += (_, _) => OnDropDownOpened(state);
-        // Popup 在模板内: 挂树后才可枚举; 顺带反射订阅 internal Closing (见类注释)
-        combo.AttachedToVisualTree += (_, _) =>
-        {
-            var popup = combo.GetVisualDescendants().OfType<Popup>().FirstOrDefault();
-            if (popup is null) return;
-
-            state.PopupBorder = popup.Child as Border;
-            var closing = typeof(Popup).GetEvent(ClosingEventName,
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            closing?.AddEventHandler(popup, new EventHandler<System.ComponentModel.CancelEventArgs>(
-                (_, e) => OnPopupClosing(popup, state, e)));
-        };
+        // ⚠ popup 的发现必须延迟到 DropDownOpened: 面板是导航后动态构建的, Attach 时
+        // 下拉框模板尚未应用, GetVisualDescendants 拿不到 Popup → 动画会静默跳过 (实测)。
+        combo.DropDownOpened += (_, _) => OnDropDownOpened(combo, state);
     }
 
     // ------------------------------------------------------------- 展开
 
-    private static void OnDropDownOpened(State state)
+    private static void OnDropDownOpened(ComboBox combo, State state)
     {
-        var border = state.PopupBorder;
+        // 此刻 popup 必然已随模板就位; 首次发现时反射订阅 internal Closing (见类注释)
+        var popup = combo.GetVisualDescendants().OfType<Popup>().FirstOrDefault();
+        if (popup is null) return;
+        var border = popup.Child as Border;
         if (border is null) return;
+
+        if (!state.ClosingWired)
+        {
+            state.ClosingWired = true;
+            state.Popup = popup;
+            state.PopupBorder = border;
+            // internal 事件无公开 add 访问器, EventInfo.AddEventHandler 会拒 ⇒
+            // 直接反射调用非公开 add 方法 (双保险 try/catch: 失败仅折叠动画退化为瞬时关闭)
+            try
+            {
+                var closing = typeof(Popup).GetEvent(ClosingEventName,
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                closing?.GetAddMethod(true)?.Invoke(popup,
+                    new object[] { new EventHandler<System.ComponentModel.CancelEventArgs>(
+                        (_, e) => OnPopupClosing(popup, state, e)) });
+            }
+            catch
+            {
+                // 反射被拒 (如策略限制): 折叠动画不可用, 关闭保持瞬时
+            }
+        }
 
         // 撤掉在飞的折叠 (折叠中途再点开): 取消即放行, 不留半卷状态
         state.Cts?.Cancel();
@@ -91,21 +125,49 @@ public static class ComboDropdownMotion
 
         if (!MotionPreferences.AnimationsEnabled) return; // 无动效档: popup 原样全高展开
 
-        // 先把高度归零 (同步, 抢在首帧渲染前), 再量自然高摊开; 内层内容同步淡入
-        var inner = border.Child as Control;
-        border.MaxHeight = 0;
-        var natural = RevealHeightMotion.MeasureNaturalHeight(border);
-        if (!RevealHeightMotion.CanDrive(natural))
-        {
-            border.MaxHeight = double.PositiveInfinity;
-            return;
-        }
-
         var cts = new CancellationTokenSource();
         state.Cts = cts;
+
+        // 先把高度归零 (同步, 抢在首帧渲染前); 内层内容同步淡入。
+        // ⚠ popup 刚开尚未布局: 直接 Measure 量到 0 (实测) —— 走「先布局一帧再动画」:
+        //   LayoutUpdated 首帧拿到真实高度后启动摊开; 期间 border.MaxHeight=0 不露内容
+        var inner = border.Child as Control;
+        border.MaxHeight = 0;
         if (inner is not null) PlayFade(inner, 0, 1, ClaudeMotion.Unroll, cts.Token);
-        _ = RunAsync(border, 0, natural, ClaudeMotion.Unroll, cts, state,
-            done: () => border.MaxHeight = double.PositiveInfinity); // 展开完放开上限, 列表可自由滚动
+        WaitForLayoutThenUnroll(combo, border, state, cts);
+    }
+
+    private static CancellationToken ctsToken(State state)
+        => state.Cts?.Token ?? CancellationToken.None;
+
+    /// <summary>等 popup 完成一帧布局 (拿到真实高度) 后启动摊开动画。</summary>
+    private static async void WaitForLayoutThenUnroll(ComboBox combo, Border border, State state, CancellationTokenSource cts)
+    {
+        try
+        {
+            var tcs = new TaskCompletionSource();
+            System.EventHandler? handler = null;
+            handler = (_, _) =>
+            {
+                border.LayoutUpdated -= handler;
+                tcs.TrySetResult();
+            };
+            border.LayoutUpdated += handler;
+            await tcs.Task;
+            if (cts.IsCancellationRequested) return;
+
+            border.Measure(new Size(combo.Bounds.Width, double.PositiveInfinity));
+            var natural = border.DesiredSize.Height;
+            if (!RevealHeightMotion.CanDrive(natural))
+            {
+                border.MaxHeight = double.PositiveInfinity;
+                return;
+            }
+
+            _ = RunAsync(border, 0, natural, ClaudeMotion.Unroll, cts, state,
+                done: () => border.MaxHeight = double.PositiveInfinity);
+        }
+        catch { border.MaxHeight = double.PositiveInfinity; }
     }
 
     // ------------------------------------------------------------- 折叠

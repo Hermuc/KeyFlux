@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:KeyFlux.Settings.ViewModels"
              xmlns:controls="using:KeyFlux.Settings.Controls"
+             xmlns:motion="using:KeyFlux.Settings.Views.Controls"
              x:Class="KeyFlux.Settings.Views.Controls.ActionEditorPanel"
              x:Name="PanelRoot"
              x:DataType="vm:ActionEditorViewModel">
@@ -87,10 +88,12 @@
            未配置档 (IsTypeDisabled) 禁用态不可命中, 天然不亮, 无需让位样式 -->
       <Grid DockPanel.Dock="Top" ColumnDefinitions="5*,7*" Margin="0,0,0,10">
         <ComboBox Classes="claudeInput" Margin="0,0,10,0"
+                  motion:ComboDropdownMotion.Enabled="True"
                   ItemsSource="{Binding GroupOptions}"
                   SelectedItem="{Binding SelectedGroup}"
                   HorizontalAlignment="Stretch" />
         <ComboBox Grid.Column="1" Classes="claudeInput"
+                  motion:ComboDropdownMotion.Enabled="True"
                   ItemsSource="{Binding TypeOptions}"
                   SelectedItem="{Binding SelectedType}"
                   IsEnabled="{Binding HasHotkey}"
