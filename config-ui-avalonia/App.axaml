@@ -41,16 +41,6 @@
     <SolidColorBrush x:Key="SemiColorPrimaryLight" Opacity="0.2" Color="#c96442" />
     <SolidColorBrush x:Key="SemiColorPrimaryLightPointerover" Opacity="0.3" Color="#c96442" />
     <SolidColorBrush x:Key="SemiColorPrimaryLightActive" Opacity="0.4" Color="#c96442" />
-
-    <!-- ToggleSwitch 开启态暖色化 (2026-09-27 实机发现): Semi 的开关 ON 态不走 Primary,
-         而走 SemiColorSuccess (绿) —— 与 Fluent 时代「开关变蓝」同族的违和问题。
-         覆盖 Checked 容器 4 态键 = Terracotta/Coral/暗阶。
-         >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 <<
-         守护 = SkinContractTests.Semi_ToggleSwitch_Checked_Are_Warm -->
-    <SolidColorBrush x:Key="ToggleSwitchContainerCheckedDefaultBackground">#c96442</SolidColorBrush>
-    <SolidColorBrush x:Key="ToggleSwitchContainerCheckedPointeroverBackground">#e1957a</SolidColorBrush>
-    <SolidColorBrush x:Key="ToggleSwitchContainerCheckedPressedBackground">#a8522f</SolidColorBrush>
-    <SolidColorBrush x:Key="ToggleSwitchContainerCheckedDisabledBackground">#f0b49e</SolidColorBrush>
   </Application.Resources>
 
   <!-- 应用级样式: 2026-09-27 起主题库由 Fluent 迁移至 Semi.Avalonia (用户裁定 1B:
