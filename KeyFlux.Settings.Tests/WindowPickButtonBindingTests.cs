@@ -57,6 +57,11 @@ public sealed class WindowPickBindingTestApp : Application
         Resources["SemiColorPrimaryLight"] = new SolidColorBrush(Color.Parse("#c96442")) { Opacity = 0.2 };
         Resources["SemiColorPrimaryLightPointerover"] = new SolidColorBrush(Color.Parse("#c96442")) { Opacity = 0.3 };
         Resources["SemiColorPrimaryLightActive"] = new SolidColorBrush(Color.Parse("#c96442")) { Opacity = 0.4 };
+        // ToggleSwitch 开启态暖色化镜像 (App.axaml 同名覆盖; Semi ON 态走 Success 绿, 见 SkinContractTests.Semi_ToggleSwitch_Checked_Are_Warm)
+        Resources["ToggleSwitchContainerCheckedDefaultBackground"] = new SolidColorBrush(Color.Parse("#c96442"));
+        Resources["ToggleSwitchContainerCheckedPointeroverBackground"] = new SolidColorBrush(Color.Parse("#e1957a"));
+        Resources["ToggleSwitchContainerCheckedPressedBackground"] = new SolidColorBrush(Color.Parse("#a8522f"));
+        Resources["ToggleSwitchContainerCheckedDisabledBackground"] = new SolidColorBrush(Color.Parse("#f0b49e"));
     }
 }
 
