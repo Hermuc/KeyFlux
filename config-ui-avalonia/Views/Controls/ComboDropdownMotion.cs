@@ -23,8 +23,9 @@ namespace KeyFlux.Settings.Views.Controls;
 /// 时长用专用令牌 (见 <see cref="ClaudeMotion.ComboDropdownExpand"/>, 比手风琴的 100ms 档长,
 /// 用户反馈 100ms 帧数低不丝滑)。
 ///
-/// <para><b>与选项页同款的取舍。</b> 保留: 高度揭示 (真·尺寸收缩) + 100ms + SineEaseInOut +
-/// 内层内容 3px 落平 (类驱动 XAML 动画, 样式见 Claude.axaml comboPopup 段)。
+/// <para><b>与选项页同款的取舍。</b> 保留: 高度揭示 (真·尺寸收缩) + SineEaseInOut + 内层
+/// 内容淡入 (代码驱动 Opacity —— XAML 类动画的 RenderTransform 代码侧无动画器会抛, 且
+/// 类选择器会误匹配全应用 ScrollViewer, 均已弃用)。落平位移省略。
 /// 省略: 16px 卷曲光影带 —— 它是选项页模板里的专用元素, ComboBox 的 Popup 模板不可注入。</para>
 ///
 /// <para><b>折叠为什么要反射内部 Closing 事件。</b> Avalonia 11.3 的 Popup.Closing 是 internal
@@ -43,7 +44,6 @@ namespace KeyFlux.Settings.Views.Controls;
 /// </summary>
 public sealed class ComboDropdownMotion
 {
-    private const string UnrollClass = "comboPopupUnroll";
     private const string RollUpClass = "comboPopupRollup";
     private const string ClosingEventName = "Closing";
 

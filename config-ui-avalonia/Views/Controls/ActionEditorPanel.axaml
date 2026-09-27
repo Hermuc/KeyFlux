@@ -10,7 +10,8 @@
   <!-- Fluent ComboBox 悬停/按压态边框是模板内 DynamicResource (无视控件 BorderBrush),
        默认深灰 → 用户报「橙圈内还有黑圈」。面板级资源覆盖 = 只影响本面板的下拉框
        (DynamicResource 沿逻辑树查找, 面板级优先于主题; ScrollBarSize 同款机制)。
-       覆盖为奶油色 = 悬停时下拉框自身边框与静止态一致, 唯一反馈是外圈橙色线条 -->
+       覆盖为奶油色 = 按压态边框与静止态一致 (悬停/聚焦的橙色反馈在 Claude.axaml
+       claudeInput 段, /template/ 部件级样式优先于这里的资源覆盖) -->
   <UserControl.Resources>
     <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">#f0eee6</SolidColorBrush>
     <SolidColorBrush x:Key="ComboBoxBorderBrushPressed">#f0eee6</SolidColorBrush>
@@ -36,7 +37,7 @@
          Background (BrushTransition 120ms = ClaudeMotion.Micro 淡入, 皮肤同款过渡器)。
          ㊉ 不能用 Opacity 淡入: 环是卡的祖先, 祖先 Opacity=0 会连卡片一起藏掉。
          悬停让位: 指针悬到可交互子控件 (下拉框/芯片/输入框/按钮) 时外圈熄灭让位
-         (childHover 类由 code-behind 指针命中测试切换); 下拉框自己的橙圈 = comboHalo。
+         (childHover 类由 code-behind 指针命中测试切换); 下拉框悬停描边见 Claude.axaml claudeInput 段。
          代价: 外框比卡片大 10px (使用处 Width 已 +10 补偿, 卡片可视尺寸不变)。 -->
   <UserControl.Styles>
     <Style Selector="Border.haloRing">

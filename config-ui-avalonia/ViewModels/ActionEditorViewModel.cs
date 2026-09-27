@@ -76,7 +76,7 @@ public sealed partial class ActionEditorViewModel : ObservableObject
     private bool _hasHotkey;
 
     /// <summary>
-    /// 动作类型下拉是否处于禁用态 (未选键 → 深灰不可点) —— 供 comboHalo 悬停描边让位判定。
+    /// 动作类型下拉是否处于禁用态 (未选键 → 深灰不可点, 禁用控件不触发 :pointerover, 悬停天然不亮)。
     /// 2026-09-25 用户二次细化: 仅禁用态悬停不亮橙圈; 已选键但类型为「未配置」时下拉框
     /// 白/可点, 悬停照常亮圈 (与其他子选项框一致)。
     /// </summary>
