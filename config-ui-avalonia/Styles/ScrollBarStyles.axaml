@@ -1,0 +1,41 @@
+<!-- 设置界面滚动条交互与外观优化 (仅作用于 ScrollBar, 不影响按钮/输入框等其他控件):
+     1. 悬停即时加粗: Fluent 默认 ShowDelay=0.5s (指针进入后延迟 500ms 才展开, 造成"等待片刻才变粗"),
+        改为 0 后指针一进入滚动条区域立即展开;
+     2. 移开立即变细: Fluent 默认 HideDelay=2s (指针移出后 2 秒才收起, 造成视觉残留),
+        改为 0 后指针移出立即收起;
+        展开/收起的粗细过渡仍由 FluentScrollBarThumb 自带的 100ms 渲染过渡完成, 平滑不突兀;
+     3. Thumb 两端圆角: FluentScrollBarThumb 模板中 Border 绑定 CornerRadius 但默认值为 0 (直角),
+        此处统一设为 8 (展开时 Thumb 宽约 14px, 8px 圆角形成胶囊状端部, 贴合 Fluent/WinUI 风格).
+        注意: 选择器只能用裸类型 "Thumb" —— ScrollBar 模板中的 Thumb 嵌套在 Track 内,
+        应用级样式的 "/template/" 与后代(空格)选择器均无法命中模板内元素(前者只匹配直接模板子元素,
+        后者基于逻辑树), 唯类型选择器按 StyleKey 直接匹配. 本项目无 Slider 等其他含 Thumb 的控件,
+        故全局 Thumb 样式实际只作用于滚动条; 若未来引入 Slider, 需在此处补充排除逻辑.
+     4. 整体宽度: Fluent 主题中滚动条宽度由 ScrollBarSize 资源控制 (ScrollBar 的 MinWidth、
+        Thumb 的 Width、两端按钮尺寸均绑定它), 已在 App.axaml 的 Application.Resources 中
+        覆盖为 10 整体收窄. 注意资源覆盖必须放在 Application.Resources ——
+        Styles.Resources 不在主题模板内 DynamicResource 的逻辑树查找链上, 覆盖无效.
+     5. 细条居中 + 悬停向两侧对称变粗 (2026-09-18 用户要求, 原为贴右缘、只向左单侧延伸):
+        实际改动**不在本文件**, 而是覆盖模板绑定的缩放变换资源
+        VerticalSmallScrollThumbScaleTransform / HorizontalSmallScrollThumbScaleTransform
+        (见 App.axaml 同名注释: 成因 = 模板内联的 RenderTransformOrigin 以右缘/下缘为缩放原点).
+        之所以不能在此处用样式改 RenderTransformOrigin —— 该属性由模板内联赋值, 写入优先级
+        Template 高于应用级 Style (实测: 此处设 0.5,0.5 无效, 读回仍是 "100%, 50%"),
+        且 "/template/" 与后代选择器均无法命中模板内元素 (同第 3 条).
+        本文件保留的原因: 第 1~3 条 (悬停延迟/圆角) 仍需在此声明; 第 5 条作为机制索引,
+        免得后来者在本文件里找不到"居中"的实现而误以为漏改.
+        守护用例: KeyFlux.Settings.Tests/ScrollBarStylesTests.cs. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- 悬停/移开延迟归零: 即时响应 -->
+  <Style Selector="ScrollBar">
+    <Setter Property="ShowDelay" Value="0:0:0" />
+    <Setter Property="HideDelay" Value="0:0:0" />
+  </Style>
+
+  <!-- Thumb 圆角 (模板 Border 的 CornerRadius 由该属性驱动) -->
+  <Style Selector="Thumb">
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+
+</Styles>

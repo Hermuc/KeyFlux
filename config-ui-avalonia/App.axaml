@@ -3,7 +3,6 @@
      故固定 Light 以保证文字为深色可读。暗色主题接线方式见 Styles/Skins/Claude.axaml 文末注释。 -->
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:semi="https://irihi.tech/semi"
              xmlns:services="using:KeyFlux.Settings.Services"
              x:Class="KeyFlux.Settings.App"
              RequestedThemeVariant="Light">
@@ -19,36 +18,138 @@
 
     <!-- ===================== 全局 UI 字体 = MiSans (2026-09-13 用户指定, 随应用打包) =====================
          单源 = 皮肤资源 AppUiFont (Styles/Skins/Claude.axaml, 4 字重入 Assets/Fonts);
-         ContentControlThemeFontFamily = 主题模板内部 DynamicResource 的主题资源键
-         (Fluent 时代引入; Semi 迁移后部分模板仍消费, 全窗口字体同时由 Window 级
-         AppUiFont 样式兜底, 值须与皮肤 AppUiFont 镜像, 勿单改一处)。
+         此处 ContentControlThemeFontFamily = Fluent 模板内部 DynamicResource 的主题资源键,
+         覆盖后模板化控件文本同样走 MiSans (值须与皮肤 AppUiFont 镜像, 勿单改一处)。
          例外 (刻意保留): 等宽场景 Consolas (代码/键盘布局), MDI 图标字体, Twemoji 表情。
          >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 <<
          (全窗口默认字体经 App.Styles 的 Window 样式引用皮肤 AppUiFont) -->
     <FontFamily x:Key="ContentControlThemeFontFamily">avares://KeyFlux.Settings/Assets/Fonts/#MiSans, Microsoft YaHei UI, Segoe UI Emoji</FontFamily>
+    <!-- 滚动条整体宽度: Fluent 主题模板中 ScrollBar 的 MinWidth 与 Thumb 宽度均绑定 ScrollBarSize 资源
+         (默认值下实测展开约 14px, 细条约 3px; 注意窗口为 125% DPI, 物理像素 = 逻辑值 x 1.25),
+         此处覆盖为 10, 展开宽度收窄至约 12-13px, 细条同步变细.
+         注意: 必须放在 Application.Resources (逻辑树根) 而非 Styles.Resources ——
+         主题模板内的 {DynamicResource ScrollBarSize} 沿逻辑树查找资源, 不经过样式集合资源. -->
+    <x:Double x:Key="ScrollBarSize">10</x:Double>
 
-    <!-- ===================== Semi 令牌暖色化 (2026-09-27, 替代原 Fluent 覆盖) =====================
-         Semi 控件 (CheckBox/RadioButton/Slider/焦点态等) 的强调色走 SemiColorPrimary 族
-         DynamicResource, 默认 Semi 蓝 —— 与 Claude 暖色体系冲突, 同机制覆盖 (模板内
-         DynamicResource 沿逻辑树查找, Application.Resources 优先)。
-         值 = Terracotta 主阶 + Coral 亮阶 + 暗阶 (与原 SystemAccent 族同源)。
+    <!-- ===================== 滚动条 Thumb 缩放变换: 细条居中 =====================
+         2026-09-18 用户要求: 滚动条细条从「贴滚动区域右缘」改为「居中于滚动条带」,
+         且鼠标悬浮展开时**向两侧对称变粗** (原为只向左单侧延伸)。
+
+         成因 (已查 Fluent 11.3.20 模板源 src/Avalonia.Themes.Fluent/Controls/ScrollBar.xaml):
+         竖直 Thumb 模板内联 `RenderTransformOrigin="100%,50%"` (= 以**右缘**为缩放原点)
+         并绑定本资源 `VerticalSmallScrollThumbScaleTransform`; 原值
+         `scaleX(0.125) translateX(-2px)` —— 缩放锚在右缘故细条紧贴右侧,
+         再向左挪 2px 留出边距 ⇒ 展开时左缘位移而右缘固定 = 单侧变粗。
+         水平条同族: 原点 `50%,100%` (下缘) + `scaleY(0.125) translateY(-2px)`, 向上单侧变粗。
+
+         改法: 把贴边位移换成**居中补偿位移** -(ScrollBarSize - ScrollBarSize x 0.125) / 2
+         = -(10 - 1.25) / 2 = -4.375px ⇒ 细条渲染范围变为 [4.375, 5.625] (宽 1.25),
+         中心 5.0 = 滚动条带正中 (即中心距视口右缘 5px, 左/右余量各 4.375px)。
+         展开时中心恒定的证明: 设参数 s 缩放、位置 t, 渲染中心 = W - W*s/2 + t;
+         取 t = -W(1-s)/2 代入得中心恒 = W/2, 与 s 无关 —— 故过渡动画每一帧都居中,
+         两侧对称扩展 (不是只有终态居中)。
+
+         注意 (为什么必须在 Application.Resources): 模板内用 {DynamicResource} 取本资源,
+         沿【逻辑树】查找, 不经过样式集合资源 (与上方 ScrollBarSize 同一原因)。
+         注意 (为什么不用样式改 RenderTransformOrigin): 该属性由模板**内联**赋值,
+         写入优先级为 Template, 高于应用级 Style(实测: 应用级 Thumb 样式设 0.5,0.5 无效,
+         读回仍是 "100%, 50%") ⇒ 只能从变换自身下手。
+         注意 (字面量耦合): -4.375px 同时耦合 ScrollBarSize=10 与 Fluent 的 0.125 缩放系数,
+         改任一值都必须同改此处; 守护用例 ScrollBarStylesTests 会因「细条不居中」而红。
+         >> 换肤须知: 以下值不属于配色, 换肤无需替换 << -->
+    <TransformOperations x:Key="VerticalSmallScrollThumbScaleTransform">scaleX(0.125) translateX(-4.375px)</TransformOperations>
+    <TransformOperations x:Key="HorizontalSmallScrollThumbScaleTransform">scaleY(0.125) translateY(-4.375px)</TransformOperations>
+
+    <!-- ===================== 系统强调色暖色化 (2026-09-13 全局冷蓝清零) =====================
+         Fluent 的 RadioButton 选中圆 / CheckBox 勾选框 / Slider 轨道填充 / AutoCompleteBox
+         下拉选中等所有「强调色态」都引用 SystemAccentColor 系 (默认取 OS 强调色 = 蓝 #0078d7),
+         此前只逐键覆盖了 ToggleSwitch/ComboBox/TextBox 三家, RadioButton 一族仍冷蓝
+         (用户报: 行为选择器与整体 UI 不匹配)。headless 实证: 在此覆盖 7 个 Color 即全部转暖,
+         派生画刷 (SystemControlBackgroundAccentBrush 等) 自动跟随; 类型必须是 Color 不是 Brush。
+         值 = Terracotta 主阶 + Coral/CoralLight 亮阶 + 三个加深阶 (悬停/按下变体用)。
          >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 <<
-         守护 = SkinContractTests.Semi_Primary_Family_Is_Warm -->
-    <SolidColorBrush x:Key="SemiColorPrimary">#c96442</SolidColorBrush>
-    <SolidColorBrush x:Key="SemiColorPrimaryPointerover">#e1957a</SolidColorBrush>
-    <SolidColorBrush x:Key="SemiColorPrimaryActive">#a8522f</SolidColorBrush>
-    <SolidColorBrush x:Key="SemiColorPrimaryDisabled">#f0b49e</SolidColorBrush>
-    <SolidColorBrush x:Key="SemiColorPrimaryLight" Opacity="0.2" Color="#c96442" />
-    <SolidColorBrush x:Key="SemiColorPrimaryLightPointerover" Opacity="0.3" Color="#c96442" />
-    <SolidColorBrush x:Key="SemiColorPrimaryLightActive" Opacity="0.4" Color="#c96442" />
+         守护 = SkinContractTests.Skin_Contract_SystemAccent_Family_Is_Warm -->
+    <Color x:Key="SystemAccentColor">#c96442</Color>
+    <Color x:Key="SystemAccentColorDark1">#a8522f</Color>
+    <Color x:Key="SystemAccentColorDark2">#8f4426</Color>
+    <Color x:Key="SystemAccentColorDark3">#75351c</Color>
+    <Color x:Key="SystemAccentColorLight1">#d97757</Color>
+    <Color x:Key="SystemAccentColorLight2">#e1957a</Color>
+    <Color x:Key="SystemAccentColorLight3">#f0b49e</Color>
+
+    <!-- ===================== 皮肤可替换资源 · Fluent 模板覆盖 =====================
+         Fluent 的 ToggleSwitch 模板用 {DynamicResource ToggleSwitchFillOn/StrokeOn/KnobFillOn}
+         取开启态配色, 默认取系统强调色 (本机为蓝) —— 与暖色体系冲突。
+
+         为什么必须放在 Application.Resources (逻辑树根) 而不是皮肤文件的 Styles.Resources:
+         模板内部的 {DynamicResource} 沿【逻辑树】查找, 不经过样式集合资源
+         (与上方 ScrollBarSize 同一原因, 见其注释; 该限制已在真实控件上验证过)。
+
+         为什么要有 Key 而不是直接写 Color: 这三个是 Fluent 的资源键, 类型必须是画刷,
+         Fluent 绑定的是画刷而非颜色, 故此处仍以字面量 hex 给出 (无法引用令牌)。
+
+         >> 换肤须知: 下面 3 个值属于皮肤配色, 新增皮肤时需同步替换 << -->
+    <SolidColorBrush x:Key="ToggleSwitchFillOn">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOn">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn">#faf9f5</SolidColorBrush>
+
+    <!-- 开启态的【悬停/按下】必须单独覆盖 —— Fluent 只为非悬停态留了上面 3 个键,
+         悬停/按下走的是 *_PointerOver / *_Pressed 变体, 其内置值是硬编码蓝
+         (#269fff / #0078d7 / #00589e), 不覆盖就会"鼠标一放上开关就变蓝"。
+         (2026-09 实测: SwitchKnobBounds 非悬停=#c96442 正确, 悬停=#269fff 蓝。) -->
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver">#e1957a</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver">#e1957a</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver">#faf9f5</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed">#c96442</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed">#faf9f5</SolidColorBrush>
+
+    <!-- 关闭态悬停: Fluent 默认也会转蓝, 改为暖灰描边 -->
+    <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver">Transparent</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver">#87867f</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchFillOffPressed">Transparent</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffPressed">#5e5d59</SolidColorBrush>
+
+    <!-- ===================== ComboBox 下拉项选中态 (2026-09-13 用户报蓝色遗漏) =====================
+         Fluent ComboBox 下拉弹层的选中项/悬停/按下背景走 ComboBoxItemBackgroundSelected* 系列
+         DynamicResource, 默认硬编码蓝 —— 与 ToggleSwitch 同族遗漏, 不覆盖则展开下拉时
+         选中项整行变蓝。必须放 Application.Resources (模板 DynamicResource 沿逻辑树查找,
+         同上方 ToggleSwitch 系列的原因)。
+         >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 << -->
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected">#e1957a</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver">#e1957a</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPressed">#d97757</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver">#f0eee6</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundPressed">#e8e2d4</SolidColorBrush>
+
+    <!-- ===================== ComboBox 弹层容器暖色化 (2026-09-13 用户报弹层方正违和) =====================
+         Fluent 弹层容器默认冷灰底 #f2f2f2 + 深灰边; 改暖 Ivory 底 + Warm 边。
+         圆角见下方 OverlayCornerRadius (弹层 Border 实证经该资源驱动)。
+         >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 << -->
+    <SolidColorBrush x:Key="ComboBoxDropdownBackground">#faf9f5</SolidColorBrush>
+    <SolidColorBrush x:Key="ComboBoxDropdownBorderBrush">#e8e6dc</SolidColorBrush>
+
+    <!-- 弹层统一圆角 (2026-09-13): ComboBox 下拉容器 Border 实证经 OverlayCornerRadius 驱动
+         (Fluent 默认 4, 皮肤 ToolTip 主题亦引用此键); 取 RadiusMd=8 与卡片圆角呼应 -->
+    <CornerRadius x:Key="OverlayCornerRadius">8,8,8,8</CornerRadius>
+
+    <!-- ===================== TextBox 聚焦边框/选中文本高亮 (2026-09-13 用户报蓝色) =====================
+         弹窗 (WindowGroupDialogWindow 等) 的 TextBox 未挂 claudeInput class, 聚焦边框与
+         选中文本高亮走 Fluent 硬编码蓝 (TextControlBorderBrushFocused /
+         TextControlSelectionHighlightColor)。全局覆盖后页面 claudeInput (自身样式 Coral)
+         与弹窗 TextBox 统一暖色。选择高亮用半透明 Coral: 选中文字需保持可读。
+         >> 换肤须知: 以下值属于皮肤配色, 新增皮肤时需同步替换 << -->
+    <SolidColorBrush x:Key="TextControlBorderBrushFocused">#d97757</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver">#c9c7bd</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlSelectionHighlightColor">#8cd97757</SolidColorBrush>
   </Application.Resources>
 
-  <!-- 应用级样式: 2026-09-27 起主题库由 Fluent 迁移至 Semi.Avalonia (用户裁定 1B:
-       用成熟组件库替换手写交互; 直接替换无双轨; 编辑面板已验收交互迁移后等价重现)。
-       Semi 令牌暖色化见下方 SemiColorPrimary 覆盖; Fluent 专属资源覆盖已随主题移除
-       (Semi 模板不引用这些键, 留着是死代码 —— 迁移期间各页面视觉逐一回归)。 -->
+  <!-- 应用级样式：使用 Fluent 主题 (变体由 Application.RequestedThemeVariant 决定) -->
   <Application.Styles>
-    <semi:SemiTheme Locale="zh-CN" />
+    <FluentTheme />
+    <!-- 滚动条交互手感与外观优化 (悬停即时加粗/移开即时变细/Thumb 圆角), 详见 Styles/ScrollBarStyles.axaml -->
+    <StyleInclude Source="avares://KeyFlux.Settings/Styles/ScrollBarStyles.axaml" />
+
     <!-- ===================== ★ 换肤点 (Skin Swap Point) ★ =====================
          下面这一行就是切换皮肤的唯一开关: 把 Source 指向 Styles/Skins/<皮肤名>.axaml
          即可整体换肤, 无需改动任何页面 XAML 或 ViewModel。
