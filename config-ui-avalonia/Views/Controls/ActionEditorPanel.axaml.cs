@@ -11,8 +11,7 @@ namespace KeyFlux.Settings.Views.Controls;
 /// <summary>
 /// 动作编辑面板 (复刻 actions/Action.vue): 窗口分组 + 动作类型下拉 + 按类型分发编辑器。
 /// 悬停光圈让位 (2026-09-25 用户要求): 指针悬到可交互子控件 (下拉框/芯片/输入框/按钮) 时,
-/// 外圈 haloRing 熄灭让位给子框自己的橙圈 (下拉框 = comboHalo 环; 芯片自带悬停描边);
-/// 指针回到卡面非交互区/环带时外圈恢复。
+/// 外圈 haloRing 熄灭让位给子框自己的悬停描边; 指针回到卡面非交互区/环带时外圈恢复。
 /// </summary>
 public partial class ActionEditorPanel : UserControl
 {
@@ -53,7 +52,19 @@ public partial class ActionEditorPanel : UserControl
         SetChildHover(childHover);
     }
 
-    private void OnPanelPointerExited(object? sender, PointerEventArgs e) => SetChildHover(false);
+    /// <summary>
+    /// 指针离开面板才清让位标记。
+    /// ⚠ 点击内层输入框/下拉框的瞬间, 指针被子控件捕获 (capture), Avalonia 会向面板发一个
+    /// **伪 PointerExited** (指针物理上仍在面板内)。此时若清 childHover, 外环立即失去让位,
+    /// 而其 :pointerover 陶土色淡入 (120ms); capture 释放后 PointerMoved 恢复路由又挂回
+    /// childHover, 陶土色再淡出 ⇒ 橙环「闪一下」(2026-09-27 用户报)。
+    /// 面板 IsPointerOver=true 即指针仍在面板内 (capture 不改变 over 链的祖先段), 忽略之。
+    /// </summary>
+    private void OnPanelPointerExited(object? sender, PointerEventArgs e)
+    {
+        if (IsPointerOver) return;
+        SetChildHover(false);
+    }
 
     private void SetChildHover(bool on)
     {
