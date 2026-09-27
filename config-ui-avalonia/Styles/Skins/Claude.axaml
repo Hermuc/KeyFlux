@@ -122,8 +122,9 @@
               ClaudeRingWarmBrush / ClaudeRingDeepBrush /
               暗色桩 (定义但不接线): ClaudeDarkSurfaceBrush / ClaudeDeepDarkBrush /
               ClaudeWarmSilverBrush / ClaudeBorderDarkBrush
-    阴影 (12): ClaudeShadowHoverRing / ClaudeShadowCtaRing /
+    阴影 (13): ClaudeShadowHoverRing / ClaudeShadowCtaRing /
               ClaudeShadowPressedInset / ClaudeShadowFocusRing / ClaudeShadowWhisper /
+              ClaudeShadowInputDepth /
               ClaudeShadowCard / ClaudeShadowCardHover / ClaudeShadowCardDeep /
               ClaudeShadowCardHalo / ClaudeShadowCardHaloHover /
               ClaudeShadowCardHaloPressed / ClaudeShadowCardHaloFocus
@@ -198,6 +199,12 @@
     <BoxShadows x:Key="ClaudeShadowCtaRing">0 0 0 1 #c96442</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowPressedInset">inset 0 0 0 1 #26262526</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowFocusRing">0 0 0 2 #d97757</BoxShadows>
+    <!-- ClaudeShadowInputDepth: 输入框/下拉框深度档 (2026-09-27 用户选定方案 B):
+         1px 暖灰实边之外叠两层渐弱投影 (0 1 2 @8% + 0 2 4 @5%), 输入框微微浮在纸面。
+         技法来源: UX Planet「Hairline Border Trick」/ Josh Comeau 层叠影法 —— 单层硬影
+         在浅底上显假, 双层 (近缘紧 + 远缘散) 才有真实纵深。首批消费方 = 选中动作页
+         两个裸 ComboBox (页面级样式挂 /template/ Border#Background)。 -->
+    <BoxShadows x:Key="ClaudeShadowInputDepth">0 1 2 0 #14000000, 0 2 4 0 #0d000000</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowWhisper">0 4 24 0 #0d000000</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowCard">0 2 4 0 #1c000000, 0 6 18 0 #14000000</BoxShadows>
     <!-- ClaudeShadowCardHover: 卡片悬停 "Ring + 略深投影" 档。
