@@ -365,6 +365,29 @@ public sealed class SkinContractTests
         }
     }
 
+    /// <summary>
+    /// 契约: ToggleSwitch 开启态 (Checked 容器 4 态) 必须暖色化 —— Semi 的开关 ON 态走
+    /// SemiColorSuccess (绿), 与 Claude 暖色体系冲突 (2026-09-27 实机发现, 同 Fluent 时代
+    /// 「开关变蓝」事故族)。覆盖键 = App.axaml 的 ToggleSwitchContainerChecked* 4 键。
+    /// </summary>
+    [AvaloniaFact]
+    public void Semi_ToggleSwitch_Checked_Are_Warm()
+    {
+        var app = Application.Current!;
+        foreach (var key in new[]
+                 {
+                     "ToggleSwitchContainerCheckedDefaultBackground",
+                     "ToggleSwitchContainerCheckedPointeroverBackground",
+                     "ToggleSwitchContainerCheckedPressedBackground",
+                     "ToggleSwitchContainerCheckedDisabledBackground",
+                 })
+        {
+            Assert.True(app.TryFindResource(key, out var v), $"缺 {key}");
+            var b = Assert.IsType<SolidColorBrush>(v);
+            Assert.True(b.Color.R > b.Color.B, $"{key} 非暖色 (R={b.Color.R} B={b.Color.B})");
+        }
+    }
+
     /// <summary>契约: 芯片单选 ControlTheme 存在且 TargetType = RadioButton (行为选择器重构的锚点)。</summary>
     [AvaloniaFact]
     public void Skin_Contract_ChipRadio_Theme_Resolves()
