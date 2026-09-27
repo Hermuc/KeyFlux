@@ -261,10 +261,10 @@ public sealed class ActionPageCardStyleTests
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         }
 
-        Assert.True(false,
+        Assert.Fail(
             $"{what} {string.Join("+", card.Classes)} 40 帧后仍未到终点态: 期望 {expected}; " +
             $"实得 {card.BoxShadow}; IsPointerOver={card.IsPointerOver}; " +
-            $"Transitions={card.Transitions.Count}; Bounds={card.Bounds}");
+            $"Transitions={card.Transitions!.Count}; Bounds={card.Bounds}");
     }
 
     /// <summary>② 选中态 (.matched) 已随「模拟测试」卡片一并移除, 命中高亮不再存在。</summary>
