@@ -31,7 +31,29 @@ public partial class SelectedActionPageView : UserControl
                 _ = vm.EnsureBehaviorCatalogAsync();
             }
         };
+        LayoutUpdated += (_, _) => NeuterComboBoxHighlightBorder();
     }
+
+    /// <summary>
+    /// 输入框和谐灰边框 (2026-09-23) 的 ComboBox 收尾: Fluent 的 ControlTheme 给
+    /// Border#HighlightBackground 静态设了**不透明主题色背景** (#ffc96442) + 40% 黑边 ——
+    /// 页面级样式赢不过 ControlTheme (模板应用晚于页面样式), 但**本地值 (LocalValue)
+    /// 优先级高于一切样式** ⇒ 用 LayoutUpdated 钩子在模板 (重)应用后直写。
+    /// 设为同值无副作用 (Avalonia 相等即不触发变更), 无需脏检查。
+    /// </summary>
+    private void NeuterComboBoxHighlightBorder()
+    {
+        foreach (var border in this.GetVisualDescendants().OfType<Border>())
+        {
+            if ((border as StyledElement)?.Name != "HighlightBackground") continue;
+            border.Background = Brushes.Transparent;
+            border.BorderBrush = StoneBorderBrush;
+        }
+    }
+
+    /// <summary>输入框和谐灰 (与页级 TextBox/ComboBox 样式同值; 集中一处便于统一调整)。</summary>
+    private static readonly IBrush StoneBorderBrush =
+        new SolidColorBrush(Color.Parse("#c8c3b4"));
 
     private void InjectConfirmDialog()
     {
