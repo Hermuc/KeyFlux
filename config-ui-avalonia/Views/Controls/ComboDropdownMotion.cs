@@ -17,9 +17,11 @@ namespace KeyFlux.Settings.Views.Controls;
 
 /// <summary>
 /// 下拉框展开/折叠动效 (2026-09-26 用户要求「与选项页设置列表组件框同款」):
-/// 打开时 PopupBorder 高度 0→自然高 卷轴摊开 (100ms SineEaseInOut), 关闭时反向卷起。
-/// 高度揭示机制复用 <see cref="RevealHeightMotion"/> —— 与选项页揭示动效同一引擎、同一
-/// 时长令牌 (<see cref="ClaudeMotion.Unroll"/>/<see cref="ClaudeMotion.Roll"/>)、同一缓动。
+/// 打开时 PopupBorder 高度 0→自然高 卷轴摊开 (220ms SineEaseInOut, 用户反馈 100ms 档
+/// 帧数低不够丝滑后拉长 —— 专用令牌见 ClaudeMotion.ComboDropdownExpand), 关闭时反向卷起。
+/// 高度揭示机制复用 <see cref="RevealHeightMotion"/> —— 与选项页揭示动效同一引擎同一缓动;
+/// 时长用专用令牌 (见 <see cref="ClaudeMotion.ComboDropdownExpand"/>, 比手风琴的 100ms 档长,
+/// 用户反馈 100ms 帧数低不丝滑)。
 ///
 /// <para><b>与选项页同款的取舍。</b> 保留: 高度揭示 (真·尺寸收缩) + 100ms + SineEaseInOut +
 /// 内层内容 3px 落平 (类驱动 XAML 动画, 样式见 Claude.axaml comboPopup 段)。
@@ -133,7 +135,7 @@ public sealed class ComboDropdownMotion
         //   LayoutUpdated 首帧拿到真实高度后启动摊开; 期间 border.MaxHeight=0 不露内容
         var inner = border.Child as Control;
         border.MaxHeight = 0;
-        if (inner is not null) PlayFade(inner, 0, 1, ClaudeMotion.Unroll, cts.Token);
+        if (inner is not null) PlayFade(inner, 0, 1, ClaudeMotion.ComboDropdownExpand, cts.Token);
         WaitForLayoutThenUnroll(combo, border, state, cts);
     }
 
@@ -164,7 +166,7 @@ public sealed class ComboDropdownMotion
                 return;
             }
 
-            _ = RunAsync(border, 0, natural, ClaudeMotion.Unroll, cts, state,
+            _ = RunAsync(border, 0, natural, ClaudeMotion.ComboDropdownExpand, cts, state,
                 done: () => border.MaxHeight = double.PositiveInfinity);
         }
         catch { border.MaxHeight = double.PositiveInfinity; }
@@ -187,8 +189,8 @@ public sealed class ComboDropdownMotion
         var cts = new CancellationTokenSource();
         state.Cts = cts;
         var inner = border.Child as Control;
-        if (inner is not null) PlayFade(inner, inner.Opacity, 0, ClaudeMotion.Roll, cts.Token);
-        _ = RunAsync(border, from, 0, ClaudeMotion.Roll, cts, state,
+        if (inner is not null) PlayFade(inner, inner.Opacity, 0, ClaudeMotion.ComboDropdownCollapse, cts.Token);
+        _ = RunAsync(border, from, 0, ClaudeMotion.ComboDropdownCollapse, cts, state,
             done: () =>
             {
                 border.MaxHeight = double.PositiveInfinity;
