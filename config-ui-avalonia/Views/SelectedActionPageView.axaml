@@ -225,6 +225,12 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="#c8c3b4" />
     </Style>
+    <!-- 聚焦态同款压制 (2026-09-27): Fluent :focus-visible 会让 HighlightBackground 显形,
+         其边框色由 SystemAccent 派生 (暖橙) —— 不压制则聚焦瞬间边框闪橙 -->
+    <Style Selector="ComboBox:focus-visible /template/ Border#HighlightBackground">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="#c8c3b4" />
+    </Style>
 
     <!-- 分隔项容器压制 (弹窗下拉用) -->
     <Style Selector="ComboBoxItem.sep-item">

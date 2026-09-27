@@ -200,11 +200,11 @@
     <BoxShadows x:Key="ClaudeShadowPressedInset">inset 0 0 0 1 #26262526</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowFocusRing">0 0 0 2 #d97757</BoxShadows>
     <!-- ClaudeShadowInputDepth: 输入框/下拉框深度档 (2026-09-27 用户选定方案 B):
-         1px 暖灰实边之外叠两层渐弱投影 (0 1 2 @8% + 0 2 4 @5%), 输入框微微浮在纸面。
+         1px 暖灰实边之外叠两层渐弱投影 (0 1 2 @14% + 0 2 5 @10%), 输入框微微浮在纸面; 初版 8%/5% 低于浅底可感知阈值 (见上), 已加强。
          技法来源: UX Planet「Hairline Border Trick」/ Josh Comeau 层叠影法 —— 单层硬影
          在浅底上显假, 双层 (近缘紧 + 远缘散) 才有真实纵深。首批消费方 = 选中动作页
          两个裸 ComboBox (页面级样式挂 /template/ Border#Background)。 -->
-    <BoxShadows x:Key="ClaudeShadowInputDepth">0 1 2 0 #14000000, 0 2 4 0 #0d000000</BoxShadows>
+    <BoxShadows x:Key="ClaudeShadowInputDepth">0 1 2 0 #24000000, 0 2 5 0 #1a000000</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowWhisper">0 4 24 0 #0d000000</BoxShadows>
     <BoxShadows x:Key="ClaudeShadowCard">0 2 4 0 #1c000000, 0 6 18 0 #14000000</BoxShadows>
     <!-- ClaudeShadowCardHover: 卡片悬停 "Ring + 略深投影" 档。
