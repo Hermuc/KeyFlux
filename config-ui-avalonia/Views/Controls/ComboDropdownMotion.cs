@@ -55,6 +55,7 @@ public sealed class ComboDropdownMotion
         public CancellationTokenSource? Cts;
         public Popup? Popup;
         public Border? PopupBorder;
+        public ScrollViewer? InnerScroll; // 动画期间隐藏滚动条用 (高度受限时会出现)
     }
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, State> States = new();
@@ -103,6 +104,7 @@ public sealed class ComboDropdownMotion
             state.ClosingWired = true;
             state.Popup = popup;
             state.PopupBorder = border;
+            state.InnerScroll = border.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
             // internal 事件无公开 add 访问器, EventInfo.AddEventHandler 会拒 ⇒
             // 直接反射调用非公开 add 方法 (双保险 try/catch: 失败仅折叠动画退化为瞬时关闭)
             try
@@ -124,6 +126,7 @@ public sealed class ComboDropdownMotion
         state.Cts = null;
         state.IgnoreClose = false;
         border.Classes.Remove(RollUpClass);
+        if (state.InnerScroll is not null) state.InnerScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
 
         if (!MotionPreferences.AnimationsEnabled) return; // 无动效档: popup 原样全高展开
 
@@ -167,7 +170,12 @@ public sealed class ComboDropdownMotion
             }
 
             _ = RunAsync(border, 0, natural, ClaudeMotion.ComboDropdownExpand, cts, state,
-                done: () => border.MaxHeight = double.PositiveInfinity);
+                done: () =>
+                {
+                    border.MaxHeight = double.PositiveInfinity;
+                    if (state.InnerScroll is not null)
+                        state.InnerScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto; // 长列表仍需滚动
+                });
         }
         catch { border.MaxHeight = double.PositiveInfinity; }
     }
@@ -194,6 +202,8 @@ public sealed class ComboDropdownMotion
             done: () =>
             {
                 border.MaxHeight = double.PositiveInfinity;
+                if (state.InnerScroll is not null)
+                    state.InnerScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 state.IgnoreClose = true; // 第二轮 Closing 放行
                 popup.Close();
             });
