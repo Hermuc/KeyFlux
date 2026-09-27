@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using KeyFlux.Settings.ViewModels;
@@ -24,6 +25,14 @@ public partial class ActionEditorPanel : UserControl
         InitializeComponent();
         PointerMoved += OnPanelPointerMoved;
         PointerExited += OnPanelPointerExited;
+    }
+
+    /// <summary>挂树后为两个下拉框接上展开/折叠动效 (见 ComboDropdownMotion)。</summary>
+    protected override void OnLoaded(RoutedEventArgs e)
+    {
+        base.OnLoaded(e);
+        // foreach (var combo in this.GetVisualDescendants().OfType<ComboBox>())
+        //     ComboDropdownMotion.Attach(combo); // [临时禁用: 启动崩溃排查]
     }
 
     /// <summary>

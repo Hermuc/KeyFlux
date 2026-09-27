@@ -729,12 +729,8 @@
   <Style Selector="ComboBox.claudeInput:pointerover /template/ Border#Background">
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
   </Style>
-  <Style Selector="ComboBox.claudeInput:pointerover /template/ Border#HighlightBackground">
-    <Setter Property="BorderBrush" Value="Transparent" />
-  </Style>
-  <!-- 按下态 (2026-09-26 用户裁定「按下后不要有阴影」): Fluent :pressed 会把背景换成
-       半透明深色 (视觉如阴影)。这两个下拉框按下即展开下拉列表, 按下态保持白底 +
-       陶土边 (与悬停一致); 阴影语义仅保留给禁用态的灰底 (无法展开) -->
+  <!-- 下拉框 Popup 展开/折叠的内容落平 (3px 位移, 与选项页揭示动效同款; 高度揭示由
+       ComboDropdownMotion 驱动 PopupBorder.MaxHeight, 见 Views/Controls/ComboDropdownMotion) -->
   <Style Selector="ComboBox.claudeInput:pressed /template/ Border#Background">
     <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
