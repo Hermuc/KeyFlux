@@ -744,6 +744,17 @@
   <Style Selector="ComboBox.claudeInput:focus-visible /template/ Border#HighlightBackground">
     <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
+  <!-- 文字凹陷 (letterpress): DropShadowEffect 挂在模板 ContentControl#ContentPresenter 上
+       —— Effect 作用于其渲染的文字字形, 下偏移 1px 极淡暖灰 = 文字像压进纸面。
+       (此前控件级 inset 双影被否; 文字级影只跟字形走, 不糊框)
+       ⚠ DropShadowEffect 属性为 OffsetX/OffsetY (Direct 版才有 ShadowDepth/Direction) -->
+  <Style Selector="ComboBox.claudeInput /template/ ContentControl#ContentPresenter">
+    <Setter Property="Effect">
+      <Setter.Value>
+        <DropShadowEffect OffsetX="0" OffsetY="1" BlurRadius="0" Opacity="0.3" Color="#57534e" />
+      </Setter.Value>
+    </Setter>
+  </Style>
 
   <!-- AutoCompleteBox.claudeInput (2026-09-26 用户报「启动目标框与其他三个输入框样式不一致」):
        Fluent 默认 AutoCompleteBox 半径/边框与 claudeInput TextBox 不一致, 且其模板是 Panel 内嵌
