@@ -7,16 +7,6 @@
              x:Name="PanelRoot"
              x:DataType="vm:ActionEditorViewModel">
 
-  <!-- Fluent ComboBox 悬停/按压态边框是模板内 DynamicResource (无视控件 BorderBrush),
-       默认深灰 → 用户报「橙圈内还有黑圈」。面板级资源覆盖 = 只影响本面板的下拉框
-       (DynamicResource 沿逻辑树查找, 面板级优先于主题; ScrollBarSize 同款机制)。
-       覆盖为奶油色 = 按压态边框与静止态一致 (悬停/聚焦的橙色反馈在 Claude.axaml
-       claudeInput 段, /template/ 部件级样式优先于这里的资源覆盖) -->
-  <UserControl.Resources>
-    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">#f0eee6</SolidColorBrush>
-    <SolidColorBrush x:Key="ComboBoxBorderBrushPressed">#f0eee6</SolidColorBrush>
-  </UserControl.Resources>
-
   <!-- 动作编辑面板 (复刻 actions/Action.vue 卡片: 分组下拉 + 类型下拉 + 按类型分发编辑器);
        宽度由使用处指定 (KeymapPage/CustomHotkey 720, AbbrPage 动态同步 chips 最宽行), 控件内不设 Width;
        Border 必须 Stretch 铺满使用处给定宽度 —— Left 会使白卡片收缩为内容最小期望宽 (动态方案下窄于 W)。
