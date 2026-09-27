@@ -80,7 +80,7 @@ public sealed class SelectedActionCardInvariantTests
 
         // 两条相同 (fileExt, "jpg, png") mapping -> 文件卡只有一个 group:image toggle (去重)
         var ids = page.FileCard.Toggles.Select(t => t.Id).ToList();
-        Assert.Single(ids.Where(id => id == "group:image"));
+        Assert.Single(ids, id => id == "group:image");
         // FindMappingForType 至多命中一条 (取首条)
         Assert.NotNull(page.FileCard.FindMappingForType("group:image"));
         Assert.Equal(2, cfg.SelectedAction.Mappings.Count(m => m.MatchValue == "jpg, png"));
@@ -151,7 +151,7 @@ public sealed class SelectedActionCardInvariantTests
         var row = page.TextCard.Detail!;
         Assert.True(row.IsTransient);
         Assert.True(page.TextCard.IsPending);
-        Assert.Empty(cfg.SelectedAction.Mappings.Where(m => m.MatchValue == "path"));
+        Assert.DoesNotContain(cfg.SelectedAction.Mappings, m => m.MatchValue == "path");
 
         row.AddEntryCommand.Execute(null); // 加入首个行为 -> 提交真实 mapping
         Assert.False(row.IsTransient);

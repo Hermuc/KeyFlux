@@ -130,8 +130,8 @@ public sealed class FocusRingTransferTests
             Dispatcher.UIThread.RunJobs();
             Assert.DoesNotContain("ring", btnCard.Classes);
             Assert.Equal(rest.ToString(), btnCard.BoxShadow.ToString());
-            Assert.Empty(view.GetVisualDescendants().OfType<Border>()
-                .Where(b => b.Classes.Contains("ring")));
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Border>(),
+                b => b.Classes.Contains("ring"));
         }
         finally
         {
@@ -152,8 +152,8 @@ public sealed class FocusRingTransferTests
 
             Assert.True(combo.Focus());
             Dispatcher.UIThread.RunJobs();
-            Assert.Empty(view.GetVisualDescendants().OfType<Border>()
-                .Where(b => b.Classes.Contains("ring")));
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Border>(),
+                b => b.Classes.Contains("ring"));
         }
         finally
         {
