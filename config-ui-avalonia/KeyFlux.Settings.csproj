@@ -54,11 +54,10 @@
 
   <ItemGroup>
     <!-- Avalonia 核心、桌面平台、Fluent 主题、MVVM 工具包 -->
-    <PackageReference Include="Avalonia" Version="11.3.22" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Avalonia" Version="11.3.20" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.20" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="Semi.Avalonia" Version="11.3.22" />
   </ItemGroup>
 
   <ItemGroup>

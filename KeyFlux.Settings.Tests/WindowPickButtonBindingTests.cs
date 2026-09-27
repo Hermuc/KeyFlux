@@ -7,6 +7,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.Themes.Fluent;
 using KeyFlux.Settings.Controls;
 using KeyFlux.Settings.Services;
 
@@ -18,15 +19,13 @@ namespace KeyFlux.Settings.Tests;
 /// Headless 测试宿主 Application。刻意不走被测 <c>App</c> —— 其
 /// OnFrameworkInitializationCompleted 会创建 MainViewModel/MainWindow 并拉起
 /// settings.exe 后端子进程; 测试只需要控件 XAML 依赖的 StaticResource
-/// (Tr / NotEmpty / IntStr, 对应被测 App.axaml 的注册) 与 SemiTheme。
+/// (Tr / NotEmpty / IntStr, 对应被测 App.axaml 的注册) 与 FluentTheme。
 /// </summary>
 public sealed class WindowPickBindingTestApp : Application
 {
     public override void Initialize()
     {
-        // 2026-09-27 起主题库由 Fluent 迁移至 Semi.Avalonia (与被测 App.axaml 的
-        // <semi:SemiTheme Locale="zh-CN" /> 同步): SemiTheme 是 public Styles 子类, 可无参构造。
-        Styles.Add(new Semi.Avalonia.SemiTheme());
+        Styles.Add(new FluentTheme());
         // Claude 暖色共享主题 (令牌 + 复用类样式), 对应被测 App.axaml 的 StyleInclude 注册。
         // 必须加载: 插件页/市场窗/主窗的页面级 {StaticResource Claude*} 全部依赖其 Styles.Resources,
         // 缺它则构造 XAML 时立刻抛 KeyNotFoundException, 测试根本走不到真正的断言。
@@ -43,20 +42,37 @@ public sealed class WindowPickBindingTestApp : Application
         Resources["NotNull"] = new NotNullConverter();
         Resources["MdiFont"] = new FontFamily(
             "avares://KeyFlux.Settings/Assets/Fonts/materialdesignicons.ttf#Material Design Icons");
-        // 镜像 App.axaml 的 Semi 令牌暖色化 (2026-09-27, 机制见 App.axaml 同名注释; 夹具不加载
-        // App.axaml, 故需手动同步 —— 与上方 Tr/NotEmpty/... 同一做法): Semi 控件
-        // (CheckBox/RadioButton/Slider/焦点态等) 的强调色走 SemiColorPrimary 族 DynamicResource,
-        // 默认 Semi 蓝 —— 不镜像则测试中这些控件退回 Semi 蓝, SkinContractTests 的暖色契约也会红。
-        // 原 Fluent 覆盖 (ToggleSwitch* / SystemAccentColor 族 / ComboBoxDropdown* /
-        // OverlayCornerRadius) 已随迁移删除: Semi 模板不引用这些键, 留着是死资源。
-        Resources["SemiColorPrimary"] = new SolidColorBrush(Color.Parse("#c96442"));
-        Resources["SemiColorPrimaryPointerover"] = new SolidColorBrush(Color.Parse("#e1957a"));
-        Resources["SemiColorPrimaryActive"] = new SolidColorBrush(Color.Parse("#a8522f"));
-        Resources["SemiColorPrimaryDisabled"] = new SolidColorBrush(Color.Parse("#f0b49e"));
-        // Light 族 = 主色的低不透明度软底 (值与 App.axaml 镜像, 勿单改一处)
-        Resources["SemiColorPrimaryLight"] = new SolidColorBrush(Color.Parse("#c96442")) { Opacity = 0.2 };
-        Resources["SemiColorPrimaryLightPointerover"] = new SolidColorBrush(Color.Parse("#c96442")) { Opacity = 0.3 };
-        Resources["SemiColorPrimaryLightActive"] = new SolidColorBrush(Color.Parse("#c96442")) { Opacity = 0.4 };
+        // 镜像 App.axaml 的皮肤侧 Fluent 模板覆盖 (夹具不加载 App.axaml, 故需手动同步;
+        // 与上方 Tr/NotEmpty/... 同一做法)。缺它们则 ToggleSwitch 开启态退回系统强调色,
+        // SkinContractTests 的覆盖键校验也会红。
+        Resources["ToggleSwitchFillOn"] = new SolidColorBrush(Color.Parse("#c96442"));
+        Resources["ToggleSwitchStrokeOn"] = new SolidColorBrush(Color.Parse("#c96442"));
+        Resources["ToggleSwitchKnobFillOn"] = new SolidColorBrush(Color.Parse("#faf9f5"));
+        // 开启态的悬停/按下变体 —— Fluent 内置值是硬编码蓝, 必须一并覆盖
+        Resources["ToggleSwitchFillOnPointerOver"] = new SolidColorBrush(Color.Parse("#e1957a"));
+        Resources["ToggleSwitchStrokeOnPointerOver"] = new SolidColorBrush(Color.Parse("#e1957a"));
+        Resources["ToggleSwitchKnobFillOnPointerOver"] = new SolidColorBrush(Color.Parse("#faf9f5"));
+        Resources["ToggleSwitchFillOnPressed"] = new SolidColorBrush(Color.Parse("#c96442"));
+        Resources["ToggleSwitchStrokeOnPressed"] = new SolidColorBrush(Color.Parse("#c96442"));
+        Resources["ToggleSwitchKnobFillOnPressed"] = new SolidColorBrush(Color.Parse("#faf9f5"));
+        Resources["ToggleSwitchFillOffPointerOver"] = new SolidColorBrush(Colors.Transparent);
+        Resources["ToggleSwitchStrokeOffPointerOver"] = new SolidColorBrush(Color.Parse("#87867f"));
+        Resources["ToggleSwitchFillOffPressed"] = new SolidColorBrush(Colors.Transparent);
+        Resources["ToggleSwitchStrokeOffPressed"] = new SolidColorBrush(Color.Parse("#5e5d59"));
+        // 镜像 App.axaml 的系统强调色暖色化 (2026-09-13, 机制见 App.axaml 同名注释): 类型必须是 Color
+        // —— Fluent 的 RadioButton/CheckBox/Slider/AutoComplete 选中态引用 SystemAccentColor 系,
+        // 不覆盖则测试中这些控件退回 OS 蓝 #0078d7, SkinContractTests 的暖色契约也会红。
+        Resources["SystemAccentColor"] = Color.Parse("#c96442");
+        Resources["SystemAccentColorDark1"] = Color.Parse("#a8522f");
+        Resources["SystemAccentColorDark2"] = Color.Parse("#8f4426");
+        Resources["SystemAccentColorDark3"] = Color.Parse("#75351c");
+        Resources["SystemAccentColorLight1"] = Color.Parse("#d97757");
+        Resources["SystemAccentColorLight2"] = Color.Parse("#e1957a");
+        Resources["SystemAccentColorLight3"] = Color.Parse("#f0b49e");
+        // 镜像 App.axaml 的 ComboBox 弹层暖化与统一圆角 (2026-09-13, 机制见 App.axaml 同名注释)
+        Resources["ComboBoxDropdownBackground"] = new SolidColorBrush(Color.Parse("#faf9f5"));
+        Resources["ComboBoxDropdownBorderBrush"] = new SolidColorBrush(Color.Parse("#e8e6dc"));
+        Resources["OverlayCornerRadius"] = new CornerRadius(8);
     }
 }
 

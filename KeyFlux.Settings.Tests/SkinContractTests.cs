@@ -338,31 +338,34 @@ public sealed class SkinContractTests
     }
 
     /// <summary>
-    /// 契约: Semi 强调色族必须暖色化 —— 主阶 = Terracotta (#c96442), 且 Pointerover/Active/
-    /// Disabled/Light 变体全部存在并均为暖色 (R&gt;B)。
-    /// 历史回归锁 (原 SystemAccent 家族契约, 2026-09-27 随 Fluent→Semi 迁移改写) —— Semi 控件
-    /// (CheckBox/RadioButton/Slider/焦点态等) 的选中/悬停态走 SemiColorPrimary 族
-    /// DynamicResource (默认 Semi 蓝), 不覆盖则与 Claude 暖色体系冲突 (原 SystemAccent 时代
-    /// 的 2026-09-13 用户报「行为选择器与整体 UI 不匹配」同源)。覆盖键放 App.axaml 的
-    /// Application.Resources (模板内部 DynamicResource 沿逻辑树查找, 应用资源优先)。
+    /// 契约: 系统强调色 7 阶必须存在、主阶 = Terracotta 且全部暖色 (R&gt;B)。
+    /// 历史回归锁 —— Fluent 的 RadioButton 选中圆 / CheckBox 勾选框 / Slider 轨道填充 /
+    /// AutoCompleteBox 下拉选中等全部强调色态引用 SystemAccentColor (默认 OS 蓝 #0078d7),
+    /// 不覆盖则与 Claude 暖色体系冲突 (2026-09-13 用户报「行为选择器与整体 UI 不匹配」;
+    /// headless 实证: 覆盖后三控件选中态全部转 Terracotta, 派生画刷自动跟随)。
     /// </summary>
     [AvaloniaFact]
-    public void Skin_Contract_Semi_Primary_Family_Is_Warm()
+    public void Skin_Contract_SystemAccent_Family_Is_Warm()
     {
         var app = Application.Current!;
-        Assert.True(app.TryFindResource("SemiColorPrimary", out var primary), "缺 SemiColorPrimary");
-        Assert.Equal(Color.Parse("#c96442"), Assert.IsType<SolidColorBrush>(primary).Color);
+        Assert.True(app.TryFindResource("SystemAccentColor", out var primary), "缺 SystemAccentColor");
+        Assert.Equal(Color.Parse("#c96442"), Assert.IsType<Color>(primary));
 
         foreach (var key in new[]
                  {
-                     "SemiColorPrimaryPointerover", "SemiColorPrimaryActive", "SemiColorPrimaryDisabled",
-                     "SemiColorPrimaryLight", "SemiColorPrimaryLightPointerover", "SemiColorPrimaryLightActive",
+                     "SystemAccentColorDark1", "SystemAccentColorDark2", "SystemAccentColorDark3",
+                     "SystemAccentColorLight1", "SystemAccentColorLight2", "SystemAccentColorLight3",
                  })
         {
             Assert.True(app.TryFindResource(key, out var v), $"缺 {key}");
-            var b = Assert.IsType<SolidColorBrush>(v);
-            Assert.True(b.Color.R > b.Color.B, $"{key} 非暖色 (R={b.Color.R} B={b.Color.B})");
+            var c = Assert.IsType<Color>(v);
+            Assert.True(c.R > c.B, $"{key} 非暖色 (R={c.R} B={c.B})");
         }
+
+        // 派生画刷跟随 (Fluent 模板实际消费的键族之一)
+        Assert.True(app.TryGetResource("SystemControlBackgroundAccentBrush", out var brush));
+        var scb = Assert.IsType<SolidColorBrush>(brush);
+        Assert.True(scb.Color.R > scb.Color.B, $"派生强调画刷仍为冷色: {scb.Color}");
     }
 
     /// <summary>契约: 芯片单选 ControlTheme 存在且 TargetType = RadioButton (行为选择器重构的锚点)。</summary>
@@ -383,13 +386,93 @@ public sealed class SkinContractTests
         Assert.Equal(typeof(Button), Assert.IsType<ControlTheme>(theme).TargetType);
     }
 
-    // 2026-09-27 随 Fluent→Semi 迁移删除三条过时契约 (Semi 模板不消费这些 Fluent 键):
-    //   Skin_Contract_Combo_Dropdown_Keys_Are_Warm —— ComboBoxDropdown*/OverlayCornerRadius 是
-    //     Fluent 专属资源, App.axaml 已删除该覆盖 (Semi ComboBoxItem 用自己的资源, 不经这些键);
-    //   Skin_Contract_ToggleSwitch_Fluent_Overrides_Exist —— ToggleSwitchFillOn/StrokeOn/
-    //     KnobFillOn 是 Fluent 模板键, Semi ToggleSwitch 不引用;
-    //   Skin_Contract_ToggleSwitch_Hover_And_Pressed_Are_Warm —— 同上, *_PointerOver/*_Pressed
-    //     变体亦为 Fluent 专属硬编码蓝的补丁, 迁移后无意义。
+    /// <summary>
+    /// 契约: ComboBox 弹层暖化键存在且暖色, 弹层统一圆角 = 8, ComboBoxItem 高亮内缩圆角生效
+    /// (2026-09-13 用户报弹层方正违和; 弹层 Border 实证经 OverlayCornerRadius 驱动,
+    /// 条目高亮画在模板 PART_ContentPresenter 上且 CornerRadius 经 TemplateBinding 绑定控件值)。
+    /// </summary>
+    [AvaloniaFact]
+    public void Skin_Contract_Combo_Dropdown_Keys_Are_Warm()
+    {
+        var app = Application.Current!;
+        foreach (var key in new[] { "ComboBoxDropdownBackground", "ComboBoxDropdownBorderBrush" })
+        {
+            Assert.True(app.TryGetResource(key, out var v), $"缺 {key}");
+            var c = ((ISolidColorBrush)v!).Color;
+            Assert.True(c.R > c.B, $"{key} 非暖色: {c}");
+        }
+        Assert.True(app.TryGetResource("OverlayCornerRadius", out var cr));
+        Assert.Equal(new CornerRadius(8), Assert.IsType<CornerRadius>(cr));
+
+        // 皮肤 ComboBoxItem 样式生效 (圆角 + 内缩边距)
+        var item = new ComboBoxItem { Content = "x" };
+        var host = new Window { Width = 120, Height = 60, Content = item };
+        host.Show();
+        Dispatcher.UIThread.RunJobs();
+        try
+        {
+            Assert.Equal(new CornerRadius(6), item.CornerRadius);
+            Assert.Equal(new Thickness(6, 3), item.Margin);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
+
+    /// <summary>
+    /// 契约: 三个 Fluent ToggleSwitch 开启态覆盖键必须存在 (放在 App.axaml 的
+    /// Application.Resources, 因为模板内部用 {DynamicResource} 沿逻辑树查找),
+    /// 且必须是画刷 —— 若被误改成别的类型或漏掉, 开关会退回系统强调色 (冷蓝)。
+    /// </summary>
+    [AvaloniaFact]
+    public void Skin_Contract_ToggleSwitch_Fluent_Overrides_Exist()
+    {
+        var app = Application.Current!;
+        foreach (var key in new[] { "ToggleSwitchFillOn", "ToggleSwitchStrokeOn", "ToggleSwitchKnobFillOn" })
+        {
+            Assert.True(app.TryFindResource(key, out var value), $"皮肤覆盖键缺失: {key}");
+            Assert.IsAssignableFrom<IBrush>(value);
+        }
+    }
+
+    /// <summary>
+    /// 契约: ToggleSwitch **开启态的悬停/按下变体**也必须是暖色。
+    /// 历史事故回归锁 —— Fluent 只为非悬停态提供了 <c>ToggleSwitchFillOn</c> 等 3 个键,
+    /// 悬停/按下走的是 <c>*_PointerOver</c> / <c>*_Pressed</c> 变体, 其内置值是**硬编码蓝**
+    /// (<c>#269fff</c> / <c>#0078d7</c> / <c>#00589e</c>)。只覆盖非悬停键时,
+    /// 表现为「开关平时是陶土色, 鼠标一放上去就变蓝」。
+    /// 这些键同样必须放在 Application.Resources (模板内部走 {DynamicResource})。
+    /// </summary>
+    [AvaloniaFact]
+    public void Skin_Contract_ToggleSwitch_Hover_And_Pressed_Are_Warm()
+    {
+        var app = Application.Current!;
+
+        // 悬停 = 比焦点色 Coral(#d97757) 浅一档的浅珊瑚
+        foreach (var key in new[] { "ToggleSwitchFillOnPointerOver", "ToggleSwitchStrokeOnPointerOver" })
+        {
+            Assert.True(app.TryFindResource(key, out var v), $"皮肤覆盖键缺失: {key}");
+            Assert.Equal(Color.Parse("#e1957a"), ((ISolidColorBrush)v!).Color);
+        }
+
+        // 按下 = 主陶土色
+        foreach (var key in new[] { "ToggleSwitchFillOnPressed", "ToggleSwitchStrokeOnPressed" })
+        {
+            Assert.True(app.TryFindResource(key, out var v), $"皮肤覆盖键缺失: {key}");
+            Assert.Equal(Color.Parse("#c96442"), ((ISolidColorBrush)v!).Color);
+        }
+
+        // 反向断言: 绝不能残留 Fluent 的蓝色变体
+        foreach (var key in new[] { "ToggleSwitchFillOnPointerOver", "ToggleSwitchStrokeOnPointerOver", "ToggleSwitchFillOnPressed" })
+        {
+            app.TryFindResource(key, out var v);
+            var c = ((ISolidColorBrush)v!).Color;
+            Assert.NotEqual(Color.Parse("#269fff"), c);
+            Assert.NotEqual(Color.Parse("#0078d7"), c);
+            Assert.NotEqual(Color.Parse("#00589e"), c);
+        }
+    }
 
     /// <summary>
     /// 契约 (2026-09-22 移除毛玻璃后): 窗口/页面全部不透明 —— 窗口底 Parchment

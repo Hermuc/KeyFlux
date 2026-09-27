@@ -326,7 +326,7 @@
     <Setter Property="FontSize" Value="{DynamicResource ToolTipContentThemeFontSize}" />
     <Setter Property="Padding" Value="{DynamicResource ToolTipBorderThemePadding}" />
     <Setter Property="MaxWidth" Value="320" />
-    <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource OverlayCornerRadius}" />
     <Setter Property="Opacity" Value="1" />
     <Setter Property="Template">
       <ControlTemplate>
@@ -687,7 +687,7 @@
        消费方是 Ivory 卡片上的面板输入区, White 底与卡面拉开层次, Fluent 默认 TextBox
        亦是 White 底, 面板内未挂类的 AutoCompleteBox 观感自然一致)。
        TextBox/ComboBox 均无 BoxShadow 属性:
-       - TextBox 焦点环阴影设在模板边框部件上 (Fluent: PART_BorderElement / Semi: PART_ContentPresenterBorder)。
+       - TextBox 焦点环阴影设在模板 Border#PART_BorderElement 上 (Fluent 实测部件名)。
        - ComboBox 模板无 PART_Border 部件, 无法挂 BoxShadow 环; 焦点态改用
          BorderBrush 变 Coral (模板 Border 经 TemplateBinding 继承), 给出可见焦点指示。
        BorderBrush 均设在控件自身 (经 TemplateBinding 继承到模板 Border)。 -->
@@ -703,11 +703,11 @@
          扩散 BoxShadow (a) 右侧压在 ScrollViewer 视口裁剪边界上被裁 (双环时期外环右缘缺失根因),
          (b) 两套图元在圆角处 AA 叠加显厚、弧段与直边衔接生硬。改为单一内描边 1.6 设计像素:
          在自身边界内渲染永不裁切, 弧段墨量充足延续直边虚边, 过渡自然、四边等宽。
-         ⚠ 厚度须同时设 /template/ 部件边框 (Fluent: PART_BorderElement / Semi: PART_ContentPresenterBorder) —— 控件属性会被主题对部件的
+         ⚠ 厚度须同时设 /template/ Border#PART_BorderElement —— 控件属性会被主题对部件的
          样式值压掉 (SettingsPageView:383 同款坑) -->
     <Setter Property="BorderThickness" Value="1.6" />
   </Style>
-  <Style Selector="TextBox.claudeInput:focus-visible /template/ Border#PART_ContentPresenterBorder">
+  <Style Selector="TextBox.claudeInput:focus-visible /template/ Border#PART_BorderElement">
     <Setter Property="BorderThickness" Value="1.6" />
   </Style>
   <Style Selector="ComboBox.claudeInput">
@@ -722,10 +722,10 @@
 
   <!-- 下拉框悬停/聚焦 (2026-09-26 用户裁定「边框颜色直接变为橙色, 在框边缘以内」):
        Fluent ComboBox 模板有两层边框部件 —— Border#Background (随 TemplateBinding) 与
-       (Semi 模板: Border#Background 承载边框, 无 Fluent 的 HighlightBackground 叠加层)。
-       改控件自身 BorderBrush 会被主题 :pointerover 部件样式压掉 ⇒ 必须用 /template/
-       直打部件: 悬停/按下/聚焦 → Background→陶土或珊瑚。禁用态未配置档不触发
-       :pointerover, 天然让位 -->
+       Border#HighlightBackground (叠在其上, 主题按 unfocused/focused 换色)。改控件自身
+       BorderBrush 会被主题 :pointerover 部件样式压掉 ⇒ 必须用 /template/ 直打部件:
+       悬停 Background→陶土 且 HighlightBackground→透明 (不遮色)。禁用态未配置档
+       不触发 :pointerover, 天然让位 -->
   <Style Selector="ComboBox.claudeInput:pointerover /template/ Border#Background">
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
   </Style>
@@ -735,13 +735,19 @@
     <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeTerracottaBrush}" />
   </Style>
+  <Style Selector="ComboBox.claudeInput:pressed /template/ Border#HighlightBackground">
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
   <Style Selector="ComboBox.claudeInput:focus-visible /template/ Border#Background">
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
+  </Style>
+  <Style Selector="ComboBox.claudeInput:focus-visible /template/ Border#HighlightBackground">
+    <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
   <!-- 按压反馈 (2026-09-26 用户要求「按下时文字有被按压下去的视觉」): 按下时模板内容宿主
        (文字+图标整体) 下沉 1px, 松开弹回 (TransformOperationsTransition 80ms = Press 令牌,
        与皮肤按钮 :pressed 的 translateY(1px) 同一语汇)。背景/边框不动 —— 只有内容沉。 -->
-  <Style Selector="ComboBox.claudeInput /template/ ContentPresenter#ContentPresenter">
+  <Style Selector="ComboBox.claudeInput /template/ ContentControl#ContentPresenter">
     <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
     <Setter Property="Transitions">
       <Setter.Value>
@@ -753,14 +759,14 @@
       </Setter.Value>
     </Setter>
   </Style>
-  <Style Selector="ComboBox.claudeInput:pressed /template/ ContentPresenter#ContentPresenter">
+  <Style Selector="ComboBox.claudeInput:pressed /template/ ContentControl#ContentPresenter">
     <Setter Property="RenderTransform" Value="translate(0px, 1px)" />
   </Style>
 
   <!-- AutoCompleteBox.claudeInput (2026-09-26 用户报「启动目标框与其他三个输入框样式不一致」):
        Fluent 默认 AutoCompleteBox 半径/边框与 claudeInput TextBox 不一致, 且其模板是 Panel 内嵌
        TextBox#PART_TextBox, 控件自身的 Background/BorderBrush 不落到内层框上 ⇒ 样式须穿透模板
-       直接设内层 TextBox; 焦点态对齐 TextBox.claudeInput (Coral 边 + 模板边框部件焦点环, Semi: PART_ContentPresenterBorder)。 -->
+       直接设内层 TextBox; 焦点态对齐 TextBox.claudeInput (Coral 边 + PART_BorderElement 焦点环)。 -->
   <Style Selector="AutoCompleteBox.claudeInput">
     <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
     <Setter Property="Foreground" Value="{StaticResource ClaudeNearBlackBrush}" />
@@ -782,7 +788,7 @@
     <Setter Property="BorderThickness" Value="1.6" />
     <!-- 与 TextBox.claudeInput 同款: 单一内描边, 不外扩、四边等宽 (厚度须设到部件上) -->
   </Style>
-  <Style Selector="AutoCompleteBox.claudeInput /template/ TextBox#PART_TextBox:focus /template/ Border#PART_ContentPresenterBorder">
+  <Style Selector="AutoCompleteBox.claudeInput /template/ TextBox#PART_TextBox:focus /template/ Border#PART_BorderElement">
     <Setter Property="BorderThickness" Value="1.6" />
   </Style>
 

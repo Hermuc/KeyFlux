@@ -10,12 +10,11 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="Semi.Avalonia" Version="11.3.22" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
     <!-- Headless 宿主: 无窗口渲染环境下实例化 Avalonia 控件做绑定链路裁决实验
          (WindowPickButton WriteBack -> 宿主绑定源)。版本对齐被测工程的 Avalonia 11.3.x。 -->
-    <PackageReference Include="Avalonia.Headless.XUnit" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="11.3.20" />
   </ItemGroup>
 
   <ItemGroup>
