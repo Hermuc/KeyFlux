@@ -723,6 +723,13 @@
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeBorderCreamBrush}" />
     <Setter Property="CornerRadius" Value="{StaticResource ClaudeRadiusMd}" />
   </Style>
+  <!-- 描边质感 (2026-09-27 用户选定方案 B): 1px 奶油边 + 双层渐弱投影, 输入框微微浮在纸面。
+       ⚠ 必须挂在 /template/ Border#Background 部件上 (BoxShadow 是 Border 的属性,
+       ComboBox 控件本身没有; 挂控件级会让皮肤加载运行时炸掉, 79 测试连锁失败已踩坑)。
+       悬停/聚焦态由 :focus-visible 等既有样式接管, 影不重设 ⇒ 全状态恒定。 -->
+  <Style Selector="ComboBox.claudeInput /template/ Border#Background">
+    <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowInputDepth}" />
+  </Style>
   <Style Selector="ComboBox.claudeInput:focus-visible">
     <Setter Property="BorderBrush" Value="{StaticResource ClaudeCoralBrush}" />
   </Style>
