@@ -53,4 +53,16 @@ public static class ClaudeMotion
     /// 顺次推开), 同时前缘卷曲光影带与内容微沉降同步走完; 见 Services/SectionUnroll.cs。
     /// </summary>
     public static readonly TimeSpan Unroll = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
+    /// 下拉框 (ComboBox) Popup 展开时长 220ms —— 与 <see cref="ComboDropdownCollapse"/> 一对
+    /// (2026-09-26 用户反馈 100ms 档「帧数低, 不够丝滑」: 下拉列表高 ~260 物理像素, 100ms
+    /// 每帧跳 30+px 显跳变; 拉长到 220ms 换逐帧平滑)。独立于 Unroll/Roll: 后者是选项页
+    /// 手风琴令牌 (软件渲染下 100ms 是逐帧重光栅可行下限, 勿动), 下拉框是轻内容 (单项列表),
+    /// 每帧成本低, 可以用更长的时长换丝滑。
+    /// </summary>
+    public static readonly TimeSpan ComboDropdownExpand = TimeSpan.FromMilliseconds(220);
+
+    /// <summary>下拉框 Popup 折叠时长 180ms (比展开略短: 收起的期待感 > 展开的展示感)。</summary>
+    public static readonly TimeSpan ComboDropdownCollapse = TimeSpan.FromMilliseconds(180);
 }
