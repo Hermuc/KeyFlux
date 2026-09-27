@@ -206,6 +206,8 @@
     <Style Selector="ComboBox /template/ Border#Background">
       <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
       <Setter Property="BorderBrush" Value="#c8c3b4" />
+      <!-- 深度档 (用户选定方案 B): 1px 实边 + 双层渐弱投影, 悬停/聚焦/展开态不重设影 ⇒ 全状态恒定 -->
+      <Setter Property="BoxShadow" Value="{StaticResource ClaudeShadowInputDepth}" />
     </Style>
     <Style Selector="ComboBox:pointerover /template/ Border#Background">
       <Setter Property="Background" Value="{StaticResource ClaudeWhiteBrush}" />
