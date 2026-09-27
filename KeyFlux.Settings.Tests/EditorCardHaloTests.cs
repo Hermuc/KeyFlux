@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Animation;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -173,4 +174,52 @@ public sealed class EditorCardHaloTests
         Assert.Equal(Color.FromArgb(0xff, 0xc9, 0x64, 0x42), ((ISolidColorBrush)templateBorder.BorderBrush!).Color);
     }
 
+    /// <summary>
+    /// 伪 PointerExited 防护 (2026-09-27 用户报「点击可编辑字框时最外大框闪橙」):
+    /// 点击内层输入框瞬间指针被子控件捕获, Avalonia 向面板发伪 Exited —— 修复前
+    /// OnPanelPointerExited 盲清 childHover ⇒ far:pointerover 陶土环淡入, capture 释放
+    /// 后又挂回 ⇒ 橙环「闪一下」。修复后面板 IsPointerOver=true 时忽略 Exited,
+    /// childHover 保持, 环不闪。此处以「悬停下拉框后手动 raise Exited」复现伪退出时序。
+    /// </summary>
+    [AvaloniaFact]
+    public void EditorPanel_Fake_PointerExited_During_Child_Hover_Keeps_Ring_Suppressed()
+    {
+        var main = new MainViewModel(new BackendSessionOptions());
+        main.Config = ConfigReadDefaults.Apply(new Config());
+        var panel = new ActionEditorPanel { Width = 588 };
+        var window = new Window { Width = 800, Height = 700, Content = panel, Background = Brushes.White };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var far = panel.GetVisualDescendants().OfType<Border>()
+            .First(b => b.Classes.Contains("haloRing") && b.Classes.Contains("far"));
+        var combo = panel.GetVisualDescendants().OfType<ComboBox>().First();
+
+        // headless 不推动画时钟: 摘掉画刷过渡直达终点态 (与既有测试同款处理)
+        foreach (var b in panel.GetVisualDescendants().OfType<Border>()
+                     .Where(b => b.Classes.Contains("haloRing")))
+            b.Transitions = null;
+
+        // 悬停下拉框 → childHover 挂上 (外环熄灭)
+        var pt = Avalonia.VisualExtensions.TranslatePoint(
+            combo, new Point(combo.Bounds.Width / 2, combo.Bounds.Height / 2), window)!.Value;
+        window.MouseMove(pt);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(combo.IsPointerOver);
+        Assert.True(far.Classes.Contains("childHover"), "悬停子控件应挂 childHover");
+
+        // 模拟伪 Exited (capture 引起): 此时面板 IsPointerOver 仍为 true
+        Assert.True(panel.IsPointerOver, "capture 期间指针仍在面板内");
+        // 直接调用私有处理器 (等价于伪 Exited 到达面板; 绕开 headless 路由的时序噪声)
+        typeof(ActionEditorPanel)
+            .GetMethod("OnPanelPointerExited", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(panel, new object?[] { panel, null });
+
+        // 修复断言: 面板仍在悬停 ⇒ childHover 不被清, 外环让位不失效
+        Assert.True(far.Classes.Contains("childHover"),
+            "面板 IsPointerOver=true 时的伪 Exited 不应清 childHover (防橙环闪烁)");
+
+        // 样式事实: childHover 在时 far 环透明 (让位生效)
+        Assert.Equal(Colors.Transparent, ((ISolidColorBrush)far.Background!).Color);
+    }
 }
