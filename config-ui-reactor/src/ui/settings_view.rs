@@ -209,31 +209,88 @@ where
         ))
 }
 
-/// 「自定义热键」行：热键(404) 内联编辑 + 功能(1117) 展示。
-pub fn hotkey_row<C: IntoPayloadCallback<String>>(
+/// 「自定义热键」列头（404 触发键 / 1117 功能）。
+pub fn hotkey_header() -> View {
+    Grid::new()
+        .columns([GridLength::Pixel(100.0), GridLength::STAR])
+        .children((
+            TextBlock::new()
+                .text(i18n::t("404"))
+                .font_size(theme::FONT_CAPTION)
+                .foreground(theme::stone_gray()),
+            Border::new().grid_column(1).content(
+                TextBlock::new()
+                    .text(i18n::t("1117"))
+                    .font_size(theme::FONT_CAPTION)
+                    .foreground(theme::stone_gray()),
+            ),
+        ))
+}
+
+/// 「自定义热键」行：热键(404) 内联编辑 + 功能(1117) **可点击编辑**（复刻旧版
+/// 「点击弹 ActionEditorWindow」交互）+ 行删除。
+pub fn hotkey_row<C, E, D>(
     hotkey: &str,
     function: &str,
     on_change: C,
-) -> View {
+    on_edit: E,
+    on_delete: D,
+) -> View
+where
+    C: IntoPayloadCallback<String>,
+    E: IntoUnitCallback,
+    D: IntoUnitCallback,
+{
     let hotkey_box: View = TextBox::new()
         .text(hotkey.to_string())
         .min_width(110.0)
         .on_text_changed(on_change)
         .into();
-    let function_text: View = TextBlock::new()
-        .text(if function.is_empty() { "-" } else { function })
-        .font_size(theme::FONT_BODY)
-        .foreground(theme::solid(theme::CHARCOAL_WARM))
-        .text_wrapping(TextWrapping::Wrap)
-        .vertical_alignment(VerticalAlignment::Center)
-        .into();
+    let function_button: View = Button::new().on_click(on_edit).content(
+        TextBlock::new()
+            .text(if function.is_empty() {
+                "-".to_string()
+            } else {
+                function.to_string()
+            })
+            .font_size(theme::FONT_BODY)
+            .foreground(theme::solid(theme::CHARCOAL_WARM))
+            .text_wrapping(TextWrapping::Wrap),
+    );
+    let delete: View = Button::new().on_click(on_delete).content(
+        TextBlock::new()
+            .text("✕")
+            .foreground(theme::solid(theme::ERROR_CRIMSON)),
+    );
 
     Grid::new()
-        .columns([GridLength::Pixel(100.0), GridLength::STAR])
+        .columns([GridLength::Pixel(100.0), GridLength::STAR, GridLength::Auto])
         .margin(Thickness::new(0.0, 0.0, 0.0, 2.0))
         .children((
             hotkey_box,
-            Border::new().grid_column(1).content(function_text),
+            Border::new().grid_column(1).content(function_button),
+            Border::new()
+                .grid_column(2)
+                .margin(Thickness::new(4.0, 0.0, 0.0, 0.0))
+                .content(delete),
+        ))
+}
+
+/// 「路径变量」列头（909 变量名 / 910 路径）——旧表头在说明行下方、行区上方。
+pub fn pathvar_header() -> View {
+    Grid::new()
+        .columns([GridLength::Pixel(112.0), GridLength::STAR])
+        .children((
+            TextBlock::new()
+                .text(i18n::t("909"))
+                .font_size(theme::FONT_CAPTION)
+                .foreground(theme::stone_gray()),
+            Border::new().grid_column(1).content(
+                TextBlock::new()
+                    .text(i18n::t("910"))
+                    .font_size(theme::FONT_CAPTION)
+                    .foreground(theme::stone_gray()),
+            ),
         ))
 }
 

@@ -14,7 +14,7 @@
 use windows_reactor::*;
 
 use crate::services::i18n;
-use crate::services::selected_action::{BadgeColor, TypeToggle};
+use crate::services::selected_action::TypeToggle;
 use crate::theme;
 
 /// toggle 格宽下限/上限（复用缩写页口径）。
@@ -123,8 +123,43 @@ where
     )
 }
 
-/// 聚合卡头：标题（旧 15 SemiBold terracotta）+ 删除按钮（未配置时禁用）。
-pub fn card_header(title: &str, can_delete: bool, on_delete: impl IntoUnitCallback) -> View {
+/// 页头右侧动作行：管理匹配类型（2519）/ 管理行为（1083）/ 添加映射（1105）
+/// （复刻旧 `SelectedActionPageView.axaml:349-368` 页头三按钮）。
+pub fn page_actions<M, B, A>(on_match_types: M, on_behaviors: B, on_add: A) -> View
+where
+    M: IntoUnitCallback,
+    B: IntoUnitCallback,
+    A: IntoUnitCallback,
+{
+    StackPanel::new()
+        .orientation(Orientation::Horizontal)
+        .spacing(8.0)
+        .children((
+            Button::new()
+                .on_click(on_match_types)
+                .content(TextBlock::new().text(i18n::t("2519"))),
+            Button::new()
+                .on_click(on_behaviors)
+                .content(TextBlock::new().text(i18n::t("1083"))),
+            Button::new()
+                .on_click(on_add)
+                .content(TextBlock::new().text(i18n::t("1105"))),
+        ))
+}
+
+/// 聚合卡头：标题 + ▶ 测试（990，真实执行）+ 红 ✕ 删除（未配置时禁用）。
+/// 旧 `SelectedActionPageView.axaml:124-137`。
+pub fn card_header<P, D>(
+    title: &str,
+    can_play: bool,
+    can_delete: bool,
+    on_play: P,
+    on_delete: D,
+) -> View
+where
+    P: IntoUnitCallback,
+    D: IntoUnitCallback,
+{
     StackPanel::new()
         .orientation(Orientation::Horizontal)
         .spacing(12.0)
@@ -136,19 +171,23 @@ pub fn card_header(title: &str, can_delete: bool, on_delete: impl IntoUnitCallba
                 .foreground(theme::terracotta())
                 .vertical_alignment(VerticalAlignment::Center),
             Button::new()
+                .is_enabled(can_play)
+                .on_click(on_play)
+                .content(TextBlock::new().text(i18n::t("990"))),
+            Border::new().width(1.0),
+            Button::new()
                 .is_enabled(can_delete)
                 .on_click(on_delete)
                 .content(
                     TextBlock::new()
-                        .text(i18n::t("967"))
+                        .text("✕")
                         .foreground(theme::solid(theme::ERROR_CRIMSON)),
                 ),
         ))
 }
 
 /// 类型 toggle 行：chips 换行（`VariableSizedWrapGrid` 统一格宽，按最长标签估算）。
-///
-/// 选中态 = Sand 底深字（对齐缩写页）；已配置 toggle 前缀一个 ● 状态点。
+/// 选中态 = Sand 底深字；状态点已随旧版 2026-09-22 定版移除。
 pub fn toggles_row<F, C>(toggles: &[TypeToggle], selected_id: &str, mut make_callback: F) -> View
 where
     F: FnMut(String) -> C,
@@ -158,7 +197,7 @@ where
         .iter()
         .map(|toggle| estimate_width(&toggle.label))
         .fold(0.0_f64, f64::max)
-        + 28.0; // 状态点 + 内边距
+        + 20.0; // 内边距
     let width = width.clamp(TOGGLE_MIN_WIDTH, TOGGLE_MAX_WIDTH);
 
     let items: Vec<(String, View)> = toggles
@@ -210,49 +249,44 @@ fn build_toggle_button(
         )
         .on_click(on_click)
         .content(
-            StackPanel::new()
-                .orientation(Orientation::Horizontal)
-                .spacing(6.0)
-                .children((
-                    TextBlock::new()
-                        .text("●")
-                        .font_size(8.0)
-                        .foreground(if is_selected {
-                            theme::solid(theme::TERRACOTTA)
-                        } else {
-                            theme::solid(theme::MUTED_GREEN)
-                        })
-                        .vertical_alignment(VerticalAlignment::Center),
-                    TextBlock::new()
-                        .text(toggle.label.clone())
-                        .font_size(13.0)
-                        .vertical_alignment(VerticalAlignment::Center),
-                )),
+            TextBlock::new()
+                .text(toggle.label.clone())
+                .font_size(13.0)
+                .horizontal_alignment(HorizontalAlignment::Center)
+                .vertical_alignment(VerticalAlignment::Center),
         )
 }
 
-/// 详情面板的一行行为编辑器（配 [`row_editor`] 子卡使用）：
-/// `序号徽章 | 行为标签（STAR） | 值输入框（无参行为不显示）+ 删除按钮`。
-///
-/// `badge`（行为色）为旧版自绘方徽章的遗留参数：旧样式 2026-09 起统一为
-/// Sand 底 + terracotta 序号（颜色不再承载语义），参数保留以免动作面板联动改造。
+/// 详情面板的一行行为编辑器（配 [`row_editor`] 子卡使用），复刻旧 `EntryRowVm`：
+/// `序号徽章 + 行为下拉（切换重置默认模板）+ ↑↓ 排序 + ✕ 删除`，有参行为带
+/// 命令模板框与工作目录框（304）。
 #[allow(clippy::too_many_arguments)]
-pub fn entry_row<C1, C2>(
+pub fn entry_row<C1, C2, C3, C4, C5, C6>(
     index: usize,
-    label: &str,
+    switch_items: Vec<String>,
+    switch_selected: Option<usize>,
     value: &str,
-    _badge: BadgeColor,
+    working_dir: &str,
     is_no_value: bool,
-    on_value: C1,
-    on_remove: C2,
+    can_up: bool,
+    can_down: bool,
+    on_switch: C1,
+    on_value: C2,
+    on_working_dir: C3,
+    on_up: C4,
+    on_down: C5,
+    on_remove: C6,
 ) -> View
 where
-    C1: IntoPayloadCallback<String>,
-    C2: IntoUnitCallback,
+    C1: IntoPayloadCallback<Option<usize>>,
+    C2: IntoPayloadCallback<String>,
+    C3: IntoPayloadCallback<String>,
+    C4: IntoUnitCallback,
+    C5: IntoUnitCallback,
+    C6: IntoUnitCallback,
 {
     // 序号徽章（旧 `rowEditor` 内：Sand 底 + RadiusSm + Padding 7,2 + 字 13 terracotta SemiBold）
     let badge: View = Border::new()
-        .grid_column(0)
         .corner_radius(theme::radius_sm())
         .background(theme::sand())
         .padding(Thickness::new(7.0, 2.0, 7.0, 2.0))
@@ -265,40 +299,91 @@ where
                 .foreground(theme::terracotta()),
         );
 
-    let name: View = TextBlock::new()
-        .grid_column(1)
-        .text(label.to_string())
-        .font_size(theme::FONT_BODY)
-        .vertical_alignment(VerticalAlignment::Center)
-        .margin(Thickness::new(10.0, 0.0, 10.0, 0.0))
+    // 行为下拉：切换即重置该行为默认模板（复刻 `EntryRowVm` 的 `OnBehaviorChanged`）
+    let switch: View = ComboBox::new()
+        .min_width(160.0)
+        .items_source(switch_items)
+        .selected_index(switch_selected)
+        .on_selection_changed(on_switch)
         .into();
 
-    // 无参行为没有值输入 ⇒ 用零宽占位保持 children 元组结构稳定
-    let value_control: View = if is_no_value {
-        Border::new().width(0.0).into()
+    let up: View = Button::new()
+        .is_enabled(can_up)
+        .on_click(on_up)
+        .content(TextBlock::new().text("↑"));
+    let down: View = Button::new()
+        .is_enabled(can_down)
+        .on_click(on_down)
+        .content(TextBlock::new().text("↓"));
+    // 旧版删除 = 红 ✕（tooltip 1108 因 reactor 无 Tooltip API 暂缺）
+    let remove: View = Button::new().on_click(on_remove).content(
+        TextBlock::new()
+            .text("✕")
+            .foreground(theme::solid(theme::ERROR_CRIMSON)),
+    );
+
+    let head: View = Grid::new()
+        .columns([
+            GridLength::Auto,
+            GridLength::STAR,
+            GridLength::Auto,
+            GridLength::Auto,
+            GridLength::Auto,
+        ])
+        .children((
+            badge,
+            Border::new()
+                .grid_column(1)
+                .margin(Thickness::new(10.0, 0.0, 10.0, 0.0))
+                .content(switch),
+            Border::new().grid_column(2).content(up),
+            Border::new()
+                .grid_column(3)
+                .margin(Thickness::new(4.0, 0.0, 4.0, 0.0))
+                .content(down),
+            Border::new().grid_column(4).content(remove),
+        ));
+
+    // 有参行为：命令模板框（2532）+ 工作目录框（2533）；无参行为两者皆无，复刻 isEmpty 隐藏
+    let input_grid: View = Grid::new()
+        .columns([GridLength::Pixel(64.0), GridLength::STAR])
+        .row_spacing(6.0)
+        .children((
+            TextBlock::new()
+                .text(i18n::t("2532"))
+                .font_size(theme::FONT_CAPTION)
+                .foreground(theme::stone_gray())
+                .vertical_alignment(VerticalAlignment::Center),
+            Border::new().grid_column(1).content(
+                TextBox::new()
+                    .text(value.to_string())
+                    .min_height(30.0)
+                    .border_brush(theme::solid(INPUT_STROKE))
+                    .on_text_changed(on_value),
+            ),
+            TextBlock::new()
+                .grid_row(1)
+                .text(i18n::t("2533"))
+                .font_size(theme::FONT_CAPTION)
+                .foreground(theme::stone_gray())
+                .vertical_alignment(VerticalAlignment::Center),
+            Border::new().grid_row(1).grid_column(1).content(
+                TextBox::new()
+                    .text(working_dir.to_string())
+                    .min_height(30.0)
+                    .border_brush(theme::solid(INPUT_STROKE))
+                    .on_text_changed(on_working_dir),
+            ),
+        ));
+    let inputs: View = if is_no_value {
+        View::empty()
     } else {
-        TextBox::new()
-            .text(value.to_string())
-            .min_width(240.0)
-            .min_height(30.0)
-            .border_brush(theme::solid(INPUT_STROKE))
-            .on_text_changed(on_value)
-            .into()
+        Border::new()
+            .margin(Thickness::new(0.0, 8.0, 0.0, 0.0))
+            .content(input_grid)
     };
 
-    let remove: View = Button::new()
-        .on_click(on_remove)
-        .content(TextBlock::new().text(i18n::t("967")));
-
-    let trailing: View = StackPanel::new()
-        .grid_column(2)
-        .orientation(Orientation::Horizontal)
-        .spacing(8.0)
-        .children((value_control, remove));
-
-    Grid::new()
-        .columns([GridLength::Auto, GridLength::STAR, GridLength::Auto])
-        .children((badge, name, trailing))
+    StackPanel::new().spacing(0.0).children((head, inputs))
 }
 
 /// 行为编辑行的**子卡外框**（旧 `Border.rowEditor`：Ivory 面 + 圆角 4 + Padding 10 + 底距 6）。
@@ -311,11 +396,13 @@ pub fn row_editor(body: View) -> View {
         .content(body)
 }
 
-/// 「添加行为」行：覆盖行为下拉 + 添加按钮（`max_entries` 已满 9 时禁用）。
+/// 「添加行为」行：覆盖行为下拉 + 添加按钮。
+/// `hint` = 禁用原因（1107 满 9 / 1119 全部已加），无则不渲染。
 pub fn add_behavior_row<C1, C2>(
     covering_labels: Vec<String>,
     picked: Option<usize>,
     can_add: bool,
+    hint: Option<String>,
     on_pick: C1,
     on_add: C2,
 ) -> View
@@ -331,17 +418,33 @@ where
         .on_selection_changed(on_pick)
         .into();
 
-    StackPanel::new()
-        .orientation(Orientation::Horizontal)
-        .spacing(12.0)
-        .margin(Thickness::new(0.0, 8.0, 0.0, 0.0))
-        .children((
-            combo,
+    let mut children: Vec<(usize, View)> = vec![
+        (0, combo),
+        (
+            1,
             Button::new()
                 .is_enabled(can_add)
                 .on_click(on_add)
                 .content(TextBlock::new().text(i18n::t("1106"))),
-        ))
+        ),
+    ];
+    if let Some(hint) = hint {
+        children.push((
+            children.len(),
+            TextBlock::new()
+                .text(hint)
+                .font_size(theme::FONT_CAPTION)
+                .foreground(theme::stone_gray())
+                .vertical_alignment(VerticalAlignment::Center)
+                .into(),
+        ));
+    }
+
+    StackPanel::new()
+        .orientation(Orientation::Horizontal)
+        .spacing(12.0)
+        .margin(Thickness::new(0.0, 8.0, 0.0, 0.0))
+        .keyed_children(children)
 }
 
 /// 未配置类型的「待配置」提示（2537 + 专属行为缺位提示 2517）。

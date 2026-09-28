@@ -209,6 +209,27 @@ pub fn commit_draft(config: &mut Config, draft: &QuickSwitchOption) -> bool {
 /// 历史条数下限（复刻 `Math.Max(1, MaxHistory)`）。
 pub const MIN_HISTORY: i32 = 1;
 
+/// 把插件声明的 `filter`（如 `"everything.exe"`）转成 Win32 `GetOpenFileNameW` 的
+/// 双 NUL 过滤器串（复刻旧 `PluginSettingsDialogWindow.axaml.cs:102-107` 的 `ExtOf`）：
+///
+/// * 取声明中**最后一个 `.` 之后**的段拼 `*.<ext>` 模式，描述 = 声明原文；
+/// * 无点 / 空声明 ⇒ 回退「所有文件」单模式过滤器；
+/// * 末尾以 `\0` 收口（`pick_open_file` 负责补终止 NUL，见 `platform::file_dialog`）。
+pub fn file_dialog_filter(declared: &str) -> String {
+    let declared = declared.trim();
+    if let Some((_, ext)) = declared.rsplit_once('.')
+        && !ext.is_empty()
+        && ext.chars().all(|c| c.is_ascii_alphanumeric())
+    {
+        return format!("{declared}\0*.{ext}\0\0");
+    }
+    if declared.is_empty() {
+        crate::platform::file_dialog::ALL_FILES_FILTER.to_string()
+    } else {
+        format!("{declared}\0*.*\0\0")
+    }
+}
+
 /// 清空 QuickSwitch 历史：把 `<部署根>/data/quickswitch/history.tsv` 截断为空文件（文件保留）。
 ///
 /// 引擎在每次对话框实例切换时经 `HistLoad` 重读该文件，故截断后历史立即呈空态。

@@ -65,7 +65,8 @@ pub const ZIP_FILTER: &str = "插件包 (*.zip)\0*.zip\0所有文件 (*.*)\0*.*\
 pub const ALL_FILES_FILTER: &str = "所有文件 (*.*)\0*.*\0\0";
 
 /// 命令框字体过滤器串（`.ttf/.otf`）。
-pub const FONT_FILTER: &str = "字体文件 (*.ttf;*.otf)\0*.ttf;*.otf\0所有文件 (*.*)\0*.*\0\0";
+pub const FONT_FILTER: &str =
+    "字体文件 (*.ttf;*.otf;*.ttc)\0*.ttf;*.otf;*.ttc\0所有文件 (*.*)\0*.*\0\0";
 
 #[cfg(test)]
 mod tests {

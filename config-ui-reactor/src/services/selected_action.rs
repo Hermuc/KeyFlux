@@ -502,6 +502,104 @@ pub fn transient_match_value(config: &Config, match_type: &str, id: &str) -> Str
     id.to_string() // type:<id> / orphan: 原样
 }
 
+// ---------------------------------------------------------------- 添加映射弹窗
+
+/// 「添加映射」类型下拉的一项（复刻 `AddMappingVm` 的候选项）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AddTypeOption {
+    /// 分区：[`MATCH_FILE_EXT`] / [`MATCH_TEXT_TYPE`]。
+    pub match_type: String,
+    /// 类型标识（`group:<name>` / 内置特征值 / `type:<id>`）。
+    pub id: String,
+    /// 显示文案。
+    pub label: String,
+}
+
+/// 「添加映射」候选类型全集，顺序复刻 `AddMappingVm`：
+/// 文件分组 → 内置文本特征 5 个 → 自定义类型（text → fileExt）。
+/// （旧版内置特征后有一个下拉分隔项；reactor ComboBox 无分隔项能力，按同序平铺。）
+pub fn add_type_options(config: &Config) -> Vec<AddTypeOption> {
+    let mut options = Vec::new();
+    for group in &config.file_groups {
+        options.push(AddTypeOption {
+            match_type: MATCH_FILE_EXT.to_string(),
+            id: format!("group:{}", group.name),
+            label: group.label.clone(),
+        });
+    }
+    for (value, key) in TEXT_TYPES {
+        options.push(AddTypeOption {
+            match_type: MATCH_TEXT_TYPE.to_string(),
+            id: value.to_string(),
+            label: i18n::t(key),
+        });
+    }
+    for mt in config.match_types.iter().filter(|mt| mt.kind == "text") {
+        options.push(AddTypeOption {
+            match_type: MATCH_TEXT_TYPE.to_string(),
+            id: format!("type:{}", mt.id),
+            label: custom_type_label(&mt.id, &mt.label, &mt.label_en),
+        });
+    }
+    for mt in config.match_types.iter().filter(|mt| mt.kind == "fileExt") {
+        options.push(AddTypeOption {
+            match_type: MATCH_FILE_EXT.to_string(),
+            id: format!("type:{}", mt.id),
+            label: custom_type_label(&mt.id, &mt.label, &mt.label_en),
+        });
+    }
+    options
+}
+
+/// 候选类型的落盘目标 `(matchType, matchValue)`（复刻 `AddMappingVm` 构造 SelectedMapping）。
+pub fn add_target(config: &Config, id: &str) -> (String, String) {
+    if let Some(name) = id.strip_prefix("group:") {
+        let match_value = config
+            .file_groups
+            .iter()
+            .find(|group| group.name == name)
+            .map(|group| group.exts.join(","))
+            .unwrap_or_default();
+        return (MATCH_FILE_EXT.to_string(), match_value);
+    }
+    if id.starts_with("type:") {
+        let kind = config
+            .match_types
+            .iter()
+            .find(|mt| format!("type:{}", mt.id) == id)
+            .map(|mt| mt.kind.clone())
+            .unwrap_or_else(|| MATCH_TEXT_TYPE.to_string());
+        let match_type = if kind == "fileExt" {
+            MATCH_FILE_EXT
+        } else {
+            MATCH_TEXT_TYPE
+        };
+        return (match_type.to_string(), id.to_string());
+    }
+    (MATCH_TEXT_TYPE.to_string(), id.to_string())
+}
+
+/// 是否已存在同 `(matchType, matchValue)` 的映射（文本特征 trim+大小写不敏感；
+/// 文件后缀走归一化集合比较，复刻 `AddMappingVm.ConfirmAsync` 的去重提示前提）。
+pub fn mapping_exists(config: &Config, match_type: &str, match_value: &str) -> bool {
+    config.selected_action.mappings.iter().any(|mapping| {
+        if mapping.match_type != match_type {
+            return false;
+        }
+        if match_type == MATCH_TEXT_TYPE {
+            mapping
+                .match_value
+                .trim()
+                .eq_ignore_ascii_case(match_value.trim())
+        } else {
+            same_exts(
+                &normalize_exts(&mapping.match_value),
+                &normalize_exts(match_value),
+            )
+        }
+    })
+}
+
 /// 行为徽章配色键：链接深灰 / 路径暖绿 / 磁力珊瑚 / 其余橄榄（对齐 `BehaviorBadgeColors`）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BadgeColor {

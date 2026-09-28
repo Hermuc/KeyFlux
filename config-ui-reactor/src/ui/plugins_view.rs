@@ -179,10 +179,16 @@ where
         .columns([GridLength::STAR, GridLength::Auto])
         .children((title, Border::new().grid_column(1).content(toggle_block)));
 
-    let delete: View = Button::new()
-        .is_enabled(card.can_delete)
-        .on_click(on_delete)
-        .content(TextBlock::new().text(i18n::t("912")));
+    // 卸载入口：旧版 `IsVisible=CanDelete`（内置卡**不渲染**此钮），tooltip 912
+    let delete: View = if card.can_delete {
+        Button::new().on_click(on_delete).content(
+            TextBlock::new()
+                .text("✕")
+                .foreground(theme::solid(theme::ERROR_CRIMSON)),
+        )
+    } else {
+        View::empty()
+    };
 
     let rows: Vec<(usize, View)> = vec![(0, header), (1, info), (2, delete)];
 
@@ -208,7 +214,30 @@ pub fn loading() -> View {
 
 /// 目录加载告警（逐包错误汇总，多行）+ 重试。
 /// 旧版容器：Ivory 面 + cream 边 1px + 圆角 4（RadiusPanel）+ Padding 14。
-pub fn load_error(message: &str, on_retry: impl IntoUnitCallback) -> View {
+/// 市场对话框传入 `title`（2433「无法加载插件市场目录」，旧 `PluginMarketWindow.axaml:117`）。
+pub fn load_error(message: &str, title: Option<&str>, on_retry: impl IntoUnitCallback) -> View {
+    let mut head: Vec<(usize, View)> = Vec::new();
+    if let Some(title) = title {
+        head.push((
+            head.len(),
+            TextBlock::new()
+                .text(title.to_string())
+                .font_size(theme::FONT_BODY)
+                .font_weight(FontWeight::SEMI_BOLD)
+                .foreground(theme::solid(theme::ERROR_CRIMSON))
+                .into(),
+        ));
+    }
+    head.push((
+        head.len(),
+        TextBlock::new()
+            .text(message.to_string())
+            .font_size(theme::FONT_CAPTION)
+            .foreground(theme::solid(theme::ERROR_CRIMSON))
+            .text_wrapping(TextWrapping::Wrap)
+            .into(),
+    ));
+
     StackPanel::new().spacing(10.0).children((
         Border::new()
             .background(theme::ivory())
@@ -216,17 +245,38 @@ pub fn load_error(message: &str, on_retry: impl IntoUnitCallback) -> View {
             .border_thickness(theme::hairline())
             .corner_radius(theme::radius_panel())
             .padding(Thickness::uniform(14.0))
-            .content(
-                TextBlock::new()
-                    .text(message.to_string())
-                    .font_size(theme::FONT_CAPTION)
-                    .foreground(theme::solid(theme::ERROR_CRIMSON))
-                    .text_wrapping(TextWrapping::Wrap),
-            ),
+            .content(StackPanel::new().spacing(4.0).keyed_children(head)),
         Button::new()
             .on_click(on_retry)
             .content(TextBlock::new().text(i18n::t("920"))),
     ))
+}
+
+/// 插件市场空态（2438 单行，区别于插件页的导入引导 2429+2430）。
+pub fn market_empty() -> View {
+    TextBlock::new()
+        .text(i18n::t("2438"))
+        .font_size(theme::FONT_BODY)
+        .foreground(theme::stone_gray())
+        .into()
+}
+
+/// 一次性操作失败横幅（导入/删除失败：纯文字、**无重试按钮**——重试语义只属于目录加载，
+/// 复刻旧版这两类失败走模态消息、目录失败才是 banner 的分流）。
+pub fn action_error(message: &str) -> View {
+    Border::new()
+        .background(theme::ivory())
+        .border_brush(theme::border_cream())
+        .border_thickness(theme::hairline())
+        .corner_radius(theme::radius_panel())
+        .padding(Thickness::uniform(14.0))
+        .content(
+            TextBlock::new()
+                .text(message.to_string())
+                .font_size(theme::FONT_CAPTION)
+                .foreground(theme::solid(theme::ERROR_CRIMSON))
+                .text_wrapping(TextWrapping::Wrap),
+        )
 }
 
 /// 空态引导（2429 + 2430）：旧版 Warm Sand 面、无边、圆角 4、Padding 14、行距 5。
@@ -457,11 +507,12 @@ pub fn setting_row<C: IntoPayloadCallback<String>, F: IntoUnitCallback>(
         .on_text_changed(on_change)
         .into();
 
-    // `file` 类型：文本框 + 「选择文件」按钮
+    // `file` 类型：文本框 + 「浏览」按钮（旧 `PluginSettingsDialogWindow.axaml:91` 用 2582；
+    // 2583 是文件对话框标题，此前误用）
     if crate::services::plugins::is_file(setting) {
         let pick: View = Button::new()
             .on_click(on_pick_file)
-            .content(TextBlock::new().text(i18n::t("2583")));
+            .content(TextBlock::new().text(i18n::t("2582")));
         children.push((
             children.len(),
             StackPanel::new()

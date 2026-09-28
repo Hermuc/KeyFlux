@@ -101,6 +101,32 @@ pub struct ShortcutInfo {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct EmptyJson {}
 
+/// `POST /api/selected-action/test` 的菜单项（`gin.H{"key","behavior","name"}`）。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct SelectedActionMenuEntry {
+    #[serde(default)]
+    pub key: i32,
+    #[serde(default)]
+    pub behavior: String,
+    #[serde(default)]
+    pub name: String,
+}
+
+/// `POST /api/selected-action/test` 响应（未命中 = `{"matched":false}`）。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct SelectedActionTestResponse {
+    #[serde(default)]
+    pub matched: bool,
+    #[serde(default)]
+    pub match_type: Option<String>,
+    #[serde(default)]
+    pub match_value: Option<String>,
+    #[serde(default)]
+    pub menu: Vec<SelectedActionMenuEntry>,
+    #[serde(default)]
+    pub preview: Option<String>,
+}
+
 /// settings.exe API 抽象 —— ViewModel/组件只依赖本 trait，便于注入假实现。
 pub trait SettingsApi: Send + Sync {
     /// 健康探测：语义 = 「HTTP 活着」，读配置能力由主加载兜底。
@@ -129,6 +155,31 @@ pub trait SettingsApi: Send + Sync {
     fn get_raw_text(&self, path: &str) -> ApiResponse<String>;
     /// 当前 BaseAddress（诊断用）。
     fn base_url(&self) -> String;
+    /// `POST /api/selected-action/test`：模拟测试（携带编辑中快照，未保存也能测）。
+    fn test_selected_action(
+        &self,
+        content: &str,
+        is_file: bool,
+        selected_action: Option<&crate::models::SelectedAction>,
+        match_types: Option<&[crate::models::MatchType]>,
+    ) -> ApiResponse<SelectedActionTestResponse>;
+    /// `POST /api/selected-action/play`：▶ 真实执行（typeId 白名单校验后写请求文件）。
+    fn play_selected_action(&self, type_id: &str) -> ApiResponse<EmptyJson>;
+    /// `POST /api/behaviors`：新建用户行为包（返回回写后的 manifest）。
+    fn create_behavior(
+        &self,
+        pack: &crate::models::BehaviorPack,
+    ) -> ApiResponse<crate::models::BehaviorPack>;
+    /// `PUT /api/behaviors/{id}`：编辑用户行为包（内置包后端 404 拒绝）。
+    fn update_behavior(
+        &self,
+        id: &str,
+        pack: &crate::models::BehaviorPack,
+    ) -> ApiResponse<crate::models::BehaviorPack>;
+    /// `DELETE /api/behaviors/{id}`：删除用户行为包。
+    fn delete_behavior(&self, id: &str) -> ApiResponse<MessageBody>;
+    /// `POST /api/behaviors/apply`：让行为变更立即生效（重启引擎；`restartFailed` 见 MessageBody）。
+    fn apply_behaviors(&self) -> ApiResponse<MessageBody>;
 }
 
 /// 基于 `ureq` 的阻塞式实现（在 `spawn_background` 中调用）。
@@ -383,6 +434,53 @@ impl SettingsApi for HttpSettingsApi {
 
     fn base_url(&self) -> String {
         self.base.clone()
+    }
+
+    fn test_selected_action(
+        &self,
+        content: &str,
+        is_file: bool,
+        selected_action: Option<&crate::models::SelectedAction>,
+        match_types: Option<&[crate::models::MatchType]>,
+    ) -> ApiResponse<SelectedActionTestResponse> {
+        // 请求体对齐 Go `selectedActionTestRequest`（编辑中快照优先，缺省回退磁盘配置）
+        let body = serde_json::json!({
+            "content": content,
+            "isFile": is_file,
+            "selectedAction": selected_action,
+            "matchTypes": match_types,
+        });
+        self.post_json("api/selected-action/test", &body)
+    }
+
+    fn play_selected_action(&self, type_id: &str) -> ApiResponse<EmptyJson> {
+        self.post_json(
+            "api/selected-action/play",
+            &serde_json::json!({ "typeId": type_id }),
+        )
+    }
+
+    fn create_behavior(
+        &self,
+        pack: &crate::models::BehaviorPack,
+    ) -> ApiResponse<crate::models::BehaviorPack> {
+        self.post_json("api/behaviors", pack)
+    }
+
+    fn update_behavior(
+        &self,
+        id: &str,
+        pack: &crate::models::BehaviorPack,
+    ) -> ApiResponse<crate::models::BehaviorPack> {
+        self.put_json(&format!("api/behaviors/{id}"), pack)
+    }
+
+    fn delete_behavior(&self, id: &str) -> ApiResponse<MessageBody> {
+        self.delete(&format!("api/behaviors/{id}"))
+    }
+
+    fn apply_behaviors(&self) -> ApiResponse<MessageBody> {
+        self.post_empty("api/behaviors/apply")
     }
 }
 
