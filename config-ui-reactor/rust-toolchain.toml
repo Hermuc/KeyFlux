@@ -1,0 +1,7 @@
+[toolchain]
+# windows-reactor 0.100 的 MSRV = 1.95；本机实测 1.98.1 可用。
+# 固定 channel 以保证 CI 与本机一致（可复现）。
+channel = "stable"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-pc-windows-msvc"]
+profile = "minimal"

@@ -1,0 +1,28 @@
+[package]
+name = "config-ui-reactor"
+version = "1.0.0"          # 与 KeyFlux 版本联动（构建溯源用）
+edition = "2024"           # 与官方 windows-reactor 样例一致
+publish = false
+
+[[bin]]
+# ⚠️ Cargo 的 bin 名不允许含 '.'，故此处用连字符；**部署阶段必须重命名为
+#    KeyFlux.Settings.exe**（引擎按该文件名拉起设置面板，见 bin/ 侧引用）。
+name = "keyflux-settings"
+path = "src/main.rs"
+
+[dependencies]
+regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+ureq = "3.4.2"
+windows-reactor = "0.100"
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_UI_Controls_Dialogs", "Win32_UI_WindowsAndMessaging"] }
+
+[build-dependencies]
+windows-reactor-setup = "0.100"   # 自包含部署：staging Windows App Runtime
+
+[lints.rust]
+unsafe_code = "warn"
+
+[lints.clippy]
+all = "warn"
