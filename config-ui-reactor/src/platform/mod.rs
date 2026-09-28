@@ -26,13 +26,13 @@ pub struct WindowSpec {
 }
 
 impl Default for WindowSpec {
-    /// 主窗口默认：浅色（KeyFlux 强制浅色）+ Mica + 1120×720。
+    /// 主窗口默认：浅色（KeyFlux 强制浅色）+ Mica + **1200×760**（对齐旧 `MainWindow.axaml:11`）。
     fn default() -> Self {
         Self {
             title: "KeyFlux Settings".to_string(),
             theme: WindowTheme::Light,
             backdrop: WindowBackdrop::Mica,
-            size: (1120.0, 720.0),
+            size: (1200.0, 760.0),
         }
     }
 }

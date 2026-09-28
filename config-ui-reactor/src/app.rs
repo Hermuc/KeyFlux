@@ -14,6 +14,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use windows_reactor::*;
 
@@ -28,7 +29,10 @@ use crate::services::api::{ApiResponse, HttpSettingsApi, MessageBody, SettingsAp
 use crate::services::backend::{BackendSession, BackendSessionOptions, resolve_settings_exe};
 use crate::services::market::{self, MarketEntry};
 use crate::services::selected_action::{self as sa, MATCH_FILE_EXT, MATCH_TEXT_TYPE};
-use crate::services::{action_editor, i18n, keymap, markdown, plugins, settings, store};
+use crate::services::{
+    action_editor, behaviors_edit, i18n, keymap, markdown, match_types_edit, plugins, settings,
+    store,
+};
 use crate::theme;
 use crate::ui::{
     abbr_view, action_editor as action_editor_view, keymap_view, markdown_view, plugins_view,
@@ -179,10 +183,6 @@ pub enum Message {
         match_type: &'static str,
         id: String,
     },
-    /// 删除当前点亮类型的映射（立即保存；⚠️ 本轮无确认弹窗，见 16 文档差异表）。
-    SaDeleteType {
-        match_type: &'static str,
-    },
     /// 「添加行为」下拉选择变化。
     SaPickBehavior {
         match_type: &'static str,
@@ -197,12 +197,130 @@ pub enum Message {
         match_type: &'static str,
         index: usize,
     },
+    /// 行为行：切换行为（pick = 覆盖序；切换重置默认模板，复刻 `EntryRowVm`）。
+    SaEntrySwitch {
+        match_type: &'static str,
+        index: usize,
+        pick: usize,
+    },
+    /// 行为行上移/下移（`delta` = -1 / +1；顺序即菜单数字键）。
+    SaEntryMove {
+        match_type: &'static str,
+        index: usize,
+        delta: i32,
+    },
     /// 编辑映射内第 `index` 个行为的命令模板。
     SaEntryValue {
         match_type: &'static str,
         index: usize,
         value: String,
     },
+    /// 编辑映射内第 `index` 个行为的工作目录。
+    SaEntryWorkingDir {
+        match_type: &'static str,
+        index: usize,
+        value: String,
+    },
+    /// ▶ 真实执行当前点亮类型（`POST /api/selected-action/play`，白名单 typeId）。
+    SaPlaySample,
+    /// ▶ 执行结果（Err = 失败原因；成功不打扰）。
+    SaPlayDone(Result<(), String>),
+    /// 打开「删除映射」确认框（1109 文案；确认后才删除 + 保存）。
+    SaDeleteAsk,
+    /// 确认删除当前点亮类型的映射。
+    SaDeleteConfirmed,
+    /// 取消删除确认框。
+    SaDeleteCancelled,
+    /// 打开「添加映射」弹窗。
+    SaAddOpen,
+    /// 「添加映射」类型下拉选择（`None` = 未选）。
+    SaAddType(Option<usize>),
+    /// 「添加映射」行为勾选/取消（`checked` 保序 = 菜单序）。
+    SaAddToggle(usize, bool),
+    /// 「添加映射」确认（重复条件 1115 拦截）。
+    SaAddConfirm,
+    /// 「添加映射」取消。
+    SaAddCancel,
+    /// 行为编辑后的尾随保存（800ms 防抖到期且仍是最新一代 ⇒ 真正落盘）。
+    SaSaveThrottled,
+    // ---------------------------------------------------------- 匹配类型管理
+    /// 打开「管理匹配类型」对话框（2519）。
+    MatchTypesOpen,
+    /// 关闭（丢弃草稿）。
+    MatchTypesClose,
+    /// 选中既有类型（`config.match_types` 下标；`None` = 回到新建草稿）。
+    MatchTypesPick(Option<usize>),
+    /// 新建草稿。
+    MtNew,
+    /// 名称（2523）。
+    MtLabel(String),
+    /// 英文名称（2567）。
+    MtLabelEn(String),
+    /// 类型（0 = text 2556 / 1 = fileExt 2551；仅草稿态可改）。
+    MtKind(usize),
+    /// 规则算子（2512 equals / 2513 prefix / 2514 suffix / 2515 contains）。
+    MtRuleOp(usize, usize),
+    /// 规则值。
+    MtRuleValue(usize, String),
+    /// 追加一条规则。
+    MtRuleAdd,
+    /// 删除一条规则。
+    MtRuleRemove(usize),
+    /// 后缀串（2528）。
+    MtExts(String),
+    /// 保存：`true` = 同时创建专属行为并强绑定（2529）。
+    MtSave(bool),
+    /// 删除类型（级联删 `type:` 引用映射 + 同名专属行为包）。
+    MtDelete,
+    /// 「试一下」示例内容（`POST /api/selected-action/test`）。
+    MtTest(String),
+    /// 提交「试一下」（携带编辑中快照：未保存的类型草稿也参与匹配）。
+    MtTestRun,
+    /// 「试一下」结果（Ok = 命中预览；空串 = 未命中；Err = 请求失败）。
+    MtTestDone(Result<String, String>),
+    // ---------------------------------------------------------- 行为库
+    /// 打开「管理行为」对话框（1083）。
+    BehaviorsOpen,
+    /// 关闭。
+    BehaviorsClose,
+    /// 选中目录项（内置在前；`None` = 未选）。
+    BhPick(Option<usize>),
+    /// 新建行为草稿。
+    BhNew,
+    /// 名称。
+    BhName(String),
+    /// 包 ID（新建可改）。
+    BhId(String),
+    /// 描述。
+    BhDescription(String),
+    /// 前提类型（0 = textType / 1 = fileExt）。
+    BhAppliesKind(usize, usize),
+    /// 前提值（后缀串 / 特征值）。
+    BhAppliesValue(usize, String),
+    /// 前提默认推荐开关。
+    BhAppliesDefault(usize, bool),
+    /// 追加前提行。
+    BhAppliesAdd,
+    /// 删除前提行。
+    BhAppliesRemove(usize),
+    /// 基础动作下拉。
+    BhBaseAction(usize),
+    /// 默认模板。
+    BhTemplate(String),
+    /// 默认工作目录。
+    BhWorkingDir(String),
+    /// 保存（新建 POST / 编辑 PUT；内置包后端拒绝）。
+    BhSave,
+    /// 删除（仅用户包）。
+    BhDelete,
+    /// 立即生效（`POST /api/behaviors/apply`，重启引擎）。
+    BhApplyNow,
+    /// 行为目录刷新完成（保存/删除后重拉）。
+    BhReloaded(Result<(), String>),
+    /// 保存结果。
+    BhSaved(Result<(), String>),
+    /// 应用结果（Err = 失败原因；Ok 忽略 `restartFailed` 差异——引擎重启失败由 1079 引导）。
+    BhApplied(Result<(), String>),
     /// 行为目录快照到达（Ready 后台拉取 `GET /api/behaviors`）。
     BehaviorsLoaded(Result<Box<sa::Catalog>, String>),
     // ------------------------------------------------------------- 插件页
@@ -288,6 +406,24 @@ pub enum Message {
     FontBrowse,
     /// 选项页字段编辑（直接写入内存 config，随页脚保存链路持久化）。
     Opt(OptEdit),
+    /// 清除页脚提示（928 成功提示 2 秒自动消失，复刻旧版 `Task.Delay(2000)`）。
+    ClearNotice,
+    // ---------------------------------------------------------- 指南编辑（OverviewEdit）
+    /// 打开「编辑使用指南」对话框（指南页底部编辑入口，复刻 `EditZoneHint`）。
+    GuideEditOpen,
+    /// 总览 markdown 编辑。
+    GuideEditValue(String),
+    /// 恢复默认文档（2404：清空 overviewDocMd ⇒ 引擎回落到站内 config_doc.md）。
+    GuideEditReset,
+    /// 保存指南文档（overviewDocMd + 立即保存，复刻旧 `SaveAsync(force:true)`）。
+    GuideEditSave,
+    /// 关闭编辑对话框（丢弃未保存修改）。
+    GuideEditClose,
+    // ---------------------------------------------------------- 自定义热键动作编辑
+    /// 打开第 `row` 行自定义热键的动作编辑（复刻 `ActionEditorWindow`，keymap id=1）。
+    CustomHotkeyEdit(usize),
+    /// 关闭动作编辑对话框。
+    CustomHotkeyEditClose,
 }
 
 /// 选项页字段编辑载荷（`Message::Opt`）。
@@ -306,6 +442,7 @@ pub enum OptEdit {
     Language(usize),
     CustomHotkey(usize, String),
     CustomHotkeyAdd,
+    CustomHotkeyRemove(usize),
     MouseDelay1(String),
     MouseDelay2(String),
     MouseFastSingle(String),
@@ -333,6 +470,17 @@ pub enum OptEdit {
     GroupCondition(usize, usize),
     GroupAdd,
     GroupRemove(usize),
+}
+
+/// 「添加映射」弹窗草稿（复刻 `AddMappingVm` + `BehaviorPickVm`：类型下拉 + 勾选序）。
+#[derive(Debug, Clone, Default)]
+struct SaAddDraft {
+    /// 类型下拉下标（`None` = 未选；候选项由 [`sa_add_type_options`] 生成）。
+    type_pick: Option<usize>,
+    /// 已勾选行为 ID（**保序** = 菜单数字键序）。
+    checked: Vec<String>,
+    /// 弹窗内错误（重复条件 1115 等）。
+    error: Option<String>,
 }
 
 /// QuickSwitch 配置对话框的可编辑字段（消息载荷）。
@@ -370,6 +518,10 @@ pub struct Shell {
     loading: bool,
     error: Option<String>,
     notice: Option<String>,
+    /// 提示条是否为**错误**（红）：保存失败不再踢出整页（对齐旧版「弹窗报错、现场保留」）。
+    notice_error: bool,
+    /// 上次页脚保存发起时刻（1 秒节流，复刻 `MainViewModel.SaveCommand` 的 `useThrottleFn`）。
+    last_save: Option<Instant>,
     session: SessionSlot,
     port: Option<u16>,
     config: Option<Config>,
@@ -382,12 +534,16 @@ pub struct Shell {
     plugin_catalog: Option<PluginListResponse>,
     /// 插件目录加载中。
     plugins_loading: bool,
-    /// 插件目录加载告警（逐包错误汇总）。
+    /// 插件目录加载告警（逐包错误汇总；**带重试按钮**，语义 = 重新拉目录）。
     plugins_error: Option<String>,
+    /// 插件页一次性操作失败（导入/删除；纯文字横幅，**无重试**——复刻旧版分流）。
+    plugins_action_error: Option<String>,
     /// 插件页一次性操作回显（导入/删除成功提示）。
     plugin_status: Option<String>,
     /// QuickSwitch 配置对话框的编辑草稿（`None` = 对话框关闭）。
     qs_draft: Option<QuickSwitchOption>,
+    /// QuickSwitch 对话框内错误（清空历史失败等；渲染在弹窗**内部**，不再写页面横幅被遮蔽）。
+    qs_error: Option<String>,
     /// 插件市场对话框是否打开。
     market_open: bool,
     /// 市场条目（目录序）。
@@ -412,6 +568,44 @@ pub struct Shell {
     ps_error: Option<String>,
     /// 插件设置对话框是否打开（校验失败重开时用）。
     ps_open: bool,
+    /// 插件设置对话框保存进行中（防在结果返回前重复提交）。
+    ps_saving: bool,
+    /// 选中动作页启用开关的**保存前值**（保存失败时回滚显示态，复刻 `SaveEnableAsync`）。
+    sa_enable_prev: Option<bool>,
+    /// 「删除映射」确认框是否打开（1109 文案）。
+    sa_delete_confirm: bool,
+    /// 选中动作页页内状态条（▶ 执行失败等；`(文本, 是否错误)`）。
+    sa_status: Option<(String, bool)>,
+    /// 「添加映射」弹窗草稿（`None` = 关闭）。
+    sa_add: Option<SaAddDraft>,
+    /// 行为编辑尾随保存的代际计数（防抖窗口内新编辑使旧定时器失效）。
+    sa_save_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// 「管理匹配类型」对话框是否打开。
+    mt_dialog: bool,
+    /// 匹配类型编辑草稿（`None` = 未进入编辑/已清）。
+    mt_draft: Option<match_types_edit::MatchTypeDraft>,
+    /// 匹配类型对话框内状态条。
+    mt_status: Option<(String, bool)>,
+    /// 「试一下」示例内容。
+    mt_test: String,
+    /// 「试一下」结果（Ok = 命中预览文本；Err = 失败原因）。
+    mt_test_result: Option<Result<String, String>>,
+    /// 「管理行为」对话框是否打开。
+    bh_dialog: bool,
+    /// 行为目录选中项（内置在前；`None` = 未选）。
+    bh_pick: Option<usize>,
+    /// 行为编辑草稿（`None` = 展示只读详情占位）。
+    bh_draft: Option<behaviors_edit::BehaviorDraft>,
+    /// 行为对话框内状态条。
+    bh_status: Option<(String, bool)>,
+    /// 行为保存/删除进行中（防重复提交）。
+    bh_saving: bool,
+    /// 「编辑使用指南」对话框是否打开。
+    guide_edit_open: bool,
+    /// 指南编辑框内容。
+    guide_edit_text: String,
+    /// 自定义热键动作编辑对话框：当前编辑的行（`Some(row)` = 打开，keymap id=1）。
+    hotkey_editor_row: Option<usize>,
     /// 选项页当前展开的分区（`None` = 全部收起；一次只展开一张，复刻旧版手风琴）。
     settings_open: Option<&'static str>,
     /// 选项页「触发延时」分区当前选中的方案（`nav` 中 id>4 方案的下标）。
@@ -432,6 +626,8 @@ pub struct Shell {
     sa_file_pick: Option<usize>,
     /// 选中动作页：热键已改未保存（保存成功后复位，对齐旧版 `HotkeyPendingSave`）。
     hotkey_pending_save: bool,
+    /// 选中动作页热键与既有占用集冲突（1025 红字提示）。
+    sa_hotkey_conflict: bool,
     /// 当前窗口分组（复刻 `store.windowGroupID`）。
     window_group_id: i32,
     /// 快捷方式下拉数据（`GET /shortcuts`，用于「启动程序或激活窗口」的目标选择）。
@@ -452,6 +648,8 @@ impl Component for Shell {
             loading: true,
             error: None,
             notice: None,
+            notice_error: false,
+            last_save: None,
             session,
             port: None,
             config: None,
@@ -461,8 +659,10 @@ impl Component for Shell {
             plugin_catalog: None,
             plugins_loading: false,
             plugins_error: None,
+            plugins_action_error: None,
             plugin_status: None,
             qs_draft: None,
+            qs_error: None,
             market_open: false,
             market_entries: Vec::new(),
             market_loading: false,
@@ -475,7 +675,26 @@ impl Component for Shell {
             ps_loading: false,
             ps_error: None,
             ps_open: false,
-            settings_open: None,
+            ps_saving: false,
+            sa_enable_prev: None,
+            sa_delete_confirm: false,
+            sa_status: None,
+            sa_add: None,
+            sa_save_gen: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            mt_dialog: false,
+            mt_draft: None,
+            mt_status: None,
+            mt_test: String::new(),
+            mt_test_result: None,
+            bh_dialog: false,
+            bh_pick: None,
+            bh_draft: None,
+            bh_status: None,
+            bh_saving: false,
+            guide_edit_open: false,
+            guide_edit_text: String::new(),
+            hotkey_editor_row: None,
+            settings_open: Some("delay"),
             delay_scheme: 0,
             settings_notice: None,
             data_root: None,
@@ -485,6 +704,7 @@ impl Component for Shell {
             sa_text_pick: None,
             sa_file_pick: None,
             hotkey_pending_save: false,
+            sa_hotkey_conflict: false,
             window_group_id: 0,
             shortcuts: Vec::new(),
         }
@@ -507,9 +727,24 @@ impl Component for Shell {
                     }
                 }
             }
-            // 禁用键的判断已在状态层完成，这里只记录选中项
+            // 禁用键的判断已在状态层完成，这里再兜一道（复刻 `KeymapEditorCore.SelectKey` 的
+            // 空值/禁用键 guard：键盘网格页与未来入口共用该消息）
             Message::SelectKey(hotkey) => {
-                self.selected_hotkey = Some(hotkey);
+                if hotkey.is_empty() {
+                    return;
+                }
+                let disabled = self
+                    .config
+                    .as_ref()
+                    .map(keymap::disabled_keys)
+                    .unwrap_or_default();
+                let guard_ok = self
+                    .current_keymap()
+                    .map(|keymap| !keymap::is_disabled(&disabled, keymap.id, &hotkey))
+                    .unwrap_or(true);
+                if guard_ok {
+                    self.selected_hotkey = Some(hotkey);
+                }
             }
             Message::CmdText(text) => {
                 // 回车执行：0.100.0 无键盘事件 API ⇒ 命令框用 `accepts_return(true)`，
@@ -628,56 +863,167 @@ impl Component for Shell {
                 let (Some(config), Some(port)) = (self.config.clone(), self.port) else {
                     return;
                 };
+                // 1 秒节流（复刻 `SaveCommand` 的 useThrottleFn(1000)）；开关等即时保存走
+                // `save_now` 不受限流
+                if let Some(last) = self.last_save
+                    && last.elapsed() < Duration::from_secs(1)
+                {
+                    return;
+                }
+                self.last_save = Some(Instant::now());
                 self.notice = None;
                 let _ = context
                     .spawn_background(move |_token| Message::SaveFinished(save(port, &config)));
             }
-            Message::SaveFinished(result) | Message::Notice(result) => match result {
-                Ok(notice) => {
-                    // 保存成功 ⇒ 热键未保存提示复位（对齐旧版 OnConfigSaved）
+            Message::ClearNotice => {
+                if !self.notice_error {
+                    self.notice = None;
+                }
+            }
+            // 保存成功/失败都**停留在当前页**（旧版失败走模态弹窗、现场保留；此处以
+            // 红色页脚提示等价承载），不再把用户踢到全页错误态。
+            Message::SaveFinished(result) => match result {
+                Ok(text) => {
                     self.hotkey_pending_save = false;
-                    self.notice = Some(notice);
+                    self.notice_error = false;
+                    self.notice = Some(text);
+                    // 保存成功 ⇒ 导航即时重建（方案启停等变化反映到侧栏，复刻 BuildNav）
+                    self.rebuild_nav();
+                    // QuickSwitch 草稿在保存确认后关闭弹窗（保存失败则保持打开供修正，
+                    // 复刻旧 `QuickSwitchDialogWindow` 的「失败窗口不关」语义）
+                    self.qs_draft = None;
+                    self.qs_error = None;
+                    self.sa_enable_prev = None;
+                    self.schedule_notice_clear(context);
                 }
                 Err(reason) => {
-                    self.notice = None;
-                    self.error = Some(reason);
+                    self.notice_error = true;
+                    self.notice = Some(reason);
+                    // 启用开关保存失败 ⇒ 回滚显示态（复刻 `SaveEnableAsync`）
+                    if let Some(previous) = self.sa_enable_prev.take()
+                        && let Some(config) = self.config.as_mut()
+                    {
+                        config.selected_action.enable = previous;
+                    }
+                }
+            },
+            Message::Notice(result) => match result {
+                Ok(text) => {
+                    self.notice_error = false;
+                    self.notice = Some(text);
+                    self.schedule_notice_clear(context);
+                }
+                Err(reason) => {
+                    self.notice_error = true;
+                    self.notice = Some(reason);
                 }
             },
             // ------------------------------------------------------------- 选中动作页
             Message::SaHotkey(text) => {
                 if let Some(config) = self.config.as_mut() {
+                    // UsedHotkeys 冲突校验（复刻 `SelectedActionPageViewModel`）：
+                    // 输入与全部 keymap 的热键/触发键比对（不含选中动作自身旧值）
+                    let mut occupied: Vec<String> = config
+                        .keymaps
+                        .iter()
+                        .flat_map(|keymap| {
+                            keymap
+                                .hotkeys
+                                .keys()
+                                .cloned()
+                                .chain(std::iter::once(keymap.hotkey.clone()))
+                        })
+                        .collect();
+                    occupied.retain(|existing| !existing.is_empty());
+                    let previous = config.selected_action.hotkey.clone();
+                    let conflict = !text.is_empty()
+                        && occupied.iter().any(|existing| {
+                            existing.eq_ignore_ascii_case(&text)
+                                && !existing.eq_ignore_ascii_case(&previous)
+                        });
+                    self.sa_hotkey_conflict = conflict;
                     config.selected_action.hotkey = text;
                     self.hotkey_pending_save = true;
                 }
             }
             Message::SaEnable(enabled) => {
+                // 记录保存前值：失败时回滚显示态（复刻 `SaveEnableAsync`）
+                self.sa_enable_prev = self
+                    .config
+                    .as_ref()
+                    .map(|config| config.selected_action.enable);
                 if let Some(config) = self.config.as_mut() {
                     config.selected_action.enable = enabled;
                 }
-                // 启用开关 = 立即保存（对齐旧版 SaveEnableAsync；不做失败回滚，见 16 文档差异表）
+                // 启用开关 = 立即保存（对齐旧版 SaveEnableAsync 语义）
                 self.save_now(context);
             }
             Message::SaSelectToggle { match_type, id } => match match_type {
                 MATCH_TEXT_TYPE => self.sa_text_sel = Some(id),
                 _ => self.sa_file_sel = Some(id),
             },
-            Message::SaDeleteType { match_type } => {
-                let id = self.sa_selected_id(match_type).unwrap_or_default();
+            Message::SaDeleteAsk => {
+                let id = self
+                    .sa_selected_id(MATCH_TEXT_TYPE)
+                    .or_else(|| self.sa_selected_id(MATCH_FILE_EXT))
+                    .unwrap_or_default();
                 if id.is_empty() {
                     return;
                 }
+                // 仅已配置（存在 mapping）的类型可删；打开确认框（1109，确认才落盘）
+                let has_mapping = self.config.as_ref().is_some_and(|config| {
+                    [MATCH_TEXT_TYPE, MATCH_FILE_EXT].iter().any(|match_type| {
+                        sa::find_mapping_for_type(config, match_type, &id).is_some()
+                    })
+                });
+                self.sa_delete_confirm = has_mapping;
+            }
+            Message::SaDeleteCancelled => self.sa_delete_confirm = false,
+            Message::SaDeleteConfirmed => {
+                self.sa_delete_confirm = false;
                 let mut removed = false;
-                if let Some(config) = self.config.as_mut()
-                    && let Some(position) = sa::find_mapping_index_for_type(config, match_type, &id)
-                {
-                    config.selected_action.mappings.remove(position);
-                    removed = true;
+                for match_type in [MATCH_TEXT_TYPE, MATCH_FILE_EXT] {
+                    let id = self.sa_selected_id(match_type).unwrap_or_default();
+                    if id.is_empty() {
+                        continue;
+                    }
+                    if let Some(config) = self.config.as_mut()
+                        && let Some(position) =
+                            sa::find_mapping_index_for_type(config, match_type, &id)
+                    {
+                        config.selected_action.mappings.remove(position);
+                        removed = true;
+                        self.reset_sa_selection(match_type);
+                    }
                 }
                 if removed {
-                    // 删除即保存（对齐旧版「确认后立即保存」；⚠️ 本轮无确认弹窗）
-                    self.reset_sa_selection(match_type);
+                    // 删除即保存（复刻旧版「确认后立即保存」）
                     self.save_now(context);
                 }
+            }
+            Message::SaPlaySample => {
+                let Some(port) = self.port else {
+                    return;
+                };
+                // typeId = toggle id（内置特征值 / group:<name> / type:<id>，后端白名单同构）
+                let Some(type_id) = self
+                    .sa_selected_id(MATCH_TEXT_TYPE)
+                    .or_else(|| self.sa_selected_id(MATCH_FILE_EXT))
+                    .filter(|id| !id.is_empty())
+                else {
+                    return;
+                };
+                let _ = context.spawn_background(move |_token| {
+                    let api = HttpSettingsApi::new(port);
+                    let response = api.play_selected_action(&type_id);
+                    Message::SaPlayDone(if response.success {
+                        Ok(())
+                    } else {
+                        Err(response
+                            .error_message
+                            .unwrap_or_else(|| format!("HTTP {}", response.status)))
+                    })
+                });
             }
             Message::SaPickBehavior { match_type, pick } => match match_type {
                 MATCH_TEXT_TYPE => self.sa_text_pick = pick,
@@ -685,6 +1031,7 @@ impl Component for Shell {
             },
             Message::SaAddBehavior { match_type } => {
                 self.add_behavior(match_type);
+                self.request_sa_throttled_save(context);
             }
             Message::SaRemoveEntry { match_type, index } => {
                 let id = self.sa_selected_id(match_type).unwrap_or_default();
@@ -695,6 +1042,66 @@ impl Component for Shell {
                     // 至少保留一个行为（旧版 1108 语义；空 entries 会被后端 400 拒绝）
                     mapping.entries.remove(index);
                 }
+                self.save_now(context);
+            }
+            Message::SaEntrySwitch {
+                match_type,
+                index,
+                pick,
+            } => {
+                let id = self.sa_selected_id(match_type).unwrap_or_default();
+                // 覆盖推导（catalog 不可变借用）→ 写回（可变借用）
+                let replacement = {
+                    let match_value = self.config.as_ref().and_then(|config| {
+                        sa::find_mapping_for_type(config, match_type, &id).map(|mapping| {
+                            (
+                                mapping.match_value.clone(),
+                                mapping.entries.get(index).cloned(),
+                            )
+                        })
+                    });
+                    match (self.config.as_ref(), match_value) {
+                        (_, Some((match_value, Some(current)))) => {
+                            let covering = sa::covering(&self.catalog, match_type, &match_value);
+                            covering.get(pick).map(|pack| {
+                                let behavior = pack.id.clone();
+                                SelectedEntry {
+                                    action_value: if self.catalog.is_no_value(&behavior) {
+                                        String::new()
+                                    } else {
+                                        // 切换行为 ⇒ 重置为该行为默认模板（复刻 OnBehaviorChanged）
+                                        self.catalog.default_template_for(&behavior)
+                                    },
+                                    ..current
+                                }
+                            })
+                        }
+                        _ => None,
+                    }
+                };
+                if let Some(replacement) = replacement
+                    && let Some(config) = self.config.as_mut()
+                    && let Some(mapping) = sa::find_mapping_for_type_mut(config, match_type, &id)
+                {
+                    mapping.entries[index] = replacement;
+                }
+                self.request_sa_throttled_save(context);
+            }
+            Message::SaEntryMove {
+                match_type,
+                index,
+                delta,
+            } => {
+                let id = self.sa_selected_id(match_type).unwrap_or_default();
+                if let Some(config) = self.config.as_mut()
+                    && let Some(mapping) = sa::find_mapping_for_type_mut(config, match_type, &id)
+                {
+                    let target = index as i64 + i64::from(delta);
+                    if target >= 0 && (target as usize) < mapping.entries.len() {
+                        mapping.entries.swap(index, target as usize);
+                    }
+                }
+                self.request_sa_throttled_save(context);
             }
             Message::SaEntryValue {
                 match_type,
@@ -708,6 +1115,596 @@ impl Component for Shell {
                 {
                     entry.action_value = value;
                 }
+                self.request_sa_throttled_save(context);
+            }
+            Message::SaEntryWorkingDir {
+                match_type,
+                index,
+                value,
+            } => {
+                let id = self.sa_selected_id(match_type).unwrap_or_default();
+                if let Some(config) = self.config.as_mut()
+                    && let Some(mapping) = sa::find_mapping_for_type_mut(config, match_type, &id)
+                    && let Some(entry) = mapping.entries.get_mut(index)
+                {
+                    entry.working_dir = value;
+                }
+                self.request_sa_throttled_save(context);
+            }
+            Message::SaSaveThrottled => self.save_now(context),
+            Message::SaPlayDone(result) => {
+                self.sa_status = match result {
+                    // 成功：引擎侧可见执行，不打扰（旧版 StatusText 仅承载失败）
+                    Ok(()) => None,
+                    Err(reason) => Some((reason, true)),
+                };
+            }
+            Message::SaAddOpen => {
+                self.sa_add = Some(SaAddDraft::default());
+            }
+            Message::SaAddCancel => self.sa_add = None,
+            Message::SaAddType(pick) => {
+                if let Some(draft) = self.sa_add.as_mut() {
+                    draft.type_pick = pick;
+                    draft.checked.clear();
+                    draft.error = None;
+                }
+            }
+            Message::SaAddToggle(index, checked) => {
+                let Some(draft) = self.sa_add.as_mut() else {
+                    return;
+                };
+                let Some(pick) = draft.type_pick else {
+                    return;
+                };
+                let Some(config) = self.config.as_ref() else {
+                    return;
+                };
+                let options = sa::add_type_options(config);
+                let Some(option) = options.get(pick) else {
+                    return;
+                };
+                let (match_type, match_value) = sa::add_target(config, &option.id);
+                let covering = sa::covering(&self.catalog, &match_type, &match_value);
+                let Some(pack) = covering.get(index) else {
+                    return;
+                };
+                let behavior = pack.id.clone();
+                if checked {
+                    // 勾选序 = 菜单序；9 上限（复刻 BehaviorPickVm）
+                    if draft.checked.len() < 9 && !draft.checked.contains(&behavior) {
+                        draft.checked.push(behavior);
+                    }
+                } else {
+                    draft.checked.retain(|existing| existing != &behavior);
+                }
+            }
+            Message::SaAddConfirm => {
+                let Some(draft) = self.sa_add.as_mut() else {
+                    return;
+                };
+                let Some(pick) = draft.type_pick else {
+                    return;
+                };
+                let Some(config) = self.config.as_ref() else {
+                    return;
+                };
+                let options = sa::add_type_options(config);
+                let Some(option) = options.get(pick) else {
+                    return;
+                };
+                if draft.checked.is_empty() {
+                    // CanConfirm：至少勾一个行为（1104_any = 「任意」文案即缺位提示）
+                    draft.error = Some(i18n::t("1104_any"));
+                    return;
+                }
+                let (match_type, match_value) = sa::add_target(config, &option.id);
+                // 重复条件拦截（1115）：同 (matchType, matchValue) 已配置
+                if sa::mapping_exists(config, &match_type, &match_value) {
+                    draft.error = Some(i18n::t("1115"));
+                    return;
+                }
+                let entries: Vec<SelectedEntry> = draft
+                    .checked
+                    .iter()
+                    .map(|behavior| SelectedEntry {
+                        behavior: behavior.clone(),
+                        action_value: self.catalog.default_template_for(behavior),
+                        ..Default::default()
+                    })
+                    .collect();
+                let Some(config) = self.config.as_mut() else {
+                    return;
+                };
+                config
+                    .selected_action
+                    .mappings
+                    .push(crate::models::SelectedMapping {
+                        match_type: match_type.clone(),
+                        match_value,
+                        entries,
+                    });
+                self.sa_add = None;
+                self.save_now(context);
+            }
+            // ---------------------------------------------------------- 匹配类型管理
+            Message::MatchTypesOpen => {
+                self.mt_dialog = true;
+                self.mt_status = None;
+                self.mt_test_result = None;
+                if self.mt_draft.is_none() {
+                    self.mt_draft = self
+                        .config
+                        .as_ref()
+                        .map(|config| match_types_edit::MatchTypeDraft::new_draft(config, "text"));
+                }
+            }
+            Message::MatchTypesClose => {
+                self.mt_dialog = false;
+                self.mt_draft = None;
+                self.mt_status = None;
+                self.mt_test_result = None;
+                self.mt_test.clear();
+            }
+            Message::MatchTypesPick(pick) => {
+                let draft = pick.and_then(|index| {
+                    self.config
+                        .as_ref()
+                        .and_then(|config| config.match_types.get(index))
+                        .map(|mt| match_types_edit::MatchTypeDraft::from_existing(index, mt))
+                });
+                self.mt_pick_set(draft);
+            }
+            Message::MtNew => {
+                let draft = self
+                    .config
+                    .as_ref()
+                    .map(|config| match_types_edit::MatchTypeDraft::new_draft(config, "text"));
+                self.mt_draft = draft;
+                self.mt_status = None;
+                self.mt_test_result = None;
+                self.mt_test.clear();
+            }
+            Message::MtLabel(value) => self.mt_edit_draft(|draft| draft.label = value),
+            Message::MtLabelEn(value) => self.mt_edit_draft(|draft| draft.label_en = value),
+            Message::MtKind(index) => {
+                let kind = if index == 1 { "fileExt" } else { "text" };
+                self.mt_edit_draft(|draft| {
+                    draft.kind = kind.to_string();
+                    if kind == "fileExt" {
+                        draft.rules.clear();
+                    } else if draft.rules.is_empty() {
+                        draft.rules.push(("contains".to_string(), String::new()));
+                    }
+                });
+            }
+            Message::MtRuleOp(rule, op_index) => {
+                let ops = ["equals", "prefix", "suffix", "contains"];
+                self.mt_edit_draft(|draft| {
+                    if let Some(slot) = draft.rules.get_mut(rule)
+                        && let Some(op) = ops.get(op_index)
+                    {
+                        slot.0 = (*op).to_string();
+                    }
+                });
+            }
+            Message::MtRuleValue(rule, value) => {
+                self.mt_edit_draft(|draft| {
+                    if let Some(slot) = draft.rules.get_mut(rule) {
+                        slot.1 = value;
+                    }
+                });
+            }
+            Message::MtRuleAdd => self.mt_edit_draft(|draft| {
+                draft.rules.push(("contains".to_string(), String::new()));
+            }),
+            Message::MtRuleRemove(rule) => {
+                self.mt_edit_draft(|draft| {
+                    if draft.rules.len() > 1 {
+                        draft.rules.remove(rule);
+                    }
+                });
+            }
+            Message::MtExts(value) => self.mt_edit_draft(|draft| draft.exts = value),
+            Message::MtSave(with_behavior) => {
+                let Some(draft) = self.mt_draft.clone() else {
+                    return;
+                };
+                if let Err(reason) = match_types_edit::validate(&draft) {
+                    self.mt_status = Some((reason, true));
+                    return;
+                }
+                let (match_type, match_value) = {
+                    if self.config.is_none() {
+                        return;
+                    }
+                    // 以写回后的 kind/引用推导目标（fileExt → 后缀串；text → type: 引用）
+                    let kind_is_file = draft.kind == "fileExt";
+                    let value = if kind_is_file {
+                        sa::normalize_exts(&draft.exts).join(",")
+                    } else {
+                        draft.type_ref()
+                    };
+                    (
+                        if kind_is_file {
+                            sa::MATCH_FILE_EXT
+                        } else {
+                            sa::MATCH_TEXT_TYPE
+                        },
+                        value,
+                    )
+                };
+                let mut config_holder = self.config.clone();
+                let Some(config) = config_holder.as_mut() else {
+                    return;
+                };
+                match_types_edit::apply(config, &draft);
+                self.config = config_holder;
+                self.mt_status = None;
+                self.save_now(context);
+
+                if with_behavior {
+                    // 「保存并创建专属行为」：建一个强绑定本类型的行为包
+                    // （基础动作取当前覆盖集首个的基础动作，模板留空由用户后续在行为库补）
+                    let base_action = sa::covering(&self.catalog, match_type, &match_value)
+                        .first()
+                        .map(|pack| self.catalog.base_action_of(&pack.id))
+                        .unwrap_or_else(|| "run".to_string());
+                    let applies = if match_type == sa::MATCH_TEXT_TYPE {
+                        crate::models::BehaviorAppliesTo {
+                            kind: sa::MATCH_TEXT_TYPE.to_string(),
+                            value: if draft.kind == "text" {
+                                Some("plain".to_string())
+                            } else {
+                                Some(match_value.clone())
+                            },
+                            exts: None,
+                            is_default: false,
+                        }
+                    } else {
+                        crate::models::BehaviorAppliesTo {
+                            kind: sa::MATCH_FILE_EXT.to_string(),
+                            value: None,
+                            exts: Some(sa::normalize_exts(&match_value)),
+                            is_default: false,
+                        }
+                    };
+                    let pack = crate::models::BehaviorPack {
+                        id: draft.id.clone(),
+                        name: draft.label.clone(),
+                        spec_version: 1,
+                        applies_to: vec![applies],
+                        entry: crate::models::BehaviorEntry {
+                            kind: "builtin".to_string(),
+                            action: Some(base_action),
+                            ..Default::default()
+                        },
+                        bound_type_id: Some(draft.type_ref()),
+                        source: Some("user".to_string()),
+                        ..Default::default()
+                    };
+                    if let Some(port) = self.port {
+                        let _ = context.spawn_background(move |_token| {
+                            let api = HttpSettingsApi::new(port);
+                            let response = api.create_behavior(&pack);
+                            match response.success {
+                                true => Message::BhReloaded(Ok(())),
+                                false => Message::BhReloaded(Err(response
+                                    .error_message
+                                    .unwrap_or_else(|| format!("HTTP {}", response.status)))),
+                            }
+                        });
+                    }
+                }
+                // 重新载入草稿为「编辑既有」态（新建后 id 已落库）
+                let index = self
+                    .config
+                    .as_ref()
+                    .and_then(|config| config.match_types.iter().position(|mt| mt.id == draft.id));
+                self.mt_pick_set(index.map(|index| {
+                    match_types_edit::MatchTypeDraft::from_existing(
+                        index,
+                        &self.config.as_ref().unwrap().match_types[index],
+                    )
+                }));
+            }
+            Message::MtDelete => {
+                let Some(draft) = self.mt_draft.clone() else {
+                    return;
+                };
+                if draft.index == match_types_edit::NEW_INDEX {
+                    return;
+                }
+                let mut config_holder = self.config.clone();
+                let deleted = config_holder
+                    .as_mut()
+                    .and_then(|config| match_types_edit::delete(config, draft.index));
+                let Some(type_id) = deleted else {
+                    return;
+                };
+                self.config = config_holder;
+                // 级联删同名专属行为包（bound_type_id 命中）
+                if let Some(port) = self.port {
+                    let type_ref = format!("type:{type_id}");
+                    let bound = self
+                        .catalog
+                        .user
+                        .iter()
+                        .find(|pack| pack.bound_type_id.as_deref() == Some(type_ref.as_str()))
+                        .map(|pack| pack.id.clone());
+                    if let Some(behavior_id) = bound {
+                        let _ = context.spawn_background(move |_token| {
+                            let api = HttpSettingsApi::new(port);
+                            let _ = api.delete_behavior(&behavior_id);
+                            let _ = api.apply_behaviors();
+                            Message::Noop
+                        });
+                    }
+                }
+                self.mt_draft = None;
+                self.save_now(context);
+            }
+            Message::MtTest(content) => {
+                self.mt_test = content;
+            }
+            Message::MtTestRun => {
+                let Some(port) = self.port else {
+                    return;
+                };
+                if self.mt_test.trim().is_empty() {
+                    self.mt_test_result = Some(Err(i18n::t("2570")));
+                    return;
+                }
+                // 编辑中快照：把草稿 apply 进克隆配置（未保存的类型也能参与匹配，
+                // 复刻 Go 端 selectedActionTestRequest 的 snapshot-priority 语义）
+                let Some(draft) = self.mt_draft.clone() else {
+                    return;
+                };
+                let mut snapshot = self.config.clone().unwrap_or_default();
+                match_types_edit::apply(&mut snapshot, &draft);
+                let is_file = draft.kind == "fileExt";
+                let match_types = snapshot.match_types.clone();
+                let selected_action = Some(snapshot.selected_action.clone());
+                let content = self.mt_test.clone();
+                let _ = context.spawn_background(move |_token| {
+                    let api = HttpSettingsApi::new(port);
+                    let response = api.test_selected_action(
+                        &content,
+                        is_file,
+                        selected_action.as_ref(),
+                        Some(&match_types),
+                    );
+                    Message::MtTestDone(match (response.success, response.value) {
+                        (true, Some(value)) if value.matched => {
+                            Ok(value.preview.unwrap_or_default())
+                        }
+                        (true, _) => Ok(String::new()),
+                        (_, _) => Err(response
+                            .error_message
+                            .unwrap_or_else(|| format!("HTTP {}", response.status))),
+                    })
+                });
+            }
+            Message::MtTestDone(result) => {
+                self.mt_test_result = Some(result);
+            }
+            // ---------------------------------------------------------- 行为库
+            Message::BehaviorsOpen => {
+                self.bh_dialog = true;
+                self.bh_status = None;
+                self.bh_pick = None;
+                self.bh_draft = None;
+            }
+            Message::BehaviorsClose => {
+                self.bh_dialog = false;
+                self.bh_pick = None;
+                self.bh_draft = None;
+                self.bh_status = None;
+            }
+            Message::BhPick(pick) => {
+                self.bh_pick = pick;
+                let merged: Vec<&crate::models::BehaviorPack> = self.catalog.packs().collect();
+                self.bh_draft = pick.and_then(|index| {
+                    merged.get(index).map(|pack| {
+                        let mut draft = behaviors_edit::BehaviorDraft::from_pack(pack);
+                        draft.index = index;
+                        draft
+                    })
+                });
+                self.bh_status = None;
+            }
+            Message::BhNew => {
+                self.bh_draft = Some(behaviors_edit::BehaviorDraft::new_draft());
+                self.bh_pick = None;
+                self.bh_status = None;
+            }
+            Message::BhName(value) => self.bh_edit_draft(|draft| draft.name = value),
+            Message::BhId(value) => self.bh_edit_draft(|draft| draft.id = value),
+            Message::BhDescription(value) => self.bh_edit_draft(|draft| draft.description = value),
+            Message::BhAppliesKind(row, index) => {
+                let kind = if index == 1 { "fileExt" } else { "textType" };
+                self.bh_edit_draft(|draft| {
+                    if let Some(slot) = draft.applies.get_mut(row) {
+                        slot.kind = kind.to_string();
+                    }
+                });
+            }
+            Message::BhAppliesValue(row, value) => {
+                self.bh_edit_draft(|draft| {
+                    if let Some(slot) = draft.applies.get_mut(row) {
+                        slot.value = value;
+                    }
+                });
+            }
+            Message::BhAppliesDefault(row, value) => {
+                self.bh_edit_draft(|draft| {
+                    if let Some(slot) = draft.applies.get_mut(row) {
+                        slot.is_default = value;
+                    }
+                });
+            }
+            Message::BhAppliesAdd => self.bh_edit_draft(|draft| {
+                draft.applies.push(behaviors_edit::AppliesDraft {
+                    kind: "textType".to_string(),
+                    ..Default::default()
+                });
+            }),
+            Message::BhAppliesRemove(row) => self.bh_edit_draft(|draft| {
+                if draft.applies.len() > 1 {
+                    draft.applies.remove(row);
+                }
+            }),
+            Message::BhBaseAction(index) => {
+                let options = behaviors_edit::base_action_options(&self.catalog);
+                self.bh_edit_draft(|draft| {
+                    if let Some(action) = options.get(index) {
+                        draft.base_action = action.clone();
+                    }
+                });
+            }
+            Message::BhTemplate(value) => self.bh_edit_draft(|draft| draft.template = value),
+            Message::BhWorkingDir(value) => self.bh_edit_draft(|draft| draft.working_dir = value),
+            Message::BhSave => {
+                let Some(draft) = self.bh_draft.clone() else {
+                    return;
+                };
+                let is_new = draft.index == behaviors_edit::NEW_INDEX;
+                if !is_new {
+                    // 内置包只读（1103_only；后端也会 404 拒绝）
+                    let is_builtin = self.catalog.builtin.iter().any(|pack| pack.id == draft.id);
+                    if is_builtin {
+                        self.bh_status = Some((i18n::t("1103_only"), true));
+                        return;
+                    }
+                }
+                if let Err(reason) = behaviors_edit::validate(&draft) {
+                    self.bh_status = Some((reason, true));
+                    return;
+                }
+                let Some(port) = self.port else {
+                    return;
+                };
+                let pack = draft.to_pack();
+                let id = pack.id.clone();
+                self.bh_saving = true;
+                let _ = context.spawn_background(move |_token| {
+                    let api = HttpSettingsApi::new(port);
+                    let response = if is_new {
+                        api.create_behavior(&pack)
+                    } else {
+                        api.update_behavior(&id, &pack)
+                    };
+                    Message::BhSaved(if response.success {
+                        Ok(())
+                    } else {
+                        Err(response
+                            .error_message
+                            .unwrap_or_else(|| format!("HTTP {}", response.status)))
+                    })
+                });
+            }
+            Message::BhSaved(result) => {
+                self.bh_saving = false;
+                match result {
+                    Ok(()) => {
+                        self.bh_status = None;
+                        self.reload_catalog(context);
+                    }
+                    Err(reason) => self.bh_status = Some((reason, true)),
+                }
+            }
+            Message::BhDelete => {
+                let Some(draft) = self.bh_draft.clone() else {
+                    return;
+                };
+                let Some(port) = self.port else {
+                    return;
+                };
+                let id = draft.id.clone();
+                self.bh_saving = true;
+                let _ = context.spawn_background(move |_token| {
+                    let api = HttpSettingsApi::new(port);
+                    let response = api.delete_behavior(&id);
+                    Message::BhSaved(if response.success {
+                        Ok(())
+                    } else {
+                        Err(response
+                            .error_message
+                            .unwrap_or_else(|| format!("HTTP {}", response.status)))
+                    })
+                });
+            }
+            Message::BhApplyNow => {
+                let Some(port) = self.port else {
+                    return;
+                };
+                let _ = context.spawn_background(move |_token| {
+                    let api = HttpSettingsApi::new(port);
+                    let response = api.apply_behaviors();
+                    Message::BhApplied(if response.success {
+                        Ok(())
+                    } else {
+                        Err(response
+                            .error_message
+                            .unwrap_or_else(|| format!("HTTP {}", response.status)))
+                    })
+                });
+            }
+            Message::BhApplied(result) => match result {
+                // 1101_applied 已含「若未恢复请托盘重载」引导
+                Ok(()) => self.bh_status = Some((i18n::t("1101_applied"), false)),
+                Err(reason) => self.bh_status = Some((reason, true)),
+            },
+            Message::BhReloaded(result) => {
+                if let Err(reason) = result {
+                    self.bh_status = Some((reason, true));
+                }
+                self.reload_catalog(context);
+            }
+            // ---------------------------------------------------------- 指南编辑
+            Message::GuideEditOpen => {
+                self.guide_edit_text = self.doc_md.clone();
+                self.guide_edit_open = true;
+            }
+            Message::GuideEditValue(value) => self.guide_edit_text = value,
+            Message::GuideEditReset => {
+                // 复刻旧 `OverviewEditWindow`：清空 = 恢复默认文档（引擎回落站内 config_doc.md）
+                self.guide_edit_text.clear();
+                if let Some(config) = self.config.as_mut() {
+                    config.overview_doc_md = String::new();
+                }
+                self.doc_md.clear();
+                self.guide_edit_open = false;
+                self.save_now(context);
+            }
+            Message::GuideEditClose => self.guide_edit_open = false,
+            Message::GuideEditSave => {
+                let text = std::mem::take(&mut self.guide_edit_text);
+                self.doc_md = text.clone();
+                self.guide_edit_open = false;
+                if let Some(config) = self.config.as_mut() {
+                    config.overview_doc_md = text;
+                }
+                self.save_now(context);
+            }
+            // ---------------------------------------------------------- 自定义热键动作编辑
+            Message::CustomHotkeyEdit(row) => {
+                // 编辑目标切换为 keymap id=1 的第 row 行（current_keymap_id 的 override）
+                let hotkey = self
+                    .config
+                    .as_ref()
+                    .and_then(|config| config.keymaps.iter().find(|km| km.id == 1))
+                    .and_then(|keymap| keymap.hotkeys.keys().nth(row).cloned());
+                let Some(hotkey) = hotkey else {
+                    return;
+                };
+                self.hotkey_editor_row = Some(row);
+                self.selected_hotkey = Some(hotkey);
+                self.window_group_id = 0;
+            }
+            Message::CustomHotkeyEditClose => {
+                self.hotkey_editor_row = None;
+                self.selected_hotkey = None;
             }
             // ---------------------------------------------------------- 插件页
             Message::PluginsReload => {
@@ -719,10 +1716,12 @@ impl Component for Shell {
                     Ok(catalog) => {
                         self.plugins_error = plugins::join_errors(catalog.errors.as_ref());
                         self.plugin_catalog = Some(*catalog);
+                        self.plugins_action_error = None;
                     }
                     Err(reason) => {
+                        // 目录加载失败**保留既有卡片**只加告警（复刻 `PluginsPageViewModel`：
+                        // 失败早退、旧列表不清）
                         self.plugins_error = Some(reason);
-                        self.plugin_catalog = None;
                     }
                 }
             }
@@ -773,17 +1772,18 @@ impl Component for Shell {
                     self.reload_plugins(context);
                 }
                 Err(reason) => {
-                    self.plugins_error = Some(format!("{}: {reason}", i18n::t("2436")));
+                    self.plugins_action_error = Some(format!("{}: {reason}", i18n::t("2436")));
                 }
             },
             Message::PluginImport => {
                 let Some(port) = self.port else {
                     return;
                 };
-                // 文件选择是**同步模态**对话（必须在 UI 线程弹出）；选定后再把字节交给后台 POST
+                // 文件选择是**同步模态**对话（必须在 UI 线程弹出）；选定后再把字节交给后台 POST。
+                // 过滤器显示名走 i18n 2437（旧版 `KeyFlux 插件包`），不再硬编码中文。
                 let picked = platform::file_dialog::pick_open_file(
                     &i18n::t("2427"),
-                    platform::file_dialog::ZIP_FILTER,
+                    &format!("{}\0*.zip\0\0", i18n::t("2437")),
                 );
                 let Some(path) = picked else {
                     return;
@@ -791,7 +1791,7 @@ impl Component for Shell {
                 let bytes = match std::fs::read(&path) {
                     Ok(bytes) => bytes,
                     Err(error) => {
-                        self.plugins_error = Some(format!("{}: {error}", i18n::t("2432")));
+                        self.plugins_action_error = Some(format!("{}: {error}", i18n::t("2432")));
                         return;
                     }
                 };
@@ -814,11 +1814,13 @@ impl Component for Shell {
             Message::PluginImported(result) => match result {
                 Ok(name) => {
                     self.plugins_error = None;
+                    self.plugins_action_error = None;
                     self.plugin_status = Some(i18n::t_fmt("2431", &[&name]));
-                    self.reload_plugins(context);
+                    // 刷新**保留**刚设的成功回显（此前 reload 先清 status ⇒ 横幅永远看不到）
+                    self.refresh_plugins(context);
                 }
                 Err(reason) => {
-                    self.plugins_error = Some(format!("{}: {reason}", i18n::t("2432")));
+                    self.plugins_action_error = Some(format!("{}: {reason}", i18n::t("2432")));
                 }
             },
             // ---------------------------------------------------------- 插件市场
@@ -876,7 +1878,7 @@ impl Component for Shell {
                             entry.is_installed = true;
                         }
                         // 插件页同步刷新（新装的插件应出现在列表里）
-                        self.reload_plugins(context);
+                        self.refresh_plugins(context);
                     }
                     Err(reason) => {
                         self.market_error = Some(format!("{}: {reason}", i18n::t("2432")));
@@ -886,6 +1888,8 @@ impl Component for Shell {
             Message::MarketClosed => {
                 self.market_open = false;
                 self.market_installing = None;
+                // 关闭市场后无条件刷新插件页（复刻 `OnMarketClosed` 的 ReloadAsync）
+                self.refresh_plugins(context);
             }
             // ---------------------------------------------------------- 插件设置对话框
             Message::PsValue(index, value) => {
@@ -894,12 +1898,13 @@ impl Component for Shell {
                 }
             }
             Message::PsPickFile(index) => {
-                // 过滤器来自后端声明；未声明则不限类型
+                // 过滤器来自后端声明；转成 Win32 双 NUL 串（复刻 ExtOf：`"everything.exe"`
+                // → 描述 + `*.exe`，此前原样直传导致对话框异常）
                 let filter = self
                     .ps_rows
                     .get(index)
                     .and_then(|(setting, _)| setting.filter.clone())
-                    .filter(|filter| !filter.is_empty())
+                    .map(|declared| plugins::file_dialog_filter(&declared))
                     .unwrap_or_else(|| platform::file_dialog::ALL_FILES_FILTER.to_string());
                 if let Some(path) = platform::file_dialog::pick_open_file(&i18n::t("2583"), &filter)
                     && let Some(slot) = self.ps_rows.get_mut(index)
@@ -933,9 +1938,13 @@ impl Component for Shell {
             Message::PsClosed(result) => {
                 if result != ContentDialogResult::Primary {
                     self.ps_open = false;
+                    self.ps_error = None;
                     return;
                 }
-                // 本地即时校验（后端仍是权威；失败 → 原样重开供修正）
+                if self.ps_saving {
+                    return; // 保存进行中，防重复提交
+                }
+                // 本地即时校验（后端仍是权威；失败 → 弹窗保持打开供修正）
                 let english = matches!(i18n::language(), i18n::Lang::En);
                 for (setting, value) in &self.ps_rows {
                     if let Some(reason) = plugins::validate_setting(setting, value) {
@@ -956,7 +1965,9 @@ impl Component for Shell {
                     .iter()
                     .map(|(setting, value)| (setting.key.clone(), value.clone()))
                     .collect();
-                self.ps_open = false;
+                // 复刻旧版「保存期间窗口保持打开，后端拒绝也不关」：弹窗保持，
+                // `PsSaved(Ok)` 才关闭（Err 时 ps_error 已在弹窗内显示）
+                self.ps_saving = true;
                 self.ps_error = None;
                 let _ = context.spawn_background(move |_token| {
                     let api = HttpSettingsApi::new(port);
@@ -970,16 +1981,20 @@ impl Component for Shell {
                     })
                 });
             }
-            Message::PsSaved(result) => match result {
-                Ok(()) => {
-                    self.ps_open = false;
-                    self.ps_error = None;
+            Message::PsSaved(result) => {
+                self.ps_saving = false;
+                match result {
+                    Ok(()) => {
+                        self.ps_open = false;
+                        self.ps_error = None;
+                    }
+                    Err(reason) => {
+                        // 后端拒绝 → 弹窗保持打开供修正（值未丢）
+                        self.ps_error = Some(format!("{}: {reason}", i18n::t("2585")));
+                        self.ps_open = true;
+                    }
                 }
-                Err(reason) => {
-                    self.ps_error = Some(format!("{}: {reason}", i18n::t("2585")));
-                    self.ps_open = true; // 后端拒绝 → 重开供修正
-                }
-            },
+            }
             Message::PluginConfigure(id) => {
                 if id == plugins::QUICK_SWITCH_ID {
                     // 打开即深拷贝出草稿（副本编辑，取消不影响真源）
@@ -1059,28 +2074,42 @@ impl Component for Shell {
                 }
             }
             Message::QsClearHistory => {
-                // 一次性动作：截断 <部署根>/data/quickswitch/history.tsv（文件保留）
+                // 一次性动作：截断 <部署根>/data/quickswitch/history.tsv（文件保留）。
+                // 错误写进**弹窗内部**（此前写页面横幅，被打开中的 ContentDialog 遮蔽）
                 let outcome = match &self.data_root {
                     Some(root) => plugins::clear_history(root),
                     None => Err("未确定部署根目录".to_string()),
                 };
                 if let Err(reason) = outcome {
-                    self.plugins_error = Some(format!("{}: {reason}", i18n::t("2417")));
+                    self.qs_error = Some(format!("{}: {reason}", i18n::t("2417")));
                 }
             }
             Message::QsClosed(result) => {
-                let draft = self.qs_draft.take();
-                if result == ContentDialogResult::Primary
-                    && let Some(draft) = draft
-                {
-                    let changed = self
-                        .config
-                        .as_mut()
-                        .map(|config| plugins::commit_draft(config, &draft))
-                        .unwrap_or(false);
-                    if changed {
-                        self.save_now(context);
-                    }
+                if result != ContentDialogResult::Primary {
+                    self.qs_draft = None;
+                    self.qs_error = None;
+                    return;
+                }
+                if self.qs_draft.is_none() {
+                    return;
+                }
+                // 复刻旧版语义：保存期间**草稿保留、弹窗保持打开**，`SaveFinished(Ok)`
+                // 才关闭（见其 Ok 分支清除 `qs_draft`）；无变更时直接丢弃草稿关闭。
+                let changed = self
+                    .qs_draft
+                    .as_ref()
+                    .and_then(|draft| {
+                        self.config
+                            .as_mut()
+                            .map(|config| plugins::commit_draft(config, draft))
+                    })
+                    .unwrap_or(false);
+                if changed {
+                    self.qs_error = None;
+                    self.save_now(context);
+                } else {
+                    self.qs_draft = None;
+                    self.qs_error = None;
                 }
             }
             // ---------------------------------------------------------- 选项页
@@ -1133,9 +2162,8 @@ impl Component for Shell {
                     self.catalog = *catalog;
                     // 目录到达后重置两卡选中（covering 列表会变）
                 }
-                Err(reason) => {
-                    // 目录拉取失败：页面仍可用（下拉为空），仅提示
-                    self.notice = Some(reason);
+                Err(_reason) => {
+                    // 目录拉取失败：页面仍可用（下拉为空）；对话框内失败经 bh_status 呈现
                 }
             },
         }
@@ -1185,18 +2213,28 @@ impl Component for Shell {
                 self.quick_switch_dialog(context),
                 self.market_dialog(context),
                 self.plugin_settings_dialog(context),
+                self.sa_delete_dialog(context),
+                self.sa_add_dialog(context),
+                self.sa_match_types_dialog(context),
+                self.sa_behaviors_dialog(context),
+                self.guide_edit_dialog(context),
+                self.custom_hotkey_dialog(context),
             ))
     }
 }
 
 impl Shell {
-    /// 侧栏底部：分隔线 + 保存提示 + 保存按钮（旧 `DockPanel.Dock="Bottom"` 区）。
+    /// 侧栏底部：分隔线 + 保存提示（成功绿 / 失败红）+ 保存按钮（旧 `DockPanel.Dock="Bottom"` 区）。
     fn pane_footer(&self, context: &mut ViewContext<Self>) -> View {
         let notice: View = match &self.notice {
             Some(text) => TextBlock::new()
                 .text(text.clone())
                 .font_size(theme::FONT_CAPTION)
-                .foreground(theme::solid(theme::MUTED_GREEN))
+                .foreground(if self.notice_error {
+                    theme::solid(theme::ERROR_CRIMSON)
+                } else {
+                    theme::solid(theme::MUTED_GREEN)
+                })
                 .text_wrapping(TextWrapping::Wrap)
                 .into(),
             None => View::empty(),
@@ -1244,6 +2282,11 @@ impl Shell {
                 .horizontal_alignment(HorizontalAlignment::Center)
                 .vertical_alignment(VerticalAlignment::Center)
                 .children((
+                    // 旧错误页的 42px ⚠ 图标（`MainWindow.axaml:208-212`）
+                    TextBlock::new()
+                        .text("⚠")
+                        .font_size(42.0)
+                        .horizontal_alignment(HorizontalAlignment::Center),
                     TextBlock::new()
                         .text(i18n::t("919"))
                         .font_size(theme::FONT_SUBTITLE)
@@ -1286,7 +2329,7 @@ impl Shell {
 
         // 使用指南：消费 services::markdown 的块模型 → 原生控件（含链接/图片）。
         if entry.kind == PageKind::Guide {
-            return self.guide_view();
+            return self.guide_view(context);
         }
 
         // 插件页：统一插件卡（内置 QuickSwitch + 用户插件）
@@ -1326,16 +2369,34 @@ impl Shell {
         };
         let sa_config = &config.selected_action;
 
-        let header: View = keymap_view::page_header(&i18n::t("914"), Some(&i18n::t("960")));
+        // 页头右侧三入口（复刻旧页头 Grid：2519 管理匹配类型 / 1083 管理行为 / 1105 添加映射）
+        let actions: View = selected_action_view::page_actions(
+            context.message(Message::MatchTypesOpen),
+            context.message(Message::BehaviorsOpen),
+            context.message(Message::SaAddOpen),
+        );
+        let header: View = StackPanel::new().spacing(6.0).children((
+            keymap_view::page_header(&i18n::t("914"), Some(&i18n::t("960"))),
+            actions,
+        ));
 
-        // 热键提示条：未保存（1077）优先于空热键警示（976）
-        let hint = if self.hotkey_pending_save {
+        // 热键提示条：未保存（1077）优先于冲突（1025）与空热键警示（976）
+        let mut hint = if self.hotkey_pending_save {
             i18n::t("1077")
+        } else if self.sa_hotkey_conflict {
+            i18n::t("1025")
         } else if sa_config.hotkey.is_empty() {
             i18n::t("976")
         } else {
             String::new()
         };
+        if self.sa_hotkey_conflict && self.hotkey_pending_save {
+            hint = format!(
+                "{hint}
+{}",
+                i18n::t("1025")
+            );
+        }
         let hotkey: View = selected_action_view::hotkey_card(
             &sa_config.hotkey,
             sa_config.enable,
@@ -1389,10 +2450,13 @@ impl Shell {
         };
 
         let mapping = sa::find_mapping_for_type(config, match_type, &sel_id);
+        let is_selected_type = self.sa_selected_id(match_type).as_deref() == Some(sel_id.as_str());
         let header: View = selected_action_view::card_header(
             &sa::match_type_label(match_type),
             mapping.is_some(),
-            context.message(Message::SaDeleteType { match_type }),
+            mapping.is_some(),
+            context.message(Message::SaPlaySample),
+            context.message(Message::SaDeleteAsk),
         );
         let toggles_area: View = selected_action_view::toggles_row(&toggles, &sel_id, |id| {
             context.message(Message::SaSelectToggle { match_type, id })
@@ -1400,37 +2464,94 @@ impl Shell {
 
         // 详情面板
         let detail: View = if let Some(mapping) = mapping {
+            let covering = sa::covering(&self.catalog, match_type, &mapping.match_value);
             let mut rows: Vec<(String, View)> = Vec::new();
+            let entry_count = mapping.entries.len();
             for (index, entry) in mapping.entries.iter().enumerate() {
                 let behavior = entry.behavior.clone();
+                // 行为切换下拉：覆盖行为全集；当前行为不在覆盖集（脏值）时追加兜底项
+                let mut switch_items: Vec<String> = covering
+                    .iter()
+                    .map(|pack| self.catalog.label_for(&pack.id))
+                    .collect();
+                let current_in_covering = covering.iter().any(|pack| pack.id == behavior);
+                let switch_selected = if current_in_covering {
+                    covering.iter().position(|pack| pack.id == behavior)
+                } else {
+                    switch_items.push(self.catalog.label_for(&behavior));
+                    Some(switch_items.len() - 1)
+                };
                 rows.push((
                     format!("entry-{index}"),
                     // 旧行编辑器套 `rowEditor` 子卡（Ivory 面 + 圆角 4 + Padding 10）
                     selected_action_view::row_editor(selected_action_view::entry_row(
                         index,
-                        &self.catalog.label_for(&behavior),
+                        switch_items,
+                        switch_selected,
                         &entry.action_value,
-                        sa::BadgeColor::for_base_action(&self.catalog.base_action_of(&behavior)),
+                        &entry.working_dir,
                         self.catalog.is_no_value(&behavior),
+                        index > 0,
+                        index + 1 < entry_count,
+                        context.callback(move |pick: Option<usize>| match pick {
+                            Some(pick) => Message::SaEntrySwitch {
+                                match_type,
+                                index,
+                                pick,
+                            },
+                            None => Message::Noop,
+                        }),
                         context.callback(move |value: String| Message::SaEntryValue {
                             match_type,
                             index,
                             value,
+                        }),
+                        context.callback(move |value: String| Message::SaEntryWorkingDir {
+                            match_type,
+                            index,
+                            value,
+                        }),
+                        context.message(Message::SaEntryMove {
+                            match_type,
+                            index,
+                            delta: -1,
+                        }),
+                        context.message(Message::SaEntryMove {
+                            match_type,
+                            index,
+                            delta: 1,
                         }),
                         context.message(Message::SaRemoveEntry { match_type, index }),
                     )),
                 ));
             }
 
-            let covering = sa::covering(&self.catalog, match_type, &mapping.match_value);
+            // 「添加行为」：自动选首个未用覆盖行为（pick 为 None 时），禁用原因 1107/1119
             let picked = self.sa_picked(match_type, covering.len());
-            let can_add = mapping.entries.len() < 9 && picked.is_some();
+            let first_unused = covering.iter().position(|pack| {
+                !mapping
+                    .entries
+                    .iter()
+                    .any(|entry| entry.behavior == pack.id)
+            });
+            let effective_pick = picked.or(first_unused);
+            let full = mapping.entries.len() >= 9;
+            let exhausted = first_unused.is_none();
+            let hint = if full {
+                Some(i18n::t("1107"))
+            } else if exhausted {
+                Some(i18n::t("1119"))
+            } else {
+                None
+            };
+            let can_add = !full && !exhausted;
             rows.push((
                 "add".to_string(),
                 selected_action_view::add_behavior_row(
                     self.sa_covering_labels(match_type, &mapping.match_value),
-                    picked,
+                    effective_pick,
                     can_add,
+                    hint,
                     context.callback(move |pick: Option<usize>| Message::SaPickBehavior {
                         match_type,
                         pick,
@@ -1462,6 +2583,7 @@ impl Shell {
                         self.sa_covering_labels(match_type, &match_value),
                         picked,
                         can_add,
+                        None,
                         context.callback(move |pick: Option<usize>| Message::SaPickBehavior {
                             match_type,
                             pick,
@@ -1471,11 +2593,29 @@ impl Shell {
                 ))
         };
 
-        selected_action_view::type_card(StackPanel::new().spacing(8.0).children((
-            header,
-            toggles_area,
-            detail,
-        )))
+        let mut card_children: Vec<(usize, View)> =
+            vec![(0, header), (1, toggles_area), (2, detail)];
+        // 页内状态条（▶ 执行失败等）：仅渲染在**当前点亮**的卡上
+        if is_selected_type && let Some((text, is_error)) = &self.sa_status {
+            card_children.push((
+                card_children.len(),
+                TextBlock::new()
+                    .text(text.clone())
+                    .font_size(theme::FONT_CAPTION)
+                    .font_weight(FontWeight::SEMI_BOLD)
+                    .foreground(if *is_error {
+                        theme::solid(theme::ERROR_CRIMSON)
+                    } else {
+                        theme::terracotta()
+                    })
+                    .text_wrapping(TextWrapping::Wrap)
+                    .into(),
+            ));
+        }
+
+        selected_action_view::type_card(
+            StackPanel::new().spacing(8.0).keyed_children(card_children),
+        )
     }
 
     /// 当前卡「添加行为」下拉的有效选中（越界折叠为 `None`）。
@@ -1517,25 +2657,91 @@ impl Shell {
         }
     }
 
-    /// 立即保存（启用开关 / 删除映射；复刻旧版「立即保存」语义）。
+    /// 立即保存（启用开关 / 删除映射等即时语义；不受页脚保存的 1 秒节流限制）。
     fn save_now(&mut self, context: &ComponentContext<Self>) {
         let (Some(config), Some(port)) = (self.config.clone(), self.port) else {
             return;
         };
 
-        // 选项页皮肤字段校验（颜色 #RRGGBB / 数值 >= 0；旧版为自由文本框，此处收紧）
+        // 选项页皮肤字段校验（颜色 #RRGGBB / 数值 >= 0；错误文案用标签而非 JSON 键）
         for field in settings::SKIN_FIELDS {
             let value = settings::skin_get(&config.options.command_input_skin, field.key)
                 .unwrap_or_default();
             if let Some(reason) = settings::validate_skin_field(&field, value) {
-                self.settings_notice =
-                    Some(format!("{} ({}): {}", i18n::t("741"), field.key, reason));
+                self.settings_notice = Some(format!(
+                    "{} ({}): {}",
+                    i18n::t("741"),
+                    i18n::t(field.label_key),
+                    reason
+                ));
                 return;
             }
         }
 
         self.notice = None;
+        self.notice_error = false;
         let _ = context.spawn_background(move |_token| Message::SaveFinished(save(port, &config)));
+    }
+
+    /// 行为编辑尾随保存（800ms 防抖）：代际计数保证只有最新一次编辑会真正落盘，
+    /// 复刻旧版「所有修改经 SaveAsync 咽喉」的自动保存语义。
+    fn request_sa_throttled_save(&mut self, context: &ComponentContext<Self>) {
+        let generation = self
+            .sa_save_gen
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            + 1;
+        let generation_slot = std::sync::Arc::clone(&self.sa_save_gen);
+        let _ = context.spawn_background(move |_token| {
+            std::thread::sleep(Duration::from_millis(800));
+            // 已有更新的编辑 ⇒ 这一代失效（由最新一代的定时器落盘）
+            if generation_slot.load(std::sync::atomic::Ordering::SeqCst) == generation {
+                Message::SaSaveThrottled
+            } else {
+                Message::Noop
+            }
+        });
+    }
+
+    /// 匹配类型草稿整体替换（选中/新建切换时清状态）。
+    fn mt_pick_set(&mut self, draft: Option<match_types_edit::MatchTypeDraft>) {
+        self.mt_draft = draft;
+        self.mt_status = None;
+        self.mt_test_result = None;
+        self.mt_test.clear();
+    }
+
+    /// 就地编辑匹配类型草稿。
+    fn mt_edit_draft(&mut self, apply: impl FnOnce(&mut match_types_edit::MatchTypeDraft)) {
+        if let Some(draft) = self.mt_draft.as_mut() {
+            apply(draft);
+        }
+    }
+
+    /// 就地编辑行为草稿。
+    fn bh_edit_draft(&mut self, apply: impl FnOnce(&mut behaviors_edit::BehaviorDraft)) {
+        if let Some(draft) = self.bh_draft.as_mut() {
+            apply(draft);
+        }
+    }
+
+    /// 重拉行为目录（保存/删除/创建专属行为后）。
+    fn reload_catalog(&mut self, context: &ComponentContext<Self>) {
+        let Some(port) = self.port else {
+            return;
+        };
+        let _ = context.spawn_background(move |_token| {
+            let api = HttpSettingsApi::new(port);
+            let response = api.get_behaviors();
+            match response.value {
+                Some(value) => Message::BehaviorsLoaded(Ok(Box::new(sa::Catalog {
+                    builtin: value.builtin,
+                    user: value.user,
+                }))),
+                None => Message::BehaviorsLoaded(Err(response
+                    .error_message
+                    .unwrap_or_else(|| format!("HTTP {}", response.status)))),
+            }
+        });
     }
 
     /// 「添加行为」：把下拉选中的行为追加到当前类型的映射（未配置类型同时创建映射）。
@@ -1550,10 +2756,6 @@ impl Shell {
             MATCH_TEXT_TYPE => self.sa_text_pick,
             _ => self.sa_file_pick,
         };
-        let Some(pick) = pick else {
-            return;
-        };
-
         // 1) matchValue（不可变借用阶段）
         let match_value = match self.config.as_ref() {
             Some(config) => sa::find_mapping_for_type(config, match_type, &id)
@@ -1562,8 +2764,29 @@ impl Shell {
             None => return,
         };
 
-        // 2) 目录推导（catalog 不可变借用）
+        // 2) 目录推导（catalog 不可变借用）；未显式选择时自动取**首个未用**覆盖行为
+        //    （复刻 `AddEntry` 的 CanAddEntry 自动挑选）
         let covering = sa::covering(&self.catalog, match_type, &match_value);
+        let pick = match pick {
+            Some(pick) => Some(pick),
+            None => self
+                .config
+                .as_ref()
+                .and_then(|config| {
+                    sa::find_mapping_for_type(config, match_type, &id).map(|mapping| {
+                        covering.iter().position(|pack| {
+                            !mapping
+                                .entries
+                                .iter()
+                                .any(|entry| entry.behavior == pack.id)
+                        })
+                    })
+                })
+                .unwrap_or(None),
+        };
+        let Some(pick) = pick else {
+            return;
+        };
         let Some(pack) = covering.get(pick) else {
             return;
         };
@@ -1613,7 +2836,13 @@ impl Shell {
     // ---------------------------------------------------------- 动作编辑（键位图系共享）
 
     /// 当前页面对应的 keymap id（仅键位图系页面有）。
+    ///
+    /// 自定义热键动作编辑对话框打开时**覆盖**为 id=1（复刻 `ActionEditorWindow`
+    /// 把动作编辑面板指向 keymap 1 的宿主逻辑）。
     fn current_keymap_id(&self) -> Option<i32> {
+        if self.hotkey_editor_row.is_some() {
+            return Some(1);
+        }
         match self.nav.get(self.page_index)?.kind {
             PageKind::Keymap(id) | PageKind::Abbr(id) => Some(id),
             _ => None,
@@ -1725,6 +2954,647 @@ impl Shell {
             )
     }
 
+    /// 「删除映射」确认框（复刻 `ConfirmAsync`：1109 正文含规则名，确认才删除并保存）。
+    fn sa_delete_dialog(&self, context: &mut ViewContext<Self>) -> View {
+        if !self.sa_delete_confirm {
+            return View::empty();
+        }
+        let id = self
+            .sa_selected_id(MATCH_TEXT_TYPE)
+            .or_else(|| self.sa_selected_id(MATCH_FILE_EXT))
+            .unwrap_or_default();
+        let label = self
+            .config
+            .as_ref()
+            .and_then(|config| {
+                sa::build_toggles(config, MATCH_TEXT_TYPE)
+                    .into_iter()
+                    .chain(sa::build_toggles(config, MATCH_FILE_EXT))
+                    .find(|toggle| toggle.id == id)
+                    .map(|toggle| toggle.label)
+            })
+            .unwrap_or_else(|| id.clone());
+
+        ContentDialog::new()
+            .title(i18n::t("967"))
+            .primary_button_text(i18n::t("610"))
+            .close_button_text(i18n::t("611"))
+            .is_open(true)
+            .on_closed(context.callback(|result: ContentDialogResult| {
+                if result == ContentDialogResult::Primary {
+                    Message::SaDeleteConfirmed
+                } else {
+                    Message::SaDeleteCancelled
+                }
+            }))
+            .content(
+                TextBlock::new()
+                    .text(i18n::t_fmt("1109", &[&label]))
+                    .text_wrapping(TextWrapping::Wrap)
+                    .min_width(360.0),
+            )
+    }
+
+    /// 「添加映射」弹窗（复刻 `AddMappingVm` + `BehaviorPickVm`）：
+    /// 类型下拉（文件分组 → 内置特征 → 自定义）+ 条件值回显 + 行为勾选（勾选序 = 菜单序）。
+    fn sa_add_dialog(&self, context: &mut ViewContext<Self>) -> View {
+        let Some(draft) = self.sa_add.as_ref() else {
+            return View::empty();
+        };
+        let Some(config) = self.config.as_ref() else {
+            return View::empty();
+        };
+
+        let options = sa::add_type_options(config);
+        let labels: Vec<String> = options.iter().map(|option| option.label.clone()).collect();
+
+        let mut rows: Vec<(usize, View)> = Vec::new();
+        if let Some(error) = &draft.error {
+            rows.push((rows.len(), plugins_view::action_error(error)));
+        }
+
+        // 类型下拉
+        let type_combo: View = ComboBox::new()
+            .min_width(320.0)
+            .placeholder_text(i18n::t("1032"))
+            .items_source(labels)
+            .selected_index(draft.type_pick)
+            .on_selection_changed(context.callback(|pick: Option<usize>| Message::SaAddType(pick)))
+            .into();
+        rows.push((rows.len(), type_combo));
+
+        // 选中类型 → 条件值回显 + 行为勾选列表
+        if let Some(pick) = draft.type_pick
+            && let Some(option) = options.get(pick)
+        {
+            let (match_type, match_value) = sa::add_target(config, &option.id);
+            let condition_text = if match_type == sa::MATCH_TEXT_TYPE {
+                option.label.clone()
+            } else {
+                match_value.clone()
+            };
+            rows.push((
+                rows.len(),
+                TextBlock::new()
+                    .text(format!("{}: {}", i18n::t("1005"), condition_text))
+                    .font_size(theme::FONT_CAPTION)
+                    .foreground(theme::stone_gray())
+                    .text_wrapping(TextWrapping::Wrap)
+                    .into(),
+            ));
+
+            let covering = sa::covering(&self.catalog, &match_type, &match_value);
+            for (index, pack) in covering.iter().enumerate() {
+                let checked = draft.checked.contains(&pack.id);
+                let exhausted = draft.checked.len() >= 9 && !checked;
+                rows.push((
+                    rows.len(),
+                    CheckBox::new()
+                        .is_checked(checked)
+                        .is_enabled(!exhausted)
+                        .on_is_checked_changed(
+                            context.callback(move |value: bool| Message::SaAddToggle(index, value)),
+                        )
+                        .content(TextBlock::new().text(self.catalog.label_for(&pack.id))),
+                ));
+            }
+            if covering.is_empty() {
+                rows.push((
+                    rows.len(),
+                    TextBlock::new()
+                        .text(i18n::t("2517"))
+                        .font_size(theme::FONT_CAPTION)
+                        .foreground(theme::stone_gray())
+                        .text_wrapping(TextWrapping::Wrap)
+                        .into(),
+                ));
+            }
+        }
+
+        ContentDialog::new()
+            .title(i18n::t("1105"))
+            .primary_button_text(i18n::t("610"))
+            .close_button_text(i18n::t("611"))
+            .is_open(true)
+            .on_closed(context.callback(|result: ContentDialogResult| {
+                if result == ContentDialogResult::Primary {
+                    Message::SaAddConfirm
+                } else {
+                    Message::SaAddCancel
+                }
+            }))
+            .content(
+                ScrollViewer::new()
+                    .max_height(430.0)
+                    .min_width(480.0)
+                    .content(StackPanel::new().spacing(8.0).keyed_children(rows)),
+            )
+    }
+
+    /// 「管理匹配类型」对话框（复刻 `MatchTypesDialogWindow` + `MatchTypesDialogViewModel`）：
+    /// 类型列表 + 内联表单（名称/英文名/kind 胶囊/规则行/后缀串）+「试一下」+ 双保存路径。
+    /// `ContentDialog`：primary = 仅保存类型（2565），secondary = 保存并创建专属行为（2529）。
+    fn sa_match_types_dialog(&self, context: &mut ViewContext<Self>) -> View {
+        if !self.mt_dialog {
+            return View::empty();
+        }
+        let Some(config) = self.config.as_ref() else {
+            return View::empty();
+        };
+        let Some(draft) = self.mt_draft.as_ref() else {
+            return View::empty();
+        };
+
+        let mut rows: Vec<(usize, View)> = Vec::new();
+        if let Some((text, is_error)) = &self.mt_status {
+            rows.push((rows.len(), plugins_view::action_error(text)));
+            let _ = is_error;
+        }
+
+        // 类型列表（既有自定义类型）+ 新建（405）
+        let type_labels: Vec<String> = config
+            .match_types
+            .iter()
+            .map(|mt| {
+                if mt.label.is_empty() {
+                    mt.id.clone()
+                } else {
+                    mt.label.clone()
+                }
+            })
+            .collect();
+        let pick_index = (draft.index != match_types_edit::NEW_INDEX).then_some(draft.index);
+        rows.push((
+            rows.len(),
+            Grid::new()
+                .columns([GridLength::STAR, GridLength::Auto])
+                .children((
+                    {
+                        let combo: View = ComboBox::new()
+                            .min_width(260.0)
+                            .placeholder_text(i18n::t("2519"))
+                            .items_source(type_labels)
+                            .selected_index(pick_index)
+                            .on_selection_changed(
+                                context
+                                    .callback(|pick: Option<usize>| Message::MatchTypesPick(pick)),
+                            )
+                            .into();
+                        combo
+                    },
+                    Button::new()
+                        .grid_column(1)
+                        .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                        .on_click(context.message(Message::MtNew))
+                        .content(TextBlock::new().text(i18n::t("405"))),
+                )),
+        ));
+
+        // 表单
+        rows.push((
+            rows.len(),
+            settings_view::text_field(
+                i18n::t("2523"),
+                &draft.label,
+                context.callback(|value: String| Message::MtLabel(value)),
+            ),
+        ));
+        rows.push((
+            rows.len(),
+            settings_view::text_field(
+                i18n::t("2567"),
+                &draft.label_en,
+                context.callback(|value: String| Message::MtLabelEn(value)),
+            ),
+        ));
+
+        // kind：草稿态可切换（胶囊下拉），编辑态锁定（kind 决定引用语义）
+        if draft.index == match_types_edit::NEW_INDEX {
+            rows.push((
+                rows.len(),
+                settings_view::combo_row(
+                    i18n::t("2556"),
+                    &[i18n::t("2556"), i18n::t("2551")],
+                    usize::from(draft.kind == "fileExt"),
+                    context.callback(|pick: Option<usize>| Message::MtKind(pick.unwrap_or(0))),
+                ),
+            ));
+        } else {
+            rows.push((
+                rows.len(),
+                TextBlock::new()
+                    .text(format!(
+                        "{}: {}",
+                        i18n::t("1011"),
+                        if draft.kind == "fileExt" {
+                            i18n::t("2551")
+                        } else {
+                            i18n::t("2556")
+                        }
+                    ))
+                    .font_size(theme::FONT_CAPTION)
+                    .foreground(theme::stone_gray())
+                    .into(),
+            ));
+        }
+
+        if draft.kind == "fileExt" {
+            rows.push((
+                rows.len(),
+                settings_view::text_field(
+                    i18n::t("2528"),
+                    &draft.exts,
+                    context.callback(|value: String| Message::MtExts(value)),
+                ),
+            ));
+            rows.push((rows.len(), settings_view::hint_row(i18n::t("2561"))));
+        } else {
+            // 规则行：算子下拉（2512 equals / 2513 prefix / 2514 suffix / 2515 contains）+ 值 + ✕
+            let ops = [
+                i18n::t("2512"),
+                i18n::t("2513"),
+                i18n::t("2514"),
+                i18n::t("2515"),
+            ];
+            for (rule, (op, value)) in draft.rules.iter().enumerate() {
+                let op_index = ["equals", "prefix", "suffix", "contains"]
+                    .iter()
+                    .position(|candidate| candidate == op)
+                    .unwrap_or(3);
+                rows.push((
+                    rows.len(),
+                    Grid::new()
+                        .columns([GridLength::Pixel(140.0), GridLength::STAR, GridLength::Auto])
+                        .children((
+                            {
+                                let combo: View = ComboBox::new()
+                                    .items_source(ops.to_vec())
+                                    .selected_index(op_index)
+                                    .on_selection_changed(context.callback(
+                                        move |pick: Option<usize>| {
+                                            Message::MtRuleOp(rule, pick.unwrap_or(3))
+                                        },
+                                    ))
+                                    .into();
+                                combo
+                            },
+                            Border::new()
+                                .grid_column(1)
+                                .margin(Thickness::new(8.0, 0.0, 8.0, 0.0))
+                                .content(TextBox::new().text(value.clone()).on_text_changed(
+                                    context.callback(move |value: String| {
+                                        Message::MtRuleValue(rule, value)
+                                    }),
+                                )),
+                            Button::new()
+                                .grid_column(2)
+                                .is_enabled(draft.rules.len() > 1)
+                                .on_click(context.message(Message::MtRuleRemove(rule)))
+                                .content(
+                                    TextBlock::new()
+                                        .text("✕")
+                                        .foreground(theme::solid(theme::ERROR_CRIMSON)),
+                                ),
+                        )),
+                ));
+            }
+            rows.push((
+                rows.len(),
+                Button::new()
+                    .on_click(context.message(Message::MtRuleAdd))
+                    .content(TextBlock::new().text(i18n::t("405"))),
+            ));
+        }
+
+        // 「试一下」（2560）：示例内容 + 提交 + 结果
+        rows.push((
+            rows.len(),
+            Grid::new()
+                .columns([GridLength::STAR, GridLength::Auto])
+                .children((
+                    TextBox::new()
+                        .grid_column(0)
+                        .text(self.mt_test.clone())
+                        .placeholder_text(i18n::t("2557"))
+                        .on_text_changed(context.callback(|value: String| Message::MtTest(value))),
+                    Button::new()
+                        .grid_column(1)
+                        .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                        .on_click(context.message(Message::MtTestRun))
+                        .content(TextBlock::new().text(i18n::t("2560"))),
+                )),
+        ));
+        if let Some(result) = &self.mt_test_result {
+            let text = match result {
+                Ok(preview) if preview.is_empty() => {
+                    format!("{}（{}）", i18n::t("2559"), i18n::t("920"))
+                }
+                Ok(preview) => format!("{}: {preview}", i18n::t("2558")),
+                Err(reason) => reason.clone(),
+            };
+            rows.push((
+                rows.len(),
+                TextBlock::new()
+                    .text(text)
+                    .font_size(theme::FONT_CAPTION)
+                    .foreground(match result {
+                        Ok(_) => theme::solid(theme::MUTED_GREEN),
+                        Err(_) => theme::solid(theme::ERROR_CRIMSON),
+                    })
+                    .text_wrapping(TextWrapping::Wrap)
+                    .into(),
+            ));
+        }
+
+        ContentDialog::new()
+            .title(i18n::t("2519"))
+            .primary_button_text(i18n::t("2565"))
+            .secondary_button_text(i18n::t("2529"))
+            .close_button_text(i18n::t("611"))
+            .is_open(true)
+            .on_closed(
+                context.callback(|result: ContentDialogResult| match result {
+                    ContentDialogResult::Primary => Message::MtSave(false),
+                    ContentDialogResult::Secondary => Message::MtSave(true),
+                    _ => Message::MatchTypesClose,
+                }),
+            )
+            .content(
+                ScrollViewer::new()
+                    .max_height(460.0)
+                    .min_width(520.0)
+                    .content(StackPanel::new().spacing(8.0).keyed_children(rows)),
+            )
+    }
+
+    /// 「管理行为」对话框（复刻 `BehaviorLibraryWindow` 的主从编辑）：
+    /// 目录下拉（内置 ★ 标注）+ 新建 + 表单（ID/名称/描述/前提行/基础动作/模板/工作目录）
+    /// + 删除 + 立即生效（1094）。内置包只读（1103_only）。
+    fn sa_behaviors_dialog(&self, context: &mut ViewContext<Self>) -> View {
+        if !self.bh_dialog {
+            return View::empty();
+        }
+
+        let mut rows: Vec<(usize, View)> = Vec::new();
+        if let Some((text, is_error)) = &self.bh_status {
+            rows.push((rows.len(), plugins_view::action_error(text)));
+            let _ = is_error;
+        }
+
+        // 目录下拉 + 新建 + 立即生效
+        let labels: Vec<String> = self
+            .catalog
+            .packs()
+            .map(|pack| {
+                let source = if pack.source.as_deref() == Some("builtin") {
+                    i18n::t("1092")
+                } else {
+                    i18n::t("1093")
+                };
+                format!("({source}) {}", self.catalog.label_for(&pack.id))
+            })
+            .collect();
+        rows.push((
+            rows.len(),
+            Grid::new()
+                .columns([GridLength::STAR, GridLength::Auto, GridLength::Auto])
+                .children((
+                    {
+                        let combo: View = ComboBox::new()
+                            .min_width(280.0)
+                            .placeholder_text(i18n::t("1083"))
+                            .items_source(labels)
+                            .selected_index(self.bh_pick)
+                            .on_selection_changed(
+                                context.callback(|pick: Option<usize>| Message::BhPick(pick)),
+                            )
+                            .into();
+                        combo
+                    },
+                    Button::new()
+                        .grid_column(1)
+                        .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                        .on_click(context.message(Message::BhNew))
+                        .content(TextBlock::new().text(i18n::t("405"))),
+                    Button::new()
+                        .grid_column(2)
+                        .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                        .on_click(context.message(Message::BhApplyNow))
+                        .content(TextBlock::new().text(i18n::t("1094"))),
+                )),
+        ));
+
+        // 表单（草稿在位时渲染；内置包可看不可存）
+        if let Some(draft) = self.bh_draft.as_ref() {
+            let is_new = draft.index == behaviors_edit::NEW_INDEX;
+            let is_builtin = !is_new && self.catalog.builtin.iter().any(|pack| pack.id == draft.id);
+            if is_builtin {
+                rows.push((rows.len(), settings_view::hint_row(i18n::t("1103_only"))));
+            }
+
+            rows.push((
+                rows.len(),
+                settings_view::text_field(
+                    "ID",
+                    &draft.id,
+                    context.callback(|value: String| Message::BhId(value)),
+                ),
+            ));
+            rows.push((
+                rows.len(),
+                settings_view::text_field(
+                    i18n::t("2568"),
+                    &draft.name,
+                    context.callback(|value: String| Message::BhName(value)),
+                ),
+            ));
+            rows.push((
+                rows.len(),
+                settings_view::text_field(
+                    i18n::t("2523"),
+                    &draft.description,
+                    context.callback(|value: String| Message::BhDescription(value)),
+                ),
+            ));
+
+            // 前提行：类型（1032 文本特征 / 1031 文件后缀）+ 值 + ✕；底部追加
+            for (row, applies) in draft.applies.iter().enumerate() {
+                let kind_labels = [i18n::t("1032"), i18n::t("1031")];
+                rows.push((
+                    rows.len(),
+                    Grid::new()
+                        .columns([GridLength::Pixel(140.0), GridLength::STAR, GridLength::Auto])
+                        .children((
+                            {
+                                let combo: View = ComboBox::new()
+                                    .items_source(kind_labels.to_vec())
+                                    .selected_index(usize::from(applies.kind == "fileExt"))
+                                    .on_selection_changed(context.callback(
+                                        move |pick: Option<usize>| {
+                                            Message::BhAppliesKind(row, pick.unwrap_or(0))
+                                        },
+                                    ))
+                                    .into();
+                                combo
+                            },
+                            Border::new()
+                                .grid_column(1)
+                                .margin(Thickness::new(8.0, 0.0, 8.0, 0.0))
+                                .content(
+                                    TextBox::new().text(applies.value.clone()).on_text_changed(
+                                        context.callback(move |value: String| {
+                                            Message::BhAppliesValue(row, value)
+                                        }),
+                                    ),
+                                ),
+                            Button::new()
+                                .grid_column(2)
+                                .is_enabled(draft.applies.len() > 1)
+                                .on_click(context.message(Message::BhAppliesRemove(row)))
+                                .content(
+                                    TextBlock::new()
+                                        .text("✕")
+                                        .foreground(theme::solid(theme::ERROR_CRIMSON)),
+                                ),
+                        )),
+                ));
+            }
+            rows.push((
+                rows.len(),
+                Button::new()
+                    .on_click(context.message(Message::BhAppliesAdd))
+                    .content(TextBlock::new().text(i18n::t("405"))),
+            ));
+
+            // 基础动作 + 模板 + 工作目录
+            let base_options = behaviors_edit::base_action_options(&self.catalog);
+            let base_index = base_options
+                .iter()
+                .position(|action| *action == draft.base_action);
+            rows.push((
+                rows.len(),
+                settings_view::combo_row(
+                    i18n::t("1011"),
+                    &base_options,
+                    base_index.unwrap_or(0),
+                    context
+                        .callback(|pick: Option<usize>| Message::BhBaseAction(pick.unwrap_or(0))),
+                ),
+            ));
+            rows.push((
+                rows.len(),
+                settings_view::text_field(
+                    i18n::t("2532"),
+                    &draft.template,
+                    context.callback(|value: String| Message::BhTemplate(value)),
+                ),
+            ));
+            rows.push((
+                rows.len(),
+                settings_view::text_field(
+                    i18n::t("2533"),
+                    &draft.working_dir,
+                    context.callback(|value: String| Message::BhWorkingDir(value)),
+                ),
+            ));
+            if !is_new {
+                rows.push((
+                    rows.len(),
+                    Button::new()
+                        .on_click(context.message(Message::BhDelete))
+                        .content(
+                            TextBlock::new()
+                                .text(i18n::t("967"))
+                                .foreground(theme::solid(theme::ERROR_CRIMSON)),
+                        ),
+                ));
+            }
+        }
+
+        ContentDialog::new()
+            .title(i18n::t("1083"))
+            .primary_button_text(i18n::t("610"))
+            .close_button_text(i18n::t("611"))
+            .is_open(true)
+            .on_closed(context.callback(|result: ContentDialogResult| {
+                if result == ContentDialogResult::Primary {
+                    Message::BhSave
+                } else {
+                    Message::BehaviorsClose
+                }
+            }))
+            .content(
+                ScrollViewer::new()
+                    .max_height(460.0)
+                    .min_width(520.0)
+                    .content(StackPanel::new().spacing(8.0).keyed_children(rows)),
+            )
+    }
+
+    /// 指南页底部编辑入口（复刻 `EditZoneHint` 虚线编辑区：点击打开总览编辑窗）。
+    fn guide_edit_entry(context: &mut ViewContext<Self>) -> View {
+        Button::new()
+            .margin(Thickness::new(0.0, 10.0, 0.0, 0.0))
+            .on_click(context.message(Message::GuideEditOpen))
+            .content(TextBlock::new().text(i18n::t("2407")))
+    }
+
+    /// 「编辑使用指南」对话框（复刻 `OverviewEditWindow`：2406 标题 / 2405 提示 /
+    /// 2404 恢复默认 / 保存 = overviewDocMd 落盘）。
+    fn guide_edit_dialog(&self, context: &mut ViewContext<Self>) -> View {
+        if !self.guide_edit_open {
+            return View::empty();
+        }
+        let body: View = StackPanel::new().spacing(10.0).children((
+            settings_view::hint_row(i18n::t("2405")),
+            TextBox::new()
+                .text(self.guide_edit_text.clone())
+                .accepts_return(true)
+                .min_height(320.0)
+                .min_width(560.0)
+                .on_text_changed(context.callback(|value: String| Message::GuideEditValue(value))),
+            Button::new()
+                .on_click(context.message(Message::GuideEditReset))
+                .content(TextBlock::new().text(i18n::t("2404"))),
+        ));
+        ContentDialog::new()
+            .title(i18n::t("2406"))
+            .primary_button_text(i18n::t("610"))
+            .close_button_text(i18n::t("611"))
+            .is_open(true)
+            .on_closed(context.callback(|result: ContentDialogResult| {
+                if result == ContentDialogResult::Primary {
+                    Message::GuideEditSave
+                } else {
+                    Message::GuideEditClose
+                }
+            }))
+            .content(ScrollViewer::new().max_height(480.0).content(body))
+    }
+
+    /// 自定义热键动作编辑对话框（复刻 `ActionEditorWindow`：承载动作编辑面板，
+    /// 经 `hotkey_editor_row` 把 `current_keymap_id` 覆盖为 keymap 1）。
+    fn custom_hotkey_dialog(&self, context: &mut ViewContext<Self>) -> View {
+        if self.hotkey_editor_row.is_none() {
+            return View::empty();
+        }
+        ContentDialog::new()
+            .title(i18n::t("1117"))
+            .primary_button_text(i18n::t("610"))
+            .close_button_text(i18n::t("611"))
+            .is_open(true)
+            .on_closed(context.callback(|result: ContentDialogResult| {
+                let _ = result;
+                Message::CustomHotkeyEditClose
+            }))
+            .content(
+                ScrollViewer::new()
+                    .max_height(480.0)
+                    .min_width(560.0)
+                    .content(self.action_editor_panel(context)),
+            )
+    }
+
     /// 后台拉取市场目录 + 本地已装集合（复刻 `PluginMarketViewModel.LoadAsync`）。
     fn reload_market(&mut self, context: &ComponentContext<Self>) {
         let Some(port) = self.port else {
@@ -1775,10 +3645,15 @@ impl Shell {
         } else if let Some(error) = &self.market_error {
             rows.push((
                 rows.len(),
-                plugins_view::load_error(error, context.message(Message::MarketReload)),
+                plugins_view::load_error(
+                    error,
+                    Some(&i18n::t("2433")),
+                    context.message(Message::MarketReload),
+                ),
             ));
         } else if self.market_entries.is_empty() {
-            rows.push((rows.len(), plugins_view::empty_state()));
+            // 市场空态 = 2438 单行（此前误用插件页的 2429+2430 导入引导文案）
+            rows.push((rows.len(), plugins_view::market_empty()));
         }
 
         for entry in &self.market_entries {
@@ -1854,7 +3729,8 @@ impl Shell {
                 }
                 config.keymaps.push(Keymap {
                     id: next_id,
-                    name: format!("{} {}", i18n::t("1118"), next_id),
+                    // 旧版新建 = 空名（IsNew），显示时回退触发键
+                    name: String::new(),
                     enable: false,
                     ..Default::default()
                 });
@@ -1870,7 +3746,7 @@ impl Shell {
             }
             OptEdit::HideMatrix(value) => config.options.hide_matrix = value,
             OptEdit::Language(index) => {
-                let value = ["", "zh", "en"][index.min(2)];
+                let value = ["zh", "en"][index.min(1)];
                 config.options.language = value.to_string();
                 i18n::apply_config_language(value);
                 self.rebuild_nav();
@@ -1900,6 +3776,13 @@ impl Shell {
                     next += 1;
                 };
                 let _ = keymap::ensure_action(config, 1, &placeholder, -1);
+            }
+            OptEdit::CustomHotkeyRemove(row) => {
+                if let Some(keymap) = config.keymaps.iter_mut().find(|km| km.id == 1)
+                    && let Some(old) = keymap.hotkeys.keys().nth(row).cloned()
+                {
+                    keymap::remove_hotkey(keymap, &old);
+                }
             }
             OptEdit::MouseDelay1(value) => config.options.mouse.delay1 = value,
             OptEdit::MouseDelay2(value) => config.options.mouse.delay2 = value,
@@ -1996,7 +3879,7 @@ impl Shell {
                     .window_groups
                     .push(crate::models::WindowGroup {
                         id: next_id,
-                        name: format!("{} {}", i18n::t("1118"), next_id),
+                        name: String::new(),
                         ..Default::default()
                     });
             }
@@ -2120,18 +4003,13 @@ impl Shell {
         sections.push((
             sections.len(),
             self.section(context, "other", "505", |this, context| {
-                let languages = vec![
-                    "跟随系统".to_string(),
-                    "中文".to_string(),
-                    "English".to_string(),
-                ];
+                let languages = vec!["中文".to_string(), "English".to_string()];
                 let language_index = match this
                     .config
                     .as_ref()
                     .map(|config| config.options.language.as_str())
                 {
-                    Some("zh") => 1,
-                    Some("en") => 2,
+                    Some("en") => 1,
                     _ => 0,
                 };
                 StackPanel::new().children((
@@ -2196,7 +4074,9 @@ impl Shell {
                         settings_view::group_row(
                             &group.name,
                             &group.value,
-                            group.condition_type.saturating_sub(1).max(0) as usize,
+                            // 条件下拉只声明 4 档：conditionType 5（自定义表达式，数据层仍合法）
+                            // 渲染时钳回 0，防 selected_index 越界
+                            group.condition_type.saturating_sub(1).min(3) as usize,
                             name_cb,
                             value_cb,
                             condition_cb,
@@ -2214,7 +4094,8 @@ impl Shell {
             }),
         ));
 
-        // 1116 自定义热键（keymap id=1；动作详情在动作编辑面板体系内）
+        // 1116 自定义热键（keymap id=1；「功能」列点击打开动作编辑对话框，
+        // 复刻旧 SettingsPageView「功能列点击弹 ActionEditorWindow」交互）
         sections.push((
             sections.len(),
             self.section(context, "customhotkeys", "1116", |this, context| {
@@ -2237,7 +4118,8 @@ impl Shell {
                             .collect()
                     })
                     .unwrap_or_default();
-                let mut list: Vec<(usize, View)> = Vec::new();
+                let mut list: Vec<(usize, View)> =
+                    vec![(usize::MAX, settings_view::hotkey_header())];
                 for (row, (hotkey, function)) in rows.iter().enumerate() {
                     list.push((
                         row,
@@ -2247,6 +4129,8 @@ impl Shell {
                             context.callback(move |value: String| {
                                 Message::Opt(OptEdit::CustomHotkey(row, value))
                             }),
+                            context.message(Message::CustomHotkeyEdit(row)),
+                            context.message(Message::Opt(OptEdit::CustomHotkeyRemove(row))),
                         ),
                     ));
                 }
@@ -2371,6 +4255,7 @@ impl Shell {
                     .map(|config| config.options.keyboard_layout.clone())
                     .unwrap_or_default();
                 StackPanel::new().spacing(8.0).children((
+                    settings_view::hint_row(i18n::t("722")),
                     TextBox::new()
                         .text(layout)
                         .accepts_return(true)
@@ -2550,11 +4435,12 @@ impl Shell {
                     ));
                 }
                 StackPanel::new().children((
+                    settings_view::pathvar_header(),
+                    settings_view::hint_row(i18n::t("911")),
                     StackPanel::new().keyed_children(rows),
                     Button::new()
                         .on_click(context.message(Message::Opt(OptEdit::PathVarAdd)))
                         .content(TextBlock::new().text(i18n::t("933"))),
-                    settings_view::hint_row(i18n::t("911")),
                 ))
             }),
         ));
@@ -2586,6 +4472,10 @@ impl Shell {
         };
 
         let mut rows: Vec<(usize, View)> = Vec::new();
+        // 弹窗内错误（清空历史失败等）：渲染在 ContentDialog **内部**，保证可见
+        if let Some(error) = &self.qs_error {
+            rows.push((rows.len(), plugins_view::action_error(error)));
+        }
         rows.push((
             rows.len(),
             plugins_view::qs_check(
@@ -2681,14 +4571,20 @@ impl Shell {
             )
     }
 
-    /// 后台拉取插件目录（复刻 `PluginsPageViewModel.ReloadAsync`）。
+    /// 后台拉取插件目录（清除一次性回显；复刻 `PluginsPageViewModel.ReloadAsync`）。
     fn reload_plugins(&mut self, context: &ComponentContext<Self>) {
+        self.plugin_status = None;
+        self.plugins_action_error = None;
+        self.refresh_plugins(context);
+    }
+
+    /// 后台拉取插件目录（**保留**一次性回显——导入成功横幅不被刷新吞掉）。
+    fn refresh_plugins(&mut self, context: &ComponentContext<Self>) {
         let Some(port) = self.port else {
             return;
         };
         self.plugins_loading = true;
         self.plugins_error = None;
-        self.plugin_status = None;
         let _ = context.spawn_background(move |_token| {
             let api = HttpSettingsApi::new(port);
             let response = api.get_plugins();
@@ -2698,6 +4594,15 @@ impl Shell {
                     .error_message
                     .unwrap_or_else(|| format!("HTTP {}", response.status)))),
             }
+        });
+    }
+
+    /// 成功提示 2 秒后自动清除（后台线程 sleep，对齐旧版 `Task.Delay(2000)`）。
+    /// `ClearNotice` 分支对错误态提示无操作，故组件关闭后误派发也无副作用。
+    fn schedule_notice_clear(&self, context: &ComponentContext<Self>) {
+        let _ = context.spawn_background(move |_token| {
+            std::thread::sleep(Duration::from_secs(2));
+            Message::ClearNotice
         });
     }
 
@@ -2755,8 +4660,11 @@ impl Shell {
         } else if let Some(error) = &self.plugins_error {
             rows.push((
                 rows.len(),
-                plugins_view::load_error(error, context.message(Message::PluginsReload)),
+                plugins_view::load_error(error, None, context.message(Message::PluginsReload)),
             ));
+        } else if let Some(error) = &self.plugins_action_error {
+            // 一次性操作失败：纯文字横幅（无重试按钮，重试语义只属于目录加载）
+            rows.push((rows.len(), plugins_view::action_error(error)));
         } else if plugins::show_empty_state(false, None, &cards) {
             rows.push((rows.len(), plugins_view::empty_state()));
         }
@@ -3246,7 +5154,7 @@ impl Shell {
             .content(comments);
 
         Grid::new()
-            .columns([GridLength::STAR, GridLength::Auto])
+            .columns([GridLength::STAR, GridLength::STAR])
             .children((left, right))
     }
 
@@ -3333,22 +5241,57 @@ impl Shell {
             .content(comments);
 
         Grid::new()
-            .columns([GridLength::STAR, GridLength::Auto])
+            .columns([GridLength::STAR, GridLength::STAR])
             .children((left, right))
     }
 
     /// 指南页：`config.overviewDocMd` 优先，为空时已在后台拉取 `/config_doc.md`。
-    fn guide_view(&self) -> View {
+    ///
+    /// 底部有「编辑指南」入口（复刻旧 `EditZoneHint` 虚线编辑区 → `OverviewEditWindow`）。
+    fn guide_view(&self, context: &mut ViewContext<Self>) -> View {
         let Some(port) = self.port else {
             return TextBlock::new().text("后端未连接").into();
         };
 
         let body: View = if self.doc_md.trim().is_empty() {
-            TextBlock::new()
-                .text("（未找到使用指南文档：config.overviewDocMd 为空且 /config_doc.md 不可读）")
-                .foreground(theme::stone_gray())
-                .text_wrapping(TextWrapping::Wrap)
-                .into()
+            // 文档不可达空态：内置快速上手引导（复刻旧 `HomePageView.axaml:42-56` 的
+            // 932 标题 + 934-938 文案，不再是一行硬编码中文）
+            ScrollViewer::new().content(
+                StackPanel::new()
+                    .spacing(10.0)
+                    .max_width(720.0)
+                    .horizontal_alignment(HorizontalAlignment::Left)
+                    .margin(Thickness::new(28.0, 20.0, 28.0, 28.0))
+                    .children((
+                        TextBlock::new()
+                            .text(self.current_title())
+                            .font_size(28.0)
+                            .font_weight(FontWeight::BOLD)
+                            .foreground(theme::near_black()),
+                        TextBlock::new()
+                            .text(i18n::t("932"))
+                            .font_size(theme::FONT_CARD_TITLE)
+                            .font_weight(FontWeight::SEMI_BOLD)
+                            .foreground(theme::near_black()),
+                        TextBlock::new()
+                            .text(i18n::t("934"))
+                            .text_wrapping(TextWrapping::Wrap),
+                        TextBlock::new()
+                            .text(i18n::t("935"))
+                            .text_wrapping(TextWrapping::Wrap),
+                        TextBlock::new()
+                            .text(i18n::t("936"))
+                            .text_wrapping(TextWrapping::Wrap),
+                        TextBlock::new()
+                            .text(i18n::t("937"))
+                            .text_wrapping(TextWrapping::Wrap),
+                        TextBlock::new()
+                            .text(i18n::t("938"))
+                            .foreground(theme::stone_gray())
+                            .text_wrapping(TextWrapping::Wrap),
+                        Self::guide_edit_entry(context),
+                    )),
+            )
         } else {
             let blocks = markdown::parse(&self.doc_md);
             let rendered = markdown_view::render(&blocks, port);
@@ -3362,6 +5305,13 @@ impl Shell {
                         .font_weight(FontWeight::BOLD)
                         .foreground(theme::near_black()),
                     rendered,
+                    // 页脚来源说明（旧 `HomePageView.axaml:33-34` 的 931，WarmSilver 12px）
+                    TextBlock::new()
+                        .text(i18n::t("931"))
+                        .font_size(theme::FONT_CAPTION)
+                        .foreground(theme::stone_gray())
+                        .text_wrapping(TextWrapping::Wrap),
+                    Self::guide_edit_entry(context),
                 ));
             // 文档较长 ⇒ 纵向滚动（Fluent：内容区可滚动，页面不整体滚动）
             ScrollViewer::new().content(content)
@@ -3514,12 +5464,10 @@ fn save(port: u16, config: &Config) -> Result<String, String> {
             .unwrap_or_else(|| format!("保存失败 (HTTP {})", response.status)));
     }
 
-    // `restartFailed`：保存已落盘但引擎重启失败 ⇒ 引导用户经托盘「重载」手动生效。
+    // `restartFailed`：保存已落盘但引擎重启失败 ⇒ 引导用户经托盘「重载」手动生效
+    // （复刻旧版 1078 标题 + 1079 正文的模态文案，此处合并为提示条文本）
     if response.value.as_ref().and_then(|body| body.restart_failed) == Some(true) {
-        return Ok(format!(
-            "{}（引擎重启失败，请在托盘点「重载」）",
-            i18n::t("928")
-        ));
+        return Ok(format!("{}：{}", i18n::t("1078"), i18n::t("1079")));
     }
 
     Ok(i18n::t("928"))

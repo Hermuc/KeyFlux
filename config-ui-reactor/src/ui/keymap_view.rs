@@ -10,6 +10,7 @@
 use windows_reactor::*;
 
 use crate::models::Keymap;
+use crate::services::i18n;
 use crate::services::keymap::{self, CellState, CommentEntry, KeyboardRow};
 use crate::theme;
 
@@ -21,8 +22,6 @@ pub const CELL_SPACING: f64 = 4.0;
 const SINGLE_CHAR_SIZE: f64 = 43.0;
 /// 多字符键格最小宽度（旧 58）。
 const MULTI_CHAR_MIN_WIDTH: f64 = 58.0;
-/// 备注汇总最大宽度。
-const COMMENT_PANEL_WIDTH: f64 = 300.0;
 
 /// 键格配色（静止态必填；悬停/按下可选，`None` 表示沿用 Fluent 默认）。
 struct CellPalette {
@@ -187,7 +186,7 @@ where
         .keyed_children(row_views)
 }
 
-/// 页头：模式名称 + 子模式上层信息（label:503）。
+/// 页头：模式名称 + 子模式上层信息（label:503）。标题字号对齐旧版 18。
 pub fn page_header(title: &str, parent_info: Option<&str>) -> View {
     let parent: View = match parent_info {
         Some(text) => TextBlock::new()
@@ -206,7 +205,7 @@ pub fn page_header(title: &str, parent_info: Option<&str>) -> View {
         .children((
             TextBlock::new()
                 .text(title.to_string())
-                .font_size(20.0)
+                .font_size(18.0)
                 .font_weight(FontWeight::SEMI_BOLD)
                 .foreground(theme::near_black()),
             parent,
@@ -237,37 +236,48 @@ pub fn compute_states(
         .collect()
 }
 
-/// 右侧备注汇总（复刻 `ActionCommentTable`）：键 + 备注，独立滚动。
+/// 右侧备注汇总（复刻 `ActionCommentTable` + `CommentSummaryPanel`）：
+/// 标题（305，serif 档）+ 条目「**键** - 备注」单行（reactor 无富文本 ⇒ 同块拼接）。
 pub fn comment_summary(entries: &[CommentEntry]) -> View {
     let items: Vec<(usize, View)> = entries
         .iter()
         .enumerate()
         .map(|(index, entry)| {
-            let block: View = StackPanel::new()
-                .spacing(2.0)
+            // 旧版单行 Run 混排「Key - Comment」；键与备注用「 - 」拼接、整体换行
+            let text = if entry.comment.is_empty() {
+                entry.key_text.clone()
+            } else {
+                format!("{} - {}", entry.key_text, entry.comment)
+            };
+            let block: View = TextBlock::new()
+                .text(text)
+                .font_size(theme::FONT_BODY)
+                .foreground(theme::solid(theme::CHARCOAL_WARM))
+                .text_wrapping(TextWrapping::Wrap)
                 .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
-                .children((
-                    TextBlock::new()
-                        .text(entry.key_text.clone())
-                        .font_size(theme::FONT_BODY)
-                        .font_weight(FontWeight::SEMI_BOLD)
-                        .foreground(theme::solid(theme::TERRACOTTA)),
-                    TextBlock::new()
-                        .text(entry.comment.clone())
-                        .font_size(theme::FONT_CAPTION)
-                        .foreground(theme::solid(theme::CHARCOAL_WARM))
-                        .text_wrapping(TextWrapping::Wrap),
-                ));
+                .into();
             (index, block)
         })
         .collect();
 
-    ScrollViewer::new().width(COMMENT_PANEL_WIDTH).content(
+    // 标题（旧 `CommentSummaryPanel` 的 label:305）作为 keyed 列表的首项
+    let mut rows: Vec<(usize, View)> = vec![(
+        usize::MAX,
+        TextBlock::new()
+            .text(i18n::t("305"))
+            .font_size(15.0)
+            .font_weight(FontWeight::MEDIUM)
+            .foreground(theme::near_black())
+            .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
+            .into(),
+    )];
+    rows.extend(items);
+    ScrollViewer::new().content(
         StackPanel::new()
             .orientation(Orientation::Vertical)
             .spacing(0.0)
             .margin(Thickness::new(0.0, 0.0, 12.0, 0.0))
-            .keyed_children(items),
+            .keyed_children(rows),
     )
 }
 

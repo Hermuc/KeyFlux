@@ -193,6 +193,11 @@ pub const SKIN_FIELDS: [SkinField; 18] = [
         kind: SkinFieldKind::Number,
     },
     SkinField {
+        key: "windowShadowSize",
+        label_key: "754",
+        kind: SkinFieldKind::Number,
+    },
+    SkinField {
         key: "windowShadowColor",
         label_key: "755",
         kind: SkinFieldKind::Color,
@@ -200,11 +205,6 @@ pub const SKIN_FIELDS: [SkinField; 18] = [
     SkinField {
         key: "windowShadowOpacity",
         label_key: "748",
-        kind: SkinFieldKind::Number,
-    },
-    SkinField {
-        key: "windowShadowSize",
-        label_key: "754",
         kind: SkinFieldKind::Number,
     },
 ];
@@ -305,7 +305,8 @@ pub fn font_weight_label_key(weight: &str) -> &'static str {
 /// 「恢复默认」（2507）：清空自定义字体路径并回到常规字重（空 = 未自定义，用内置字体）。
 pub fn font_reset(config: &mut Config) {
     config.options.command_font.source_path = String::new();
-    config.options.command_font.weight = String::new();
+    // 默认字重 = semibold（2026-09-21 口径订正：与用户实际在用档位一致）
+    config.options.command_font.weight = "semibold".to_string();
 }
 
 // ---------------------------------------------------------------- 路径变量
@@ -485,7 +486,10 @@ mod tests {
 
         font_reset(&mut config);
         assert_eq!(config.options.command_font.source_path, "");
-        assert_eq!(config.options.command_font.weight, "");
+        assert_eq!(
+            config.options.command_font.weight, "semibold",
+            "恢复默认字重 = semibold（2026-09-21 口径订正）"
+        );
     }
 
     #[test]
