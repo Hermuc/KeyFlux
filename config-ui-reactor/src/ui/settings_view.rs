@@ -144,14 +144,11 @@ pub fn hint_row(text: impl Into<String>) -> View {
 }
 
 /// 「快捷键方案」表头（501 名称 / 502 触发键 / 504 开关）。
-/// 列宽对齐旧表前两列（124 / 120；旧表还有修饰键列与图标列，新版为结构性精简）。
+/// 名称列 **STAR 自适应**：卡片宽 560（旧版同宽 + 1.12 缩放），固定 124px 会把
+/// 「CapsLock + Space」截断；开关列补 504 表头。
 pub fn scheme_header() -> View {
     Grid::new()
-        .columns([
-            GridLength::Pixel(124.0),
-            GridLength::Pixel(120.0),
-            GridLength::Auto,
-        ])
+        .columns([GridLength::STAR, GridLength::Pixel(130.0), GridLength::Auto])
         .children((
             TextBlock::new()
                 .text(i18n::t("501"))
@@ -163,10 +160,20 @@ pub fn scheme_header() -> View {
                     .font_size(theme::FONT_CAPTION)
                     .foreground(theme::stone_gray()),
             ),
+            Border::new()
+                .grid_column(2)
+                .margin(Thickness::new(16.0, 0.0, 0.0, 0.0))
+                .content(
+                    TextBlock::new()
+                        .text(i18n::t("504"))
+                        .font_size(theme::FONT_CAPTION)
+                        .foreground(theme::stone_gray()),
+                ),
         ))
 }
 
 /// 「快捷键方案」行：名称(501) / 触发键(502) / 开关(504) 三列内联编辑。
+/// 行距 8px（此前 2px 过挤，12 行连成一片）；开关列左留 16px。
 pub fn scheme_row<N, H, E>(
     name: &str,
     hotkey: &str,
@@ -182,12 +189,13 @@ where
 {
     let name_box: View = TextBox::new()
         .text(name.to_string())
-        .min_width(120.0)
+        .min_height(32.0)
         .on_text_changed(on_name)
         .into();
     let hotkey_box: View = TextBox::new()
         .text(hotkey.to_string())
-        .min_width(90.0)
+        .min_width(110.0)
+        .min_height(32.0)
         .on_text_changed(on_hotkey)
         .into();
     let switch: View = ToggleSwitch::new()
@@ -196,16 +204,19 @@ where
         .into();
 
     Grid::new()
-        .columns([
-            GridLength::Pixel(124.0),
-            GridLength::Pixel(120.0),
-            GridLength::Auto,
-        ])
-        .margin(Thickness::new(0.0, 0.0, 0.0, 2.0))
+        .columns([GridLength::STAR, GridLength::Pixel(130.0), GridLength::Auto])
+        .margin(Thickness::new(0.0, 0.0, 0.0, 8.0))
         .children((
             name_box,
-            Border::new().grid_column(1).content(hotkey_box),
-            Border::new().grid_column(2).content(switch),
+            Border::new()
+                .grid_column(1)
+                .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                .content(hotkey_box),
+            Border::new()
+                .grid_column(2)
+                .margin(Thickness::new(16.0, 0.0, 0.0, 0.0))
+                .vertical_alignment(VerticalAlignment::Center)
+                .content(switch),
         ))
 }
 
