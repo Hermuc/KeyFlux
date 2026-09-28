@@ -12,6 +12,8 @@ use windows_reactor::{WindowBackdrop, WindowTheme, WindowVisuals};
 
 /// Windows Job Object 封装（保证 GUI 死亡时连带回收后端子进程树）。
 pub mod file_dialog;
+/// 随包字体（MiSans）进程内私有加载。
+pub mod fonts;
 pub mod job;
 
 /// 一个窗口的声明式描述。所有开窗点都应经由它，避免逐处硬编码。

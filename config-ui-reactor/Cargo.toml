@@ -16,7 +16,14 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 ureq = "3.4.2"
 windows-reactor = "0.100"
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_UI_Controls_Dialogs", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_UI_Controls_Dialogs", "Win32_UI_WindowsAndMessaging"] }
+
+# vendor 补丁（2026-09-28）：上游 0.100.0 无字体通道（无 font_family builder /
+# ResourceOverrides 仅色值 / AppContext 不暴露 Resources），fork 在装完 Fluent
+# 资源后经 XamlReader 覆盖 ContentControlThemeFontFamily 全局字体键（MiSans）。
+# 补丁面：app_shim.rs 新增 install_global_ui_font + app.rs 一行调用；其余与上游一致。
+[patch.crates-io]
+windows-reactor = { path = "vendor/windows-reactor" }
 
 [build-dependencies]
 windows-reactor-setup = "0.100"   # 自包含部署：staging Windows App Runtime
