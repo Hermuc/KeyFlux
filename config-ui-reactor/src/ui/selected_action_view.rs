@@ -20,25 +20,32 @@ use crate::theme;
 /// toggle 格宽下限/上限（复用缩写页口径）。
 const TOGGLE_MIN_WIDTH: f64 = 53.0;
 const TOGGLE_MAX_WIDTH: f64 = 160.0;
-const TOGGLE_HEIGHT: f64 = 34.0;
+/// 旧 `ToggleButton.type-toggle` 的 `MinHeight=30`。
+const TOGGLE_HEIGHT: f64 = 30.0;
 
-fn badge_brush(color: BadgeColor) -> Brush {
-    theme::solid(match color {
-        BadgeColor::LinkDarkWarm => theme::DARK_WARM,
-        BadgeColor::PathGreen => theme::MUTED_GREEN,
-        BadgeColor::MagnetCoral => theme::CORAL,
-        BadgeColor::PlainOlive => theme::OLIVE_GRAY,
-    })
-}
+/// 旧页级输入框描边色（2026-09-23 三轮定色：Sand 与 StoneGray 之间的暖中灰）。
+const INPUT_STROKE: Color = Color::rgb(0xc8, 0xc3, 0xb4);
 
-/// 卡片外框（与动作面板同款）。
+/// 卡片外框（旧 `Border.actionCard`：Ivory 面 + cream 边 2px + 圆角 14 + Padding 16）。
 pub fn card(body: View) -> View {
     Border::new()
         .padding(theme::pad_md())
-        .background(theme::card_background())
-        .border_brush(theme::card_stroke())
-        .border_thickness(theme::hairline())
-        .corner_radius(theme::radius_md())
+        .background(theme::ivory())
+        .border_brush(theme::border_cream())
+        .border_thickness(theme::card_border())
+        .corner_radius(theme::radius_card())
+        .content(body)
+}
+
+/// 聚合卡外框（旧 `Border.type-card`：同 `card` 但 Padding 12 + 底距 8）。
+pub fn type_card(body: View) -> View {
+    Border::new()
+        .padding(Thickness::uniform(12.0))
+        .margin(Thickness::new(0.0, 0.0, 0.0, 8.0))
+        .background(theme::ivory())
+        .border_brush(theme::border_cream())
+        .border_thickness(theme::card_border())
+        .corner_radius(theme::radius_card())
         .content(body)
 }
 
@@ -58,6 +65,7 @@ where
         .text(hotkey.to_string())
         .min_width(220.0)
         .min_height(32.0)
+        .border_brush(theme::solid(INPUT_STROKE))
         .on_text_changed(on_hotkey)
         .into();
 
@@ -84,29 +92,38 @@ where
             switch,
         ));
 
-    let mut panel_children = vec![row];
+    let mut panel_children: Vec<(usize, View)> = vec![(0, row)];
+    // 提示条（旧 `.hint`）：Sand 面 + 圆角 4 + Padding 12,8 + 字 12
     if !hint.is_empty() {
-        panel_children.push(
-            TextBlock::new()
-                .text(hint.to_string())
-                .font_size(theme::FONT_CAPTION)
-                .foreground(if hint == i18n::t("976") {
-                    theme::solid(theme::ERROR_CRIMSON)
-                } else {
-                    theme::stone_gray()
-                })
-                .margin(Thickness::new(0.0, 6.0, 0.0, 0.0))
-                .text_wrapping(TextWrapping::Wrap)
-                .into(),
-        );
+        panel_children.push((
+            1,
+            Border::new()
+                .background(theme::sand())
+                .corner_radius(theme::radius_panel())
+                .padding(Thickness::new(12.0, 8.0, 12.0, 8.0))
+                .content(
+                    TextBlock::new()
+                        .text(hint.to_string())
+                        .font_size(theme::FONT_CAPTION)
+                        .foreground(if hint == i18n::t("976") {
+                            theme::solid(theme::ERROR_CRIMSON)
+                        } else {
+                            theme::solid(theme::DARK_WARM)
+                        })
+                        .text_wrapping(TextWrapping::Wrap),
+                ),
+        ));
     }
 
-    // ⚠️ `IntoViews` 未为 `Vec` 实现 ⇒ 动态长度集合一律走 `keyed_children`
-    let panel_rows: Vec<(usize, View)> = panel_children.into_iter().enumerate().collect();
-    card(StackPanel::new().spacing(0.0).keyed_children(panel_rows))
+    // 旧热键卡内 Spacing=10；⚠️ `IntoViews` 未为 `Vec` 实现 ⇒ 动态集合一律 `keyed_children`
+    card(
+        StackPanel::new()
+            .spacing(10.0)
+            .keyed_children(panel_children),
+    )
 }
 
-/// 聚合卡头：标题 + 删除按钮（未配置时禁用）。
+/// 聚合卡头：标题（旧 15 SemiBold terracotta）+ 删除按钮（未配置时禁用）。
 pub fn card_header(title: &str, can_delete: bool, on_delete: impl IntoUnitCallback) -> View {
     StackPanel::new()
         .orientation(Orientation::Horizontal)
@@ -114,7 +131,9 @@ pub fn card_header(title: &str, can_delete: bool, on_delete: impl IntoUnitCallba
         .children((
             TextBlock::new()
                 .text(title.to_string())
-                .font_size(theme::FONT_TITLE)
+                .font_size(theme::FONT_CARD_TITLE)
+                .font_weight(FontWeight::SEMI_BOLD)
+                .foreground(theme::terracotta())
                 .vertical_alignment(VerticalAlignment::Center),
             Button::new()
                 .is_enabled(can_delete)
@@ -206,20 +225,23 @@ fn build_toggle_button(
                         .vertical_alignment(VerticalAlignment::Center),
                     TextBlock::new()
                         .text(toggle.label.clone())
-                        .font_size(theme::FONT_BODY)
+                        .font_size(13.0)
                         .vertical_alignment(VerticalAlignment::Center),
                 )),
         )
 }
 
-/// 详情面板的一行行为编辑器：三列 Grid
-/// `序号徽章（行为色） | 行为标签（STAR） | 值输入框（无参行为不显示）+ 删除按钮`。
+/// 详情面板的一行行为编辑器（配 [`row_editor`] 子卡使用）：
+/// `序号徽章 | 行为标签（STAR） | 值输入框（无参行为不显示）+ 删除按钮`。
+///
+/// `badge`（行为色）为旧版自绘方徽章的遗留参数：旧样式 2026-09 起统一为
+/// Sand 底 + terracotta 序号（颜色不再承载语义），参数保留以免动作面板联动改造。
 #[allow(clippy::too_many_arguments)]
 pub fn entry_row<C1, C2>(
     index: usize,
     label: &str,
     value: &str,
-    badge: BadgeColor,
+    _badge: BadgeColor,
     is_no_value: bool,
     on_value: C1,
     on_remove: C2,
@@ -228,19 +250,19 @@ where
     C1: IntoPayloadCallback<String>,
     C2: IntoUnitCallback,
 {
+    // 序号徽章（旧 `rowEditor` 内：Sand 底 + RadiusSm + Padding 7,2 + 字 13 terracotta SemiBold）
     let badge: View = Border::new()
         .grid_column(0)
-        .width(22.0)
-        .height(22.0)
         .corner_radius(theme::radius_sm())
-        .background(badge_brush(badge))
+        .background(theme::sand())
+        .padding(Thickness::new(7.0, 2.0, 7.0, 2.0))
+        .vertical_alignment(VerticalAlignment::Center)
         .content(
             TextBlock::new()
                 .text((index + 1).to_string())
-                .font_size(theme::FONT_CAPTION)
-                .foreground(theme::solid(theme::WHITE))
-                .horizontal_alignment(HorizontalAlignment::Center)
-                .vertical_alignment(VerticalAlignment::Center),
+                .font_size(13.0)
+                .font_weight(FontWeight::SEMI_BOLD)
+                .foreground(theme::terracotta()),
         );
 
     let name: View = TextBlock::new()
@@ -259,6 +281,7 @@ where
             .text(value.to_string())
             .min_width(240.0)
             .min_height(30.0)
+            .border_brush(theme::solid(INPUT_STROKE))
             .on_text_changed(on_value)
             .into()
     };
@@ -275,8 +298,17 @@ where
 
     Grid::new()
         .columns([GridLength::Auto, GridLength::STAR, GridLength::Auto])
-        .margin(Thickness::new(0.0, 0.0, 0.0, 8.0))
         .children((badge, name, trailing))
+}
+
+/// 行为编辑行的**子卡外框**（旧 `Border.rowEditor`：Ivory 面 + 圆角 4 + Padding 10 + 底距 6）。
+pub fn row_editor(body: View) -> View {
+    Border::new()
+        .background(theme::ivory())
+        .corner_radius(theme::radius_panel())
+        .padding(Thickness::uniform(10.0))
+        .margin(Thickness::new(0.0, 0.0, 0.0, 6.0))
+        .content(body)
 }
 
 /// 「添加行为」行：覆盖行为下拉 + 添加按钮（`max_entries` 已满 9 时禁用）。
@@ -317,8 +349,8 @@ pub fn pending_hint(has_dedicated: bool) -> View {
     let mut children = vec![
         TextBlock::new()
             .text(i18n::t("2537"))
-            .font_size(theme::FONT_BODY)
-            .foreground(theme::stone_gray()),
+            .font_size(theme::FONT_CAPTION)
+            .foreground(theme::solid(theme::DARK_WARM)),
     ];
 
     if !has_dedicated {
@@ -338,7 +370,12 @@ pub fn pending_hint(has_dedicated: bool) -> View {
         .enumerate()
         .map(|(index, block)| (index, block.into()))
         .collect();
-    StackPanel::new().spacing(0.0).keyed_children(rows)
+    // 旧「待配置」容器：Sand 面 + 圆角 4 + Padding 10,8 + 字 12 DarkWarm
+    Border::new()
+        .background(theme::sand())
+        .corner_radius(theme::radius_panel())
+        .padding(Thickness::new(10.0, 8.0, 10.0, 8.0))
+        .content(StackPanel::new().spacing(4.0).keyed_children(rows))
 }
 
 // NOTE(测试边界)：本模块**无单元测试** —— 构件需要 `ComponentContext` 产出的 `Callback`

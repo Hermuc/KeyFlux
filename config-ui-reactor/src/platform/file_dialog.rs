@@ -64,6 +64,9 @@ pub const ZIP_FILTER: &str = "插件包 (*.zip)\0*.zip\0所有文件 (*.*)\0*.*\
 /// 不限类型的过滤器串（插件设置项未声明 `filter` 时兜底）。
 pub const ALL_FILES_FILTER: &str = "所有文件 (*.*)\0*.*\0\0";
 
+/// 命令框字体过滤器串（`.ttf/.otf`）。
+pub const FONT_FILTER: &str = "字体文件 (*.ttf;*.otf)\0*.ttf;*.otf\0所有文件 (*.*)\0*.*\0\0";
+
 #[cfg(test)]
 mod tests {
     use super::*;

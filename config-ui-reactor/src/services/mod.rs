@@ -26,4 +26,5 @@ pub mod markdown;
 pub mod market;
 pub mod plugins;
 pub mod selected_action;
+pub mod settings;
 pub mod store;

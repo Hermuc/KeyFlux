@@ -28,11 +28,11 @@ use crate::services::api::{ApiResponse, HttpSettingsApi, MessageBody, SettingsAp
 use crate::services::backend::{BackendSession, BackendSessionOptions, resolve_settings_exe};
 use crate::services::market::{self, MarketEntry};
 use crate::services::selected_action::{self as sa, MATCH_FILE_EXT, MATCH_TEXT_TYPE};
-use crate::services::{action_editor, i18n, keymap, markdown, plugins, store};
+use crate::services::{action_editor, i18n, keymap, markdown, plugins, settings, store};
 use crate::theme;
 use crate::ui::{
     abbr_view, action_editor as action_editor_view, keymap_view, markdown_view, plugins_view,
-    selected_action_view,
+    selected_action_view, settings_view,
 };
 
 /// 页面种类（由 `build_nav` 依配置推导，对齐 `MainViewModel.PageForKeymap`）。
@@ -275,6 +275,64 @@ pub enum Message {
     PsClosed(ContentDialogResult),
     /// 保存结果（Err = 后端拒绝，原样重开）。
     PsSaved(Result<(), String>),
+    // ------------------------------------------------------------- 选项页
+    /// 开合一个分区（一次只展开一张，复刻旧版手风琴）。
+    SettingsSection(&'static str),
+    /// 开机自启开关（即时 `POST /server/command/3|4`，不走保存链路）。
+    StartupToggle(bool),
+    /// 开机自启命令完成（Err = 失败原因，进选项页提示条）。
+    StartupDone(Result<(), String>),
+    /// 「触发延时」分区当前选中的方案（渲染态）。
+    DelayScheme(usize),
+    /// 「命令框字体」浏览按钮（Win32 文件对话框，UI 线程同步弹出）。
+    FontBrowse,
+    /// 选项页字段编辑（直接写入内存 config，随页脚保存链路持久化）。
+    Opt(OptEdit),
+}
+
+/// 选项页字段编辑载荷（`Message::Opt`）。
+///
+/// 下标语义：`Scheme*` = `config.keymaps` 中 **id > 4** 方案的下标（渲染序）；
+/// `CustomHotkey*` = keymap id=1 的热键行下标；`Skin(i)` = [`settings::SKIN_FIELDS`] 下标；
+/// `Group*` = `options.window_groups` 中 **id > 0** 分组的下标（哨兵 Exclude/Global 不进编辑器）。
+#[derive(Clone)]
+pub enum OptEdit {
+    SchemeName(usize, String),
+    SchemeHotkey(usize, String),
+    SchemeEnable(usize, bool),
+    SchemeAdd,
+    SchemeDelay(usize, String),
+    HideMatrix(bool),
+    Language(usize),
+    CustomHotkey(usize, String),
+    CustomHotkeyAdd,
+    MouseDelay1(String),
+    MouseDelay2(String),
+    MouseFastSingle(String),
+    MouseFastRepeat(String),
+    MouseSlowSingle(String),
+    MouseSlowRepeat(String),
+    MouseTipSymbol(String),
+    MouseKeepMode(bool),
+    MouseShowTip(bool),
+    ScrollDelay1(String),
+    ScrollDelay2(String),
+    ScrollOnceLine(String),
+    LayoutPreset(&'static str),
+    KeyboardLayoutSet(String),
+    Skin(usize, String),
+    FontSource(String),
+    FontWeight(usize),
+    FontReset,
+    PathVarName(usize, String),
+    PathVarValue(usize, String),
+    PathVarAdd,
+    PathVarRemove(usize),
+    GroupName(usize, String),
+    GroupValue(usize, String),
+    GroupCondition(usize, usize),
+    GroupAdd,
+    GroupRemove(usize),
 }
 
 /// QuickSwitch 配置对话框的可编辑字段（消息载荷）。
@@ -354,6 +412,12 @@ pub struct Shell {
     ps_error: Option<String>,
     /// 插件设置对话框是否打开（校验失败重开时用）。
     ps_open: bool,
+    /// 选项页当前展开的分区（`None` = 全部收起；一次只展开一张，复刻旧版手风琴）。
+    settings_open: Option<&'static str>,
+    /// 选项页「触发延时」分区当前选中的方案（`nav` 中 id>4 方案的下标）。
+    delay_scheme: usize,
+    /// 选项页一次性提示（开机自启结果 / 保存校验失败原因）。
+    settings_notice: Option<String>,
     /// 部署根路径（`<deploy>`；用于「清空历史」定位 `data/quickswitch/history.tsv`）。
     data_root: Option<std::path::PathBuf>,
     /// 行为目录快照（选中动作页；`GET /api/behaviors`）。
@@ -411,6 +475,9 @@ impl Component for Shell {
             ps_loading: false,
             ps_error: None,
             ps_open: false,
+            settings_open: None,
+            delay_scheme: 0,
+            settings_notice: None,
             data_root: None,
             catalog: sa::Catalog::default(),
             sa_text_sel: None,
@@ -1016,6 +1083,51 @@ impl Component for Shell {
                     }
                 }
             }
+            // ---------------------------------------------------------- 选项页
+            Message::SettingsSection(section) => {
+                // 一次只展开一张（复刻旧版手风琴）：再点已展开的则收起
+                self.settings_open = if self.settings_open == Some(section) {
+                    None
+                } else {
+                    Some(section)
+                };
+            }
+            Message::StartupToggle(enabled) => {
+                if let Some(config) = self.config.as_mut() {
+                    settings::set_startup(config, enabled);
+                }
+                if let Some(port) = self.port {
+                    let command_id = settings::startup_command_id(enabled);
+                    let _ = context.spawn_background(move |_token| {
+                        let api = HttpSettingsApi::new(port);
+                        let response = api.send_server_command(command_id);
+                        Message::StartupDone(if response.success {
+                            Ok(())
+                        } else {
+                            Err(response
+                                .error_message
+                                .unwrap_or_else(|| format!("HTTP {}", response.status)))
+                        })
+                    });
+                }
+            }
+            Message::StartupDone(result) => match result {
+                Ok(()) => self.settings_notice = None,
+                Err(reason) => self.settings_notice = Some(reason),
+            },
+            Message::Opt(edit) => self.apply_opt(edit),
+            Message::DelayScheme(index) => self.delay_scheme = index,
+            Message::FontBrowse => {
+                let picked = platform::file_dialog::pick_open_file(
+                    &i18n::t("2504"),
+                    platform::file_dialog::FONT_FILTER,
+                );
+                if let Some(path) = picked
+                    && let Some(config) = self.config.as_mut()
+                {
+                    config.options.command_font.source_path = path.to_string_lossy().into_owned();
+                }
+            }
             Message::BehaviorsLoaded(result) => match result {
                 Ok(catalog) => {
                     self.catalog = *catalog;
@@ -1182,6 +1294,11 @@ impl Shell {
             return self.plugins_page(context);
         }
 
+        // 选项页（keymap id=4）：方案卡 + 手风琴分区
+        if entry.kind == PageKind::Settings {
+            return self.settings_page(context);
+        }
+
         let hint = match entry.kind {
             PageKind::SelectedAction => {
                 return self.selected_action_page(context);
@@ -1230,10 +1347,13 @@ impl Shell {
         let text_card = self.sa_type_card(context, MATCH_TEXT_TYPE);
         let file_card = self.sa_type_card(context, MATCH_FILE_EXT);
 
+        // 旧页面容器：`Grid Margin="8,20,20,20"` + `StackPanel Spacing="14" MaxWidth="860"`
         ScrollViewer::new().content(
             StackPanel::new()
-                .margin(Thickness::new(24.0, 20.0, 24.0, 28.0))
-                .spacing(16.0)
+                .margin(Thickness::new(8.0, 20.0, 20.0, 20.0))
+                .spacing(14.0)
+                .max_width(860.0)
+                .horizontal_alignment(HorizontalAlignment::Left)
                 .children((header, hotkey, text_card, file_card)),
         )
     }
@@ -1245,10 +1365,12 @@ impl Shell {
         };
         let toggles = sa::build_toggles(config, match_type);
         if toggles.is_empty() {
-            return selected_action_view::card(
+            return selected_action_view::type_card(
                 TextBlock::new()
                     .text(sa::match_type_label(match_type))
-                    .font_size(theme::FONT_TITLE)
+                    .font_size(theme::FONT_CARD_TITLE)
+                    .font_weight(FontWeight::SEMI_BOLD)
+                    .foreground(theme::terracotta())
                     .into(),
             );
         }
@@ -1283,7 +1405,8 @@ impl Shell {
                 let behavior = entry.behavior.clone();
                 rows.push((
                     format!("entry-{index}"),
-                    selected_action_view::entry_row(
+                    // 旧行编辑器套 `rowEditor` 子卡（Ivory 面 + 圆角 4 + Padding 10）
+                    selected_action_view::row_editor(selected_action_view::entry_row(
                         index,
                         &self.catalog.label_for(&behavior),
                         &entry.action_value,
@@ -1295,7 +1418,7 @@ impl Shell {
                             value,
                         }),
                         context.message(Message::SaRemoveEntry { match_type, index }),
-                    ),
+                    )),
                 ));
             }
 
@@ -1348,7 +1471,7 @@ impl Shell {
                 ))
         };
 
-        selected_action_view::card(StackPanel::new().spacing(8.0).children((
+        selected_action_view::type_card(StackPanel::new().spacing(8.0).children((
             header,
             toggles_area,
             detail,
@@ -1399,6 +1522,18 @@ impl Shell {
         let (Some(config), Some(port)) = (self.config.clone(), self.port) else {
             return;
         };
+
+        // 选项页皮肤字段校验（颜色 #RRGGBB / 数值 >= 0；旧版为自由文本框，此处收紧）
+        for field in settings::SKIN_FIELDS {
+            let value = settings::skin_get(&config.options.command_input_skin, field.key)
+                .unwrap_or_default();
+            if let Some(reason) = settings::validate_skin_field(&field, value) {
+                self.settings_notice =
+                    Some(format!("{} ({}): {}", i18n::t("741"), field.key, reason));
+                return;
+            }
+        }
+
         self.notice = None;
         let _ = context.spawn_background(move |_token| Message::SaveFinished(save(port, &config)));
     }
@@ -1675,6 +1810,771 @@ impl Shell {
             )
     }
 
+    /// 选项页字段编辑（`Message::Opt` 的落地）。
+    ///
+    /// 下标语义见 [`OptEdit`] 文档；全部**直接写入内存 config**，随页脚保存链路持久化
+    /// （与键位图页/缩写页的编辑模式一致）。
+    fn apply_opt(&mut self, edit: OptEdit) {
+        let Some(config) = self.config.as_mut() else {
+            return;
+        };
+        match edit {
+            OptEdit::SchemeName(index, value) => {
+                if let Some(keymap) = config.keymaps.iter_mut().filter(|km| km.id > 4).nth(index) {
+                    keymap.name = value;
+                }
+            }
+            OptEdit::SchemeHotkey(index, value) => {
+                if let Some(keymap) = config.keymaps.iter_mut().filter(|km| km.id > 4).nth(index) {
+                    keymap.hotkey = value;
+                }
+            }
+            OptEdit::SchemeEnable(index, value) => {
+                let changed = config
+                    .keymaps
+                    .iter_mut()
+                    .filter(|km| km.id > 4)
+                    .nth(index)
+                    .map(|keymap| {
+                        let changed = keymap.enable != value;
+                        keymap.enable = value;
+                        changed
+                    })
+                    .unwrap_or(false);
+                // 启停改变导航构成 ⇒ 重建导航（与保存后 BuildNav 同语义）
+                if changed {
+                    let next = config.clone();
+                    self.nav = build_nav(&next);
+                }
+            }
+            OptEdit::SchemeAdd => {
+                let mut next_id = 5;
+                while config.keymaps.iter().any(|km| km.id == next_id) {
+                    next_id += 1;
+                }
+                config.keymaps.push(Keymap {
+                    id: next_id,
+                    name: format!("{} {}", i18n::t("1118"), next_id),
+                    enable: false,
+                    ..Default::default()
+                });
+                self.rebuild_nav();
+            }
+            OptEdit::SchemeDelay(index, value) => {
+                if let (Some(keymap), Ok(delay)) = (
+                    config.keymaps.iter_mut().filter(|km| km.id > 4).nth(index),
+                    value.trim().parse::<i32>(),
+                ) {
+                    keymap.delay = delay;
+                }
+            }
+            OptEdit::HideMatrix(value) => config.options.hide_matrix = value,
+            OptEdit::Language(index) => {
+                let value = ["", "zh", "en"][index.min(2)];
+                config.options.language = value.to_string();
+                i18n::apply_config_language(value);
+                self.rebuild_nav();
+            }
+            OptEdit::CustomHotkey(index, value) => {
+                if let Some(keymap) = config.keymaps.iter_mut().find(|km| km.id == 1) {
+                    let old = keymap.hotkeys.keys().nth(index).cloned();
+                    if let Some(old) = old {
+                        keymap::change_hotkey(keymap, &old, &value);
+                    }
+                }
+            }
+            OptEdit::CustomHotkeyAdd => {
+                // 占位热键：动作为空 ⇒ `clean_for_save` 在保存时整体丢弃，不会生成无效 AHK
+                let mut next = 1;
+                let placeholder = loop {
+                    let candidate = format!("ctrl+alt+shift+f{next}");
+                    let taken = config
+                        .keymaps
+                        .iter()
+                        .find(|km| km.id == 1)
+                        .map(|km| km.hotkeys.contains_key(&candidate))
+                        .unwrap_or(true);
+                    if !taken {
+                        break candidate;
+                    }
+                    next += 1;
+                };
+                let _ = keymap::ensure_action(config, 1, &placeholder, -1);
+            }
+            OptEdit::MouseDelay1(value) => config.options.mouse.delay1 = value,
+            OptEdit::MouseDelay2(value) => config.options.mouse.delay2 = value,
+            OptEdit::MouseFastSingle(value) => config.options.mouse.fast_single = value,
+            OptEdit::MouseFastRepeat(value) => config.options.mouse.fast_repeat = value,
+            OptEdit::MouseSlowSingle(value) => config.options.mouse.slow_single = value,
+            OptEdit::MouseSlowRepeat(value) => config.options.mouse.slow_repeat = value,
+            OptEdit::MouseTipSymbol(value) => config.options.mouse.tip_symbol = value,
+            OptEdit::MouseKeepMode(value) => config.options.mouse.keep_mouse_mode = value,
+            OptEdit::MouseShowTip(value) => config.options.mouse.show_tip = value,
+            OptEdit::ScrollDelay1(value) => config.options.scroll.delay1 = value,
+            OptEdit::ScrollDelay2(value) => config.options.scroll.delay2 = value,
+            OptEdit::ScrollOnceLine(value) => config.options.scroll.once_line_count = value,
+            OptEdit::LayoutPreset(kind) => {
+                let current = config.options.keyboard_layout.clone();
+                if let Some(layout) = settings::keyboard_layout_preset(kind, &current) {
+                    config.options.keyboard_layout = layout;
+                }
+            }
+            OptEdit::KeyboardLayoutSet(value) => config.options.keyboard_layout = value,
+            OptEdit::Skin(index, value) => {
+                if let Some(field) = settings::SKIN_FIELDS.get(index) {
+                    settings::skin_set(&mut config.options.command_input_skin, field.key, &value);
+                }
+            }
+            OptEdit::FontSource(value) => config.options.command_font.source_path = value,
+            OptEdit::FontWeight(index) => {
+                if let Some(weight) = settings::FONT_WEIGHTS.get(index) {
+                    config.options.command_font.weight = (*weight).to_string();
+                }
+            }
+            OptEdit::FontReset => settings::font_reset(config),
+            OptEdit::PathVarName(index, value) => {
+                if let Some(row) = config.options.path_variables.get_mut(index) {
+                    row.name = value;
+                }
+            }
+            OptEdit::PathVarValue(index, value) => {
+                if let Some(row) = config.options.path_variables.get_mut(index) {
+                    row.value = value;
+                }
+            }
+            OptEdit::PathVarAdd => {
+                settings::add_path_variable(config);
+            }
+            OptEdit::PathVarRemove(index) => {
+                settings::remove_path_variable(config, index);
+            }
+            OptEdit::GroupName(row, value) => {
+                if let Some(group) = config
+                    .options
+                    .window_groups
+                    .iter_mut()
+                    .filter(|group| group.id > 0)
+                    .nth(row)
+                {
+                    group.name = value;
+                }
+            }
+            OptEdit::GroupValue(row, value) => {
+                if let Some(group) = config
+                    .options
+                    .window_groups
+                    .iter_mut()
+                    .filter(|group| group.id > 0)
+                    .nth(row)
+                {
+                    group.value = value;
+                }
+            }
+            OptEdit::GroupCondition(row, index) => {
+                if let Some(group) = config
+                    .options
+                    .window_groups
+                    .iter_mut()
+                    .filter(|group| group.id > 0)
+                    .nth(row)
+                {
+                    group.condition_type = index as i32 + 1;
+                }
+            }
+            OptEdit::GroupAdd => {
+                let mut next_id = 1;
+                while config
+                    .options
+                    .window_groups
+                    .iter()
+                    .any(|group| group.id == next_id)
+                {
+                    next_id += 1;
+                }
+                config
+                    .options
+                    .window_groups
+                    .push(crate::models::WindowGroup {
+                        id: next_id,
+                        name: format!("{} {}", i18n::t("1118"), next_id),
+                        ..Default::default()
+                    });
+            }
+            OptEdit::GroupRemove(row) => {
+                let keep: Vec<usize> = config
+                    .options
+                    .window_groups
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, group)| group.id > 0)
+                    .map(|(index, _)| index)
+                    .collect();
+                if let Some(&index) = keep.get(row) {
+                    config.options.window_groups.remove(index);
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------- 选项页
+
+    /// 手风琴分区卡包装：展开时才构建内容（一次只展开一张，复刻旧版）。
+    fn section(
+        &self,
+        context: &mut ViewContext<Self>,
+        id: &'static str,
+        title_key: &str,
+        body: impl FnOnce(&Self, &mut ViewContext<Self>) -> View,
+    ) -> View {
+        let open = self.settings_open == Some(id);
+        let content = if open {
+            body(self, context)
+        } else {
+            View::empty()
+        };
+        settings_view::section_card(
+            i18n::t(title_key),
+            open,
+            context.message(Message::SettingsSection(id)),
+            content,
+        )
+    }
+
+    /// 选项页（keymap id=4）：左列「快捷键方案」卡 + 右列手风琴分区栈。
+    ///
+    /// 分区顺序对齐旧 `SettingsPageView.axaml`：其他设置 / 程序分组 / 自定义热键 /
+    /// 鼠标参数 / 滚轮 / 键盘布局 / 触发延时 / 命令框皮肤 / 命令框字体 / 路径变量。
+    fn settings_page(&self, context: &mut ViewContext<Self>) -> View {
+        let Some(config) = self.config.as_ref() else {
+            return TextBlock::new().text("配置未加载").into();
+        };
+        let schemes: Vec<&Keymap> = config.keymaps.iter().filter(|km| km.id > 4).collect();
+
+        // 左列：快捷键方案（915）——行内直接编辑名称/触发键/开关
+        let mut scheme_rows: Vec<(usize, View)> = Vec::new();
+        for (index, keymap) in schemes.iter().enumerate() {
+            scheme_rows.push((
+                index,
+                settings_view::scheme_row(
+                    &keymap.name,
+                    &keymap.hotkey,
+                    keymap.enable,
+                    context.callback(move |value: String| {
+                        Message::Opt(OptEdit::SchemeName(index, value))
+                    }),
+                    context.callback(move |value: String| {
+                        Message::Opt(OptEdit::SchemeHotkey(index, value))
+                    }),
+                    context.callback(move |value: bool| {
+                        Message::Opt(OptEdit::SchemeEnable(index, value))
+                    }),
+                ),
+            ));
+        }
+
+        // 左列卡：旧 `Border.leftPanel`（Ivory 面 + cream 边 2px + 圆角 14 + Padding 16）；
+        // 标题 915 旧 16 SemiBold + 底距 12
+        let left: View = Border::new()
+            .padding(theme::pad_md())
+            .margin(Thickness::new(0.0, 0.0, 16.0, 0.0))
+            .background(theme::ivory())
+            .border_brush(theme::border_cream())
+            .border_thickness(theme::card_border())
+            .corner_radius(theme::radius_card())
+            .vertical_alignment(VerticalAlignment::Top)
+            .content(
+                StackPanel::new().spacing(10.0).children((
+                    TextBlock::new()
+                        .text(i18n::t("915"))
+                        .font_size(theme::FONT_SECTION_TITLE)
+                        .font_weight(FontWeight::SEMI_BOLD)
+                        .foreground(theme::near_black())
+                        .margin(Thickness::new(0.0, 0.0, 0.0, 12.0)),
+                    settings_view::scheme_header(),
+                    StackPanel::new().keyed_children(scheme_rows),
+                    Button::new()
+                        .margin(Thickness::new(0.0, 10.0, 0.0, 0.0))
+                        .on_click(context.message(Message::Opt(OptEdit::SchemeAdd)))
+                        .content(TextBlock::new().text(i18n::t("405"))),
+                )),
+            );
+
+        // 右列：分区栈
+        let mut sections: Vec<(usize, View)> = Vec::new();
+
+        // 一次性提示（自启命令失败 / 保存校验失败）
+        if let Some(notice) = &self.settings_notice {
+            sections.push((
+                sections.len(),
+                TextBlock::new()
+                    .text(notice.clone())
+                    .font_size(theme::FONT_CAPTION)
+                    .foreground(theme::solid(theme::ERROR_CRIMSON))
+                    .text_wrapping(TextWrapping::Wrap)
+                    .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
+                    .into(),
+            ));
+        }
+
+        // 505 其他设置：506 开机自启（即时生效）/ 901 隐藏矩阵 / 781 语言
+        sections.push((
+            sections.len(),
+            self.section(context, "other", "505", |this, context| {
+                let languages = vec![
+                    "跟随系统".to_string(),
+                    "中文".to_string(),
+                    "English".to_string(),
+                ];
+                let language_index = match this
+                    .config
+                    .as_ref()
+                    .map(|config| config.options.language.as_str())
+                {
+                    Some("zh") => 1,
+                    Some("en") => 2,
+                    _ => 0,
+                };
+                StackPanel::new().children((
+                    settings_view::toggle_row(
+                        i18n::t("506"),
+                        this.config
+                            .as_ref()
+                            .map(|c| c.options.startup)
+                            .unwrap_or(false),
+                        context.callback(|value: bool| Message::StartupToggle(value)),
+                    ),
+                    settings_view::check_row(
+                        i18n::t("902"),
+                        this.config
+                            .as_ref()
+                            .map(|c| c.options.hide_matrix)
+                            .unwrap_or(false),
+                        context.callback(|value: bool| Message::Opt(OptEdit::HideMatrix(value))),
+                    ),
+                    settings_view::combo_row(
+                        i18n::t("781"),
+                        &languages,
+                        language_index,
+                        context.callback(|value: Option<usize>| {
+                            Message::Opt(OptEdit::Language(value.unwrap_or(0)))
+                        }),
+                    ),
+                ))
+            }),
+        ));
+
+        // 601 编辑程序分组（哨兵 Exclude/Global 不进编辑器）
+        sections.push((
+            sections.len(),
+            self.section(context, "groups", "601", |this, context| {
+                let groups: Vec<&crate::models::WindowGroup> = this
+                    .config
+                    .as_ref()
+                    .map(|config| {
+                        config
+                            .options
+                            .window_groups
+                            .iter()
+                            .filter(|group| group.id > 0)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let mut rows: Vec<(usize, View)> = Vec::new();
+                for (row, group) in groups.iter().enumerate() {
+                    let name_cb = context.callback(move |value: String| {
+                        Message::Opt(OptEdit::GroupName(row, value))
+                    });
+                    let value_cb = context.callback(move |value: String| {
+                        Message::Opt(OptEdit::GroupValue(row, value))
+                    });
+                    let condition_cb = context.callback(move |value: Option<usize>| {
+                        Message::Opt(OptEdit::GroupCondition(row, value.unwrap_or(0)))
+                    });
+                    let delete_cb = context.message(Message::Opt(OptEdit::GroupRemove(row)));
+                    rows.push((
+                        row,
+                        settings_view::group_row(
+                            &group.name,
+                            &group.value,
+                            group.condition_type.saturating_sub(1).max(0) as usize,
+                            name_cb,
+                            value_cb,
+                            condition_cb,
+                            delete_cb,
+                        ),
+                    ));
+                }
+                StackPanel::new().children((
+                    StackPanel::new().keyed_children(rows),
+                    Button::new()
+                        .on_click(context.message(Message::Opt(OptEdit::GroupAdd)))
+                        .content(TextBlock::new().text(i18n::t("609"))),
+                    settings_view::hint_row(i18n::t("612")),
+                ))
+            }),
+        ));
+
+        // 1116 自定义热键（keymap id=1；动作详情在动作编辑面板体系内）
+        sections.push((
+            sections.len(),
+            self.section(context, "customhotkeys", "1116", |this, context| {
+                let rows: Vec<(String, String)> = this
+                    .config
+                    .as_ref()
+                    .and_then(|config| config.keymaps.iter().find(|km| km.id == 1))
+                    .map(|keymap| {
+                        keymap
+                            .hotkeys
+                            .iter()
+                            .map(|(hotkey, actions)| {
+                                let function = actions
+                                    .iter()
+                                    .find(|action| !action.comment.is_empty())
+                                    .map(|action| action.comment.clone())
+                                    .unwrap_or_default();
+                                (hotkey.clone(), function)
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let mut list: Vec<(usize, View)> = Vec::new();
+                for (row, (hotkey, function)) in rows.iter().enumerate() {
+                    list.push((
+                        row,
+                        settings_view::hotkey_row(
+                            hotkey,
+                            function,
+                            context.callback(move |value: String| {
+                                Message::Opt(OptEdit::CustomHotkey(row, value))
+                            }),
+                        ),
+                    ));
+                }
+                StackPanel::new().children((
+                    StackPanel::new().keyed_children(list),
+                    Button::new()
+                        .on_click(context.message(Message::Opt(OptEdit::CustomHotkeyAdd)))
+                        .content(TextBlock::new().text(i18n::t("1118"))),
+                ))
+            }),
+        ));
+
+        // 701 修改鼠标参数（9 字段；字符串型数值原样透传，与旧版自由文本框一致）
+        sections.push((
+            sections.len(),
+            self.section(context, "mouse", "701", |this, context| {
+                let mouse = this
+                    .config
+                    .as_ref()
+                    .map(|config| config.options.mouse.clone())
+                    .unwrap_or_default();
+                fn text<C: Fn(String) -> Message + 'static>(
+                    callback: C,
+                ) -> impl Fn(String) -> Message + 'static {
+                    move |value: String| callback(value)
+                }
+                StackPanel::new().children((
+                    settings_view::hint_row(i18n::t("702")),
+                    settings_view::text_field(
+                        i18n::t("703"),
+                        &mouse.delay1,
+                        context.callback(text(|value| Message::Opt(OptEdit::MouseDelay1(value)))),
+                    ),
+                    settings_view::text_field(
+                        i18n::t("704"),
+                        &mouse.delay2,
+                        context.callback(text(|value| Message::Opt(OptEdit::MouseDelay2(value)))),
+                    ),
+                    settings_view::text_field(
+                        i18n::t("705"),
+                        &mouse.fast_single,
+                        context
+                            .callback(text(|value| Message::Opt(OptEdit::MouseFastSingle(value)))),
+                    ),
+                    settings_view::text_field(
+                        i18n::t("706"),
+                        &mouse.fast_repeat,
+                        context
+                            .callback(text(|value| Message::Opt(OptEdit::MouseFastRepeat(value)))),
+                    ),
+                    settings_view::text_field(
+                        i18n::t("707"),
+                        &mouse.slow_single,
+                        context
+                            .callback(text(|value| Message::Opt(OptEdit::MouseSlowSingle(value)))),
+                    ),
+                    settings_view::text_field(
+                        i18n::t("708"),
+                        &mouse.slow_repeat,
+                        context
+                            .callback(text(|value| Message::Opt(OptEdit::MouseSlowRepeat(value)))),
+                    ),
+                    settings_view::text_field(
+                        i18n::t("709"),
+                        &mouse.tip_symbol,
+                        context
+                            .callback(text(|value| Message::Opt(OptEdit::MouseTipSymbol(value)))),
+                    ),
+                    settings_view::check_row(
+                        i18n::t("710"),
+                        mouse.show_tip,
+                        context.callback(|value: bool| Message::Opt(OptEdit::MouseShowTip(value))),
+                    ),
+                    settings_view::check_row(
+                        i18n::t("711"),
+                        mouse.keep_mouse_mode,
+                        context.callback(|value: bool| Message::Opt(OptEdit::MouseKeepMode(value))),
+                    ),
+                ))
+            }),
+        ));
+
+        // 712 滚轮相关参数（3 字段）
+        sections.push((
+            sections.len(),
+            self.section(context, "scroll", "712", |this, context| {
+                let scroll = this
+                    .config
+                    .as_ref()
+                    .map(|config| config.options.scroll.clone())
+                    .unwrap_or_default();
+                StackPanel::new().children((
+                    settings_view::text_field(
+                        i18n::t("713"),
+                        &scroll.delay1,
+                        context
+                            .callback(|value: String| Message::Opt(OptEdit::ScrollDelay1(value))),
+                    ),
+                    settings_view::text_field(
+                        i18n::t("714"),
+                        &scroll.delay2,
+                        context
+                            .callback(|value: String| Message::Opt(OptEdit::ScrollDelay2(value))),
+                    ),
+                    settings_view::text_field(
+                        i18n::t("715"),
+                        &scroll.once_line_count,
+                        context
+                            .callback(|value: String| Message::Opt(OptEdit::ScrollOnceLine(value))),
+                    ),
+                ))
+            }),
+        ));
+
+        // 721 修改键盘布局：多行文本 + 四个预设按钮
+        sections.push((
+            sections.len(),
+            self.section(context, "layout", "721", |this, context| {
+                let layout = this
+                    .config
+                    .as_ref()
+                    .map(|config| config.options.keyboard_layout.clone())
+                    .unwrap_or_default();
+                StackPanel::new().spacing(8.0).children((
+                    TextBox::new()
+                        .text(layout)
+                        .accepts_return(true)
+                        .min_height(180.0)
+                        .on_text_changed(context.callback(|value: String| {
+                            Message::Opt(OptEdit::KeyboardLayoutSet(value))
+                        })),
+                    StackPanel::new()
+                        .orientation(Orientation::Horizontal)
+                        .spacing(8.0)
+                        .children((
+                            Button::new()
+                                .on_click(context.message(Message::Opt(OptEdit::LayoutPreset("0"))))
+                                .content(TextBlock::new().text(i18n::t("723"))),
+                            Button::new()
+                                .on_click(
+                                    context.message(Message::Opt(OptEdit::LayoutPreset("74"))),
+                                )
+                                .content(TextBlock::new().text(i18n::t("724"))),
+                            Button::new()
+                                .on_click(
+                                    context.message(Message::Opt(OptEdit::LayoutPreset("104"))),
+                                )
+                                .content(TextBlock::new().text(i18n::t("725"))),
+                            Button::new()
+                                .on_click(context.message(Message::Opt(OptEdit::LayoutPreset("1"))))
+                                .content(TextBlock::new().text(i18n::t("726"))),
+                        )),
+                ))
+            }),
+        ));
+
+        // 761 设置触发延时：方案下拉 + 毫秒数（提示 763）
+        sections.push((
+            sections.len(),
+            self.section(context, "delay", "761", |this, context| {
+                let schemes: Vec<String> = this
+                    .config
+                    .as_ref()
+                    .map(|config| {
+                        config
+                            .keymaps
+                            .iter()
+                            .filter(|km| km.id > 4)
+                            .map(|km| km.name.clone())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let index = this.delay_scheme.min(schemes.len().saturating_sub(1));
+                let delay = this
+                    .config
+                    .as_ref()
+                    .and_then(|config| config.keymaps.iter().filter(|km| km.id > 4).nth(index))
+                    .map(|keymap| keymap.delay.to_string())
+                    .unwrap_or_default();
+                StackPanel::new().children((
+                    settings_view::combo_row(
+                        i18n::t("915"),
+                        &schemes,
+                        index,
+                        context.callback(|value: Option<usize>| {
+                            Message::DelayScheme(value.unwrap_or(0))
+                        }),
+                    ),
+                    settings_view::text_field(
+                        i18n::t("762"),
+                        &delay,
+                        context.callback(move |value: String| {
+                            Message::Opt(OptEdit::SchemeDelay(index, value))
+                        }),
+                    ),
+                    settings_view::hint_row(i18n::t("763")),
+                ))
+            }),
+        ));
+
+        // 741 命令框皮肤（18 字段；748 透明度共用文案）
+        sections.push((
+            sections.len(),
+            self.section(context, "skin", "741", |this, context| {
+                let mut rows: Vec<(usize, View)> = Vec::new();
+                for (index, field) in settings::SKIN_FIELDS.iter().enumerate() {
+                    let value = this
+                        .config
+                        .as_ref()
+                        .and_then(|config| {
+                            settings::skin_get(&config.options.command_input_skin, field.key)
+                        })
+                        .unwrap_or("")
+                        .to_string();
+                    rows.push((
+                        index,
+                        settings_view::skin_row(
+                            i18n::t(field.label_key),
+                            &value,
+                            context.callback(move |value: String| {
+                                Message::Opt(OptEdit::Skin(index, value))
+                            }),
+                        ),
+                    ));
+                }
+                StackPanel::new().keyed_children(rows)
+            }),
+        ));
+
+        // 2503 命令框字体：路径 + 浏览 + 字重 + 恢复默认
+        sections.push((
+            sections.len(),
+            self.section(context, "font", "2503", |this, context| {
+                let (source, weight_index) = this
+                    .config
+                    .as_ref()
+                    .map(|config| {
+                        let index = settings::FONT_WEIGHTS
+                            .iter()
+                            .position(|weight| *weight == config.options.command_font.weight)
+                            .unwrap_or(2);
+                        (config.options.command_font.source_path.clone(), index)
+                    })
+                    .unwrap_or_default();
+                let weights: Vec<String> = settings::FONT_WEIGHTS
+                    .iter()
+                    .map(|w| i18n::t(settings::font_weight_label_key(w)))
+                    .collect();
+                StackPanel::new().children((
+                    settings_view::text_field(
+                        i18n::t("2504"),
+                        &source,
+                        context.callback(|value: String| Message::Opt(OptEdit::FontSource(value))),
+                    ),
+                    settings_view::button_row(
+                        "",
+                        i18n::t("2582"),
+                        context.message(Message::FontBrowse),
+                    ),
+                    settings_view::combo_row(
+                        i18n::t("2508"),
+                        &weights,
+                        weight_index,
+                        context.callback(|value: Option<usize>| {
+                            Message::Opt(OptEdit::FontWeight(value.unwrap_or(2)))
+                        }),
+                    ),
+                    settings_view::button_row(
+                        "",
+                        i18n::t("2507"),
+                        context.message(Message::Opt(OptEdit::FontReset)),
+                    ),
+                ))
+            }),
+        ));
+
+        // 907 编辑路径变量：行编辑 + 新增（933）
+        sections.push((
+            sections.len(),
+            self.section(context, "pathvars", "907", |this, context| {
+                let variables = this
+                    .config
+                    .as_ref()
+                    .map(|config| config.options.path_variables.clone())
+                    .unwrap_or_default();
+                let mut rows: Vec<(usize, View)> = Vec::new();
+                for (row, variable) in variables.iter().enumerate() {
+                    rows.push((
+                        row,
+                        settings_view::pathvar_row(
+                            &variable.name,
+                            &variable.value,
+                            context.callback(move |value: String| {
+                                Message::Opt(OptEdit::PathVarName(row, value))
+                            }),
+                            context.callback(move |value: String| {
+                                Message::Opt(OptEdit::PathVarValue(row, value))
+                            }),
+                            context.message(Message::Opt(OptEdit::PathVarRemove(row))),
+                        ),
+                    ));
+                }
+                StackPanel::new().children((
+                    StackPanel::new().keyed_children(rows),
+                    Button::new()
+                        .on_click(context.message(Message::Opt(OptEdit::PathVarAdd)))
+                        .content(TextBlock::new().text(i18n::t("933"))),
+                    settings_view::hint_row(i18n::t("911")),
+                ))
+            }),
+        ));
+
+        // 右列：旧 `StackPanel Width="460" Spacing="16" Margin="24,0,24,24"`（卡间距由
+        // section_card 自带底距 16 承担）；整页容器 = 旧 `Margin="24,20,24,28"`
+        let right: View = ScrollViewer::new().content(
+            StackPanel::new()
+                .width(460.0)
+                .horizontal_alignment(HorizontalAlignment::Left)
+                .margin(Thickness::new(24.0, 0.0, 24.0, 24.0))
+                .keyed_children(sections),
+        );
+
+        Grid::new()
+            .margin(Thickness::new(24.0, 20.0, 24.0, 28.0))
+            .columns([GridLength::Pixel(560.0), GridLength::STAR])
+            .children((left, Border::new().grid_column(1).content(right)))
+    }
+
     /// QuickSwitch 配置对话框（`ContentDialog`；草稿存在即打开）。
     ///
     /// 字段与旧 `QuickSwitchDialogWindow.axaml` 一致：4 个开关 + 历史条数 + 排除目录表 + 清空历史。
@@ -1821,23 +2721,12 @@ impl Shell {
                 context.message(Message::PluginImport),
             ),
         ));
-        rows.push((rows.len(), plugins_view::section_note()));
 
         if let Some(status) = &self.plugin_status {
             rows.push((rows.len(), plugins_view::status_banner(status)));
         }
 
-        if self.plugins_loading {
-            rows.push((rows.len(), plugins_view::loading()));
-        } else if let Some(error) = &self.plugins_error {
-            rows.push((
-                rows.len(),
-                plugins_view::load_error(error, context.message(Message::PluginsReload)),
-            ));
-        } else if plugins::show_empty_state(false, None, &cards) {
-            rows.push((rows.len(), plugins_view::empty_state()));
-        }
-
+        // 统一插件列表（旧版顺序：卡列表在前，加载/告警/空态随后）
         for card in &cards {
             let toggle_id = card.id.clone();
             let is_builtin = card.is_builtin;
@@ -1861,10 +2750,27 @@ impl Shell {
             ));
         }
 
+        if self.plugins_loading {
+            rows.push((rows.len(), plugins_view::loading()));
+        } else if let Some(error) = &self.plugins_error {
+            rows.push((
+                rows.len(),
+                plugins_view::load_error(error, context.message(Message::PluginsReload)),
+            ));
+        } else if plugins::show_empty_state(false, None, &cards) {
+            rows.push((rows.len(), plugins_view::empty_state()));
+        }
+
+        // 页尾：运行时边界说明 + 配置引导（旧版在列表之后）
+        rows.push((rows.len(), plugins_view::footer_notes()));
+
+        // 旧 `StackPanel Margin="36,32,36,40" Spacing="16" MaxWidth="820"`（左对齐）
         ScrollViewer::new().content(
             StackPanel::new()
-                .spacing(0.0)
-                .margin(theme::pad_lg())
+                .spacing(16.0)
+                .max_width(820.0)
+                .horizontal_alignment(HorizontalAlignment::Left)
+                .margin(Thickness::new(36.0, 32.0, 36.0, 40.0))
                 .keyed_children(rows),
         )
     }

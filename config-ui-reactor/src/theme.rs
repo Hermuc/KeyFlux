@@ -20,7 +20,7 @@ pub const IVORY: Color = Color::rgb(0xfa, 0xf9, 0xf5);
 pub const SAND: Color = Color::rgb(0xe8, 0xe6, 0xdc);
 pub const NEAR_BLACK: Color = Color::rgb(0x14, 0x14, 0x13);
 pub const CHARCOAL_WARM: Color = Color::rgb(0x4d, 0x4c, 0x48);
-pub const OLIVE_GRAY: Color = Color::rgb(0x5e, 0x7d, 0x59);
+pub const OLIVE_GRAY: Color = Color::rgb(0x5e, 0x5d, 0x59);
 pub const STONE_GRAY: Color = Color::rgb(0x87, 0x86, 0x7f);
 pub const DARK_WARM: Color = Color::rgb(0x3d, 0x3d, 0x3a);
 pub const TERRACOTTA: Color = Color::rgb(0xc9, 0x64, 0x42);
@@ -112,6 +112,17 @@ pub fn radius_xl() -> CornerRadius {
     CornerRadius::uniform(16.0)
 }
 
+/// 旧 `ClaudeRadiusCard`（14）—— 内容卡（插件卡/热键卡/分区卡）统一圆角。
+/// 迁移期曾误统一为 `radius_md`(8)，2026-09-28 按旧 UI 比对归还。
+pub fn radius_card() -> CornerRadius {
+    CornerRadius::uniform(14.0)
+}
+
+/// 旧 `ClaudeRadiusPanel`（4）—— 说明条/提示条/空态等次级面板圆角。
+pub fn radius_panel() -> CornerRadius {
+    CornerRadius::uniform(4.0)
+}
+
 // ---------------------------------------------------------------- 间距 / 描边
 
 pub fn pad_sm() -> Thickness {
@@ -129,6 +140,11 @@ pub fn pad_lg() -> Thickness {
 /// 1px 细环 —— **阴影替代方案**（旧版亦为 1px ring；reactor 无阴影 API）。
 pub fn hairline() -> Thickness {
     Thickness::uniform(1.0)
+}
+
+/// 内容卡描边宽度（旧 2px，2026-09-16 用户裁定「组件框描边有点细」1→2）。
+pub fn card_border() -> Thickness {
+    Thickness::uniform(2.0)
 }
 
 /// 侧栏分隔线（单向）。
@@ -152,6 +168,17 @@ pub const FONT_TITLE: f64 = 18.0;
 pub const FONT_SUBTITLE: f64 = 20.0;
 pub const FONT_BODY: f64 = 14.0;
 pub const FONT_CAPTION: f64 = 12.0;
+
+/// 页标题（旧 `TextBlock.pageTitle` = 24 Medium；迁移期误用 28/BOLD）。
+pub const FONT_PAGE_TITLE: f64 = 24.0;
+/// 分栏/区块标题（旧选项页左右列标题 = 16 SemiBold）。
+pub const FONT_SECTION_TITLE: f64 = 16.0;
+/// 卡片标题（旧 `.pluginName`/`sectionHeader`/`cardTitle` = 15 SemiBold）。
+pub const FONT_CARD_TITLE: f64 = 15.0;
+/// 徽标/小注文字（旧版本徽标、运行时标注 = 11）。
+pub const FONT_BADGE: f64 = 11.0;
+/// 开关状态等微字号（旧 ON/OFF 状态文字 = 10）。
+pub const FONT_MICRO: f64 = 10.0;
 
 // ---------------------------------------------------------------- 尺寸（旧 MainWindow）
 
@@ -182,16 +209,23 @@ mod tests {
         assert_eq!(RING_WARM, Color::rgb(0xd1, 0xcf, 0xc5));
         assert_eq!(RING_DEEP, Color::rgb(0xc2, 0xc0, 0xb6));
         assert_eq!(STONE_GRAY, Color::rgb(0x87, 0x86, 0x7f));
+        assert_eq!(
+            OLIVE_GRAY,
+            Color::rgb(0x5e, 0x5d, 0x59),
+            "皮肤 ClaudeOliveGrayBrush"
+        );
         assert_eq!(WHITE, Color::rgb(0xff, 0xff, 0xff));
         assert_eq!(MUTED_GREEN_SOFT, Color::rgb(0xe7, 0xeb, 0xe3));
     }
 
     #[test]
-    fn radius_tokens_are_sm_md_lg_xl() {
+    fn radius_tokens_are_sm_md_lg_xl_card_panel() {
         assert_eq!(radius_sm(), CornerRadius::uniform(6.0));
         assert_eq!(radius_md(), CornerRadius::uniform(8.0));
         assert_eq!(radius_lg(), CornerRadius::uniform(12.0));
         assert_eq!(radius_xl(), CornerRadius::uniform(16.0));
+        assert_eq!(radius_card(), CornerRadius::uniform(14.0));
+        assert_eq!(radius_panel(), CornerRadius::uniform(4.0));
     }
 
     #[test]
