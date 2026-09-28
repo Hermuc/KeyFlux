@@ -8,20 +8,22 @@ buildServer:
 	rm -f -r bin/templates
 	cp -r config-server/templates bin/templates
 
-# 发布 Avalonia 原生设置界面到 bin/ui/ (自包含, 免装 .NET 运行时)
-# 2026-09-12 裁剪+R2R: 发布调优 (PublishTrimmed/TrimMode/R2R/TrimmerRoots/STJ 反射开关)
-#   统一收进 KeyFlux.Settings.csproj 单一真源 —— 命令行 -p: 会覆盖 csproj, 本文件勿再传。
-#   实测: bin/ui 118M→65M (deploy 140M→87M), 冷启动 598ms (R2R 保 <1s), 面板稳态内存 <200MB。
-# 注意 PATH 陷阱: C:\Program Files\dotnet 可能只有运行时没有 SDK, 须显式探测
-# 2026-09-17 修 i18n 散资源断言配方 (原写法在 POSIX shell 下必然失败): 原用双引号包裹 pwsh -Command
-#   载荷, make 折半后的 $src/$dst/$h1 会被 sh 当变量展开成空 ⇒ 载荷退化为 `+ +`, pwsh 报 ParserError
-#   (且载荷里的中文会被 pwsh 按 ANSI 码页解码, 可能吞掉紧随的引号)。改为**单引号包裹**载荷 +
-#   载荷内只用双引号与 ASCII 文案 (注释仍可中文): 单引号阻断 sh 展开, make 的 $$ 折半后原样送进 pwsh。
-buildClientAvalonia:
-	@dotnet --list-sdks | grep -q . || (echo "[错误] dotnet --list-sdks 为空: 未找到 .NET SDK (PATH 陷阱: C:\\Program Files\\dotnet 可能只有运行时无 SDK), 请安装 SDK 或将 PATH 指向含 SDK 的 dotnet.exe"; exit 1)
+# 发布 Rust/WinUI3 原生设置界面 (config-ui-reactor) 到 bin/ui/。
+# 三道闸门 (迁移知识库 12 号): fmt --check / clippy -D warnings / test, 全绿才允许出包。
+# 自包含: build.rs 的 as_self_contained() 把 pinned Windows App Runtime stage 进 target/release
+#   (exe + 28 DLL + 4 PRI + ~87 语言资源目录), 排除 cargo 中间产物后整体拷入 bin/ui
+#   ⇒ 实测 207 文件 / 65MB。
+# ⚠️ 产物必须改名 KeyFlux.Settings.exe: 引擎按该文件名拉起面板
+#   (bin/lib/core/Functions.ahk: Run('...ui\KeyFlux.Settings.exe') / ProcessClose 同名)。
+# i18n 用 include_str! 编译期内嵌 (唯一真源 resources/i18n.json), 故无「散资源」拷贝;
+#   键数与语义一致性由 i18n 单测闸门守护 (cargo test)。
+# robocopy 退出码 0-7 均为成功 (与 deploy 目标同一约定)。
+buildClientReactor:
 	rm -f -r bin/ui
-	cd config-ui-avalonia; dotnet publish -c Release -r win-x64 --self-contained true -o ../bin/ui
-	@pwsh -NoProfile -Command '$$src="config-ui-avalonia/Resources/i18n.json"; $$dst="bin/ui/Resources/i18n.json"; if(!(Test-Path $$dst)){Write-Error ("[FAIL] missing loose resource: " + $$dst); exit 1}; $$h1=(Get-FileHash $$src -Algorithm SHA256).Hash; $$h2=(Get-FileHash $$dst -Algorithm SHA256).Hash; if($$h1 -ne $$h2){Write-Error ("[FAIL] i18n.json SHA256 mismatch: src=" + $$h1 + " out=" + $$h2); exit 1}; Write-Host ("[OK] i18n.json SHA256 match: " + $$h1)'
+	mkdir bin/ui
+	@pwsh -NoProfile -Command '. config-ui-reactor/env.ps1; cargo fmt --all --check; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] fmt --check"; exit 1}; cargo clippy --all-targets -- -D warnings; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] clippy -D warnings"; exit 1}; cargo test --quiet; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] test"; exit 1}; cargo build --release; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] release build"; exit 1}; Write-Host "[OK] cargo gates + release build"'
+	@pwsh -NoProfile -Command '$$src=(Resolve-Path "config-ui-reactor/target/release").Path; $$dst="bin/ui"; robocopy $$src $$dst /E /XD .fingerprint build deps examples incremental /XF *.pdb *.d *.cargo-lock *.cargo-build-lock *.cargo-artifact-lock keyflux-settings.exe | Out-Null; if($$LASTEXITCODE -ge 8){Write-Error ("[FAIL] robocopy exit " + $$LASTEXITCODE); exit 1}; Copy-Item "$$src/keyflux-settings.exe" "$$dst/KeyFlux.Settings.exe" -Force; Write-Host ("[OK] reactor client -> bin/ui: " + (Get-ChildItem $$dst -Recurse -File | Measure-Object).Count + " files")'
+	@test -f bin/ui/KeyFlux.Settings.exe || (echo "[FAIL] missing bin/ui/KeyFlux.Settings.exe"; exit 1)
 
 copyFiles: CopyAHK
 	rm -f -r $(folder)
@@ -44,7 +46,7 @@ CopyAHK:
 	cmd.exe /c CopyAHK.bat
 	rm CopyAHK.bat
 
-build: buildServer buildClientAvalonia copyFiles
+build: buildServer buildClientReactor copyFiles
 	cd bin; ./settings.exe ChangeVersion $(version)
 	rm -f KeyFlux-*.7z
 	7z.exe a $(zip) $(folder)
@@ -156,17 +158,13 @@ check: buildServer lint check-texttypes check-hooks sync-plugins | $(OUT_DIR)
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/oracle.ps1
 
-# check-cs: C# 设置界面单元测试 (dotnet SDK 须在 PATH; 本机 SDK 在 Scoop 的 dotnet-sdk)
-check-cs:
-	dotnet test KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --nologo
-
-# analyzers: IDE 代码风格诊断闸门 (未使用 using / 未使用私有成员 / 未使用变量与参数 / Substring 简化)
-# **必须两个项目都跑**: 2026-09-16 发现本闸门此前只覆盖 config-ui-avalonia, 测试项目从未受检,
-# 首次补跑即命中 5 处 (IDE0059 ×3 / IDE0060 ×1 / IDE0057 ×1, 均已修复)。
-# 前置: 需先 build/restore (故带 --no-restore); 与 .github/workflows/analyzers.yml 的命令须保持一致。
+# check-cs: (已退役) 原 C# 设置界面单测随 config-ui-avalonia 一并移除;
+#   等价契约覆盖在 config-ui-reactor 的 cargo test (models/services 单测) 中。
+# analyzers: 代码风格闸门。.NET 闸门随 Avalonia 退役; Rust 侧由 clippy -D warnings 承担
+#   (与 .github/workflows/analyzers.yml 的 reactor-gates 保持一致)。
+# 前置: 工具链经 config-ui-reactor/env.ps1 注入。
 analyzers:
-	dotnet format style config-ui-avalonia/KeyFlux.Settings.csproj --verify-no-changes --no-restore --severity info --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059
-	dotnet format style KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --verify-no-changes --no-restore --severity info --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059
+	@pwsh -NoProfile -Command '. config-ui-reactor/env.ps1; cargo fmt --all --check; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] fmt --check"; exit 1}; cargo clippy --all-targets -- -D warnings; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] clippy -D warnings"; exit 1}; Write-Host "[OK] rust style gates"'
 
 # sync-plugins: 把官方示例插件放到部署树 data/plugins。
 #   由来 (2026-09-18): 生成端只扫 `<config.json 同级>/plugins` (generators/plugins.go),
@@ -208,7 +206,7 @@ check-commandinput-patch:
 # ⚠️ 配方里的 echo 串必须带引号: 裸写的 `-> $(OUT_DIR)` 会被 sh 解析成**重定向**
 #    (`-` 后跟 `>`), 报 "D:/...: Is a directory" 并让 make 以 Error 1 收尾 —— 依赖链已全部执行完,
 #    但退出码骗人 (2026-09-17 实测踩到, 已加引号)。同一坑对 `build` 目标不适用 (其 echo 无 `->`)。
-out: buildServer buildClientAvalonia sync-out
+out: buildServer buildClientReactor sync-out
 	@echo "------------------------- out ok -> $(OUT_DIR) -------------------------------"
 
 # deploy: 回归通过后编译并同步到部署目录, 重启实例 (robocopy 退出码 0-7 均为成功)
@@ -218,7 +216,7 @@ out: buildServer buildClientAvalonia sync-out
 #   (实测 make Error 1; 此时前置步骤其实已全部成功, 只是实例没被重启)。
 #   改为**单引号**包裹载荷 (与 buildClientAvalonia 的 i18n 校验行同款): 单引号阻断 sh 展开,
 #   make 的 $$ 折半后原样送进 pwsh; 载荷内只用双引号与 ASCII。
-deploy: check buildClientAvalonia sync-out
+deploy: check buildClientReactor sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: server ahk buildServer buildClientAvalonia copyFiles upload build check check-texttypes check-cs check-hooks check-ime analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch out deploy
+.PHONY: server ahk buildServer buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch out deploy

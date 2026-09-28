@@ -1,16 +1,16 @@
 name: analyzers
 
-# IDE 代码风格诊断闸门 —— 未使用 using / 未使用私有成员 / 未使用变量与参数 / Substring 简化。
+# 代码风格/静态闸门 —— 风格漂移与契约回归。
 #
 # 为什么**独立于 release.yml** (2026-09-16 建):
 #   风格问题不该拦住发布 —— 本 workflow 只在 push / PR 上给红灯, 打 tag 出包不受影响。
 #   对应地, release.yml 保持原样未动。
 #
-# 为什么**两个项目都要跑**:
-#   该闸门此前只在 config-ui-avalonia 上跑, 测试项目 (KeyFlux.Settings.Tests) 从未受检;
-#   2026-09-16 首次补跑即命中 5 处 (IDE0059 ×3 / IDE0060 ×1 / IDE0057 ×1)。
-#
-# 命令须与 Makefile 的 `analyzers` 目标保持一致 (本地用 `make analyzers` 复现本 CI)。
+# 历史: 2026-09-16~09-27 期间是 .NET (config-ui-avalonia + KeyFlux.Settings.Tests) 的
+#   dotnet format 闸门; 2026-09-28 Avalonia 客户端退役, 改为 Rust 侧三道闸门
+#   (fmt --check / clippy -D warnings / cargo test), 与 Makefile 的 buildClientReactor
+#   严格一致 —— 本地 `make analyzers` 复现前两道, `make buildClientReactor` 复现全部。
+#   旧 C# 单测的契约覆盖已迁移为 config-ui-reactor 的 cargo 单测 (models/services)。
 
 on:
   push:
@@ -18,33 +18,40 @@ on:
   workflow_dispatch:
 
 jobs:
-  analyzers:
+  # Rust/WinUI3 客户端 (config-ui-reactor) 三道闸门。
+  # 说明: build.rs 的 windows_reactor_setup 在构建期会拉取 pinned Windows App Runtime
+  #   (NuGet 缓存), GitHub 托管机自带网络与 MSVC, 无需额外准备。
+  reactor-gates:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
+        working-directory: config-ui-reactor
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+      - name: Setup Rust toolchain (version pinned by rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
         with:
-          dotnet-version: 10.0.x
+          components: rustfmt, clippy
 
-      # 先 build (同时完成 restore) —— 闸门命令带 --no-restore, 与该前置严格配对
-      - name: Build (restores packages)
-        run: dotnet build KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj --nologo -v q
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            config-ui-reactor/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('config-ui-reactor/Cargo.lock') }}
 
-      - name: Analyzers gate — config-ui-avalonia
-        run: >
-          dotnet format style config-ui-avalonia/KeyFlux.Settings.csproj
-          --verify-no-changes --no-restore --severity info
-          --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059
+      - name: Fmt gate
+        run: cargo fmt --all --check
 
-      - name: Analyzers gate — KeyFlux.Settings.Tests
-        run: >
-          dotnet format style KeyFlux.Settings.Tests/KeyFlux.Settings.Tests.csproj
-          --verify-no-changes --no-restore --severity info
-          --diagnostics IDE0005 IDE0051 IDE0052 IDE0060 IDE0057 IDE0059
+      - name: Clippy gate (-D warnings)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test gate
+        run: cargo test --quiet
+

@@ -35,7 +35,7 @@
 
 本 fork 基于上游 [xianyukang/MyKeymap](https://github.com/xianyukang/MyKeymap)，主要改造如下：
 
-- 🖥️ **原生设置窗口**：Avalonia 桌面端（`config-ui-avalonia/`）取代旧 Vue 浏览器版，热键/托盘直接唤起，经 localhost HTTP 与 Go 后端通信，配置写盘仍由后端统一负责
+- 🖥️ **原生设置窗口**：Rust + WinUI3 桌面端（`config-ui-reactor/`，迁移自旧 Avalonia 版）取代旧 Vue 浏览器版，热键/托盘直接唤起，经 localhost HTTP 与 Go 后端通信，配置写盘仍由后端统一负责
 - ⚡ **「选中动作」系统**：选中文本或文件后按快捷键即执行预设操作，规则可可视化配置；支持「文件后缀」「文本特征」两类匹配，文本特征与行为强制联动，避免「选中链接却被程序打开」的错配
 - 🎨 **CommandInput 皮肤可配置**：输入框外观（背景、边框、圆角、网格线、按键配色、窗口位置、阴影等 18 项）可视化调整，存于 `commandInputSkin`
 - 🛡️ **更不容易崩溃**：单个热键配置出错只跳过并提示，不会导致整个程序退出
@@ -96,9 +96,9 @@
 <details>
 <summary>🛠️ 构建说明（开发者）</summary>
 
-- **源码**：`config-ui-avalonia/`（.NET 10 / Avalonia 11 / CommunityToolkit.Mvvm），单元测试在仓库根目录 `KeyFlux.Settings.Tests/`
-- **构建**：`make buildClientAvalonia`（完整构建 `make build` 已包含），`dotnet publish` 自包含 win-x64 + ReadyToRun 发布到 `bin/ui/`（不入库），需 .NET 10 SDK
-- **运行原理**：GUI 拉起 `settings.exe --headless` 子进程（Mutex 单实例 + Job Object 兜底回收），经 localhost HTTP 调用既有 API；GUI 不直接写 config.json
+- **源码**：`config-ui-reactor/`（Rust + windows-reactor 0.100 / WinUI3；2026-09-28 起取代 `config-ui-avalonia/`），单元测试随源码（`cargo test`，157 项）
+- **构建**：`make buildClientReactor`（完整构建 `make build` 已包含）——先跑三道闸门（`cargo fmt --check` / `clippy -D warnings` / `cargo test`）再发布；自包含 Windows App Runtime，产物整体拷入 `bin/ui/`（不入库）并改名为 `KeyFlux.Settings.exe`；工具链经 `config-ui-reactor/env.ps1` 注入
+- **运行原理**：GUI 拉起 `settings.exe --headless` 子进程（Mutex 单实例 + Job Object 兜底回收，`BREAKAWAY_OK` 保托盘存活），经 localhost HTTP 调用既有 API；GUI 不直接写 config.json
 - **入口**：AHK 设置入口（`bin/lib/core/Functions.ahk`）启动 `bin\ui\KeyFlux.Settings.exe`；旧浏览器版设置页已随 Vue 源码移除
 
 </details>

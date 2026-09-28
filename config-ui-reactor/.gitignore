@@ -1,0 +1,7 @@
+# Rust build output (large; never commit)
+/target
+
+# 构建日志与真机验证截图（过程产物，不入库；证据归档在迁移知识库）
+build-*.log
+evidence-*.png
+

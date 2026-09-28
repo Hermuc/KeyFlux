@@ -8,11 +8,6 @@ bin/templates
 bin/keyflux-settings-server
 bin/keyflux-settings-server.exe
 bin/settings.exe
-# Avalonia 设置界面构建产物 (自包含发布到 bin/ui/, 不入库)
-config-ui-avalonia/bin/
-config-ui-avalonia/obj/
-KeyFlux.Settings.Tests/bin/
-KeyFlux.Settings.Tests/obj/
 *.7z
 todo.md
 .idea
@@ -22,8 +17,8 @@ shortcuts/
 lanzou_cookie.txt
 CommandInputSkin.txt
 /go-tmp/
-# 测试运行输出 (dotnet test 生成)
-KeyFlux.Settings.Tests/TestResults/
+# Rust 构建产物 (cargo, 不入库; bin/ui 由 buildClientReactor 生成)
+config-ui-reactor/target/
 # 运行时生成的插件镜像与配置 (部署/启动产物, 不入库)
 data/plugins/
 # Python 工具字节码缓存 (lint_ident.py 等运行生成)
