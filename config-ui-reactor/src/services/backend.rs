@@ -18,6 +18,7 @@
 //! `CreateJobObject` / `AssignProcessToJobObject` / `SetInformationJobObject`。
 
 use std::io::{BufRead, BufReader};
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
@@ -191,17 +192,24 @@ impl BackendSession {
     }
 
     /// 子进程模式：拉起 `settings.exe --headless` 并读取端口通告。
+    ///
+    /// ⚠️ 必须带 `CREATE_NO_WINDOW`：`settings.exe` 是控制台程序，缺该标志时
+    /// spawn 会弹出一个黑色控制台窗口（2026-09-28 用户实测报告；旧 C#
+    /// `BackendSession.cs` 的 `CreateNoWindow=true` / `UseShellExecute=false` 即为此）。
     pub fn spawn(
         exe: &Path,
         working_directory: Option<&Path>,
         options: &BackendSessionOptions,
     ) -> Result<Self, BackendError> {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
         let mut command = Command::new(exe);
         command
             .arg(HEADLESS_FLAG)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .stdin(Stdio::null());
+            .stdin(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW);
         if let Some(dir) = working_directory {
             command.current_dir(dir);
         } else if let Some(parent) = exe.parent() {

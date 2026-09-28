@@ -10,3 +10,4 @@ pub mod keymap_view;
 pub mod markdown_view;
 pub mod plugins_view;
 pub mod selected_action_view;
+pub mod settings_view;

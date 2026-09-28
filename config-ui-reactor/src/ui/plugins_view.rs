@@ -15,49 +15,63 @@ use crate::services::i18n;
 use crate::services::plugins::PluginCard;
 use crate::theme;
 
-/// 页头：页标题 + 两个入口按钮。
+/// 页头：页标题 + 两个入口按钮（旧 `Grid *,Auto,Auto`：标题/市场 12 / 导入 8）。
 pub fn page_header<M, I>(on_market: M, on_import: I) -> View
 where
     M: IntoUnitCallback,
     I: IntoUnitCallback,
 {
-    StackPanel::new()
-        .orientation(Orientation::Horizontal)
-        .spacing(10.0)
-        .margin(Thickness::new(0.0, 0.0, 0.0, 14.0))
+    Grid::new()
+        .columns([GridLength::STAR, GridLength::Auto, GridLength::Auto])
         .children((
             TextBlock::new()
                 .text(i18n::t("2418"))
-                .font_size(28.0)
-                .font_weight(FontWeight::BOLD)
+                .font_size(theme::FONT_PAGE_TITLE)
+                .font_weight(FontWeight::MEDIUM)
                 .foreground(theme::near_black())
                 .vertical_alignment(VerticalAlignment::Center),
             Button::new()
+                .grid_column(1)
+                .margin(Thickness::new(12.0, 0.0, 0.0, 0.0))
                 .on_click(on_market)
                 .content(TextBlock::new().text(i18n::t("2428"))),
             Button::new()
+                .grid_column(2)
+                .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
                 .on_click(on_import)
                 .content(TextBlock::new().text(i18n::t("2427"))),
         ))
 }
 
-/// 第三方插件分区标题 + 说明。
-pub fn section_note() -> View {
-    StackPanel::new()
-        .spacing(2.0)
-        .margin(Thickness::new(0.0, 6.0, 0.0, 10.0))
-        .children((
+/// 运行时边界说明（2425，stone 12）+ 配置引导（2426，terracotta 11）——页尾两行。
+pub fn footer_notes() -> View {
+    StackPanel::new().spacing(4.0).children((
+        TextBlock::new()
+            .text(i18n::t("2425"))
+            .font_size(theme::FONT_CAPTION)
+            .foreground(theme::stone_gray())
+            .text_wrapping(TextWrapping::Wrap),
+        TextBlock::new()
+            .text(i18n::t("2426"))
+            .font_size(theme::FONT_BADGE)
+            .foreground(theme::terracotta())
+            .text_wrapping(TextWrapping::Wrap),
+    ))
+}
+
+/// 徽标胶囊（Warm Sand 底、圆角 10、内边距 8×2）。
+fn badge(text: &str, color: Color) -> View {
+    Border::new()
+        .background(theme::sand())
+        .corner_radius(windows_reactor::CornerRadius::uniform(10.0))
+        .padding(Thickness::new(8.0, 2.0, 8.0, 2.0))
+        .vertical_alignment(VerticalAlignment::Center)
+        .content(
             TextBlock::new()
-                .text(i18n::t("2421"))
-                .font_size(theme::FONT_SUBTITLE)
-                .font_weight(FontWeight::SEMI_BOLD)
-                .foreground(theme::near_black()),
-            TextBlock::new()
-                .text(i18n::t("2425"))
-                .font_size(theme::FONT_CAPTION)
-                .foreground(theme::stone_gray())
-                .text_wrapping(TextWrapping::Wrap),
-        ))
+                .text(text.to_string())
+                .font_size(theme::FONT_BADGE)
+                .foreground(theme::solid(color)),
+        )
 }
 
 /// 插件卡。
@@ -76,31 +90,41 @@ where
     P: IntoPayloadCallback<PointerEventInfo>,
 {
     let version = card.version_text();
+    // 标题行：名称 15 SemiBold + 版本徽标（Sand 胶囊 11）+ 运行时标注（仅用户插件，2421）
+    let mut title_items: Vec<(usize, View)> = Vec::new();
+    title_items.push((
+        title_items.len(),
+        TextBlock::new()
+            .text(card.display_name(english))
+            .font_size(theme::FONT_CARD_TITLE)
+            .font_weight(FontWeight::SEMI_BOLD)
+            .foreground(theme::near_black())
+            .vertical_alignment(VerticalAlignment::Center)
+            .into(),
+    ));
+    if !version.is_empty() {
+        title_items.push((title_items.len(), badge(&version, theme::CHARCOAL_WARM)));
+    }
+    if !card.is_builtin {
+        title_items.push((
+            title_items.len(),
+            badge(&i18n::t("2421"), theme::OLIVE_GRAY),
+        ));
+    }
     let title: View = StackPanel::new()
         .orientation(Orientation::Horizontal)
-        .spacing(10.0)
-        .children((
-            TextBlock::new()
-                .text(card.display_name(english))
-                .font_size(theme::FONT_SUBTITLE)
-                .font_weight(FontWeight::SEMI_BOLD)
-                .foreground(theme::near_black()),
-            TextBlock::new()
-                .text(version)
-                .font_size(theme::FONT_CAPTION)
-                .foreground(theme::solid(theme::OLIVE_GRAY))
-                .vertical_alignment(VerticalAlignment::Center),
-        ));
+        .spacing(8.0)
+        .keyed_children(title_items);
 
-    // 说明区（描述 + 作者 + 可配置提示），整体可点 ⇒ 打开配置
+    // 说明区（描述 13 olive + 作者 11 stone），整体可点 ⇒ 打开配置
     let mut details: Vec<(usize, View)> = Vec::new();
     if !card.description.is_empty() {
         details.push((
             details.len(),
             TextBlock::new()
                 .text(card.description.clone())
-                .font_size(theme::FONT_BODY)
-                .foreground(theme::solid(theme::CHARCOAL_WARM))
+                .font_size(13.0)
+                .foreground(theme::solid(theme::OLIVE_GRAY))
                 .text_wrapping(TextWrapping::Wrap)
                 .into(),
         ));
@@ -110,19 +134,8 @@ where
             details.len(),
             TextBlock::new()
                 .text(card.author.clone())
-                .font_size(theme::FONT_CAPTION)
+                .font_size(theme::FONT_BADGE)
                 .foreground(theme::stone_gray())
-                .into(),
-        ));
-    }
-    if card.can_configure {
-        details.push((
-            details.len(),
-            TextBlock::new()
-                .text(i18n::t("2426"))
-                .font_size(theme::FONT_CAPTION)
-                .foreground(theme::solid(theme::MUTED_GREEN))
-                .text_wrapping(TextWrapping::Wrap)
                 .into(),
         ));
     }
@@ -147,12 +160,19 @@ where
         .into();
     let status: View = TextBlock::new()
         .text(card.status_text())
-        .font_size(theme::FONT_CAPTION)
-        .foreground(theme::stone_gray())
+        .font_size(theme::FONT_MICRO)
+        .font_weight(FontWeight::SEMI_BOLD)
+        .foreground(if card.enabled {
+            theme::solid(theme::OLIVE_GRAY)
+        } else {
+            theme::stone_gray()
+        })
+        .margin(Thickness::new(0.0, 0.0, 12.0, 0.0))
+        .horizontal_alignment(HorizontalAlignment::Center)
         .into();
     let toggle_block: View = StackPanel::new()
         .spacing(2.0)
-        .horizontal_alignment(HorizontalAlignment::Right)
+        .horizontal_alignment(HorizontalAlignment::Center)
         .children((switch, status));
 
     let header: View = Grid::new()
@@ -166,63 +186,66 @@ where
 
     let rows: Vec<(usize, View)> = vec![(0, header), (1, info), (2, delete)];
 
+    // 旧 `Border.pluginCard`：Ivory 面 + cream 边 2px + 圆角 14 + Padding 20,16 + 底距 10
     Border::new()
-        .padding(theme::pad_md())
-        .margin(Thickness::new(0.0, 0.0, 0.0, 12.0))
-        .background(theme::card_background())
-        .border_brush(theme::card_stroke())
-        .border_thickness(theme::hairline())
-        .corner_radius(theme::radius_md())
+        .padding(Thickness::new(20.0, 16.0, 20.0, 16.0))
+        .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
+        .background(theme::ivory())
+        .border_brush(theme::border_cream())
+        .border_thickness(theme::card_border())
+        .corner_radius(theme::radius_card())
         .content(StackPanel::new().spacing(0.0).keyed_children(rows))
 }
 
-/// 加载中（2439）。
+/// 加载中（2439）：旧版为纯文字 13。
 pub fn loading() -> View {
-    StackPanel::new()
-        .spacing(10.0)
-        .horizontal_alignment(HorizontalAlignment::Center)
-        .children((
-            ProgressRing::new().is_active(true).width(36.0).height(36.0),
-            TextBlock::new()
-                .text(i18n::t("2439"))
-                .foreground(theme::stone_gray()),
-        ))
+    TextBlock::new()
+        .text(i18n::t("2439"))
+        .font_size(13.0)
+        .foreground(theme::stone_gray())
+        .into()
 }
 
 /// 目录加载告警（逐包错误汇总，多行）+ 重试。
+/// 旧版容器：Ivory 面 + cream 边 1px + 圆角 4（RadiusPanel）+ Padding 14。
 pub fn load_error(message: &str, on_retry: impl IntoUnitCallback) -> View {
     StackPanel::new().spacing(10.0).children((
-        TextBlock::new()
-            .text(message.to_string())
-            .font_size(theme::FONT_CAPTION)
-            .foreground(theme::solid(theme::ERROR_CRIMSON))
-            .text_wrapping(TextWrapping::Wrap),
+        Border::new()
+            .background(theme::ivory())
+            .border_brush(theme::border_cream())
+            .border_thickness(theme::hairline())
+            .corner_radius(theme::radius_panel())
+            .padding(Thickness::uniform(14.0))
+            .content(
+                TextBlock::new()
+                    .text(message.to_string())
+                    .font_size(theme::FONT_CAPTION)
+                    .foreground(theme::solid(theme::ERROR_CRIMSON))
+                    .text_wrapping(TextWrapping::Wrap),
+            ),
         Button::new()
             .on_click(on_retry)
             .content(TextBlock::new().text(i18n::t("920"))),
     ))
 }
 
-/// 空态引导（2429 + 2430）。
+/// 空态引导（2429 + 2430）：旧版 Warm Sand 面、无边、圆角 4、Padding 14、行距 5。
 pub fn empty_state() -> View {
     Border::new()
-        .padding(theme::pad_md())
-        .margin(Thickness::new(0.0, 0.0, 0.0, 12.0))
-        .background(theme::card_background())
-        .border_brush(theme::card_stroke())
-        .border_thickness(theme::hairline())
-        .corner_radius(theme::radius_md())
+        .background(theme::sand())
+        .corner_radius(theme::radius_panel())
+        .padding(Thickness::uniform(14.0))
         .content(
-            StackPanel::new().spacing(4.0).children((
+            StackPanel::new().spacing(5.0).children((
                 TextBlock::new()
                     .text(i18n::t("2429"))
-                    .font_size(theme::FONT_BODY)
+                    .font_size(13.0)
                     .font_weight(FontWeight::SEMI_BOLD)
                     .foreground(theme::solid(theme::CHARCOAL_WARM)),
                 TextBlock::new()
                     .text(i18n::t("2430"))
                     .font_size(theme::FONT_CAPTION)
-                    .foreground(theme::stone_gray())
+                    .foreground(theme::solid(theme::OLIVE_GRAY))
                     .text_wrapping(TextWrapping::Wrap),
             )),
         )
@@ -304,21 +327,26 @@ pub fn market_entry<C: IntoUnitCallback>(
     installing: bool,
     on_install: C,
 ) -> View {
+    // 标题行：名称 15 SemiBold + 版本徽标（对齐插件卡口径）
+    let version = entry.version_text();
+    let mut title_items: Vec<(usize, View)> = Vec::new();
+    title_items.push((
+        title_items.len(),
+        TextBlock::new()
+            .text(entry.display_name(english))
+            .font_size(theme::FONT_CARD_TITLE)
+            .font_weight(FontWeight::SEMI_BOLD)
+            .foreground(theme::near_black())
+            .vertical_alignment(VerticalAlignment::Center)
+            .into(),
+    ));
+    if !version.is_empty() {
+        title_items.push((title_items.len(), badge(&version, theme::CHARCOAL_WARM)));
+    }
     let title: View = StackPanel::new()
         .orientation(Orientation::Horizontal)
-        .spacing(10.0)
-        .children((
-            TextBlock::new()
-                .text(entry.display_name(english))
-                .font_size(theme::FONT_BODY)
-                .font_weight(FontWeight::SEMI_BOLD)
-                .foreground(theme::near_black()),
-            TextBlock::new()
-                .text(entry.version_text())
-                .font_size(theme::FONT_CAPTION)
-                .foreground(theme::solid(theme::OLIVE_GRAY))
-                .vertical_alignment(VerticalAlignment::Center),
-        ));
+        .spacing(8.0)
+        .keyed_children(title_items);
 
     let mut details: Vec<(usize, View)> = Vec::new();
     if !entry.description.is_empty() {
@@ -326,8 +354,8 @@ pub fn market_entry<C: IntoUnitCallback>(
             details.len(),
             TextBlock::new()
                 .text(entry.description.clone())
-                .font_size(theme::FONT_CAPTION)
-                .foreground(theme::solid(theme::CHARCOAL_WARM))
+                .font_size(13.0)
+                .foreground(theme::solid(theme::OLIVE_GRAY))
                 .text_wrapping(TextWrapping::Wrap)
                 .into(),
         ));
@@ -337,7 +365,7 @@ pub fn market_entry<C: IntoUnitCallback>(
             details.len(),
             TextBlock::new()
                 .text(entry.author.clone())
-                .font_size(theme::FONT_CAPTION)
+                .font_size(theme::FONT_BADGE)
                 .foreground(theme::stone_gray())
                 .into(),
         ));
@@ -363,13 +391,14 @@ pub fn market_entry<C: IntoUnitCallback>(
         (2, action),
     ];
 
+    // 几何对齐 `Border.pluginCard`（Ivory 面 / cream 边 2px / 圆角 14 / Padding 20,16）
     Border::new()
-        .padding(theme::pad_md())
+        .padding(Thickness::new(20.0, 16.0, 20.0, 16.0))
         .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
-        .background(theme::card_background())
-        .border_brush(theme::card_stroke())
-        .border_thickness(theme::hairline())
-        .corner_radius(theme::radius_md())
+        .background(theme::ivory())
+        .border_brush(theme::border_cream())
+        .border_thickness(theme::card_border())
+        .corner_radius(theme::radius_card())
         .content(StackPanel::new().spacing(0.0).keyed_children(rows))
 }
 
@@ -462,13 +491,13 @@ pub fn setting_row<C: IntoPayloadCallback<String>, F: IntoUnitCallback>(
         .keyed_children(children)
 }
 
-/// 一次性操作回显（导入/删除成功提示，文案由调用方按 2431 等格式化）。
+/// 一次性操作回显（导入/删除成功提示）：旧版 13 SemiBold terracotta。
 pub fn status_banner(message: &str) -> View {
     TextBlock::new()
         .text(message.to_string())
-        .font_size(theme::FONT_CAPTION)
-        .foreground(theme::solid(theme::MUTED_GREEN))
+        .font_size(13.0)
+        .font_weight(FontWeight::SEMI_BOLD)
+        .foreground(theme::terracotta())
         .text_wrapping(TextWrapping::Wrap)
-        .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
         .into()
 }
