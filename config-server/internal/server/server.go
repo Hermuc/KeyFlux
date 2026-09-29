@@ -18,12 +18,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Run 启动 HTTP 服务。参数显式传入 main() 侧的状态:
-//   - hasError: 代码雨错误通道 (debug 模式下为 nil)
-//   - rainDone: 代码雨结束信号
-//   - debug: 调试模式 (开启 CORS、gin debug 输出、保存时重新生成脚本)
-//   - headless: 无头模式 (Avalonia 壳子进程拉起, 端口通告行)
-func Run(hasError chan<- struct{}, rainDone <-chan struct{}, debug bool, headless bool) {
+// NewRouter 装配 gin 引擎（路由 + 中间件）。
+//
+// 抽出的理由：HTTP 服务（Run）与 CLI 进程内桥（bridge.go）**必须共用同一套 handler**
+// ——「换传输不换逻辑」，避免 handler 逻辑产生第二真源。
+func NewRouter(hasError chan<- struct{}, rainDone <-chan struct{}, debug bool) *gin.Engine {
 	if !debug {
 		gin.SetMode(gin.ReleaseMode)
 		gin.DefaultWriter = io.Discard
@@ -63,6 +62,17 @@ func Run(hasError chan<- struct{}, rainDone <-chan struct{}, debug bool, headles
 	// 插件设置 (声明式 schema + 值; 存 data/plugin-settings.json, 引擎侧免重启热生效)
 	router.GET("/api/plugins/:id/settings", GetPluginSettingsHandler)
 	router.PUT("/api/plugins/:id/settings", SavePluginSettingsHandler)
+
+	return router
+}
+
+// Run 启动 HTTP 服务。参数显式传入 main() 侧的状态:
+//   - hasError: 代码雨错误通道 (debug 模式下为 nil)
+//   - rainDone: 代码雨结束信号
+//   - debug: 调试模式 (开启 CORS、gin debug 输出、保存时重新生成脚本)
+//   - headless: 无头模式 (Avalonia 壳子进程拉起, 端口通告行)
+func Run(hasError chan<- struct{}, rainDone <-chan struct{}, debug bool, headless bool) {
+	router := NewRouter(hasError, rainDone, debug)
 
 	// 先尝试 12333 端口, 失败了则用随机端口. 因为 12333 端口可能已被占用, 或者被禁:
 	// An attempt was made to access a socket in a way forbidden by its access permissions.
