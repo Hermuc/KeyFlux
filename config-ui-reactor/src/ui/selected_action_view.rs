@@ -82,8 +82,13 @@ where
             StackPanel::new()
                 .grid_column(1)
                 .orientation(Orientation::Horizontal)
-                .spacing(12.0)
+                .spacing(10.0)
                 .children((
+                    // 内置「开/关」文案置空；指示字在开关**正右边**
+                    ToggleSwitch::new()
+                        .is_on(enable)
+                        .on_toggled(on_enable)
+                        .slots(crate::ui::empty_on_off_slots()),
                     TextBlock::new()
                         .text(state)
                         .font_size(theme::FONT_CAPTION)
@@ -94,11 +99,6 @@ where
                             theme::stone_gray()
                         })
                         .vertical_alignment(VerticalAlignment::Center),
-                    // 内置「开/关」文案置空（只保留左侧 ON/OFF 指示，避免重复）
-                    ToggleSwitch::new()
-                        .is_on(enable)
-                        .on_toggled(on_enable)
-                        .slots(crate::ui::empty_on_off_slots()),
                 )),
         ));
 
