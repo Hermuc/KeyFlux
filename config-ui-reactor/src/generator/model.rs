@@ -155,7 +155,7 @@ pub struct Scroll {
     pub once_line_count: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CommandInputSkin {
     #[serde(rename = "backgroundColor")]

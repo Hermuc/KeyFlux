@@ -25,10 +25,19 @@
 make parity                                      # 用 bin/settings.exe 复现基线
 pwsh -File tools/parity/run_parity.ps1 -Exe <path>   # 换实现（如 Rust settings.exe）
 pwsh -File tools/parity/run_parity.ps1 -Capture      # 重新录制基线
+pwsh -File tools/parity/run_parity.ps1 -Exe <rust-settings.exe> -Kinds plan   # 只比某个产物
 ```
 
 - 输出末行为 ASCII：`PARITY: n/n PASS [CHECK|CAPTURE]`；失败时附 `  - <item> : MISMATCH [plan,ahk]`。
 - 退出码：0 = 全过，1 = 有任何不等（可直接作 CI 闸门）。
+- `-Kinds`（可多值，如 `-Kinds plan,ahk`）用于**增量迁移期**：只比已实现的产物 ——
+  Rust `settings.exe` 未实现的子命令会**显式报错退出 2**，故不筛选会得到一堆"预期失败"。
+  ⚠️ 参数名 `Kinds` 与脚本内局部变量 `itemKinds` 是**刻意不同名**的：PowerShell 变量名
+  大小写不敏感，若局部变量也叫 `kinds` 会覆盖参数、使过滤恒真（已实测踩过）。
+- ⚠️ **Rust `settings.exe` 的 `-Exe` 用法**：内置行为包取自**可执行文件目录**下的 `behaviors/`
+  （与 Go 一致，部署树里 `settings.exe` 与 `behaviors/` 同层）。若直接从
+  `config-ui-reactor/target/release/settings.exe` 运行，需先把 `bin/behaviors` 拷到它旁边，
+  否则行为目录为空 ⇒ `selectedAction` 的 `name` 会退化成 id、对账必红。
 
 ## 目录
 

@@ -10,6 +10,12 @@ publish = false
 name = "keyflux-settings"
 path = "src/main.rs"
 
+[[bin]]
+# P3：Rust 版 `settings.exe`（drop-in 替代 Go）。**增量实现** —— 未实现的子命令显式报错。
+# 与面板 bin 并列，故 Makefile 的 robocopy 必须把它排除在 bin/ui 之外（否则会误入部署的 UI 目录）。
+name = "settings"
+path = "src/bin/settings.rs"
+
 [lib]
 # P3（Rust 迁移）起 crate = lib + bin：
 # * lib 承载面板各层（app/models/platform/services/theme/ui），并作为后续 **Rust 生成器**

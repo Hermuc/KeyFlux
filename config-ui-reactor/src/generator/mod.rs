@@ -11,5 +11,8 @@
 //!    （`config-server` 侧有门控导出测试产出对账夹具）。
 //! 2. 每个单元迁完即跑端到端 parity；对账不过不推进。
 
+pub mod behaviors;
+pub mod config;
 pub mod model;
+pub mod plan;
 pub mod text;

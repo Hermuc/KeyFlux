@@ -27,7 +27,11 @@
 
 param(
   [string]$Exe = '',
-  [switch]$Capture
+  [switch]$Capture,
+  # Optional artifact filter (e.g. -Kinds plan). Used while the Rust settings.exe is being built
+  # incrementally: only the already-implemented artifacts can be compared, the rest would fail
+  # by design. Empty = every artifact declared per item in manifest.json.
+  [string[]]$Kinds = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,8 +78,10 @@ try {
   foreach ($item in $manifest.items) {
     $name = $item.name
     $total++
-    $kinds = @($item.artifacts)
-    if ($kinds.Count -eq 0) { $kinds = @('plan', 'ahk') }
+    $itemKinds = @($item.artifacts)
+    if ($itemKinds.Count -eq 0) { $itemKinds = @('plan', 'ahk') }
+    if ($Kinds.Count -gt 0) { $itemKinds = @($itemKinds | Where-Object { $Kinds -contains $_ }) }
+    if ($itemKinds.Count -eq 0) { continue }
 
     $itemWork = Join-Path $work $name
     New-Item -ItemType Directory -Force -Path $itemWork | Out-Null
@@ -89,7 +95,7 @@ try {
     $cfg = Join-Path $itemWork 'config.json'
     $ok = $true
     $outs = @{}
-    foreach ($kind in $kinds) {
+    foreach ($kind in $itemKinds) {
       if (-not $ArtifactMap.ContainsKey($kind)) { $fail += ("$name : unknown artifact '" + $kind + "'"); $ok = $false; break }
       $outs[$kind] = Join-Path $itemWork $ArtifactMap[$kind].Work
       $code = Invoke-Produce $kind $cfg $outs[$kind]
@@ -99,7 +105,7 @@ try {
 
     if ($Capture) {
       $deterministic = $true
-      foreach ($kind in $kinds) {
+      foreach ($kind in $itemKinds) {
         $second = Join-Path $itemWork ('second-' + $ArtifactMap[$kind].Work)
         $code = Invoke-Produce $kind $cfg $second
         if ($code -ne 0) {
@@ -113,14 +119,14 @@ try {
       }
       if (!$deterministic) { continue }
       New-Item -ItemType Directory -Force -Path $refDir | Out-Null
-      foreach ($kind in $kinds) {
+      foreach ($kind in $itemKinds) {
         Copy-Item $outs[$kind] (Join-Path $refDir ($name + '.' + $ArtifactMap[$kind].Ref)) -Force
       }
       $pass++
     }
     else {
       $bad = @()
-      foreach ($kind in $kinds) {
+      foreach ($kind in $itemKinds) {
         $ref = Join-Path $refDir ($name + '.' + $ArtifactMap[$kind].Ref)
         if (!(Test-Path $ref)) { $bad += ($kind + '(no-ref)'); continue }
         if ((Get-Sha256 $outs[$kind]) -ne (Get-Sha256 $ref)) { $bad += $kind }
