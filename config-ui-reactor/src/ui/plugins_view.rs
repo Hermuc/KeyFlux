@@ -170,9 +170,10 @@ where
         .margin(Thickness::new(0.0, 0.0, 12.0, 0.0))
         .horizontal_alignment(HorizontalAlignment::Center)
         .into();
+    // 状态字在开关**正右边**（用户定版：不再放开关下方）
     let toggle_block: View = StackPanel::new()
-        .spacing(2.0)
-        .horizontal_alignment(HorizontalAlignment::Center)
+        .orientation(Orientation::Horizontal)
+        .spacing(10.0)
         .children((switch, status));
 
     let header: View = Grid::new()

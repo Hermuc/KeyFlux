@@ -198,16 +198,16 @@ where
         .min_height(32.0)
         .on_text_changed(on_hotkey)
         .into();
-    // 开关统一 ON/OFF 指示（置空内置「开/关」，与选中动作/插件页同口径）
+    // 开关统一 ON/OFF 指示在**正右边**（置空内置「开/关」，三页同口径）
     let switch: View = StackPanel::new()
         .orientation(Orientation::Horizontal)
         .spacing(8.0)
         .children((
-            crate::ui::on_off_indicator(enabled),
             ToggleSwitch::new()
                 .is_on(enabled)
                 .on_toggled(on_enable)
                 .slots(crate::ui::empty_on_off_slots()),
+            crate::ui::on_off_indicator(enabled),
         ));
 
     Grid::new()
