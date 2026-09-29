@@ -1,0 +1,479 @@
+{
+  "keymaps": [
+    {
+      "id": 1,
+      "name": "Custom Hotkeys",
+      "enable": true,
+      "hotkey": "customHotkeys",
+      "parentID": 0,
+      "delay": 0,
+      "disableAt": "",
+      "hotkeys": {
+        "a": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 5,
+            "remapToKey": "b"
+          }
+        ],
+        "c": [
+          {
+            "windowGroupID": 1,
+            "actionTypeID": 5,
+            "remapToKey": "d"
+          }
+        ],
+        "e": [
+          {
+            "windowGroupID": 2,
+            "actionTypeID": 5,
+            "remapToKey": "f"
+          }
+        ],
+        "g": [
+          {
+            "windowGroupID": 3,
+            "actionTypeID": 5,
+            "remapToKey": "h"
+          }
+        ],
+        "i": [
+          {
+            "windowGroupID": 4,
+            "actionTypeID": 5,
+            "remapToKey": "j"
+          }
+        ],
+        "k": [
+          {
+            "windowGroupID": 5,
+            "actionTypeID": 5,
+            "remapToKey": "l"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "name": "Command",
+      "enable": true,
+      "hotkey": "capslockAbbr",
+      "parentID": 0,
+      "delay": 0,
+      "disableAt": "",
+      "hotkeys": {
+        "edit": [
+          {
+            "windowGroupID": 1,
+            "actionTypeID": 6,
+            "keysToSend": "{blind}code"
+          }
+        ],
+        "expr": [
+          {
+            "windowGroupID": 5,
+            "actionTypeID": 8,
+            "ahkCode": "Run(\"calc.exe\")"
+          }
+        ],
+        "jk": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 6,
+            "keysToSend": "{blind}jk"
+          }
+        ],
+        "multi": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 2,
+            "actionValueID": 1
+          },
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 6,
+            "keysToSend": "{enter}"
+          }
+        ],
+        "web": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 1,
+            "target": "chrome.exe"
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "name": "Abbreviation",
+      "enable": true,
+      "hotkey": "semicolonAbbr",
+      "parentID": 0,
+      "delay": 0,
+      "disableAt": "",
+      "hotkeys": {
+        ",": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 6,
+            "keysToSend": "{enter}"
+          }
+        ],
+        "sys": [
+          {
+            "windowGroupID": 2,
+            "actionTypeID": 2,
+            "actionValueID": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "name": "CapsLock",
+      "enable": true,
+      "hotkey": "*CapsLock",
+      "parentID": 0,
+      "delay": 0,
+      "disableAt": "ahk_exe steam.exe",
+      "hotkeys": {
+        "*0": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 8,
+            "ahkCode": "MsgBox(\"hello\")"
+          }
+        ],
+        "*1": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 1,
+            "target": "notepad.exe"
+          }
+        ],
+        "*2": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 2,
+            "actionValueID": 1
+          }
+        ],
+        "*3": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 3,
+            "actionValueID": 1
+          }
+        ],
+        "*4": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 3,
+            "actionValueID": 4
+          }
+        ],
+        "*5": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 4,
+            "actionValueID": 1
+          }
+        ],
+        "*6": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 4,
+            "actionValueID": 5
+          }
+        ],
+        "*7": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 6,
+            "keysToSend": "hello\n{text}world"
+          }
+        ],
+        "*8": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 7,
+            "actionValueID": 1
+          }
+        ],
+        "*9": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 7,
+            "actionValueID": 7
+          }
+        ],
+        "*e": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 9,
+            "actionValueID": 1
+          }
+        ],
+        "*q": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 9,
+            "actionValueID": 6
+          }
+        ],
+        "*r": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 9,
+            "actionValueID": 8
+          }
+        ],
+        "*t": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 5,
+            "remapToKey": "x"
+          }
+        ],
+        "*w": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 9,
+            "actionValueID": 5
+          }
+        ],
+        "*z": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 9,
+            "actionValueID": 9
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "name": "媒体控制",
+      "enable": true,
+      "hotkey": "*F13",
+      "parentID": 0,
+      "delay": 0,
+      "disableAt": "ahk_exe game1.exe\nahk_exe game2.exe",
+      "hotkeys": {
+        "m1": [
+          {
+            "windowGroupID": 1,
+            "actionTypeID": 1,
+            "winTitle": "ahk_exe calc.exe",
+            "target": "calc.exe",
+            "args": "/auto",
+            "workingDir": "D:\\tools",
+            "runAsAdmin": true
+          }
+        ],
+        "m2": [
+          {
+            "windowGroupID": 2,
+            "actionTypeID": 2,
+            "actionValueID": 5
+          }
+        ],
+        "m3": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 6,
+            "keysToSend": "ahk:ToolTip(\"hi\")\nsleep 500\n{enter}"
+          }
+        ],
+        "m4": [
+          {
+            "windowGroupID": 5,
+            "actionTypeID": 7,
+            "actionValueID": 19
+          }
+        ],
+        "m5": [
+          {
+            "windowGroupID": 1,
+            "actionTypeID": 4,
+            "actionValueID": 2
+          }
+        ],
+        "m6": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 9,
+            "actionValueID": 4
+          }
+        ],
+        "m7": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 9,
+            "actionValueID": 7
+          }
+        ]
+      }
+    }
+  ],
+  "options": {
+    "hideMatrix": false,
+    "keyfluxVersion": "",
+    "windowGroups": [
+      {
+        "id": 1,
+        "name": "Editor",
+        "value": "ahk_exe code.exe",
+        "conditionType": 1
+      },
+      {
+        "id": 2,
+        "name": "Browsers",
+        "value": "ahk_exe chrome.exe\nahk_exe firefox.exe",
+        "conditionType": 2
+      },
+      {
+        "id": 3,
+        "name": "Explorer",
+        "value": "ahk_class CabinetWClass",
+        "conditionType": 3
+      },
+      {
+        "id": 4,
+        "name": "NoPhotoshop",
+        "value": "ahk_exe photoshop.exe",
+        "conditionType": 4
+      },
+      {
+        "id": 5,
+        "name": "CustomExpr",
+        "value": "WinActive(\"A\") \u0026\u0026 GetKeyState(\"Shift\")",
+        "conditionType": 5
+      }
+    ],
+    "mouse": {
+      "keepMouseMode": false,
+      "showTip": true,
+      "tipSymbol": "🐶",
+      "delay1": "200",
+      "delay2": "600",
+      "fastSingle": "6",
+      "fastRepeat": "60",
+      "slowSingle": "30",
+      "slowRepeat": "150"
+    },
+    "scroll": {
+      "delay1": "200",
+      "delay2": "600",
+      "onceLineCount": "3"
+    },
+    "commandInputSkin": {
+      "backgroundColor": "",
+      "backgroundOpacity": "",
+      "borderWidth": "",
+      "borderColor": "",
+      "borderOpacity": "",
+      "borderRadius": "",
+      "cornerColor": "",
+      "cornerOpacity": "",
+      "gridlineColor": "",
+      "gridlineOpacity": "",
+      "keyColor": "",
+      "keyOpacity": "",
+      "hideAnimationDuration": "",
+      "windowYPos": "",
+      "windowWidth": "",
+      "windowShadowColor": "",
+      "windowShadowOpacity": "",
+      "windowShadowSize": ""
+    },
+    "pathVariables": [
+      {
+        "name": "editor",
+        "value": "D:\\tools\\edit.exe"
+      },
+      {
+        "name": "desktop",
+        "value": "ahk-expression: A_Desktop"
+      },
+      {
+        "name": "",
+        "value": "ignored-blank-name"
+      },
+      {
+        "name": "   ",
+        "value": "ignored-space-name"
+      }
+    ],
+    "startup": false,
+    "language": "",
+    "keyMapping": "",
+    "keyboardLayout": "",
+    "quickSwitch": {
+      "collectEnabled": true,
+      "autoShow": true,
+      "autoJumpOpen": true,
+      "autoJumpSave": false,
+      "pollIntervalMs": 800,
+      "maxHistory": 200,
+      "overlayRows": 8,
+      "overlayRowsCompact": 4,
+      "excludedPrefixes": [
+        "D:\\Archive",
+        "C:\\Temp"
+      ]
+    },
+    "plugins": {
+      "disabled": null
+    },
+    "commandFont": {
+      "sourcePath": "",
+      "weight": ""
+    }
+  },
+  "selectedAction": {
+    "hotkey": "\u003e^p",
+    "enable": true,
+    "mappings": [
+      {
+        "matchType": "textType",
+        "matchValue": "url",
+        "entries": [
+          {
+            "behavior": "open_url",
+            "options": {
+              "copyToClipboard": false,
+              "clearSelection": false,
+              "confirm": false
+            }
+          },
+          {
+            "behavior": "search",
+            "actionValue": "https://www.bing.com/search?q=%selected%",
+            "options": {
+              "copyToClipboard": true,
+              "clearSelection": false,
+              "confirm": false
+            }
+          }
+        ]
+      },
+      {
+        "matchType": "fileExt",
+        "matchValue": "jpg,png",
+        "entries": [
+          {
+            "behavior": "open",
+            "actionValue": "%selected%",
+            "options": {
+              "copyToClipboard": false,
+              "clearSelection": false,
+              "confirm": true
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

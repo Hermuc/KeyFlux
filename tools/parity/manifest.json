@@ -2,17 +2,23 @@
   "version": 1,
   "comment": "Differential-parity corpus for the Rust generator migration. Inputs are frozen; reference/ holds byte-exact outputs captured from the reference implementation (Go).",
   "template": "config-server/templates/keyflux.tmpl",
+  "skinTemplate": "config-server/templates/CommandInputSkin.tmpl",
   "items": [
     {
       "name": "factory",
       "config": "corpus/factory/config.json",
-      "artifacts": ["plan", "ahk"]
+      "artifacts": ["plan", "ahk", "skin"]
     },
     {
       "name": "factory-plugins",
       "config": "corpus/factory/config.json",
       "plugins": "plugins/examples",
-      "artifacts": ["plan", "ahk"]
+      "artifacts": ["plan", "ahk", "skin"]
+    },
+    {
+      "name": "synthetic",
+      "config": "corpus/synthetic/config.json",
+      "artifacts": ["plan", "ahk", "skin"]
     }
   ]
 }
