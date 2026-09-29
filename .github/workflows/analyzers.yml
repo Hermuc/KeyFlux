@@ -55,3 +55,28 @@ jobs:
       - name: Test gate
         run: cargo test --quiet
 
+  # 生成端差分对账 (P0, docs/plan-rust-migration.md §4)。
+  #   用当前构建的 settings.exe 复现 tools/parity/reference 的逐字节基线:
+  #   P0 阶段守护「基准不漂移」(生成规则改动未重新录制 reference 即红);
+  #   Rust 生成器接入后, 同一脚本即为 Go vs Rust 的等价性闸门。
+  parity-gate:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go (version pinned by config-server/go.mod)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: config-server/go.mod
+          cache-dependency-path: config-server/go.sum
+
+      - name: Build backend (settings.exe)
+        working-directory: config-server
+        run: go build -tags=nomsgpack -ldflags "-s -w -X settings/internal/script.KeyfluxVersion=ci" -o ../bin/settings.exe ./cmd/settings
+
+      - name: Parity gate (reference reproduction)
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./tools/parity/run_parity.ps1
+

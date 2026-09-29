@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "comment": "Differential-parity corpus for the Rust generator migration. Inputs are frozen; reference/ holds byte-exact outputs captured from the reference implementation (Go).",
+  "template": "config-server/templates/keyflux.tmpl",
+  "items": [
+    {
+      "name": "factory",
+      "config": "corpus/factory/config.json",
+      "artifacts": ["plan", "ahk"]
+    }
+  ]
+}

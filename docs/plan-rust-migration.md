@@ -97,10 +97,10 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 2. 冻结 `docs/CONTRACTS.md` 中生成契约，作为 parity 的期望源。
 
 **P0 开工清单（零行为风险）**
-- [ ] 建 `tools/parity/run_parity.ps1`：跑两版 → 逐字节 diff → 输出 `PARITY: n/n PASS`（纯 ASCII 供 CI）。
-- [ ] 语料：复用 `config-server/internal/script/testdata/` + `data/config.json` + 构造的插件/异常样本。
-- [ ] `Makefile` 加 `parity` 目标；`.github/workflows/analyzers.yml` 加一步。
-- [ ] **反证**：临时制造一处不等，确认 harness 变红（证明不是恒真断言）。
+- [x] 建 `tools/parity/run_parity.ps1`：`-Capture` 录制 / 默认 CHECK；跑两遍拒绝录制非确定性语料；纯 ASCII 输出 `PARITY: n/n PASS` + 退出码。
+- [x] `Makefile` 加 `parity` 目标；`.github/workflows/analyzers.yml` 加 `parity-gate`（用当前 `settings.exe` 复现基线）。
+- [x] **反证**：篡改 reference ⇒ `MISMATCH [ahk]` + exit 1（证明不是恒真断言）。
+- [ ] 语料扩充：当前仅 `factory`（`data/config.json` 冻结副本）；待补「含 `plugins/` 的项」（manifest 已支持 `plugins` 字段）与边界样本。
 
 ## 8. 附：不推荐的路径（备忘）
 

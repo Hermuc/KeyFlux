@@ -159,6 +159,13 @@ check: buildServer lint check-texttypes check-hooks sync-plugins | $(OUT_DIR)
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/oracle.ps1
 
+# parity: 生成端差分对账闸门 (P0, 见 docs/plan-rust-migration.md)。
+#   用当前 bin/settings.exe 复现 tools/parity/reference 的逐字节基线 —— 守护「基准不漂移」；
+#   Rust 生成器接入后, 同一脚本即为 Go vs Rust 的等价性闸门 (迁移的切换许可证)。
+#   -Capture 仅在**有意的**生成规则变更后重新录制 reference。
+parity:
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/parity/run_parity.ps1
+
 # check-cs: (已退役) 原 C# 设置界面单测随 config-ui-avalonia 一并移除;
 #   等价契约覆盖在 config-ui-reactor 的 cargo test (models/services 单测) 中。
 # analyzers: 代码风格闸门。.NET 闸门随 Avalonia 退役; Rust 侧由 clippy -D warnings 承担
