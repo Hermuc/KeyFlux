@@ -12,10 +12,10 @@
 //! | 工作目录 | 缺省 = settings.exe 所在目录（Go 依赖相对 `../data`、`./site`、`./templates`）|
 //! | 协议串 | `KEYFLUX_GUI_READY port=<p> elapsed_ms=<n>`（`:MainViewModel.cs:134`）、`KEYFLUX_BACKEND_EXITED code=<n>`（`:444`）|
 //!
-//! ⚠️ **与旧版的已知差异（Phase 3 待补）**：C# 用 **Job Object**（`BREAKAWAY_OK`）保证
-//! GUI 进程即使被强杀也会由 OS 连带回收后端子进程树；Rust 侧当前仅用 `Drop` 终止子进程
-//! （正常退出路径等价，**强杀 GUI 会留孤儿**）。补齐需 `windows` crate 的
-//! `CreateJobObject` / `AssignProcessToJobObject` / `SetInformationJobObject`。
+//! 子进程回收：除 `Drop` 终止子进程外，已用 **Job Object**（`crate::platform::job`，
+//! `KILL_ON_JOB_CLOSE` + `BREAKAWAY_OK`）保证 GUI 被强杀时由 OS 连带回收后端进程树；
+//! `BREAKAWAY_OK` 允许保存时以 `CREATE_BREAKAWAY_FROM_JOB` 重启的 KeyFlux **脱离**本 Job
+//! （关面板不杀托盘程序）。
 
 use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;
