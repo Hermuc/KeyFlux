@@ -157,7 +157,7 @@ where
     let switch: View = ToggleSwitch::new()
         .is_on(card.enabled)
         .on_toggled(on_toggle)
-        .into();
+        .slots(crate::ui::empty_on_off_slots());
     let status: View = TextBlock::new()
         .text(card.status_text())
         .font_size(theme::FONT_MICRO)
