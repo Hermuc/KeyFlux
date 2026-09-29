@@ -1394,6 +1394,52 @@ impl Shell {
         StackPanel::new().spacing(0.0).keyed_children(rows)
     }
 
+    /// 键位/缩写页右侧备注汇总列（可折叠）。
+    ///
+    /// 展开时**定宽 340**：默认 1200 窗宽下左列（STAR）仍能完整容纳键盘网格
+    /// （最宽行 ~700px，旧 `[STAR, STAR]` 半窗 ~564px 会横向裁切键格）；
+    /// 折叠时窄轨按钮，左列近乎全宽。点按钮往复切换。
+    pub(super) fn comments_column(
+        &self,
+        context: &mut ViewContext<Self>,
+        entries: &[keymap::CommentEntry],
+    ) -> View {
+        if self.comments_collapsed {
+            return Border::new()
+                .grid_column(1)
+                .margin(Thickness::new(12.0, 20.0, 8.0, 28.0))
+                .vertical_alignment(VerticalAlignment::Top)
+                .content(
+                    Button::new()
+                        .on_click(context.message(Message::ToggleComments))
+                        .content(TextBlock::new().text("« 备注")),
+                );
+        }
+        let comments: View = if entries.is_empty() {
+            keymap_view::comment_empty_hint()
+        } else {
+            keymap_view::comment_summary(entries)
+        };
+        Border::new()
+            .grid_column(1)
+            .width(340.0)
+            .margin(Thickness::new(20.0, 20.0, 4.0, 28.0))
+            .content(
+                StackPanel::new().spacing(4.0).children((
+                    Button::new()
+                        .on_click(context.message(Message::ToggleComments))
+                        .horizontal_alignment(HorizontalAlignment::Right)
+                        .content(
+                            TextBlock::new()
+                                .text("收起 »")
+                                .font_size(theme::FONT_CAPTION)
+                                .foreground(theme::stone_gray()),
+                        ),
+                    comments,
+                )),
+            )
+    }
+
     /// 键位图页：页头 + 键盘网格 + 动作编辑面板 + 右侧备注汇总。
     pub(super) fn keymap_page(&self, context: &mut ViewContext<Self>, keymap_id: i32) -> View {
         let Some(config) = self.config.as_ref() else {
@@ -1444,20 +1490,10 @@ impl Shell {
         );
 
         let entries = keymap::build_comment_entries(keymap, config);
-        let comments: View = if entries.is_empty() {
-            keymap_view::comment_empty_hint()
-        } else {
-            keymap_view::comment_summary(&entries)
-        };
-
-        let right: View = Border::new()
-            .grid_column(1)
-            .margin(Thickness::new(20.0, 20.0, 4.0, 28.0))
-            .content(comments);
 
         Grid::new()
-            .columns([GridLength::STAR, GridLength::STAR])
-            .children((left, right))
+            .columns([GridLength::STAR, GridLength::Auto])
+            .children((left, self.comments_column(context, &entries)))
     }
 
     /// 缩写页（id 2/3）：页头 + chips 网格 + 命令框 + 动作编辑面板 + 右侧备注汇总。
@@ -1531,20 +1567,10 @@ impl Shell {
 
         // 缩写页备注用 `format_space` 口径（原样键 + 尾部空格可见）
         let entries = abbr::build_comment_entries(keymap, config);
-        let comments: View = if entries.is_empty() {
-            keymap_view::comment_empty_hint()
-        } else {
-            keymap_view::comment_summary(&entries)
-        };
-
-        let right: View = Border::new()
-            .grid_column(1)
-            .margin(Thickness::new(20.0, 20.0, 4.0, 28.0))
-            .content(comments);
 
         Grid::new()
-            .columns([GridLength::STAR, GridLength::STAR])
-            .children((left, right))
+            .columns([GridLength::STAR, GridLength::Auto])
+            .children((left, self.comments_column(context, &entries)))
     }
 
     /// 指南页：`config.overviewDocMd` 优先，为空时已在后台拉取 `/config_doc.md`。
