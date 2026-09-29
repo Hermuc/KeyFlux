@@ -28,6 +28,13 @@ cargo test --quiet
 Assert-LastExit 'test'
 
 Write-Host '== [4/5] cargo build --release'
+# Mirror Makefile's `version = ...` (single source of truth): the Go build injects
+# it via -ldflags; the Rust build needs it as KEYFLUX_VERSION (option_env!) so that
+# GET /config's keyfluxVersion field matches the Go baseline byte-for-byte.
+$mkLine = Select-String -Path (Join-Path $repo 'Makefile') -Pattern '^version\s*=\s*(\S+)' | Select-Object -First 1
+if (-not $mkLine) { Write-Error '[FAIL] cannot read version from Makefile'; exit 1 }
+$env:KEYFLUX_VERSION = $mkLine.Matches[0].Groups[1].Value
+Write-Host "   KEYFLUX_VERSION=$env:KEYFLUX_VERSION"
 cargo build --release
 Assert-LastExit 'build'
 
