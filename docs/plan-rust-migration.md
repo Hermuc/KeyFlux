@@ -59,10 +59,10 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 
 | 阶段 | 交付物 | 验收门 | 回退 |
 |---|---|---|---|
-| **P0 护栏** | `tools/parity/` 差分 harness：Go=reference，固定语料（golden + 真实 config + 插件变体 + 异常输入）两版产物**逐字节**比对；`Makefile` 加 `parity`；CI 加一步 | harness 能抓假等价（先造一处"故意不等"验证会红） | 纯新增 |
+| **P0 护栏** | ✅ `tools/parity/`：3 条语料（`factory` / `factory-plugins` / `synthetic`）× 3 类产物（`plan` / `ahk` / `skin`）共 **9 份基线**，SHA-256 逐字节比对；`Makefile` 加 `parity`；CI 加 `parity-gate` | harness 能抓假等价（反证：篡改任一基线 ⇒ `MISMATCH [...]` + exit 1）；`-Capture` 跑两遍拒录非确定语料 | 纯新增 |
 | **P1 面板去 HTTP** | ✅ 已就绪（**默认值保持 `http`，且据 §4 ROI 复核决定不再翻**）：Go 进程内桥 `server.Call` + `CliSettingsApi`（18 方法全覆盖）+ `new_settings_api` 统一工厂 + `--api=cli`／`KEYFLUX_API` 阀 + 静态资源直读（§5 #12）+ **探测失败自动回退 HTTP**。未做（需真机且收益不足）：CLI 下「保存→重启引擎」走 Go 的 breakaway 降级分支 | 两传输同源（**共用同一套 gin handler**）；cargo 189 全绿；Go `Call` 冒烟实测 | `--api=http` / `KEYFLUX_API=http`（免重建） |
 | **P2 Rust 接管外围** | ✅ 仅保留**零变换**项：「使用指南文档 + 快捷方式列表」改**本机直读**（`services/local_fs.rs`，读不到回退后端）。❌ `GET /config` **不可**直读替代（§5 #13）。❌ plugins / behaviors **主动不做** —— 按 §4「ROI 复核」，复刻 965 行解析逻辑换 150 ms/次不值得 | `config_doc.md` 7522B 与后端逐字节相同；`shortcuts` 146 项与后端完全相同；cargo 189 全绿 | 直读返回 `None` 即自动回退后端（等于改动前行为） |
-| **P3 Rust 重写生成器 + drop-in** | 生成器 **与校验**（同源）迁 Rust；产出同名 `settings.exe`；Go 退为 reference（不进部署包） | **全语料 parity 100%** + golden + Oracle diff | 换回 Go 二进制（开关） |
+| **P3 Rust 重写生成器 + drop-in** | 生成器 **与校验**（同源）迁 Rust；产出同名 `settings.exe`；Go 退为 reference（不进部署包）。前置已就绪：语料覆盖全矩阵（`synthetic` = `golden_test.go` 的 `syntheticConfig()` 导出，21 个矩阵锚点全命中）+ 运行时两份产物均在闸门内 | **全语料 parity 100%** + golden + Oracle diff | 换回 Go 二进制（开关） |
 | **P4 Go 退役** | 消费方全指向 Rust；golden/CONTRACTS/Oracle 随迁；CI 由 `go test` → cargo + parity | 三闸门 + parity 全绿 | git 历史 |
 
 **顺序理由**：先去掉「连接」（P1），再换掉「实现」（P3）——两类风险分开，出问题能立刻归类。
