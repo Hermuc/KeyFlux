@@ -1,0 +1,9 @@
+{
+  "step": 15,
+  "method": "PUT",
+  "path": "/api/behaviors/parity_demo",
+  "corpus": "behavior_pack_demo_update.json",
+  "callLine": "KEYFLUX_CALL status=200",
+  "status": 200,
+  "bodyBase64": "eyJpZCI6InBhcml0eV9kZW1vIiwibmFtZSI6IuWvuei0pua8lOekuu+8iOaUue+8iSIsIm5hbWVFbiI6IlBhcml0eSBkZW1vICh1cGRhdGVkKSIsInZlcnNpb24iOiIxLjAuMSIsImRlc2NyaXB0aW9uIjoiYXBpLXBhcml0eSDooYzkuLrljIUgQ1JVRCDln7rnur/moLfmnKzvvIhQVVQg5L+u5pS55oCB77yJIiwic3BlY1ZlcnNpb24iOjEsImFwcGxpZXNUbyI6W3sidHlwZSI6InRleHRUeXBlIiwidmFsdWUiOiJwbGFpbiJ9XSwiZW50cnkiOnsia2luZCI6ImJ1aWx0aW4iLCJhY3Rpb24iOiJjb3B5IiwicGFyYW1zIjp7fX0sInBlcm1pc3Npb25zIjpbInNlbGVjdGlvbiIsInJ1biJdLCJzb3VyY2UiOiJ1c2VyIn0="
+}

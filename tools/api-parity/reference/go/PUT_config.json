@@ -1,0 +1,9 @@
+{
+  "step": 10,
+  "method": "PUT",
+  "path": "/config",
+  "corpus": null,
+  "callLine": "KEYFLUX_CALL status=200",
+  "status": 200,
+  "bodyBase64": "eyJtZXNzYWdlIjoib2siLCJyZXN0YXJ0RmFpbGVkIjpmYWxzZX0="
+}
