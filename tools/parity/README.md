@@ -54,6 +54,15 @@ Go 渲染路径存在**已知 map 迭代非确定性**（见 `config-server/inte
 仅当**有意的**生成规则变更（改了生成器/模板并接受新行为）时重新录制；录制后基线随之更新。
 若是无意变更 ⇒ 说明生成行为被意外改动，应修代码而不是重录基线（与 golden 的处理方式一致）。
 
+## 行尾与 git（重要）
+
+`reference/` 与 `corpus/` 在根 `.gitattributes` 里标记为 **`-text`**（原字节存取，禁 EOL 转换）：
+本闸门是**字节级**的，而 `core.autocrlf=true` 会在 checkout 时把存储的 LF 变成 CRLF
+⇒ 生成的 `plan.json`（LF）与取出的 reference（CRLF）不等，**只有 CI 会红**（本地工作区不重取，不复现）。
+
+- **不要**改成 `text eol=lf`——生成的 `KeyFlux.ahk` 本就是 CRLF，强制 LF 会改坏该产物。
+- 新增 reference 文件后若 `git add` 未按新属性重新哈希，需 `git rm --cached` 再 `git add` 强制重存。
+
 ## CI
 
 `.github/workflows/analyzers.yml` 的 `parity-gate` 用当前构建的 `settings.exe` 复现基线

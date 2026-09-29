@@ -75,7 +75,7 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 | 2 | **Go `json.Marshal` 默认 HTML 转义**（`<`/`>`/`&` → `\u003c`），serde_json 不转 | parity 逐字节比对暴露；按需对齐编码 |
 | 3 | 键序 / 字段序：Go 结构体序 vs serde 声明序 / `BTreeMap` 排序 | 显式固定序列化顺序 |
 | 4 | 数字格式化：Go `%v` vs Rust `Display`（浮点尾数、科学计数） | parity 覆盖超长/浮点样本 |
-| 5 | 行尾 CRLF vs LF | 统一按 Go 现状，parity 校验 |
+| 5 | 行尾 CRLF vs LF | 统一按 Go 现状，parity 逐字节校验。⚠️ 实测坑：`core.autocrlf=true` 会在 checkout 时改 reference 行尾 ⇒ 仅 CI 假红；`tools/parity/{reference,corpus}` 已在根 `.gitattributes` 标 `-text` |
 | 6 | **CLI 中文错误乱码**（输出经管道走控制台码页） | CLI 输出强制 UTF-8；结果行走 ASCII 标记 |
 | 7 | **保存失败被静默吞**（`proc.ExecCmd` 是 fire-and-forget，不查退出码） | CLI 适配器**必等退出码 + 解析 `KEYFLUX_SAVE`** |
 | 8 | **引擎不重生成**：`Launcher.ahk` 的 `NeedsRegenerate` 用 **mtime** 判定 | 保存后保证 mtime 更新，或显式触发重生成 |
