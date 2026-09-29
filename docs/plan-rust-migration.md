@@ -82,7 +82,7 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 | 9 | 保存副作用遗漏：缓存失效 / 外观变更 kill CommandInput / `restartFailed` 提示 | CLI 子命令逐条等价，用例 + parity 覆盖 |
 | 10 | `options.startup` 直读失真（现靠后端查 `schtasks` 回填） | 面板自查计划任务 |
 | 11 | 并发写 / 半写文件（面板被杀留 `*.tmp`） | `*.tmp` + 原子 rename；读侧容忍半写 |
-| 12 | **静态资源（使用指南 4 张图片 + 内部链接）依赖 `127.0.0.1:<port>`**：`Image` 经 `BitmapImage.UriSource` 取 URL，无端口即无 URL（CLI 模式实测限制） | 去 HTTP 前必须先定方案：① 验证 WinUI `BitmapImage` 能否加载 `file:///` URI；② 或给 vendor fork 的 reactor 加「按字节设源」（`SetSourceAsync`）；③ 或保留一个极小本地静态服务（只服务 `bin/site/**`） |
+| 12 | **静态资源（使用指南 4 张图片 + 内部链接）依赖 `127.0.0.1:<port>`**：`Image` 经 `BitmapImage.UriSource` 取 URL，无端口即无 URL（CLI 模式实测限制） | 去 HTTP 前必须定方案（**MS 文档只记载 `ms-appx:///` / `ms-appdata:///` / `http(s)`，`file:///` 不在支持列表 ⇒ ① 不可靠**）：**推荐 ②** 给 vendor fork 的 reactor 加「按字节设源」（`InMemoryRandomAccessStream` + `BitmapImage.SetSourceAsync`，或 `StorageFile` 直接赋 `Image.Source`）；③ 兜底保留极小本地静态服务（只服务 `bin/site/**`）。②③ 都需**真机视觉验收** |
 
 ## 6. 安全机制（四点保证）
 
