@@ -1420,23 +1420,32 @@ impl Shell {
         } else {
             keymap_view::comment_summary(entries)
         };
+        // ⚠️ 必须用 Grid 行约束而非 StackPanel：StackPanel 给子级无限高度，
+        // ScrollViewer 拿不到边界 ⇒ 不滚动、列表底部溢出窗口被裁（2026-09-29 实测）。
         Border::new()
             .grid_column(1)
             .width(340.0)
             .margin(Thickness::new(20.0, 20.0, 4.0, 28.0))
             .content(
-                StackPanel::new().spacing(4.0).children((
-                    Button::new()
-                        .on_click(context.message(Message::ToggleComments))
-                        .horizontal_alignment(HorizontalAlignment::Right)
-                        .content(
-                            TextBlock::new()
-                                .text("收起 »")
-                                .font_size(theme::FONT_CAPTION)
-                                .foreground(theme::stone_gray()),
-                        ),
-                    comments,
-                )),
+                Grid::new()
+                    .rows([GridLength::Auto, GridLength::STAR])
+                    .children((
+                        Border::new()
+                            .grid_row(0)
+                            .margin(Thickness::new(0.0, 0.0, 0.0, 4.0))
+                            .content(
+                                Button::new()
+                                    .on_click(context.message(Message::ToggleComments))
+                                    .horizontal_alignment(HorizontalAlignment::Right)
+                                    .content(
+                                        TextBlock::new()
+                                            .text("收起 »")
+                                            .font_size(theme::FONT_CAPTION)
+                                            .foreground(theme::stone_gray()),
+                                    ),
+                            ),
+                        Border::new().grid_row(1).content(comments),
+                    )),
             )
     }
 
