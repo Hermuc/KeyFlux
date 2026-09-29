@@ -25,7 +25,7 @@ use crate::models::{
 };
 use crate::platform::{self, WindowSpec};
 use crate::services::abbr;
-use crate::services::api::{ApiResponse, HttpSettingsApi, MessageBody, SettingsApi};
+use crate::services::api::{ApiResponse, MessageBody, SettingsApi};
 use crate::services::backend::{BackendSession, BackendSessionOptions, resolve_settings_exe};
 use crate::services::market::{self, MarketEntry};
 use crate::services::selected_action::{self as sa, MATCH_FILE_EXT, MATCH_TEXT_TYPE};
@@ -340,7 +340,7 @@ impl Component for Shell {
             Message::WindowSpy => {
                 if let Some(port) = self.port {
                     let _ = context.spawn_background(move |_token| {
-                        let api = HttpSettingsApi::new(port);
+                        let api = crate::services::transport::new_settings_api(port);
                         let response: ApiResponse<crate::services::api::EmptyJson> =
                             api.send_server_command(2);
                         Message::Notice(if response.success {
@@ -371,7 +371,7 @@ impl Component for Shell {
                 self.error = None;
                 // 行为目录快照（选中动作页消费；失败时目录为空 = 下拉空，不阻断页面）
                 let _ = context.spawn_background(move |_token| {
-                    let api = HttpSettingsApi::new(port);
+                    let api = crate::services::transport::new_settings_api(port);
                     let response = api.get_behaviors();
                     if let Some(value) = response.value {
                         Message::BehaviorsLoaded(Ok(Box::new(sa::Catalog {
@@ -551,7 +551,7 @@ impl Component for Shell {
                     return;
                 };
                 let _ = context.spawn_background(move |_token| {
-                    let api = HttpSettingsApi::new(port);
+                    let api = crate::services::transport::new_settings_api(port);
                     let response = api.play_selected_action(&type_id);
                     Message::SaPlayDone(if response.success {
                         Ok(())
@@ -939,7 +939,7 @@ impl Component for Shell {
                     };
                     if let Some(port) = self.port {
                         let _ = context.spawn_background(move |_token| {
-                            let api = HttpSettingsApi::new(port);
+                            let api = crate::services::transport::new_settings_api(port);
                             let response = api.create_behavior(&pack);
                             match response.success {
                                 true => Message::BhReloaded(Ok(())),
@@ -988,7 +988,7 @@ impl Component for Shell {
                         .map(|pack| pack.id.clone());
                     if let Some(behavior_id) = bound {
                         let _ = context.spawn_background(move |_token| {
-                            let api = HttpSettingsApi::new(port);
+                            let api = crate::services::transport::new_settings_api(port);
                             let _ = api.delete_behavior(&behavior_id);
                             let _ = api.apply_behaviors();
                             Message::Noop
@@ -1021,7 +1021,7 @@ impl Component for Shell {
                 let selected_action = Some(snapshot.selected_action.clone());
                 let content = self.mt_test.clone();
                 let _ = context.spawn_background(move |_token| {
-                    let api = HttpSettingsApi::new(port);
+                    let api = crate::services::transport::new_settings_api(port);
                     let response = api.test_selected_action(
                         &content,
                         is_file,
@@ -1142,7 +1142,7 @@ impl Component for Shell {
                 let id = pack.id.clone();
                 self.bh_saving = true;
                 let _ = context.spawn_background(move |_token| {
-                    let api = HttpSettingsApi::new(port);
+                    let api = crate::services::transport::new_settings_api(port);
                     let response = if is_new {
                         api.create_behavior(&pack)
                     } else {
@@ -1177,7 +1177,7 @@ impl Component for Shell {
                 let id = draft.id.clone();
                 self.bh_saving = true;
                 let _ = context.spawn_background(move |_token| {
-                    let api = HttpSettingsApi::new(port);
+                    let api = crate::services::transport::new_settings_api(port);
                     let response = api.delete_behavior(&id);
                     Message::BhSaved(if response.success {
                         Ok(())
@@ -1193,7 +1193,7 @@ impl Component for Shell {
                     return;
                 };
                 let _ = context.spawn_background(move |_token| {
-                    let api = HttpSettingsApi::new(port);
+                    let api = crate::services::transport::new_settings_api(port);
                     let response = api.apply_behaviors();
                     Message::BhApplied(if response.success {
                         Ok(())
@@ -1297,7 +1297,7 @@ impl Component for Shell {
             Message::PluginDelete(id) => {
                 if let Some(port) = self.port {
                     let _ = context.spawn_background(move |_token| {
-                        let api = HttpSettingsApi::new(port);
+                        let api = crate::services::transport::new_settings_api(port);
                         let response = api.delete_plugin(&id);
                         Message::PluginDeleted {
                             id,
@@ -1355,7 +1355,7 @@ impl Component for Shell {
                     .unwrap_or_else(|| "plugin.zip".to_string());
 
                 let _ = context.spawn_background(move |_token| {
-                    let api = HttpSettingsApi::new(port);
+                    let api = crate::services::transport::new_settings_api(port);
                     let response = api.import_plugin(&bytes, &file_name);
                     Message::PluginImported(match response.value {
                         Some(manifest) => Ok(manifest.name),
@@ -1408,7 +1408,7 @@ impl Component for Shell {
                 let _ = context.spawn_background(move |_token| {
                     // 客户端下载 zip → 复用本地导入链路（后端不出网）
                     let outcome = market::download_zip(&url).and_then(|bytes| {
-                        let api = HttpSettingsApi::new(port);
+                        let api = crate::services::transport::new_settings_api(port);
                         let response = api.import_plugin(&bytes, &format!("{id}.zip"));
                         match response.value {
                             Some(manifest) => Ok(manifest.name),
@@ -1524,7 +1524,7 @@ impl Component for Shell {
                 self.ps_saving = true;
                 self.ps_error = None;
                 let _ = context.spawn_background(move |_token| {
-                    let api = HttpSettingsApi::new(port);
+                    let api = crate::services::transport::new_settings_api(port);
                     let response = api.save_plugin_settings(&id, &values);
                     Message::PsSaved(if response.success {
                         Ok(())
@@ -1578,7 +1578,7 @@ impl Component for Shell {
                     if let Some(port) = self.port {
                         let plugin_id = manifest.id.clone();
                         let _ = context.spawn_background(move |_token| {
-                            let api = HttpSettingsApi::new(port);
+                            let api = crate::services::transport::new_settings_api(port);
                             let response = api.get_plugin_settings(&plugin_id);
                             Message::PsLoaded {
                                 id: plugin_id,
@@ -1682,7 +1682,7 @@ impl Component for Shell {
                 if let Some(port) = self.port {
                     let command_id = settings::startup_command_id(enabled);
                     let _ = context.spawn_background(move |_token| {
-                        let api = HttpSettingsApi::new(port);
+                        let api = crate::services::transport::new_settings_api(port);
                         let response = api.send_server_command(command_id);
                         Message::StartupDone(if response.success {
                             Ok(())

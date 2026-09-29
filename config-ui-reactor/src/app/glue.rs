@@ -11,45 +11,51 @@ pub fn load_backend(slot: SessionSlot) -> Message {
     let args: Vec<String> = std::env::args().collect();
     let options = BackendSessionOptions::parse(&args);
 
-    let session = match connect(&options) {
-        Ok(session) => session,
-        Err(reason) => return Message::Failed(reason),
+    // 传输分流：CLI 模式（`--api=cli`）不拉子进程、不占端口；HTTP 模式与改动前完全一致。
+    let (api, port): (Arc<dyn SettingsApi>, u16) = match crate::services::transport::transport() {
+        crate::services::transport::Transport::Cli => (
+            Arc::new(crate::services::cli_api::CliSettingsApi::for_panel()),
+            0,
+        ),
+        crate::services::transport::Transport::Http => {
+            let session = match connect(&options) {
+                Ok(session) => session,
+                Err(reason) => return Message::Failed(reason),
+            };
+            let port = session.port();
+            let api = session.api();
+            // 会话必须存活（持有子进程，drop 即终止）⇒ 移交到组件持有的槽。
+            if let Ok(mut guard) = slot.lock() {
+                *guard = Some(session);
+            }
+            (api, port)
+        }
     };
 
-    let response = session.api().get_config();
+    let response = api.get_config();
     let Some(config) = response.value.clone() else {
         return Message::Failed(
             response
                 .error_message
-                .unwrap_or_else(|| format!("读取配置失败 (HTTP {})", response.status)),
+                .unwrap_or_else(|| format!("读取配置失败 (status {})", response.status)),
         );
     };
-    let port = session.port();
 
     // 使用指南文档：自定义内容优先，为空时取后端静态站的默认文档
     // （对齐旧 `HomePageViewModel.LoadAsync`）。
     let mut doc_md = config.overview_doc_md.clone();
     if doc_md.trim().is_empty() {
-        doc_md = session
-            .api()
-            .get_raw_text("/config_doc.md")
-            .value
-            .unwrap_or_default();
+        doc_md = api.get_raw_text("/config_doc.md").value.unwrap_or_default();
     }
 
     // 快捷方式列表（`GET /shortcuts`；空目录后端返回 null ⇒ 容忍为空）
-    let shortcuts = session
-        .api()
+    let shortcuts = api
         .get_shortcuts()
         .value
         .unwrap_or_default()
         .into_iter()
         .map(|item| item.path)
         .collect::<Vec<_>>();
-
-    if let Ok(mut guard) = slot.lock() {
-        *guard = Some(session);
-    }
 
     Message::Ready {
         config: Box::new(config),
@@ -100,7 +106,7 @@ pub fn connect(options: &BackendSessionOptions) -> Result<BackendSession, String
 /// 清洗后 PUT 配置（`ConfigSaver` 语义），返回保存提示文案。
 pub fn save(port: u16, config: &Config) -> Result<String, String> {
     let payload = store::clean_for_save(config);
-    let api = HttpSettingsApi::new(port);
+    let api = crate::services::transport::new_settings_api(port);
     let response: ApiResponse<MessageBody> = api.save_config(&payload);
 
     if !response.success {
