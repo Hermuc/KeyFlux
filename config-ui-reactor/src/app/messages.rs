@@ -104,6 +104,8 @@ pub enum Message {
     Nav(Option<String>),
     /// 点选键格 / 缩写条目（复刻 `Key.vue` click；禁用键已在状态层拦住）。
     SelectKey(String),
+    /// 键位/缩写页右侧备注汇总折叠 ⇄ 展开（布局优先保证键盘网格完整显示）。
+    ToggleComments,
     /// 缩写页命令框输入。
     CmdText(String),
     /// 缩写页命令框回车执行（`del <缩写>` / `rn <新名>` / 其余视为选中）。

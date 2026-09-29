@@ -117,6 +117,8 @@ pub struct Shell {
     sa_add: Option<SaAddDraft>,
     /// 行为编辑尾随保存的代际计数（防抖窗口内新编辑使旧定时器失效）。
     sa_save_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// 键位/缩写页右侧备注汇总是否折叠（默认展开；折叠以优先保证键盘网格完整显示）。
+    comments_collapsed: bool,
     /// 「管理匹配类型」对话框是否打开。
     mt_dialog: bool,
     /// 匹配类型编辑草稿（`None` = 未进入编辑/已清）。
@@ -218,6 +220,7 @@ impl Component for Shell {
             sa_status: None,
             sa_add: None,
             sa_save_gen: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            comments_collapsed: false,
             mt_dialog: false,
             mt_draft: None,
             mt_status: None,
@@ -266,6 +269,9 @@ impl Component for Shell {
             }
             // 禁用键的判断已在状态层完成，这里再兜一道（复刻 `KeymapEditorCore.SelectKey` 的
             // 空值/禁用键 guard：键盘网格页与未来入口共用该消息）
+            Message::ToggleComments => {
+                self.comments_collapsed = !self.comments_collapsed;
+            }
             Message::SelectKey(hotkey) => {
                 if hotkey.is_empty() {
                     return;
