@@ -28,6 +28,7 @@ pub mod app;
 pub mod generator;
 pub mod models;
 pub mod platform;
+pub mod server;
 pub mod services;
 pub mod theme;
 pub mod ui;

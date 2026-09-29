@@ -29,6 +29,9 @@ path = "src/lib.rs"
 regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+# R1「面板后端 HTTP 服务模式」（settings.exe --headless）：轻量 HTTP/1.1 服务端，
+# 支持 keep-alive 与并发连接，替代 Go gin 的最小子集（/health /config /server/command/:id）。
+tiny_http = "0.12"
 ureq = "3.4.2"
 windows-reactor = "0.100"
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_UI_Controls_Dialogs", "Win32_UI_WindowsAndMessaging"] }
