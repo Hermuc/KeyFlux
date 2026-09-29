@@ -129,3 +129,28 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 - **直接删除 Go 并让 Rust 重写**（无对账）：正是「第二真源」的制造方式——两份无对账实现必然漂移，症状是"设置改了引擎不生效"这类**静默 bug**。
 - **只删原真源**：不解决分叉，只是换了幸存者；若忘记迁移消费方（`Launcher.ahk` 等）会直接破坏核心功能。
 - 正确姿态：**收敛到一份**，而非"删掉其中一份"。本方案即"先对账、再替换、后淘汰"。
+
+## 9. 附：P4 切换 runbook（2026-09-29 更新，代码侧已全部就绪）
+
+**当前态**：Rust `settings.exe` 五个子命令（DumpPlan / GenerateAHK / GenerateScripts /
+ChangeVersion / UseOriginalAHK）+ `InstallCommandFont` 均已实现；对 4 条语料的
+plan/ahk/skin 共 12 份产物与 Go **逐字节一致**（双向 `PARITY: 4/4 PASS`）；
+`GenerateScripts` 已在沙箱部署树做 Go vs Rust 差分冒烟（两产物 SHA256 相同）。
+
+**消费方无需改动**：`bin/Launcher.ahk:40`、`tools/oracle.ps1`、`误报病毒时执行这个.bat`
+全部按**文件名**调用 `bin/settings.exe` —— 覆盖该文件即完成切换。
+
+**切换步骤**（需要真机验收，建议用户在场）：
+
+1. `make parity` 必须 `4/4 PASS`；`cargo test` 全绿。
+2. `make drop-in-rust`（新增目标：fmt/clippy/test/release 全过才覆盖 `bin/settings.exe`）。
+3. 仓库内验证：`cd bin && ./settings.exe DumpPlan ../data/config.json %TEMP%\p.json`，
+   与 `tools/parity/reference/factory.plan.json` 比对应相等。
+4. 部署：`make deploy`（sync-out 会把新二进制带进部署树并重启实例）。
+5. **真机验收清单**：① 引擎开机生成（`Launcher.ahk` 的 `NeedsRegenerate` 走 mtime，
+   首次切换建议删 `bin/KeyFlux.ahk` 强制重生成）；② 设置保存→引擎重启生效；
+   ③ **换命令框字体生效**（`font/font.ttf` 由 Rust `InstallCommandFont` 落盘）；
+   ④ 命令框唤起正常（字体渲染）。
+6. 回退：`make buildServer`（重建 Go 版覆盖回去）—— Go 源码与 `go test` 守卫保留至确认稳定。
+7. 稳定后再做收尾：`go test` 守卫改挂 cargo + parity、从部署包移除 Go 二进制、
+   `docs/CONTRACTS.md`/golden 的"实现语言"措辞随迁。

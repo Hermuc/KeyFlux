@@ -45,7 +45,9 @@ $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $here 'manifest.json') | 
 $template = Join-Path $repo $manifest.template
 $skinTemplate = Join-Path $repo $manifest.skinTemplate
 $refDir = Join-Path $here 'reference'
-$work = Join-Path $env:TEMP 'kfparity'
+# Unique work dir per run: two concurrent invocations must not clobber each other's
+# scratch tree (the dir is deleted on start, so a fixed name is a real foot-gun).
+$work = Join-Path $env:TEMP ('kfparity-' + [guid]::NewGuid().ToString('N'))
 if (Test-Path $work) { Remove-Item -Recurse -Force $work }
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 
@@ -135,7 +137,10 @@ try {
     }
   }
 }
-finally { Pop-Location }
+finally {
+  Pop-Location
+  if (Test-Path $work) { Remove-Item -Recurse -Force $work }
+}
 
 $mode = if ($Capture) { 'CAPTURE' } else { 'CHECK' }
 if ($fail.Count -gt 0) {
