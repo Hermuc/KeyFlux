@@ -24,6 +24,7 @@ pub mod behaviors_edit;
 pub mod cli_api;
 pub mod i18n;
 pub mod keymap;
+pub mod local_fs;
 pub mod markdown;
 pub mod market;
 pub mod match_types_edit;

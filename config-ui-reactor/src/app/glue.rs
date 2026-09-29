@@ -47,28 +47,38 @@ fn assemble(api: &dyn SettingsApi, port: u16, options: &BackendSessionOptions) -
         );
     };
 
-    // 使用指南文档：自定义内容优先，为空时取后端静态站的默认文档
-    // （对齐旧 `HomePageViewModel.LoadAsync`）。
+    let data_root = resolve_deployment_root(options);
+    let root = data_root.as_deref();
+
+    // 使用指南文档：自定义内容优先；为空时**本机直读**静态站（纯文件、零变换），
+    // 读不到再回退后端（语义对齐旧 `HomePageViewModel.LoadAsync`）。
     let mut doc_md = config.overview_doc_md.clone();
     if doc_md.trim().is_empty() {
-        doc_md = api.get_raw_text("/config_doc.md").value.unwrap_or_default();
+        doc_md = root
+            .and_then(|dir| crate::services::local_fs::read_site_text(dir, "/config_doc.md"))
+            .or_else(|| api.get_raw_text("/config_doc.md").value)
+            .unwrap_or_default();
     }
 
-    // 快捷方式列表（`GET /shortcuts`；空目录后端返回 null ⇒ 容忍为空）
-    let shortcuts = api
-        .get_shortcuts()
-        .value
-        .unwrap_or_default()
-        .into_iter()
-        .map(|item| item.path)
-        .collect::<Vec<_>>();
+    // 快捷方式列表：同为纯目录 glob（`GET /shortcuts` 无任何变换）⇒ 本机直读优先；
+    // 目录缺失时回退后端（后端空目录返回 null ⇒ 容忍为空）。
+    let shortcuts = root
+        .and_then(crate::services::local_fs::list_shortcuts)
+        .unwrap_or_else(|| {
+            api.get_shortcuts()
+                .value
+                .unwrap_or_default()
+                .into_iter()
+                .map(|item| item.path)
+                .collect()
+        });
 
     Message::Ready {
         config: Box::new(config),
         port,
         doc_md,
         shortcuts,
-        data_root: resolve_deployment_root(options),
+        data_root,
     }
 }
 
