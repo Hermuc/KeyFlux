@@ -1,6 +1,6 @@
 # API-level parity harness -- captures byte-exact baseline responses of the Go settings
-# backend and replays the same requests against a candidate implementation (Rust) to
-# diff them byte-for-byte.
+# backend and replays the same ordered request sequence against a candidate
+# implementation (Rust) to diff them byte-for-byte.
 #
 # WHY: docs/plan-rust-migration.md replaces the Go panel backend with a Rust one. The
 # route surface is locked by config-server/internal/server/bridge_test.go (19 routes).
@@ -16,7 +16,8 @@
 # CONVENTIONS:
 #   - ASCII-only on purpose: `pwsh -File` / PS 5.1 misparse non-BOM UTF-8 (same rule as
 #     tools/parity/run_parity.ps1). Human-readable Chinese docs live in README.md.
-#   - Side-effect endpoints are NOT executed in this phase (see README "Side-effect endpoints").
+#   - Steps run in a FIXED order inside ONE sandbox per pass (stateful steps depend on
+#     earlier steps; manifest.json items carry the "step" number and "stateful" flag).
 #   - Sandbox always under %TEMP%, unique per run, deleted afterwards.
 #   - Final line is ASCII: "API-PARITY: <pass>/<total> PASS [MODE]" (exit 0) or FAIL (exit 1).
 #   - Determinism: -Capture records TWICE into two independent sandboxes and refuses to
@@ -42,29 +43,52 @@ if (!(Test-Path $Exe)) { Write-Host "API-PARITY: 0/0 FAIL [exe not found: $Exe]"
 $Exe = (Resolve-Path $Exe).Path
 
 # ---------------------------------------------------------------------------
-# Endpoint table. Read-only set only; surface locked by bridge_test.go.
-# body = corpus file name (relative to corpus/) or $null.
+# Step table (FIXED ORDER -- stateful steps depend on earlier ones).
+# method / path: request line.
+# corpus:        static body file in corpus/ ($null = no body).
+# multipart:     wrap corpus (a plugin manifest JSON) into a minimal plugin zip and
+#                send it as multipart field "file" (POST /api/plugins/import).
+# bodyFrom:      'config-echo' = PUT /config body derived from the captured GET /config
+#                baseline bytes with one deterministic surgical edit (see below).
+# stateful:      step mutates sandbox state; later stateful steps are SKIPPED (not
+#                counted as MISMATCH) once an earlier stateful step is MISSING.
+# suffix:        disambiguates repeated (method, path) pairs at different state points.
 # ---------------------------------------------------------------------------
 $items = @(
-  @{ method = 'GET';  path = '/health';                                body = $null },
-  @{ method = 'GET';  path = '/config';                                body = $null },
-  @{ method = 'GET';  path = '/shortcuts';                             body = $null },
-  @{ method = 'GET';  path = '/api/behaviors';                         body = $null },
-  @{ method = 'GET';  path = '/api/plugins';                           body = $null },
-  @{ method = 'GET';  path = '/api/plugins/everything_search/settings'; body = $null },
-  @{ method = 'POST'; path = '/api/selected-action/test';              body = 'test_selected-action_url_hit.json' },
-  @{ method = 'POST'; path = '/api/selected-action/test';              body = 'test_selected-action_textfeature_hit.json' },
-  @{ method = 'POST'; path = '/api/selected-action/test';              body = 'test_selected-action_nomatch.json' }
+  @{ step = 1;  method = 'GET';    path = '/health';                                 corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $false; suffix = $null },
+  @{ step = 2;  method = 'GET';    path = '/config';                                 corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $false; suffix = $null },
+  @{ step = 3;  method = 'GET';    path = '/shortcuts';                              corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $false; suffix = $null },
+  @{ step = 4;  method = 'GET';    path = '/api/behaviors';                          corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $false; suffix = $null },
+  @{ step = 5;  method = 'GET';    path = '/api/plugins';                            corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $false; suffix = $null },
+  @{ step = 6;  method = 'GET';    path = '/api/plugins/everything_search/settings'; corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $false; suffix = $null },
+  @{ step = 7;  method = 'POST';   path = '/api/selected-action/test';               corpus = 'test_selected-action_url_hit.json';          multipart = $false; bodyFrom = $null; stateful = $false; suffix = $null },
+  @{ step = 8;  method = 'POST';   path = '/api/selected-action/test';               corpus = 'test_selected-action_textfeature_hit.json';  multipart = $false; bodyFrom = $null; stateful = $false; suffix = $null },
+  @{ step = 9;  method = 'POST';   path = '/api/selected-action/test';               corpus = 'test_selected-action_nomatch.json';          multipart = $false; bodyFrom = $null; stateful = $false; suffix = $null },
+  @{ step = 10; method = 'PUT';    path = '/config';                                 corpus = $null; multipart = $false; bodyFrom = 'config-echo'; stateful = $true;  suffix = $null },
+  @{ step = 11; method = 'POST';   path = '/server/command/2';                       corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $true;  suffix = $null },
+  @{ step = 12; method = 'POST';   path = '/server/command/3';                       corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $true;  suffix = $null },
+  @{ step = 13; method = 'POST';   path = '/server/command/4';                       corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $true;  suffix = $null },
+  @{ step = 14; method = 'POST';   path = '/api/behaviors';                          corpus = 'behavior_pack_demo.json';        multipart = $false; bodyFrom = $null; stateful = $true; suffix = $null },
+  @{ step = 15; method = 'PUT';    path = '/api/behaviors/parity_demo';              corpus = 'behavior_pack_demo_update.json'; multipart = $false; bodyFrom = $null; stateful = $true; suffix = $null },
+  @{ step = 16; method = 'POST';   path = '/api/behaviors/apply';                    corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $true;  suffix = $null },
+  @{ step = 17; method = 'DELETE'; path = '/api/behaviors/parity_demo';              corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $true;  suffix = $null },
+  @{ step = 18; method = 'POST';   path = '/api/plugins/import';                     corpus = 'demo_plugin.manifest.json'; multipart = $true; bodyFrom = $null; stateful = $true; suffix = 'imported' },
+  @{ step = 19; method = 'GET';    path = '/api/plugins';                            corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $true;  suffix = 'after-import' },
+  @{ step = 20; method = 'GET';    path = '/api/plugins/demo_plugin/settings';       corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $true;  suffix = 'before' },
+  @{ step = 21; method = 'PUT';    path = '/api/plugins/demo_plugin/settings';       corpus = 'plugin_settings_put.json'; multipart = $false; bodyFrom = $null; stateful = $true; suffix = 'save' },
+  @{ step = 22; method = 'GET';    path = '/api/plugins/demo_plugin/settings';       corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $true;  suffix = 'after' },
+  @{ step = 23; method = 'DELETE'; path = '/api/plugins/demo_plugin';                corpus = $null; multipart = $false; bodyFrom = $null;         stateful = $true;  suffix = $null }
 )
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-# Reference file name: "<METHOD>_<path with / . etc escaped>.json" (+ corpus stem suffix
-# when a request body is involved, since one endpoint may carry several samples).
-function Get-RefName([string]$method, [string]$path, [string]$body) {
+# Reference file name: "<METHOD>_<path escaped>[.<suffix>][.<corpus stem>].json".
+# suffix wins over the corpus stem (repeated endpoints at different state points).
+function Get-RefName([string]$method, [string]$path, [string]$body, [string]$suffix) {
   $p = $path.TrimStart('/') -replace '[^A-Za-z0-9._-]', '_'
+  if ($suffix) { return "${method}_${p}.${suffix}.json" }
   if ($body) {
     $stem = [IO.Path]::GetFileNameWithoutExtension($body)
     return "${method}_${p}.${stem}.json"
@@ -78,19 +102,32 @@ function Quote-Arg([string]$s) {
   return $s
 }
 
-# Minimal JSON string escaper; inputs here are ASCII-only, hand-serialized so that the
-# emitted bytes are stable across PowerShell 5.1 / 7 ConvertTo-Json formatting drift.
+# Minimal JSON string escaper; escapes control chars (callLine etc. must stay strict
+# JSON -- a literal \n inside a string breaks python json.loads / ConvertFrom-Json),
+# quote and backslash. Hand-rolled so emitted bytes are stable across PS 5.1 / 7.
 function ConvertTo-JsonStringLiteral([string]$s) {
-  return '"' + $s.Replace('\', '\\').Replace('"', '\"') + '"'
+  $sb = New-Object System.Text.StringBuilder
+  [void]$sb.Append('"')
+  foreach ($ch in $s.ToCharArray()) {
+    $code = [int]$ch
+    if ($code -lt 0x20) { [void]$sb.Append(('\u{0:x4}' -f $code)) }
+    elseif ($ch -eq '"') { [void]$sb.Append('\"') }
+    elseif ($ch -eq '\') { [void]$sb.Append('\\') }
+    else { [void]$sb.Append($ch) }
+  }
+  [void]$sb.Append('"')
+  return $sb.ToString()
 }
 
-# Run `settings.exe Call <METHOD> <PATH> <out-file> [--body f]` with cwd = the exe's
-# directory (Go resolves ../data, ./behaviors, ./templates relative to it -- bridge.go).
-# Returns @{ ExitCode; StdOut; StdErr }. No shell involved; %TEMP% spaces are safe.
+# Run `settings.exe Call <METHOD> <PATH> <out-file> [--body f] [--content-type ct]`
+# with cwd = the exe's directory (Go resolves ../data, ./behaviors, ./templates relative
+# to it -- bridge.go). Returns @{ ExitCode; StdOut; StdErr }. No shell involved;
+# %TEMP% spaces are safe.
 function Invoke-SettingsCall([string]$exePath, [string]$cwd, [string]$method, [string]$path,
-                             [string]$outFile, [string]$bodyFile) {
+                             [string]$outFile, [string]$bodyFile, [string]$contentType) {
   $argStr = 'Call ' + (Quote-Arg $method) + ' ' + (Quote-Arg $path) + ' ' + (Quote-Arg $outFile)
   if ($bodyFile) { $argStr += ' --body ' + (Quote-Arg $bodyFile) }
+  if ($contentType) { $argStr += ' --content-type ' + (Quote-Arg $contentType) }
 
   $psi = New-Object System.Diagnostics.ProcessStartInfo
   $psi.FileName = $exePath
@@ -106,9 +143,25 @@ function Invoke-SettingsCall([string]$exePath, [string]$cwd, [string]$method, [s
   return @{ ExitCode = $proc.ExitCode; StdOut = $so; StdErr = $se }
 }
 
+# No-op engine stub: PUT /config and POST /api/behaviors/apply spawn ./KeyFlux.exe
+# (cwd <sandbox>/root). With the exe MISSING, Go falls back to an explorer.exe relay
+# (proc.FallbackExecCmd) which still returns true but launches a REAL explorer against
+# a soon-deleted sandbox path -- visible desktop dialog noise on the QA machine.
+# A silent stub exe makes ExecCmd take the fast breakaway path; the recorded response
+# bytes are identical either way (restartFailed=false). Compiled on the fly with the
+# always-present .NET Framework csc.exe; if unavailable we simply skip the stub.
+function New-EngineStub([string]$root) {
+  $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+  if (!(Test-Path $csc)) { return }
+  $cs = Join-Path $root '__stub__.cs'
+  [IO.File]::WriteAllText($cs, 'class P { static void Main() {} }', [Text.Encoding]::ASCII)
+  & $csc /nologo /target:exe /out:(Join-Path $root 'KeyFlux.exe') $cs | Out-Null
+  Remove-Item -Force $cs
+}
+
 # Build the deploy-tree sandbox under %TEMP%:
 #   <sandbox>/bin/settings.exe  <sandbox>/bin/behaviors/  <sandbox>/bin/templates/
-#   <sandbox>/data/config.json  <sandbox>/data/plugins/
+#   <sandbox>/data/config.json  <sandbox>/data/plugins/   <sandbox>/KeyFlux.exe (stub)
 # cwd for every Call = <sandbox>/bin (deploy-tree convention; see bridge.go).
 function New-Sandbox([string]$exeSrc) {
   $root = Join-Path $env:TEMP ('kfapiparity-' + [guid]::NewGuid().ToString('N'))
@@ -120,6 +173,7 @@ function New-Sandbox([string]$exeSrc) {
   Copy-Item (Join-Path $repo 'data\plugins') $data -Recurse
   Copy-Item (Join-Path $repo 'bin\behaviors') $bin -Recurse
   Copy-Item (Join-Path $repo 'bin\templates') $bin -Recurse
+  New-EngineStub $root
   return $root
 }
 
@@ -127,40 +181,99 @@ function Remove-Sandbox([string]$root) {
   if ($root -and (Test-Path $root)) { Remove-Item -Recurse -Force $root }
 }
 
-# Capture one full pass over $items inside a fresh sandbox.
-# Returns array of @{ method; path; body; exit; callLine; status; bytes }.
-function Invoke-CapturePass([string]$exeSrc) {
-  $sandbox = New-Sandbox $exeSrc
-  $results = @()
+# PUT /config body: the GET /config baseline bytes with ONE deterministic surgical edit
+# (append a fixed marker to the first keymap comment). Raw-text edit, not JSON
+# re-serialization, so the bytes are stable across PowerShell versions.
+function ConvertTo-ConfigEchoBytes([byte[]]$configBytes) {
+  $json = [Text.Encoding]::UTF8.GetString($configBytes)
+  $needle = '"comment":"label:36"'
+  if (!$json.Contains($needle)) { throw 'config-echo: needle "comment":"label:36" not found in GET /config baseline' }
+  $edited = [regex]::new([regex]::Escape($needle)).Replace($json, '"comment":"label:36|parity"', 1)
+  return [Text.Encoding]::UTF8.GetBytes($edited)
+}
+
+# Minimal plugin zip for POST /api/plugins/import: plugin.json (corpus manifest) at the
+# zip root + a no-op entry script. Zip bytes are the REQUEST body only; the recorded
+# baseline is the response (installed manifest), so zip determinism is not required.
+function New-PluginZipBytes([string]$manifestPath) {
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $tmpZip = Join-Path $env:TEMP ('kfapiparity-zip-' + [guid]::NewGuid().ToString('N') + '.zip')
+  $jsonBytes = [IO.File]::ReadAllBytes($manifestPath)
+  $scriptBytes = [Text.Encoding]::UTF8.GetBytes('; api-parity demo entry (no-op)' + "`r`n")
+  $zip = [System.IO.Compression.ZipFile]::Open($tmpZip, [System.IO.Compression.ZipArchiveMode]::Create)
   try {
-    foreach ($it in $items) {
-      $bodyFile = $null
-      if ($it.body) { $bodyFile = Join-Path $corpusDir $it.body }
-      $outFile = Join-Path $sandbox 'bin\__resp__.bin'
-      # ALWAYS run the sandboxed copy, never $exeSrc directly: /shortcuts resolves
-      # shortcuts/ relative to the exe's parent dir (os.Executable), so running the
-      # repo exe would pollute the baseline with the repo's shortcuts/ content.
-      $r = Invoke-SettingsCall (Join-Path $sandbox 'bin\settings.exe') (Join-Path $sandbox 'bin') $it.method $it.path $outFile $bodyFile
-
-      $callLine = ''
-      if ($r.StdOut -match '(?m)^KEYFLUX_CALL status=(\d+)\s*$') { $callLine = $Matches[0] }
-      $status = 0
-      if ($r.StdOut -match 'KEYFLUX_CALL status=(\d+)') { $status = [int]$Matches[1] }
-
-      $bytes = $null
-      if ((Test-Path $outFile) -and $r.ExitCode -eq 0) {
-        $bytes = [IO.File]::ReadAllBytes($outFile)
-        Remove-Item -Force $outFile
-      }
-      $results += @{
-        method = $it.method; path = $it.path; body = $it.body
-        exit = $r.ExitCode; callLine = $callLine; status = $status; bytes = $bytes
-      }
+    foreach ($pair in @(@('plugin.json', $jsonBytes), @('main.ahk', $scriptBytes))) {
+      $entry = $zip.CreateEntry($pair[0])
+      $es = $entry.Open()
+      $es.Write($pair[1], 0, $pair[1].Length)
+      $es.Close()
     }
-  } finally {
-    Remove-Sandbox $sandbox
+  } finally { $zip.Dispose() }
+  $bytes = [IO.File]::ReadAllBytes($tmpZip)
+  Remove-Item -Force $tmpZip
+  return $bytes
+}
+
+# Multipart envelope for c.FormFile("file") -- gin parses it from the raw request body,
+# which works through the in-process Call transport as long as Content-Type is set.
+function New-MultipartBytes([byte[]]$fileBytes, [string]$fileName, [string]$boundary) {
+  $ms = New-Object System.IO.MemoryStream
+  $w = New-Object System.IO.BinaryWriter($ms)
+  $enc = [Text.Encoding]::UTF8
+  $w.Write($enc.GetBytes('--' + $boundary + "`r`n"))
+  $w.Write($enc.GetBytes('Content-Disposition: form-data; name="file"; filename="' + $fileName + '"' + "`r`n"))
+  $w.Write($enc.GetBytes('Content-Type: application/zip' + "`r`n`r`n"))
+  $w.Write($fileBytes)
+  $w.Write($enc.GetBytes("`r`n--" + $boundary + "--`r`n"))
+  $w.Flush()
+  return $ms.ToArray()
+}
+
+# Resolve the request body (and content type) for one step; writes derived bodies into
+# the sandbox bin dir. Returns @{ Path; ContentType } (Path = $null when no body).
+# $it may be a hashtable (capture) or the ConvertFrom-Json PSCustomObject (check).
+function Resolve-StepBody($it, [string]$binDir, [string]$configEchoFile) {
+  if ($it.bodyFrom -eq 'config-echo') {
+    return @{ Path = $configEchoFile; ContentType = 'application/json' }
   }
-  return ,$results
+  if ($it.multipart) {
+    $zipBytes = New-PluginZipBytes (Join-Path $corpusDir $it.corpus)
+    $mpBytes = New-MultipartBytes $zipBytes 'demo-plugin.zip' 'kfparityboundary'
+    $p = Join-Path $binDir '__multipart__.bin'
+    [IO.File]::WriteAllBytes($p, $mpBytes)
+    return @{ Path = $p; ContentType = 'multipart/form-data; boundary=kfparityboundary' }
+  }
+  if ($it.corpus) {
+    return @{ Path = (Join-Path $corpusDir $it.corpus); ContentType = 'application/json' }
+  }
+  return @{ Path = $null; ContentType = '' }
+}
+
+# Execute one step inside a sandbox; returns the record for the baseline.
+function Invoke-Step([hashtable]$it, [string]$sandbox, [string]$configEchoFile) {
+  $binDir = Join-Path $sandbox 'bin'
+  $body = Resolve-StepBody $it $binDir $configEchoFile
+  $outFile = Join-Path $binDir '__resp__.bin'
+  # ALWAYS run the sandboxed copy, never the source exe directly: /shortcuts resolves
+  # shortcuts/ relative to the exe's parent dir (os.Executable), so running the repo
+  # exe would pollute the baseline with the repo's shortcuts/ content.
+  $r = Invoke-SettingsCall (Join-Path $binDir 'settings.exe') $binDir $it.method $it.path $outFile $body.Path $body.ContentType
+
+  $callLine = ''
+  $m = [regex]::Match($r.StdOut, 'KEYFLUX_CALL status=\d+')
+  if ($m.Success) { $callLine = $m.Value }
+  $status = 0
+  if ($m.Success) { $status = [int]($m.Value -replace '^\D*(\d+)$', '$1') }
+
+  $bytes = $null
+  if ((Test-Path $outFile) -and $r.ExitCode -eq 0) {
+    $bytes = [IO.File]::ReadAllBytes($outFile)
+    Remove-Item -Force $outFile
+  }
+  return @{
+    step = [int]$it.step; method = $it.method; path = $it.path; corpus = $it.corpus
+    exit = $r.ExitCode; callLine = $callLine; status = $status; bytes = $bytes
+  }
 }
 
 # Serialize one record to deterministic JSON bytes (hand-rolled, UTF-8 no BOM, LF).
@@ -168,8 +281,9 @@ function ConvertTo-BaselineJson([hashtable]$r) {
   $b64 = ''
   if ($r.bytes) { $b64 = [Convert]::ToBase64String($r.bytes) }
   $corpus = 'null'
-  if ($r.body) { $corpus = ConvertTo-JsonStringLiteral $r.body }
+  if ($r.corpus) { $corpus = ConvertTo-JsonStringLiteral $r.corpus }
   return '{' + "`n" +
+    '  "step": ' + $r.step + ',' + "`n" +
     '  "method": ' + (ConvertTo-JsonStringLiteral $r.method) + ',' + "`n" +
     '  "path": ' + (ConvertTo-JsonStringLiteral $r.path) + ',' + "`n" +
     '  "corpus": ' + $corpus + ',' + "`n" +
@@ -183,6 +297,34 @@ function Write-Utf8NoBom([string]$path, [string]$text) {
   $dir = Split-Path -Parent $path
   if (!(Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
   [IO.File]::WriteAllText($path, $text, (New-Object System.Text.UTF8Encoding($false)))
+}
+
+# Run a full ordered pass over $items inside a fresh sandbox. The config-echo body is
+# derived from THIS pass's GET /config response (steps are order-dependent by design).
+# Returns array of records.
+function Invoke-CapturePass([string]$exeSrc) {
+  $sandbox = New-Sandbox $exeSrc
+  $results = @()
+  try {
+    $configEchoFile = Join-Path $sandbox 'bin\__config_echo__.json'
+    $configEchoReady = $false
+    foreach ($it in $items) {
+      $echoFile = $null
+      if ($it.bodyFrom -eq 'config-echo') {
+        if (!$configEchoReady) { throw 'config-echo: GET /config must run before PUT /config (step order broken)' }
+        $echoFile = $configEchoFile
+      }
+      $r = Invoke-Step $it $sandbox $echoFile
+      $results += $r
+      if ($it.method -eq 'GET' -and $it.path -eq '/config' -and $r.bytes) {
+        [IO.File]::WriteAllBytes($configEchoFile, (ConvertTo-ConfigEchoBytes $r.bytes))
+        $configEchoReady = $true
+      }
+    }
+  } finally {
+    Remove-Sandbox $sandbox
+  }
+  return ,$results
 }
 
 # ---------------------------------------------------------------------------
@@ -205,7 +347,7 @@ if ($Capture) {
       elseif ($null -eq $a.bytes -or $null -eq $b.bytes) { $same = $false }
       else { $same = ([Convert]::ToBase64String($a.bytes) -eq [Convert]::ToBase64String($b.bytes)) }
     }
-    if (-not $same) { $drift += ('{0} {1} (corpus: {2})' -f $a.method, $a.path, $a.body) }
+    if (-not $same) { $drift += ('step {0}: {1} {2}' -f $a.step, $a.method, $a.path) }
   }
   if ($drift.Count -gt 0) {
     Write-Host '[capture] NON-DETERMINISTIC OUTPUT, reference NOT written:'
@@ -218,32 +360,40 @@ if ($Capture) {
   $failed = @()
   New-Item -ItemType Directory -Force -Path $refGoDir | Out-Null
   foreach ($r in $pass1) {
-    $refName = Get-RefName $r.method $r.path $r.body
+    $it = $items[$r.step - 1]
+    $refName = Get-RefName $r.method $r.path $r.corpus $it.suffix
     if ($r.exit -ne 0 -or $null -eq $r.bytes) {
-      $failed += ('{0} {1} (exit={2})' -f $r.method, $r.path, $r.exit)
+      $failed += ('step {0}: {1} {2} (exit={3})' -f $r.step, $r.method, $r.path, $r.exit)
       continue
     }
     Write-Utf8NoBom (Join-Path $refGoDir $refName) (ConvertTo-BaselineJson $r)
-    Write-Host ('  captured {0} -> reference/go/{1} (status={2}, {3} bytes)' -f $r.path, $refName, $r.status, $r.bytes.Length)
+    Write-Host ('  captured step {0,2} {1} {2} -> reference/go/{3} (status={4}, {5} bytes)' -f $r.step, $r.method, $r.path, $refName, $r.status, $r.bytes.Length)
   }
 
-  # manifest.json -- index of the frozen baseline (deterministic content, no timestamp).
+  # manifest.json -- ordered index of the frozen baseline (deterministic, no timestamp).
   $exeHash = (Get-FileHash -Algorithm SHA256 -Path $Exe).Hash.ToLower()
   $mf = '{' + "`n" +
-    '  "schema": "api-parity-manifest/1",' + "`n" +
+    '  "schema": "api-parity-manifest/2",' + "`n" +
     '  "transport": "Call",' + "`n" +
     '  "sourceExeSha256": ' + (ConvertTo-JsonStringLiteral $exeHash) + ',' + "`n" +
     '  "items": [' + "`n"
   $first = $true
-  foreach ($r in $pass1) {
+  for ($i = 0; $i -lt $items.Count; $i++) {
+    $it = $items[$i]
     if (-not $first) { $mf += ',' + "`n" }
     $first = $false
     $corpus = 'null'
-    if ($r.body) { $corpus = ConvertTo-JsonStringLiteral $r.body }
-    $mf += '    { "method": ' + (ConvertTo-JsonStringLiteral $r.method) +
-           ', "path": ' + (ConvertTo-JsonStringLiteral $r.path) +
+    if ($it.corpus) { $corpus = ConvertTo-JsonStringLiteral $it.corpus }
+    $bodyFrom = 'null'
+    if ($it.bodyFrom) { $bodyFrom = ConvertTo-JsonStringLiteral $it.bodyFrom }
+    $mf += '    { "step": ' + $it.step +
+           ', "method": ' + (ConvertTo-JsonStringLiteral $it.method) +
+           ', "path": ' + (ConvertTo-JsonStringLiteral $it.path) +
            ', "corpus": ' + $corpus +
-           ', "ref": ' + (ConvertTo-JsonStringLiteral (Get-RefName $r.method $r.path $r.body)) + ' }'
+           ', "multipart": ' + $it.multipart.ToString().ToLower() +
+           ', "bodyFrom": ' + $bodyFrom +
+           ', "stateful": ' + $it.stateful.ToString().ToLower() +
+           ', "ref": ' + (ConvertTo-JsonStringLiteral (Get-RefName $it.method $it.path $it.corpus $it.suffix)) + ' }'
   }
   $mf += "`n" + '  ]' + "`n" + '}' + "`n"
   Write-Utf8NoBom $manifestPath $mf
@@ -270,27 +420,46 @@ $sandbox = New-Sandbox $Exe
 $pass = 0
 $missing = @()
 $mismatch = @()
+$stateBroken = $false
 try {
+  $configEchoFile = Join-Path $sandbox 'bin\__config_echo__.json'
+  $configEchoReady = $false
   foreach ($item in $manifest.items) {
     $refFile = Join-Path $refGoDir $item.ref
-    if (!(Test-Path $refFile)) { $mismatch += ('{0} {1} [reference file missing]' -f $item.method, $item.path); continue }
+    if (!(Test-Path $refFile)) { $mismatch += ('step {0}: {1} {2} [reference file missing]' -f $item.step, $item.method, $item.path); continue }
     $ref = Get-Content -Raw -Encoding UTF8 $refFile | ConvertFrom-Json
 
-    $bodyFile = $null
-    if ($item.corpus) { $bodyFile = Join-Path $corpusDir $item.corpus }
-    $outFile = Join-Path $sandbox 'bin\__resp__.bin'
-    # Run the sandboxed copy of the candidate exe (deploy-tree semantics; /shortcuts
-    # resolves shortcuts/ relative to the exe's parent dir, see bridge.go).
-    $r = Invoke-SettingsCall (Join-Path $sandbox 'bin\settings.exe') (Join-Path $sandbox 'bin') $item.method $item.path $outFile $bodyFile
+    # Derive the config-echo body from the REFERENCE baseline (not from the exe under
+    # test) so capture and check send byte-identical request bodies.
+    $echoFile = $null
+    if ($item.bodyFrom -eq 'config-echo') {
+      if (!$configEchoReady) {
+        $cfgRefFile = Join-Path $refGoDir 'GET_config.json'
+        $cfgRef = Get-Content -Raw -Encoding UTF8 $cfgRefFile | ConvertFrom-Json
+        [IO.File]::WriteAllBytes($configEchoFile, (ConvertTo-ConfigEchoBytes ([Convert]::FromBase64String($cfgRef.bodyBase64))))
+        $configEchoReady = $true
+      }
+      $echoFile = $configEchoFile
+    }
+
+    $binDir = Join-Path $sandbox 'bin'
+    $body = Resolve-StepBody $item $binDir $echoFile
+    $outFile = Join-Path $binDir '__resp__.bin'
+    $r = Invoke-SettingsCall (Join-Path $binDir 'settings.exe') $binDir $item.method $item.path $outFile $body.Path $body.ContentType
 
     if ($r.ExitCode -ne 0) {
       # Candidate does not implement this endpoint/transport -- expected for Rust-in-progress.
-      $missing += ('{0} {1} (exit={2})' -f $item.method, $item.path, $r.ExitCode)
-      Write-Host ('  MISSING_ENDPOINT {0} {1}' -f $item.method, $item.path)
+      $missing += ('step {0}: {1} {2} (exit={3})' -f $item.step, $item.method, $item.path, $r.ExitCode)
+      Write-Host ('  MISSING_ENDPOINT step {0} {1} {2}' -f $item.step, $item.method, $item.path)
+      if ($item.stateful) { $stateBroken = $true }
+      continue
+    }
+    if ($item.stateful -and $stateBroken) {
+      Write-Host ('  SKIPPED_STATE step {0} {1} {2} (earlier stateful step missing)' -f $item.step, $item.method, $item.path)
       continue
     }
     if ($r.StdOut -notmatch 'KEYFLUX_CALL status=(\d+)') {
-      $mismatch += ('{0} {1} [KEYFLUX_CALL status line missing]' -f $item.method, $item.path)
+      $mismatch += ('step {0}: {1} {2} [KEYFLUX_CALL status line missing]' -f $item.step, $item.method, $item.path)
       continue
     }
     $status = [int]$Matches[1]
@@ -299,15 +468,15 @@ try {
     $b64 = [Convert]::ToBase64String($bytes)
 
     if ($status -ne $ref.status) {
-      $mismatch += ('{0} {1} [status {2} != baseline {3}]' -f $item.method, $item.path, $status, $ref.status)
+      $mismatch += ('step {0}: {1} {2} [status {3} != baseline {4}]' -f $item.step, $item.method, $item.path, $status, $ref.status)
       continue
     }
     if ($b64 -ne $ref.bodyBase64) {
-      $mismatch += ('{0} {1} [body {2} bytes != baseline {3} bytes]' -f $item.method, $item.path, $bytes.Length, $ref.bodyBase64.Length)
+      $mismatch += ('step {0}: {1} {2} [body {3} bytes != baseline {4} bytes]' -f $item.step, $item.method, $item.path, $bytes.Length, $ref.bodyBase64.Length)
       continue
     }
     $pass++
-    Write-Host ('  PASS {0} {1}' -f $item.method, $item.path)
+    Write-Host ('  PASS step {0,2} {1} {2}' -f $item.step, $item.method, $item.path)
   }
 } finally {
   Remove-Sandbox $sandbox
@@ -321,5 +490,6 @@ if ($mismatch.Count -gt 0) {
 Write-Host ('MISSING_ENDPOINT count: {0}' -f $missing.Count)
 Write-Host ('API-PARITY: {0}/{1} PASS [CHECK]' -f $pass, $total)
 if ($mismatch.Count -gt 0) { exit 1 }
-# Only MISSING_ENDPOINT (Rust endpoints not implemented yet) is NOT a tool failure.
+# Only MISSING_ENDPOINT / SKIPPED_STATE (candidate endpoints not implemented yet) is
+# NOT a tool failure.
 exit 0

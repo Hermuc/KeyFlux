@@ -1,0 +1,9 @@
+{
+  "step": 13,
+  "method": "POST",
+  "path": "/server/command/4",
+  "corpus": null,
+  "callLine": "KEYFLUX_CALL status=200",
+  "status": 200,
+  "bodyBase64": "e30="
+}

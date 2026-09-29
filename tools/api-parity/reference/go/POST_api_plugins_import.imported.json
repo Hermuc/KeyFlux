@@ -1,0 +1,9 @@
+{
+  "step": 18,
+  "method": "POST",
+  "path": "/api/plugins/import",
+  "corpus": "demo_plugin.manifest.json",
+  "callLine": "KEYFLUX_CALL status=200",
+  "status": 200,
+  "bodyBase64": "eyJpZCI6ImRlbW9fcGx1Z2luIiwibmFtZSI6IuWvuei0pua8lOekuuaPkuS7tiIsIm5hbWVFbiI6IlBhcml0eSBkZW1vIHBsdWdpbiIsInZlcnNpb24iOiIwLjEuMCIsInNwZWNWZXJzaW9uIjoxLCJkZXNjcmlwdGlvbiI6ImFwaS1wYXJpdHkg5o+S5Lu25a+85YWlL+iuvue9ri/liKDpmaTln7rnur/moLfmnKwiLCJhdXRob3IiOiJLZXlGbHV4IFFBIiwiZW50cnkiOnsia2luZCI6InNjcmlwdCIsImZpbGUiOiJtYWluLmFoayIsImZ1bmMiOiJQYXJpdHlEZW1vTWFpbiJ9LCJwZXJtaXNzaW9ucyI6WyJzZWxlY3Rpb24iLCJydW4iLCJzZXR0aW5ncyJdLCJzZXR0aW5ncyI6W3sia2V5IjoiZGVtb1BhdGgiLCJ0eXBlIjoiZmlsZSIsImxhYmVsIjoi5ryU56S66Lev5b6EIiwibGFiZWxFbiI6IkRlbW8gcGF0aCIsImhpbnQiOiJhcGktcGFyaXR5IOWfuue6v+eUqOiuvue9rumhueOAgiJ9XX0="
+}

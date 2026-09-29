@@ -1,0 +1,1 @@
+{"id":"parity_demo","name":"对账演示（改）","nameEn":"Parity demo (updated)","version":"1.0.1","specVersion":1,"description":"api-parity 行为包 CRUD 基线样本（PUT 修改态）","appliesTo":[{"type":"textType","value":"plain"}],"entry":{"kind":"builtin","action":"copy"},"permissions":["selection","run"]}

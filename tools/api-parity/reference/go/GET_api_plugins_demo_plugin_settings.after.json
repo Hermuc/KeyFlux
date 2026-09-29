@@ -1,0 +1,9 @@
+{
+  "step": 22,
+  "method": "GET",
+  "path": "/api/plugins/demo_plugin/settings",
+  "corpus": null,
+  "callLine": "KEYFLUX_CALL status=200",
+  "status": 200,
+  "bodyBase64": "eyJpZCI6ImRlbW9fcGx1Z2luIiwic2V0dGluZ3MiOlt7ImtleSI6ImRlbW9QYXRoIiwidHlwZSI6ImZpbGUiLCJsYWJlbCI6Iua8lOekuui3r+W+hCIsImxhYmVsRW4iOiJEZW1vIHBhdGgiLCJoaW50IjoiYXBpLXBhcml0eSDln7rnur/nlKjorr7nva7pobnjgIIifV0sInZhbHVlcyI6eyJkZW1vUGF0aCI6IkQ6L2RlbW8vdGFyZ2V0LmV4ZSJ9fQ=="
+}
