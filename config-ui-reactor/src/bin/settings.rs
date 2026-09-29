@@ -25,6 +25,10 @@ fn main() -> ExitCode {
 
     match command {
         "DumpPlan" => dump_plan(&args),
+        // CLI 进程内 HTTP 桥（Go bridge.go：Call <METHOD> <PATH> <out-file>
+        // [--body <file>] [--content-type <ct>]；stdout 末行 KEYFLUX_CALL status=）。
+        // cwd 语义与 HTTP 模式一致：调用方必须把 cwd 设为 settings.exe 所在目录。
+        "Call" => config_ui_reactor::server::bridge::run_call(&args),
         "GenerateAHK" => generate_ahk(&args),
         "GenerateScripts" => {
             // Go: 无参数，配置恒取 `../data/config.json`，cwd 必须是部署树 `bin/`

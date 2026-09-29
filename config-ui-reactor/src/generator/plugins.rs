@@ -93,6 +93,11 @@ impl Manifest {
     pub fn has_permission(&self, name: &str) -> bool {
         self.permissions.iter().any(|p| p == name)
     }
+
+    /// Go `(*Manifest).SettingByKey`：按 key 取设置项声明。
+    pub(crate) fn setting_by_key(&self, key: &str) -> Option<&Setting> {
+        self.settings.iter().find(|s| s.key == key)
+    }
 }
 
 /// Go `plugins.Catalog`：用户插件目录快照（按 ID 字典序 + 逐包错误隔离）。
@@ -127,7 +132,7 @@ fn is_valid_setting_key(key: &str) -> bool {
 }
 
 /// Go `(*Setting).ValueLimit`。
-fn value_limit(setting: &Setting) -> i64 {
+pub(crate) fn value_limit(setting: &Setting) -> i64 {
     if setting.kind == "char" {
         return 1;
     }
@@ -141,7 +146,7 @@ fn value_limit(setting: &Setting) -> i64 {
 }
 
 /// Go `plugins.ValidateSettingValue`：空串一律合法；非空按类型校验。
-fn validate_setting_value(setting: &Setting, value: &str) -> Result<(), String> {
+pub(crate) fn validate_setting_value(setting: &Setting, value: &str) -> Result<(), String> {
     if value.is_empty() {
         return Ok(());
     }
