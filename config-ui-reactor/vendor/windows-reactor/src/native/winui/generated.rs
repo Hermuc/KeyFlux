@@ -149,7 +149,22 @@ impl Handle {
     pub fn create(kind: MountedKind) -> Result<Self, RuntimeError> {
         Ok(match kind {
             MountedKind::TextBlock => {
-                Self::TextBlock(bindings::TextBlock::new().map_err(native_error)?)
+                let text_block = bindings::TextBlock::new().map_err(native_error)?;
+                // 2026-09-29 全局字体补口：元素级 FontFamily 本地值（依赖属性本地值
+                // 优先级最高，压过默认样式的 XamlAutoFontFamily 字面量——资源字典
+                // 覆盖对该字面量不可达，见 app_shim.rs 注释）。
+                // FontFamily 类型 bindings 未生成 ⇒ 经 XamlReader::Load 解析
+                // `<FontFamily>`（与 app_shim.rs 同一手法）取 IInspectable 直接 SetValue。
+                {
+                    const FONT_FAMILY_XAML: &str =
+                        "<FontFamily xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">MiSans, Segoe UI Emoji</FontFamily>";
+                    let font_family = bindings::XamlReader::Load(FONT_FAMILY_XAML)
+                        .map_err(native_error)?;
+                    text_block
+                        .set_font_family_raw(&font_family)
+                        .map_err(native_error)?;
+                }
+                Self::TextBlock(text_block)
             }
             MountedKind::Button => Self::Button(bindings::Button::new().map_err(native_error)?),
             MountedKind::HyperlinkButton => {

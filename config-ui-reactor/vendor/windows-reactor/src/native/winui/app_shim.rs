@@ -84,12 +84,13 @@ pub fn install_global_ui_font(application: &Application) -> Result<()> {
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
-            <FontFamily x:Key="ContentControlThemeFontFamily">MiSans, Microsoft YaHei UI, Segoe UI Emoji</FontFamily>
+            <FontFamily x:Key="ContentControlThemeFontFamily">MiSans, Segoe UI Emoji</FontFamily>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Default">
-            <FontFamily x:Key="ContentControlThemeFontFamily">MiSans, Microsoft YaHei UI, Segoe UI Emoji</FontFamily>
+            <FontFamily x:Key="ContentControlThemeFontFamily">MiSans, Segoe UI Emoji</FontFamily>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
+
 </ResourceDictionary>"#;
 
     let value = XamlReader::Load(FONT_DICT_XAML)?;
