@@ -824,6 +824,9 @@ impl WinUiRuntime {
             if let Some(host) = self.window_hosts.get(&node) {
                 Self::apply_window_theme(host, visuals.theme)?;
             }
+            self.content_dialogs
+                .borrow_mut()
+                .set_window_theme(visuals.theme);
         }
 
         if changes.icon
@@ -2467,6 +2470,11 @@ impl WinUiRuntime {
             children.Append(&child).map_err(native_error)?;
             if let Some(visuals) = self.window_visuals.get(&parent) {
                 Self::apply_window_theme(host, visuals.theme)?;
+            }
+            if let Some(visuals) = self.window_visuals.get(&parent) {
+                self.content_dialogs
+                    .borrow_mut()
+                    .set_window_theme(visuals.theme);
             }
             if let Some(observations) = self.window_observations.get(&parent).copied() {
                 self.set_window_observations(parent, observations)?;

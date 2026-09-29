@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use super::*;
 
 #[derive(Default)]
@@ -5,6 +7,11 @@ pub(super) struct ContentDialogScheduler {
     dialogs: HashMap<NodeId, ContentDialogLifecycle>,
     next_generation: u64,
     request_order: u64,
+    /// 宿主窗口主题（`apply_window_theme` 时记录）。ContentDialog 在 ShowAsync 前
+    /// 不在可视树内，**继承不到**宿主 Grid 上的 RequestedTheme —— 主题回落系统
+    /// （深色系统下弹窗整体深色，与强制浅色的主面板冲突）。故 show 前显式打到
+    /// dialog 上（`IFrameworkElement::RequestedTheme`），由内容/标题/按钮整体继承。
+    window_theme: Cell<WindowTheme>,
 }
 
 pub(super) enum ContentDialogAction {
@@ -43,6 +50,26 @@ impl ContentDialogScheduler {
         self.dialogs.contains_key(&node)
     }
 
+    pub(super) fn set_window_theme(&mut self, theme: WindowTheme) {
+        self.window_theme.set(theme);
+    }
+
+    fn element_theme(&self) -> ElementTheme {
+        match self.window_theme.get() {
+            WindowTheme::Light => ElementTheme::Light,
+            WindowTheme::Dark => ElementTheme::Dark,
+            WindowTheme::System => ElementTheme::Default,
+        }
+    }
+
+    /// show 前把宿主窗口主题打到 dialog（两处 SetXamlRoot 路径共用）。
+    fn apply_theme(dialog: &bindings::ContentDialog, theme: ElementTheme) -> Result<(), RuntimeError> {
+        dialog
+            .cast::<IFrameworkElement>()
+            .and_then(|element| element.SetRequestedTheme(theme))
+            .map_err(native_error)
+    }
+
     pub(super) fn create(&mut self, node: NodeId, dialog: bindings::ContentDialog) {
         self.next_generation += 1;
         self.dialogs.insert(
@@ -73,6 +100,7 @@ impl ContentDialogScheduler {
         let occupied = xaml_root
             .as_ref()
             .is_some_and(|root| self.root_occupied(root, Some(node)));
+        let element_theme = self.element_theme();
         let state = self
             .dialogs
             .get_mut(&node)
@@ -89,6 +117,7 @@ impl ContentDialogScheduler {
                     .cast::<IUIElement>()
                     .and_then(|dialog| dialog.SetXamlRoot(&xaml_root))
                     .map_err(native_error)?;
+                Self::apply_theme(&state.dialog, element_theme)?;
             }
             if state.xaml_root.is_none() {
                 Self::assign_request_order(&mut self.request_order, state);
@@ -129,6 +158,7 @@ impl ContentDialogScheduler {
         xaml_root: XamlRoot,
     ) -> Result<(), RuntimeError> {
         let occupied = self.root_occupied(&xaml_root, Some(node));
+        let element_theme = self.element_theme();
         let Some(state) = self.dialogs.get_mut(&node) else {
             return Ok(());
         };
@@ -141,6 +171,7 @@ impl ContentDialogScheduler {
             .cast::<IUIElement>()
             .and_then(|dialog| dialog.SetXamlRoot(&xaml_root))
             .map_err(native_error)?;
+        Self::apply_theme(&state.dialog, element_theme)?;
         if occupied {
             state.queued = true;
         } else {
