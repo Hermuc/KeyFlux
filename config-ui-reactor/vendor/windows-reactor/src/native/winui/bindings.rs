@@ -27342,6 +27342,43 @@ impl TextBlock {
     pub(crate) fn new() -> windows_core::Result<Self> {
         Self::IActivationFactory(|f| f.ActivateInstance::<Self>())
     }
+    /// 2026-09-29 全局字体补口：直接调用 `ITextBlock_Vtbl.SetFontFamily` 槽位
+    /// （该 vtable 字段在结构体里存在但未生成包装 —— 字段类型为 usize 的原始槽）。
+    /// `font_family` = XamlReader::Load 解析 `<FontFamily>` 得到的 IInspectable
+    /// （即 Media.FontFamily 实例的接口指针）。
+    #[allow(unsafe_code)]
+    #[allow(clippy::missing_transmute_annotations)]
+    pub(crate) fn set_font_family_raw(
+        &self,
+        font_family: &windows_core::IInspectable,
+    ) -> windows_core::Result<()> {
+        let this = windows_core::Interface::as_raw(self);
+        // SAFETY: WinRT ABI 固定；ITextBlock_Vtbl.SetFontFamily 是生成的具名槽位字段
+        // （本 crate bindings 以 usize 占位）。签名 =
+        // fn(*mut c_void /*this*/, *mut c_void /*FontFamily*/) -> HRESULT
+        let vtable: &ITextBlock_Vtbl =
+            unsafe { core::mem::transmute(windows_core::Interface::vtable(self)) };
+        let slot = vtable.SetFontFamily;
+        debug_assert!(slot != 0, "ITextBlock.SetFontFamily slot is null");
+        if slot == 0 {
+            return Err(windows_core::Error::new(
+                windows_core::HRESULT(-2147467259i32),
+                "ITextBlock.SetFontFamily slot not generated",
+            ));
+        }
+        let set_font_family: unsafe extern "system" fn(
+            *mut core::ffi::c_void,
+            *mut core::ffi::c_void,
+        ) -> windows_core::HRESULT = unsafe { core::mem::transmute(slot) };
+        unsafe {
+            set_font_family(
+                this,
+                windows_core::Interface::as_raw(font_family),
+            )
+        }
+        .ok()
+    }
+
     fn IActivationFactory<
         R,
         F: FnOnce(&windows_core::imp::IGenericFactory) -> windows_core::Result<R>,

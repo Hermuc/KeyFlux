@@ -162,9 +162,9 @@ pub fn window_frame_ring() -> Thickness {
 /// UI 字体栈（单源事实）：随包 MiSans 四字重经 `platform::fonts` 进程内私有加载，
 /// 由 fork `install_global_ui_font` 覆盖 `ContentControlThemeFontFamily` 全局生效
 /// （reactor 无 per-control font_family builder，故不在此消费；此处仅作事实记录）。
-pub const UI_FONT: &str = "MiSans, Microsoft YaHei UI, Segoe UI Emoji";
+pub const UI_FONT: &str = "MiSans, Segoe UI Emoji";
 /// 标题（衬线）字体栈（旧版 DESIGN 的 serif 档；reactor 无 font_family 暂不可达）。
-pub const SERIF_FONT: &str = "Georgia, Segoe UI Variable, Microsoft YaHei UI, serif";
+pub const SERIF_FONT: &str = "Georgia, Segoe UI Variable, serif";
 
 pub const FONT_TITLE: f64 = 18.0;
 pub const FONT_SUBTITLE: f64 = 20.0;
