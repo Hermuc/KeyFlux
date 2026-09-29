@@ -85,10 +85,7 @@ pub fn toggle_row<C: IntoPayloadCallback<bool>>(
     is_on: bool,
     on_change: C,
 ) -> View {
-    let control: View = ToggleSwitch::new()
-        .is_on(is_on)
-        .on_toggled(on_change)
-        .into();
+    let control: View = crate::ui::compact_switch(is_on, on_change);
     field_row(label, control)
 }
 
@@ -198,15 +195,12 @@ where
         .min_height(32.0)
         .on_text_changed(on_hotkey)
         .into();
-    // 开关统一 ON/OFF 指示在**正右边**（置空内置「开/关」，三页同口径）
+    // 开关统一 ON/OFF 指示在**正右边**（compact_switch 已修 WinUI 默认 MinWidth=154，三页同口径）
     let switch: View = StackPanel::new()
         .orientation(Orientation::Horizontal)
         .spacing(8.0)
         .children((
-            ToggleSwitch::new()
-                .is_on(enabled)
-                .on_toggled(on_enable)
-                .slots(crate::ui::empty_on_off_slots()),
+            crate::ui::compact_switch(enabled, on_enable),
             crate::ui::on_off_indicator(enabled),
         ));
 

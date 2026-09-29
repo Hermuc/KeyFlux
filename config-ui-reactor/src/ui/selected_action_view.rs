@@ -84,11 +84,8 @@ where
                 .orientation(Orientation::Horizontal)
                 .spacing(10.0)
                 .children((
-                    // 内置「开/关」文案置空；指示字在开关**正右边**
-                    ToggleSwitch::new()
-                        .is_on(enable)
-                        .on_toggled(on_enable)
-                        .slots(crate::ui::empty_on_off_slots()),
+                    // 紧凑开关（修 WinUI 默认 MinWidth=154）；指示字在开关**正右边**
+                    crate::ui::compact_switch(enable, on_enable),
                     TextBlock::new()
                         .text(state)
                         .font_size(theme::FONT_CAPTION)

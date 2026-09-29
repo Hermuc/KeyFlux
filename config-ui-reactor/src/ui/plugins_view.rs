@@ -154,10 +154,8 @@ where
         Border::new().content(inner)
     };
 
-    let switch: View = ToggleSwitch::new()
-        .is_on(card.enabled)
-        .on_toggled(on_toggle)
-        .slots(crate::ui::empty_on_off_slots());
+    // 紧凑开关（修 WinUI 默认 MinWidth=154，否则状态字被推远；见 ui::compact_switch）
+    let switch: View = crate::ui::compact_switch(card.enabled, on_toggle);
     let status: View = TextBlock::new()
         .text(card.status_text())
         .font_size(theme::FONT_MICRO)

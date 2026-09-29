@@ -84,10 +84,7 @@ pub fn toggle<C: IntoPayloadCallback<bool>>(
     is_on: bool,
     on_toggle: C,
 ) -> View {
-    let switch: View = ToggleSwitch::new()
-        .is_on(is_on)
-        .on_toggled(on_toggle)
-        .into();
+    let switch: View = crate::ui::compact_switch(is_on, on_toggle);
     toggle_row(label, switch)
 }
 
