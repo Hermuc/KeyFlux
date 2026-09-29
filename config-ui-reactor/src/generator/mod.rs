@@ -16,4 +16,6 @@ pub mod behaviors;
 pub mod config;
 pub mod model;
 pub mod plan;
+pub mod plugins;
+pub mod template;
 pub mod text;
