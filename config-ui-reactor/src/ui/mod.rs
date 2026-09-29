@@ -46,3 +46,21 @@ pub fn on_off_indicator(is_on: bool) -> View {
         .vertical_alignment(VerticalAlignment::Center)
         .into()
 }
+
+/// 紧凑开关（**唯一的 ToggleSwitch 构造点**，勿在页面里裸建 `ToggleSwitch::new()`）。
+///
+/// 🔴 WinUI `ToggleSwitch` 默认样式经 `ToggleSwitchThemeMinWidth` 内建
+/// `MinWidth=154`（`microsoft-ui-xaml#3652`）——**即使 On/Off 内容为空也预留 154px**。
+/// 于是「开关 + 右侧 ON/OFF 字」的排布里，状态字被推到约 154px 之外（2026-09-29 用户报告
+/// 选中动作/插件/选项三页「ON 离开关太远」的根因）。官方 workaround = 直接在控件上设
+/// `MinWidth`（改 `ToggleSwitchThemeMinWidth` 资源实测无效）⇒ 这里统一 `min_width(0.0)`。
+///
+/// 同时置空内置「开/关」文案（见 [`empty_on_off_slots`]），由调用方在右侧自行放
+/// [`on_off_indicator`] 或自定义状态字。
+pub fn compact_switch<C: IntoPayloadCallback<bool>>(is_on: bool, on_toggle: C) -> View {
+    ToggleSwitch::new()
+        .is_on(is_on)
+        .on_toggled(on_toggle)
+        .min_width(0.0)
+        .slots(empty_on_off_slots())
+}
