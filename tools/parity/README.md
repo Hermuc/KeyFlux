@@ -30,6 +30,14 @@ pwsh -File tools/parity/run_parity.ps1 -Capture      # 重新录制基线
 | `reference/` | **冻结**的基线产物（由 `-Capture` 从参考实现录制，入库） |
 | `run_parity.ps1` | 脚本本体（**纯 ASCII**，与 `tools/oracle.ps1` 同约定：`pwsh -File` 会误读无 BOM 的 UTF-8 中文） |
 
+## 基线依赖的输入（这些改动必须重新 `-Capture`）
+
+| 输入 | 说明 |
+|---|---|
+| `config-server/templates/keyflux.tmpl` | 模板（manifest 的 `template`） |
+| `bin/behaviors/**` | **内置行为包**——`LoadBehaviorCatalog` 从 **`settings.exe` 所在目录**读 `behaviors/`（故 Rust 实现也须落在同目录，否则目录不同→目录内容不同→基线不等） |
+| 语料同级 `plugins/` | 由 manifest 的 `plugins` 字段在运行时拷入工作目录 |
+
 ## 语料约束（重要）
 
 Go 渲染路径存在**已知 map 迭代非确定性**（见 `config-server/internal/script/golden_test.go`

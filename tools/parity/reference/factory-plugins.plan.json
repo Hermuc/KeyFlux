@@ -1,0 +1,2197 @@
+{
+  "planVersion": 1,
+  "keymaps": [
+    {
+      "id": 5,
+      "name": "CapsLock",
+      "hotkey": "*CapsLock",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "*c",
+          "typeID": 2,
+          "valueID": 5,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:21"
+        },
+        {
+          "hotkey": "*z",
+          "typeID": 2,
+          "valueID": 8,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:24"
+        },
+        {
+          "hotkey": "*.",
+          "typeID": 3,
+          "valueID": 13,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:15"
+        },
+        {
+          "hotkey": "*a",
+          "typeID": 3,
+          "valueID": 11,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:13"
+        },
+        {
+          "hotkey": "*b",
+          "typeID": 3,
+          "valueID": 8,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:10"
+        },
+        {
+          "hotkey": "*e",
+          "typeID": 3,
+          "valueID": 4,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:4"
+        },
+        {
+          "hotkey": "*g",
+          "typeID": 3,
+          "valueID": 12,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:14"
+        },
+        {
+          "hotkey": "*p",
+          "typeID": 3,
+          "valueID": 6,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:6"
+        },
+        {
+          "hotkey": "*q",
+          "typeID": 3,
+          "valueID": 9,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:11"
+        },
+        {
+          "hotkey": "*r",
+          "typeID": 3,
+          "valueID": 3,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:3"
+        },
+        {
+          "hotkey": "*s",
+          "typeID": 3,
+          "valueID": 10,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:12"
+        },
+        {
+          "hotkey": "*t",
+          "typeID": 3,
+          "valueID": 14,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:16"
+        },
+        {
+          "hotkey": "*v",
+          "typeID": 3,
+          "valueID": 7,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:7"
+        },
+        {
+          "hotkey": "*w",
+          "typeID": 3,
+          "valueID": 2,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:2"
+        },
+        {
+          "hotkey": "*x",
+          "typeID": 3,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:1"
+        },
+        {
+          "hotkey": "*y",
+          "typeID": 3,
+          "valueID": 5,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:5"
+        },
+        {
+          "hotkey": "*,",
+          "typeID": 4,
+          "valueID": 12,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:36"
+        },
+        {
+          "hotkey": "*/",
+          "typeID": 4,
+          "valueID": 13,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:37"
+        },
+        {
+          "hotkey": "*;",
+          "typeID": 4,
+          "valueID": 8,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:32"
+        },
+        {
+          "hotkey": "*h",
+          "typeID": 4,
+          "valueID": 7,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:31"
+        },
+        {
+          "hotkey": "*i",
+          "typeID": 4,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:25"
+        },
+        {
+          "hotkey": "*j",
+          "typeID": 4,
+          "valueID": 3,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:27"
+        },
+        {
+          "hotkey": "*k",
+          "typeID": 4,
+          "valueID": 2,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:26"
+        },
+        {
+          "hotkey": "*l",
+          "typeID": 4,
+          "valueID": 4,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:28"
+        },
+        {
+          "hotkey": "*m",
+          "typeID": 4,
+          "valueID": 10,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:34"
+        },
+        {
+          "hotkey": "*n",
+          "typeID": 4,
+          "valueID": 9,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:33"
+        },
+        {
+          "hotkey": "*o",
+          "typeID": 4,
+          "valueID": 6,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:30"
+        },
+        {
+          "hotkey": "*u",
+          "typeID": 4,
+          "valueID": 5,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:29"
+        },
+        {
+          "hotkey": "*0",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "删除一行东西，然后输入一串文本，然后等待 1000 毫秒，再依次按下 enter、y、e、s、enter 键"
+        },
+        {
+          "hotkey": "*d",
+          "typeID": 8,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "窗口居中并设置大小为 1740x1000"
+        },
+        {
+          "hotkey": "singlePress",
+          "typeID": 9,
+          "valueID": 6,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:76"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "CapsLock + F",
+      "hotkey": "*f",
+      "parentID": 5,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "*a",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Windows Terminal"
+        },
+        {
+          "hotkey": "*d",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Edge"
+        },
+        {
+          "hotkey": "*e",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "File Explorer"
+        },
+        {
+          "hotkey": "*h",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Visual Studio"
+        },
+        {
+          "hotkey": "*i",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Typora"
+        },
+        {
+          "hotkey": "*j",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "IntelliJ IDEA"
+        },
+        {
+          "hotkey": "*k",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "PotPlayer"
+        },
+        {
+          "hotkey": "*l",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Excel"
+        },
+        {
+          "hotkey": "*n",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "GoLand"
+        },
+        {
+          "hotkey": "*o",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "OneNote 桌面版"
+        },
+        {
+          "hotkey": "*p",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "PowerPoint"
+        },
+        {
+          "hotkey": "*q",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Everything"
+        },
+        {
+          "hotkey": "*r",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "FoxitReader"
+        },
+        {
+          "hotkey": "*s",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Visual Studio Code"
+        },
+        {
+          "hotkey": "*w",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Chrome"
+        },
+        {
+          "hotkey": "singlePress",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "输入 f 键"
+        },
+        {
+          "hotkey": "*m",
+          "typeID": 8,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "如果 QQ.exe 进程存在则输入 Ctrl+Alt+Z 热键激活 QQ，否则启动 QQ"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "CapsLock + Space",
+      "hotkey": "*Space",
+      "parentID": 5,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "*d",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "DataGrip"
+        },
+        {
+          "hotkey": "singlePress",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "输入 space 键"
+        },
+        {
+          "hotkey": "*w",
+          "typeID": 8,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "如果 Weixin.exe 进程存在则输入 Ctrl+Alt+W 热键激活微信，否则启动微信"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "J 模式",
+      "hotkey": "*j",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "*i",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "防全拼打字误触"
+        },
+        {
+          "hotkey": "singlePress",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "输入 j 键"
+        },
+        {
+          "hotkey": "*,",
+          "typeID": 7,
+          "valueID": 23,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:65"
+        },
+        {
+          "hotkey": "*.",
+          "typeID": 7,
+          "valueID": 24,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:66"
+        },
+        {
+          "hotkey": "*2",
+          "typeID": 7,
+          "valueID": 28,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:70"
+        },
+        {
+          "hotkey": "*3",
+          "typeID": 7,
+          "valueID": 26,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:68"
+        },
+        {
+          "hotkey": "*a",
+          "typeID": 7,
+          "valueID": 5,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:42"
+        },
+        {
+          "hotkey": "*b",
+          "typeID": 7,
+          "valueID": 18,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:56"
+        },
+        {
+          "hotkey": "*c",
+          "typeID": 7,
+          "valueID": 21,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:63"
+        },
+        {
+          "hotkey": "*d",
+          "typeID": 7,
+          "valueID": 2,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:39"
+        },
+        {
+          "hotkey": "*e",
+          "typeID": 7,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:38"
+        },
+        {
+          "hotkey": "*f",
+          "typeID": 7,
+          "valueID": 4,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:41"
+        },
+        {
+          "hotkey": "*g",
+          "typeID": 7,
+          "valueID": 6,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:43"
+        },
+        {
+          "hotkey": "*k",
+          "typeID": 7,
+          "valueID": 19,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:57"
+        },
+        {
+          "hotkey": "*q",
+          "typeID": 7,
+          "valueID": 17,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:54"
+        },
+        {
+          "hotkey": "*r",
+          "typeID": 7,
+          "valueID": 25,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:67"
+        },
+        {
+          "hotkey": "*s",
+          "typeID": 7,
+          "valueID": 3,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:40"
+        },
+        {
+          "hotkey": "*t",
+          "typeID": 7,
+          "valueID": 33,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:55"
+        },
+        {
+          "hotkey": "*v",
+          "typeID": 7,
+          "valueID": 8,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:45"
+        },
+        {
+          "hotkey": "*w",
+          "typeID": 7,
+          "valueID": 27,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:69"
+        },
+        {
+          "hotkey": "*x",
+          "typeID": 7,
+          "valueID": 20,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:62"
+        },
+        {
+          "hotkey": "*z",
+          "typeID": 7,
+          "valueID": 7,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:44"
+        },
+        {
+          "hotkey": "*space",
+          "typeID": 7,
+          "valueID": 22,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:64"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "3 模式",
+      "hotkey": "*3",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "*0",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to F10"
+        },
+        {
+          "hotkey": "*2",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to F2"
+        },
+        {
+          "hotkey": "*4",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to F4"
+        },
+        {
+          "hotkey": "*5",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to F5"
+        },
+        {
+          "hotkey": "*9",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to F9"
+        },
+        {
+          "hotkey": "*b",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 7"
+        },
+        {
+          "hotkey": "*e",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to F11"
+        },
+        {
+          "hotkey": "*h",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 0"
+        },
+        {
+          "hotkey": "*i",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 5"
+        },
+        {
+          "hotkey": "*j",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 1"
+        },
+        {
+          "hotkey": "*k",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 2"
+        },
+        {
+          "hotkey": "*l",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 3"
+        },
+        {
+          "hotkey": "*m",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 9"
+        },
+        {
+          "hotkey": "*n",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 8"
+        },
+        {
+          "hotkey": "*o",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 6"
+        },
+        {
+          "hotkey": "*r",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to F12"
+        },
+        {
+          "hotkey": "*t",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to Volume_Up"
+        },
+        {
+          "hotkey": "*u",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to 4"
+        },
+        {
+          "hotkey": "*w",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to Volume_Down"
+        },
+        {
+          "hotkey": "*space",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Remap to F1"
+        },
+        {
+          "hotkey": "singlePress",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "输入 3 键"
+        },
+        {
+          "hotkey": "*/",
+          "typeID": 9,
+          "valueID": 8,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:78"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "分号模式( ; )",
+      "hotkey": "*;",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "*a",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 *"
+        },
+        {
+          "hotkey": "*b",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 %"
+        },
+        {
+          "hotkey": "*c",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 ."
+        },
+        {
+          "hotkey": "*d",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 ="
+        },
+        {
+          "hotkey": "*e",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 ^"
+        },
+        {
+          "hotkey": "*f",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 \u003e"
+        },
+        {
+          "hotkey": "*g",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 !"
+        },
+        {
+          "hotkey": "*h",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 +"
+        },
+        {
+          "hotkey": "*i",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 :"
+        },
+        {
+          "hotkey": "*j",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 ;"
+        },
+        {
+          "hotkey": "*k",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 `"
+        },
+        {
+          "hotkey": "*m",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 -"
+        },
+        {
+          "hotkey": "*n",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 /"
+        },
+        {
+          "hotkey": "*r",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 \u0026"
+        },
+        {
+          "hotkey": "*s",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 \u003c"
+        },
+        {
+          "hotkey": "*t",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 ~"
+        },
+        {
+          "hotkey": "*u",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 $"
+        },
+        {
+          "hotkey": "*v",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 |"
+        },
+        {
+          "hotkey": "*w",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 #"
+        },
+        {
+          "hotkey": "*x",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 _"
+        },
+        {
+          "hotkey": "*y",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 @"
+        },
+        {
+          "hotkey": "*z",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "符号 \\"
+        },
+        {
+          "hotkey": "singlePress",
+          "typeID": 9,
+          "valueID": 5,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:75"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "句号模式( . )",
+      "hotkey": "*.",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "singlePress",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "输入 . 键"
+        },
+        {
+          "hotkey": "*,",
+          "typeID": 7,
+          "valueID": 19,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:57"
+        },
+        {
+          "hotkey": "*2",
+          "typeID": 7,
+          "valueID": 28,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:70"
+        },
+        {
+          "hotkey": "*3",
+          "typeID": 7,
+          "valueID": 26,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:68"
+        },
+        {
+          "hotkey": "*a",
+          "typeID": 7,
+          "valueID": 5,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:42"
+        },
+        {
+          "hotkey": "*b",
+          "typeID": 7,
+          "valueID": 18,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:56"
+        },
+        {
+          "hotkey": "*c",
+          "typeID": 7,
+          "valueID": 21,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:63"
+        },
+        {
+          "hotkey": "*d",
+          "typeID": 7,
+          "valueID": 2,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:39"
+        },
+        {
+          "hotkey": "*e",
+          "typeID": 7,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:38"
+        },
+        {
+          "hotkey": "*f",
+          "typeID": 7,
+          "valueID": 4,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:41"
+        },
+        {
+          "hotkey": "*g",
+          "typeID": 7,
+          "valueID": 6,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:43"
+        },
+        {
+          "hotkey": "*q",
+          "typeID": 7,
+          "valueID": 17,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:54"
+        },
+        {
+          "hotkey": "*r",
+          "typeID": 7,
+          "valueID": 25,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:67"
+        },
+        {
+          "hotkey": "*s",
+          "typeID": 7,
+          "valueID": 3,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:40"
+        },
+        {
+          "hotkey": "*v",
+          "typeID": 7,
+          "valueID": 8,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:45"
+        },
+        {
+          "hotkey": "*w",
+          "typeID": 7,
+          "valueID": 27,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:69"
+        },
+        {
+          "hotkey": "*x",
+          "typeID": 7,
+          "valueID": 20,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:62"
+        },
+        {
+          "hotkey": "*z",
+          "typeID": 7,
+          "valueID": 7,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:44"
+        },
+        {
+          "hotkey": "*space",
+          "typeID": 7,
+          "valueID": 22,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:64"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "鼠标右键",
+      "hotkey": "RButton",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "*XButton1",
+          "typeID": 3,
+          "valueID": 6,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:6"
+        },
+        {
+          "hotkey": "*XButton2",
+          "typeID": 3,
+          "valueID": 5,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:5"
+        },
+        {
+          "hotkey": "singlePress",
+          "typeID": 4,
+          "valueID": 10,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:34"
+        },
+        {
+          "hotkey": "*LButton",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Ctrl + Alt + Tab ( 可用鼠标中键关闭窗口 )"
+        },
+        {
+          "hotkey": "*MButton",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "Win + Tab"
+        },
+        {
+          "hotkey": "*c",
+          "typeID": 7,
+          "valueID": 21,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:63"
+        },
+        {
+          "hotkey": "*d",
+          "typeID": 7,
+          "valueID": 23,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:65"
+        },
+        {
+          "hotkey": "*x",
+          "typeID": 7,
+          "valueID": 20,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:62"
+        },
+        {
+          "hotkey": "*space",
+          "typeID": 7,
+          "valueID": 22,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:64"
+        },
+        {
+          "hotkey": "*WheelUp",
+          "typeID": 7,
+          "valueID": 28,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:70"
+        },
+        {
+          "hotkey": "*WheelDown",
+          "typeID": 7,
+          "valueID": 26,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:68"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Custom Hotkeys",
+      "hotkey": "customHotkeys",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "RAlt",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "重映射为 LControl"
+        },
+        {
+          "hotkey": "!'",
+          "typeID": 9,
+          "valueID": 2,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:72"
+        },
+        {
+          "hotkey": "!+'",
+          "typeID": 9,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:71"
+        },
+        {
+          "hotkey": "!f17",
+          "typeID": 9,
+          "valueID": 2,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "!CapsLock",
+          "typeID": 9,
+          "valueID": 7,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\"",
+          "comment": "label:77"
+        }
+      ]
+    }
+  ],
+  "abbr": {
+    "capslockEnabled": true,
+    "capslockKeys": "bb,ca,cc,cmd,dd,dm,ex,ga,gg,gj,kp,ld,lj,ly,mm,ms,mu,no,pd,rb,rex,se,sl,sp,ss,tm,vm,we,wf,wt",
+    "capslock": [
+      {
+        "abbr": "bb",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "查询选中的单词 (低配版划词翻译)"
+          }
+        ]
+      },
+      {
+        "abbr": "ca",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "Calculator ( 计算器 )"
+          }
+        ]
+      },
+      {
+        "abbr": "cc",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "用 VS Code 打开选中的文件，在新窗口中打开"
+          }
+        ]
+      },
+      {
+        "abbr": "cmd",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "位于 PATH 环境变量中的命令 (比如 cmd.exe) 无需使用绝对路径"
+          }
+        ]
+      },
+      {
+        "abbr": "dd",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "打开「 下载 」文件夹"
+          }
+        ]
+      },
+      {
+        "abbr": "dm",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "打开「 KeyFlux 」文件夹"
+          }
+        ]
+      },
+      {
+        "abbr": "ex",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 9,
+            "valueID": 3,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:73"
+          }
+        ]
+      },
+      {
+        "abbr": "ga",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "打开桌面的 Game 文件夹"
+          }
+        ]
+      },
+      {
+        "abbr": "gg",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "用 Bing 搜索选中的内容，或跳转到选中的 HTTP 链接"
+          }
+        ]
+      },
+      {
+        "abbr": "gj",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 2,
+            "valueID": 3,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:19"
+          }
+        ]
+      },
+      {
+        "abbr": "kp",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 3,
+            "valueID": 15,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:8"
+          }
+        ]
+      },
+      {
+        "abbr": "ld",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 2,
+            "valueID": 6,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:22"
+          }
+        ]
+      },
+      {
+        "abbr": "lj",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "打开「 回收站 」文件夹"
+          }
+        ]
+      },
+      {
+        "abbr": "ly",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "打开蓝牙设置"
+          }
+        ]
+      },
+      {
+        "abbr": "mm",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "个人常用项目 - KeyFlux"
+          }
+        ]
+      },
+      {
+        "abbr": "ms",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "个人常用项目 - My Site"
+          }
+        ]
+      },
+      {
+        "abbr": "mu",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 2,
+            "valueID": 9,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:2401"
+          }
+        ]
+      },
+      {
+        "abbr": "no",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "记事本"
+          }
+        ]
+      },
+      {
+        "abbr": "pd",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 2,
+            "valueID": 10,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:2402"
+          }
+        ]
+      },
+      {
+        "abbr": "rb",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 2,
+            "valueID": 4,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:20"
+          }
+        ]
+      },
+      {
+        "abbr": "rex",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 2,
+            "valueID": 7,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:23"
+          }
+        ]
+      },
+      {
+        "abbr": "se",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 9,
+            "valueID": 4,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:74"
+          }
+        ]
+      },
+      {
+        "abbr": "sl",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 2,
+            "valueID": 2,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:18"
+          }
+        ]
+      },
+      {
+        "abbr": "sp",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "Spotify 网页"
+          }
+        ]
+      },
+      {
+        "abbr": "ss",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "Spotify 应用"
+          }
+        ]
+      },
+      {
+        "abbr": "tm",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "Ctrl + Shift + Esc ( Task Manager )"
+          }
+        ]
+      },
+      {
+        "abbr": "vm",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "Volume Mixer 音量合成器"
+          }
+        ]
+      },
+      {
+        "abbr": "we",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "网易云音乐 UWP 版"
+          }
+        ]
+      },
+      {
+        "abbr": "wf",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "查看周围 WiFi"
+          }
+        ]
+      },
+      {
+        "abbr": "wt",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "用 Windows Terminal 打开选中的文件夹"
+          }
+        ]
+      }
+    ],
+    "semicolonEnabled": true,
+    "semicolonKeys": ",,,.,/,dk,dq,fz,gg,gt,i love nia,jt,kg,rq,sj,sk,xf,xk,zh,zk",
+    "semicolon": [
+      {
+        "abbr": ",",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "因为在输入法中设置了「 中文状态下使用英文标点 」, 所以用这个输入中文逗号"
+          }
+        ]
+      },
+      {
+        "abbr": ".",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "因为在输入法中设置了「 中文状态下使用英文标点 」, 所以用这个输入中文句号"
+          }
+        ]
+      },
+      {
+        "abbr": "/",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "因为在输入法中设置了「 中文状态下使用英文标点 」, 所以用这个输入中文顿号"
+          }
+        ]
+      },
+      {
+        "abbr": "dk",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "输入一对 {} 并把光标移动中间"
+          }
+        ]
+      },
+      {
+        "abbr": "dq",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "对齐代码注释"
+          }
+        ]
+      },
+      {
+        "abbr": "fz",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "用剪切板收集文本 (连续复制然后合并粘贴)"
+          }
+        ]
+      },
+      {
+        "abbr": "gg",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "一键 Git 提交"
+          }
+        ]
+      },
+      {
+        "abbr": "gt",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "狗头 🐶"
+          }
+        ]
+      },
+      {
+        "abbr": "i love nia",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "没错，缩写中可以包含空格，用del i love nia删掉这个示例"
+          }
+        ]
+      },
+      {
+        "abbr": "jt",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "输入箭头符号"
+          }
+        ]
+      },
+      {
+        "abbr": "kg",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 7,
+            "valueID": 29,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "label:61"
+          }
+        ]
+      },
+      {
+        "abbr": "rq",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "输入当前日期"
+          }
+        ]
+      },
+      {
+        "abbr": "sj",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "输入当前时间"
+          }
+        ]
+      },
+      {
+        "abbr": "sk",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "输入一对「」并把光标移动中间"
+          }
+        ]
+      },
+      {
+        "abbr": "xf",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "输入小括号和分号"
+          }
+        ]
+      },
+      {
+        "abbr": "xk",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "输入一对 () 并把光标移到中间"
+          }
+        ]
+      },
+      {
+        "abbr": "zh",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "搜索时加上 site: 选项，能让搜索引擎只搜某网站的内容，另外用 inurl: 过滤掉专栏和视频内容"
+          }
+        ]
+      },
+      {
+        "abbr": "zk",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\"",
+            "comment": "输入一对 [] 并把光标移到中间"
+          }
+        ]
+      }
+    ]
+  },
+  "selectedAction": {
+    "hotkey": "",
+    "enable": false,
+    "mappings": []
+  },
+  "windowGroups": [
+    {
+      "id": -1,
+      "name": "🚫 Exclude",
+      "value": "Stardew Valley ahk_class SDL_app\nahk_exe Rune Factory 3 Special.exe"
+    },
+    {
+      "id": 0,
+      "name": "🌎 Global"
+    },
+    {
+      "id": 1,
+      "name": "🌐 Web Browser",
+      "value": "ahk_exe chrome.exe\nahk_exe msedge.exe\nahk_exe firefox.exe",
+      "conditionType": 1
+    },
+    {
+      "id": 2,
+      "name": "📂 文件对话框",
+      "value": "ahk_class #32770",
+      "conditionType": 1
+    },
+    {
+      "id": 3,
+      "name": "📁 File Explorer",
+      "value": "ahk_exe explorer.exe",
+      "conditionType": 1
+    }
+  ],
+  "matchTypes": null
+}
