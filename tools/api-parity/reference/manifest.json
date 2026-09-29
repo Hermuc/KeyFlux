@@ -1,0 +1,16 @@
+{
+  "schema": "api-parity-manifest/1",
+  "transport": "Call",
+  "sourceExeSha256": "cd6b91dd4c8db56c425d84d417209d75a971642eafd1cf7d1fc69c7f75df8d5b",
+  "items": [
+    { "method": "GET", "path": "/health", "corpus": null, "ref": "GET_health.json" },
+    { "method": "GET", "path": "/config", "corpus": null, "ref": "GET_config.json" },
+    { "method": "GET", "path": "/shortcuts", "corpus": null, "ref": "GET_shortcuts.json" },
+    { "method": "GET", "path": "/api/behaviors", "corpus": null, "ref": "GET_api_behaviors.json" },
+    { "method": "GET", "path": "/api/plugins", "corpus": null, "ref": "GET_api_plugins.json" },
+    { "method": "GET", "path": "/api/plugins/everything_search/settings", "corpus": null, "ref": "GET_api_plugins_everything_search_settings.json" },
+    { "method": "POST", "path": "/api/selected-action/test", "corpus": "test_selected-action_url_hit.json", "ref": "POST_api_selected-action_test.test_selected-action_url_hit.json" },
+    { "method": "POST", "path": "/api/selected-action/test", "corpus": "test_selected-action_textfeature_hit.json", "ref": "POST_api_selected-action_test.test_selected-action_textfeature_hit.json" },
+    { "method": "POST", "path": "/api/selected-action/test", "corpus": "test_selected-action_nomatch.json", "ref": "POST_api_selected-action_test.test_selected-action_nomatch.json" }
+  ]
+}

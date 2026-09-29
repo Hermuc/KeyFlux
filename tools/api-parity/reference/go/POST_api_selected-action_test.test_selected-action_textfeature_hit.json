@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/api/selected-action/test",
+  "corpus": "test_selected-action_textfeature_hit.json",
+  "callLine": "KEYFLUX_CALL status=200
+",
+  "status": 200,
+  "bodyBase64": "eyJtYXRjaFR5cGUiOiJ0ZXh0VHlwZSIsIm1hdGNoVmFsdWUiOiJ0eXBlOmtmeGRlbW8iLCJtYXRjaGVkIjp0cnVlLCJtZW51IjpbeyJiZWhhdmlvciI6ImNvcHkiLCJrZXkiOjEsIm5hbWUiOiLlpI3liLYifV0sInByZXZpZXciOiIifQ=="
+}

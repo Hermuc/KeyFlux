@@ -1,0 +1,1 @@
+{"content":"KFXdemo 选中测试","isFile":false,"matchTypes":[{"id":"kfxdemo","label":"演示特征","kind":"text","rules":[{"op":"prefix","value":"KFX"}]}],"selectedAction":{"hotkey":"","enable":false,"mappings":[{"matchType":"textType","matchValue":"type:kfxdemo","entries":[{"behavior":"copy","options":{}}]}]}}
