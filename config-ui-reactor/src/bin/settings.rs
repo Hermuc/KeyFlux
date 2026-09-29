@@ -57,6 +57,10 @@ fn main() -> ExitCode {
                 ExitCode::from(1)
             }
         },
+        // 面板后端 HTTP 服务模式（Go: main.go:26 `headless := len(os.Args) == 2 &&
+        // os.Args[1] == "--headless"`）：bind → stdout 首行通告 KEYFLUX_PORT= →
+        // 永久服务。仅接受恰一个参数的形态（与 Go 分派条件一致）。
+        "--headless" if args.len() == 2 => config_ui_reactor::server::run_headless(),
         other => {
             eprintln!("unsupported command: {other}");
             ExitCode::from(2)
