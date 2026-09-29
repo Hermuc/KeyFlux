@@ -233,6 +233,12 @@ pub enum Message {
     SaDeleteCancelled,
     /// 打开「添加映射」弹窗。
     SaAddOpen,
+    /// 清除选中动作热键（输入行尾 ✕，复刻旧 HotkeyCapture 的清除钮）。
+    SaHotkeyClear,
+    /// 卡内「＋ 新建匹配类型」（2553）：直接打开匹配类型对话框并预置对应 kind 的草稿。
+    SaNewType {
+        kind: &'static str,
+    },
     /// 「添加映射」类型下拉选择（`None` = 未选）。
     SaAddType(Option<usize>),
     /// 「添加映射」行为勾选/取消（`checked` 保序 = 菜单序）。
@@ -1141,6 +1147,23 @@ impl Component for Shell {
             }
             Message::SaAddOpen => {
                 self.sa_add = Some(SaAddDraft::default());
+            }
+            Message::SaHotkeyClear => {
+                self.sa_hotkey_conflict = false;
+                if let Some(config) = self.config.as_mut() {
+                    config.selected_action.hotkey = String::new();
+                }
+                self.hotkey_pending_save = true;
+            }
+            Message::SaNewType { kind } => {
+                self.mt_dialog = true;
+                self.mt_status = None;
+                self.mt_test_result = None;
+                self.mt_test.clear();
+                self.mt_draft = self
+                    .config
+                    .as_ref()
+                    .map(|config| match_types_edit::MatchTypeDraft::new_draft(config, kind));
             }
             Message::SaAddCancel => self.sa_add = None,
             Message::SaAddType(pick) => {
@@ -2369,16 +2392,25 @@ impl Shell {
         };
         let sa_config = &config.selected_action;
 
-        // 页头右侧三入口（复刻旧页头 Grid：2519 管理匹配类型 / 1083 管理行为 / 1105 添加映射）
+        // 页头（旧截图复刻）：标题与三入口**同排**（标题 STAR 左，按钮 Auto 右）
         let actions: View = selected_action_view::page_actions(
             context.message(Message::MatchTypesOpen),
             context.message(Message::BehaviorsOpen),
             context.message(Message::SaAddOpen),
         );
-        let header: View = StackPanel::new().spacing(6.0).children((
-            keymap_view::page_header(&i18n::t("914"), Some(&i18n::t("960"))),
-            actions,
-        ));
+        let header: View = Grid::new()
+            .columns([GridLength::STAR, GridLength::Auto])
+            .children((
+                TextBlock::new()
+                    .text(i18n::t("914"))
+                    .font_size(theme::FONT_PAGE_TITLE)
+                    .font_weight(FontWeight::MEDIUM)
+                    .foreground(theme::near_black())
+                    .vertical_alignment(VerticalAlignment::Center),
+                Border::new().grid_column(1).content(actions),
+            ));
+        // 说明条（960）：Sand 横幅（复刻旧 `.axaml:374-378`）
+        let banner: View = selected_action_view::hint_bar(&i18n::t("960"));
 
         // 热键提示条：未保存（1077）优先于冲突（1025）与空热键警示（976）
         let mut hint = if self.hotkey_pending_save {
@@ -2403,19 +2435,20 @@ impl Shell {
             &hint,
             context.callback(|text: String| Message::SaHotkey(text)),
             context.callback(|enabled: bool| Message::SaEnable(enabled)),
+            context.message(Message::SaHotkeyClear),
         );
 
         let text_card = self.sa_type_card(context, MATCH_TEXT_TYPE);
         let file_card = self.sa_type_card(context, MATCH_FILE_EXT);
 
-        // 旧页面容器：`Grid Margin="8,20,20,20"` + `StackPanel Spacing="14" MaxWidth="860"`
+        // 旧页面容器：`Grid Margin="8,20,20,20"` + `StackPanel Spacing="14"`（内容宽 ≈740）
         ScrollViewer::new().content(
             StackPanel::new()
                 .margin(Thickness::new(8.0, 20.0, 20.0, 20.0))
                 .spacing(14.0)
-                .max_width(860.0)
+                .max_width(760.0)
                 .horizontal_alignment(HorizontalAlignment::Left)
-                .children((header, hotkey, text_card, file_card)),
+                .children((header, banner, hotkey, text_card, file_card)),
         )
     }
 
@@ -2593,8 +2626,17 @@ impl Shell {
                 ))
         };
 
+        // 卡内「＋ 新建匹配类型」（2553）：按卡种类预置 text/fileExt 草稿
+        let new_type: View =
+            selected_action_view::new_type_link(context.message(Message::SaNewType {
+                kind: if match_type == MATCH_TEXT_TYPE {
+                    "text"
+                } else {
+                    "fileExt"
+                },
+            }));
         let mut card_children: Vec<(usize, View)> =
-            vec![(0, header), (1, toggles_area), (2, detail)];
+            vec![(0, header), (1, toggles_area), (2, new_type), (3, detail)];
         // 页内状态条（▶ 执行失败等）：仅渲染在**当前点亮**的卡上
         if is_selected_type && let Some((text, is_error)) = &self.sa_status {
             card_children.push((
