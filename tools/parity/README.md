@@ -55,6 +55,7 @@ pwsh -File tools/parity/run_parity.ps1 -Exe <rust-settings.exe> -Kinds plan   # 
 | `factory` | 出厂 `data/config.json` 的冻结副本 | 真实样例（键位/缩写/选中动作/窗口组/QuickSwitch…） |
 | `factory-plugins` | 同上 + `plugins/examples` 拷为同级 `plugins/` | 插件注入路径（ahk 22766 → 23415 字节证明注入生效） |
 | `synthetic` | `config-server/internal/script/golden_test.go` 的 `syntheticConfig()` 导出的 JSON | **覆盖矩阵全集**：9 个 TypeID 各分支、缩写注册表（含 ct5 去单引号）、`hotifHeader` conditionType 0–5、`.KeyMapping` 重映射、windowGroups 单行/多行、QuickSwitch `excludedPrefixes`… |
+| `no-capslock-abbr` | 出厂配置 + keymap `id==5` 置 `enable:false` | **`{{ if .CapslockAbbrEnabled }}` 的 skip 路径**（该盲区曾漏掉一个字节偏差：capslock 关闭时 Rust 多输出 1 个空行；由 corpus 外的独立抽查发现） |
 
 `synthetic` 的再生成（改了 `syntheticConfig()` 后必须重跑这两步）：
 

@@ -19,6 +19,11 @@
       "name": "synthetic",
       "config": "corpus/synthetic/config.json",
       "artifacts": ["plan", "ahk", "skin"]
+    },
+    {
+      "name": "no-capslock-abbr",
+      "config": "corpus/no-capslock-abbr/config.json",
+      "artifacts": ["plan", "ahk", "skin"]
     }
   ]
 }
