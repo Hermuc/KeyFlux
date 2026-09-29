@@ -11,27 +11,33 @@ pub fn load_backend(slot: SessionSlot) -> Message {
     let args: Vec<String> = std::env::args().collect();
     let options = BackendSessionOptions::parse(&args);
 
-    // 传输分流：CLI 模式（`--api=cli`）不拉子进程、不占端口；HTTP 模式与改动前完全一致。
-    let (api, port): (Arc<dyn SettingsApi>, u16) = match crate::services::transport::transport() {
-        crate::services::transport::Transport::Cli => (
-            Arc::new(crate::services::cli_api::CliSettingsApi::for_panel()),
-            0,
-        ),
-        crate::services::transport::Transport::Http => {
-            let session = match connect(&options) {
-                Ok(session) => session,
-                Err(reason) => return Message::Failed(reason),
-            };
-            let port = session.port();
-            let api = session.api();
-            // 会话必须存活（持有子进程，drop 即终止）⇒ 移交到组件持有的槽。
-            if let Ok(mut guard) = slot.lock() {
-                *guard = Some(session);
-            }
-            (api, port)
+    // CLI 传输（`--api=cli`）：无端口、无常驻后端进程。**探测失败自动回退 HTTP** ——
+    // 面板在任何情况下都必须可用（这条安全网使切换传输不会把用户挡在设置之外）。
+    if crate::services::transport::transport() == crate::services::transport::Transport::Cli {
+        let cli = crate::services::cli_api::CliSettingsApi::for_panel();
+        if cli.health_check() {
+            return assemble(&cli, 0, &options);
         }
-    };
+        // 落到下面的 HTTP 分支
+    }
 
+    let session = match connect(&options) {
+        Ok(session) => session,
+        Err(reason) => return Message::Failed(reason),
+    };
+    let port = session.port();
+    let api = session.api();
+    // 会话必须存活（持有子进程，drop 即终止）⇒ 移交到组件持有的槽。
+    if let Ok(mut guard) = slot.lock() {
+        *guard = Some(session);
+    }
+    assemble(api.as_ref(), port, &options)
+}
+
+/// 连接成功后统一装载：配置 + 使用指南 + 快捷方式。
+///
+/// 抽出的理由：CLI 与 HTTP 两条传输的**装载语义必须逐字一致** —— 放在一处避免第二真源。
+fn assemble(api: &dyn SettingsApi, port: u16, options: &BackendSessionOptions) -> Message {
     let response = api.get_config();
     let Some(config) = response.value.clone() else {
         return Message::Failed(
@@ -62,7 +68,7 @@ pub fn load_backend(slot: SessionSlot) -> Message {
         port,
         doc_md,
         shortcuts,
-        data_root: resolve_deployment_root(&options),
+        data_root: resolve_deployment_root(options),
     }
 }
 
