@@ -1,4 +1,4 @@
-//! `settings.exe` 的 Rust 版（**drop-in 替代**，P3）—— 目前实现 `DumpPlan` 与 `GenerateAHK`。
+//! `settings.exe` 的 Rust 版（**drop-in 替代**，P3）—— 已实现全部子命令：DumpPlan / GenerateAHK / GenerateScripts / ChangeVersion / UseOriginalAHK。
 //!
 //! 契约（**逐字不变**，见 `docs/plan-rust-migration.md` §2）：
 //! * 二进制名最终必须叫 `settings.exe`（`bin/Launcher.ahk` / `tools/oracle.ps1` /
@@ -14,7 +14,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use config_ui_reactor::generator::{behaviors, config as config_parse, plan, template};
+use config_ui_reactor::generator::{behaviors, config as config_parse, plan, scripts, template};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -26,19 +26,42 @@ fn main() -> ExitCode {
     match command {
         "DumpPlan" => dump_plan(&args),
         "GenerateAHK" => generate_ahk(&args),
-        "GenerateScripts" => unsupported("GenerateScripts"),
-        "ChangeVersion" => unsupported("ChangeVersion"),
-        "UseOriginalAHK" => unsupported("UseOriginalAHK"),
+        "GenerateScripts" => {
+            // Go: 无参数，配置恒取 `../data/config.json`，cwd 必须是部署树 `bin/`
+            match scripts::run_generate_scripts(&exe_dir()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(1)
+                }
+            }
+        }
+        "ChangeVersion" => {
+            // Go: `ChangeVersion <version>` ⇒ args[0] = os.Args[2]
+            if args.len() < 3 {
+                eprintln!("ChangeVersion requires 1 argument, for example: ChangeVersion 1.0.0");
+                return ExitCode::from(2);
+            }
+            match scripts::change_version(&args[2], &exe_dir()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(1)
+                }
+            }
+        }
+        "UseOriginalAHK" => match scripts::use_original_ahk() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("{error}");
+                ExitCode::from(1)
+            }
+        },
         other => {
             eprintln!("unsupported command: {other}");
             ExitCode::from(2)
         }
     }
-}
-
-fn unsupported(command: &str) -> ExitCode {
-    eprintln!("{command}: not implemented yet in the Rust settings.exe (P3 incremental)");
-    ExitCode::from(2)
 }
 
 fn exe_dir() -> PathBuf {

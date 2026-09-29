@@ -28,7 +28,7 @@ pub const REMAP_KEY: i32 = 5;
 pub struct Config {
     pub keymaps: Vec<Keymap>,
     pub options: Options,
-    #[serde(rename = "selectedAction")]
+    #[serde(rename = "selectedAction", skip_serializing_if = "Option::is_none")]
     pub selected_action: Option<SelectedAction>,
     #[serde(rename = "actionSchemes", skip_serializing_if = "Vec::is_empty")]
     pub action_schemes: Vec<ActionScheme>,
