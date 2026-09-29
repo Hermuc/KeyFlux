@@ -60,8 +60,8 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 | 阶段 | 交付物 | 验收门 | 回退 |
 |---|---|---|---|
 | **P0 护栏** | `tools/parity/` 差分 harness：Go=reference，固定语料（golden + 真实 config + 插件变体 + 异常输入）两版产物**逐字节**比对；`Makefile` 加 `parity`；CI 加一步 | harness 能抓假等价（先造一处"故意不等"验证会红） | 纯新增 |
-| **P1 面板去 HTTP** | ✅ 已就绪（**默认值仍 `http`**）：Go 进程内桥 `server.Call` + `CliSettingsApi`（18 方法全覆盖）+ `new_settings_api` 统一工厂 + `--api=cli`／`KEYFLUX_API` 阀 + 静态资源直读（§5 #12）+ **探测失败自动回退 HTTP**。⏳ 待办：真机验证「CLI 下保存→重启引擎」（Go 的 breakaway 降级分支）后翻默认值 | 两传输同源（**共用同一套 gin handler**）；cargo 185 全绿；Go `Call` 冒烟实测 | `--api=http` / `KEYFLUX_API=http`（免重建） |
-| **P2 Rust 接管外围** | ✅ 第一片：「使用指南文档 + 快捷方式列表」改**本机直读**（`services/local_fs.rs`，读不到回退后端）——二者在 Go 侧零变换。❌ **`GET /config` 不可直读替代**（见 §5 #13）。⏳ 待办：plugins / behaviors（需先逐字段对账） | `config_doc.md` 7522B 与后端逐字节相同；`shortcuts` 146 项与后端完全相同；cargo 189 全绿 | 直读返回 `None` 即自动回退后端（等于改动前行为） |
+| **P1 面板去 HTTP** | ✅ 已就绪（**默认值保持 `http`，且据 §4 ROI 复核决定不再翻**）：Go 进程内桥 `server.Call` + `CliSettingsApi`（18 方法全覆盖）+ `new_settings_api` 统一工厂 + `--api=cli`／`KEYFLUX_API` 阀 + 静态资源直读（§5 #12）+ **探测失败自动回退 HTTP**。未做（需真机且收益不足）：CLI 下「保存→重启引擎」走 Go 的 breakaway 降级分支 | 两传输同源（**共用同一套 gin handler**）；cargo 189 全绿；Go `Call` 冒烟实测 | `--api=http` / `KEYFLUX_API=http`（免重建） |
+| **P2 Rust 接管外围** | ✅ 仅保留**零变换**项：「使用指南文档 + 快捷方式列表」改**本机直读**（`services/local_fs.rs`，读不到回退后端）。❌ `GET /config` **不可**直读替代（§5 #13）。❌ plugins / behaviors **主动不做** —— 按 §4「ROI 复核」，复刻 965 行解析逻辑换 150 ms/次不值得 | `config_doc.md` 7522B 与后端逐字节相同；`shortcuts` 146 项与后端完全相同；cargo 189 全绿 | 直读返回 `None` 即自动回退后端（等于改动前行为） |
 | **P3 Rust 重写生成器 + drop-in** | 生成器 **与校验**（同源）迁 Rust；产出同名 `settings.exe`；Go 退为 reference（不进部署包） | **全语料 parity 100%** + golden + Oracle diff | 换回 Go 二进制（开关） |
 | **P4 Go 退役** | 消费方全指向 Rust；golden/CONTRACTS/Oracle 随迁；CI 由 `go test` → cargo + parity | 三闸门 + parity 全绿 | git 历史 |
 
@@ -75,6 +75,16 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 | CLI | **每次 spawn 一个 `settings.exe`：实测 130–180 ms**（`Call GET /health` 5 次 128–160 ms；`Call GET /config` 5 次 162–180 ms） | P2 第一片已去掉 2 次 ⇒ 剩 1 次 `get_config` ≈ 150 ms |
 
 ⇒ CLI 换来「无 loopback、无常驻后端」，代价是**按调用计费**。因此 **P2 的"把纯文件查询下移到 Rust"直接决定 CLI 能否当默认值**：把读路径都变成 0 次 spawn，CLI 才不吃亏。
+
+**ROI 复核（2026-09-29，据上表）**：P2 剩余两项的收益**远低于**其成本 ——
+
+| 项 | 改成直读的收益 | 成本 / 风险 |
+|---|---|---|
+| `GET /api/behaviors` | CLI 模式少 1 次 spawn（~150 ms） | Go `internal/behaviors` **965 行**（`loadDir` / `sortPacks` / 错误隔离 / plugin 目录同 ID 跳过 / `appliesTo` 校验）搬进 Rust ⇒ 大块第二真源，且 Go 侧已有一整套测试 |
+| `GET /api/plugins` | 同上 | 同类（DTO + 目录扫描语义） |
+| `GET /config` | 少 **启动时唯一**的 1 次 spawn | **不可做**（§5 #13：DTO 是超集，需复刻 5 个派生字段） |
+
+⇒ **结论：不翻默认值、也不继续 P2 的"复刻式直读"**。CLI 传输**保持 opt-in**（`--api=cli` / `KEYFLUX_API=cli`），要"彻底不连 loopback"应由 **P3（Rust 生成器 + 同名 `settings.exe` drop-in）** 实现 —— 那才是真正减少 Go 的部分，而不是把 Go 的逻辑抄一份。P2 只保留**零变换**的 `config_doc.md` / `shortcuts`（已完成）。
 
 ## 5. 迁移特有的隐藏 bug（"代码安全"的考点）
 
