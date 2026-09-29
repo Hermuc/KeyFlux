@@ -1,0 +1,459 @@
+{
+  "planVersion": 1,
+  "keymaps": [
+    {
+      "id": 1,
+      "name": "Custom Hotkeys",
+      "hotkey": "customHotkeys",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "",
+      "entries": [
+        {
+          "hotkey": "a",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "c",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 1,
+          "conditionType": 1,
+          "winTitle": "\"ahk_exe code.exe\""
+        },
+        {
+          "hotkey": "e",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 2,
+          "conditionType": 2,
+          "winTitle": "\"ahk_group MY_WINDOW_GROUP_2\""
+        },
+        {
+          "hotkey": "g",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 3,
+          "conditionType": 3,
+          "winTitle": "\"ahk_class CabinetWClass\""
+        },
+        {
+          "hotkey": "i",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 4,
+          "conditionType": 4,
+          "winTitle": "\"ahk_exe photoshop.exe\""
+        },
+        {
+          "hotkey": "k",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 5,
+          "conditionType": 5,
+          "winTitle": "WinActive(\"A\") \u0026\u0026 GetKeyState(\"Shift\")"
+        },
+        {
+          "hotkey": "!f17",
+          "typeID": 9,
+          "valueID": 2,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "CapsLock",
+      "hotkey": "*CapsLock",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "ahk_exe steam.exe",
+      "entries": [
+        {
+          "hotkey": "*1",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*2",
+          "typeID": 2,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*3",
+          "typeID": 3,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*4",
+          "typeID": 3,
+          "valueID": 4,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*5",
+          "typeID": 4,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*6",
+          "typeID": 4,
+          "valueID": 5,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*t",
+          "typeID": 5,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*7",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*8",
+          "typeID": 7,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*9",
+          "typeID": 7,
+          "valueID": 7,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*0",
+          "typeID": 8,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*e",
+          "typeID": 9,
+          "valueID": 1,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*q",
+          "typeID": 9,
+          "valueID": 6,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*r",
+          "typeID": 9,
+          "valueID": 8,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*w",
+          "typeID": 9,
+          "valueID": 5,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "*z",
+          "typeID": 9,
+          "valueID": 9,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "媒体控制",
+      "hotkey": "*F13",
+      "parentID": 0,
+      "delaySec": "",
+      "disableAt": "ahk_group GROUP_DISABLE_KEYMAP_6",
+      "entries": [
+        {
+          "hotkey": "m1",
+          "typeID": 1,
+          "valueID": 0,
+          "windowGroupID": 1,
+          "conditionType": 1,
+          "winTitle": "\"ahk_exe code.exe\""
+        },
+        {
+          "hotkey": "m2",
+          "typeID": 2,
+          "valueID": 5,
+          "windowGroupID": 2,
+          "conditionType": 2,
+          "winTitle": "\"ahk_group MY_WINDOW_GROUP_2\""
+        },
+        {
+          "hotkey": "m5",
+          "typeID": 4,
+          "valueID": 2,
+          "windowGroupID": 1,
+          "conditionType": 1,
+          "winTitle": "\"ahk_exe code.exe\""
+        },
+        {
+          "hotkey": "m3",
+          "typeID": 6,
+          "valueID": 0,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "m4",
+          "typeID": 7,
+          "valueID": 19,
+          "windowGroupID": 5,
+          "conditionType": 5,
+          "winTitle": "WinActive(\"A\") \u0026\u0026 GetKeyState(\"Shift\")"
+        },
+        {
+          "hotkey": "m6",
+          "typeID": 9,
+          "valueID": 4,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        },
+        {
+          "hotkey": "m7",
+          "typeID": 9,
+          "valueID": 7,
+          "windowGroupID": 0,
+          "conditionType": 0,
+          "winTitle": "\"\""
+        }
+      ]
+    }
+  ],
+  "abbr": {
+    "capslockEnabled": true,
+    "capslockKeys": "edit,expr,jk,multi,web",
+    "capslock": [
+      {
+        "abbr": "edit",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 1,
+            "conditionType": 1,
+            "winTitle": "\"ahk_exe code.exe\""
+          }
+        ]
+      },
+      {
+        "abbr": "expr",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 8,
+            "valueID": 0,
+            "windowGroupID": 5,
+            "conditionType": 5,
+            "winTitle": "WinActive(\"A\") \u0026\u0026 GetKeyState(\"Shift\")"
+          }
+        ]
+      },
+      {
+        "abbr": "jk",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\""
+          }
+        ]
+      },
+      {
+        "abbr": "multi",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 2,
+            "valueID": 1,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\""
+          },
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\""
+          }
+        ]
+      },
+      {
+        "abbr": "web",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 1,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\""
+          }
+        ]
+      }
+    ],
+    "semicolonEnabled": true,
+    "semicolonKeys": ",,,sys",
+    "semicolon": [
+      {
+        "abbr": ",",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 6,
+            "valueID": 0,
+            "windowGroupID": 0,
+            "conditionType": 0,
+            "winTitle": "\"\""
+          }
+        ]
+      },
+      {
+        "abbr": "sys",
+        "actions": [
+          {
+            "hotkey": "",
+            "typeID": 2,
+            "valueID": 1,
+            "windowGroupID": 2,
+            "conditionType": 2,
+            "winTitle": "\"ahk_group MY_WINDOW_GROUP_2\""
+          }
+        ]
+      }
+    ]
+  },
+  "selectedAction": {
+    "hotkey": "\u003e^p",
+    "enable": true,
+    "mappings": [
+      {
+        "matchType": "textType",
+        "matchValue": "url",
+        "entries": [
+          {
+            "key": 1,
+            "behavior": "open_url",
+            "action": "open_url",
+            "actionValue": "",
+            "workingDir": "",
+            "name": "默认浏览器打开网址"
+          },
+          {
+            "key": 2,
+            "behavior": "search",
+            "action": "search",
+            "actionValue": "https://www.bing.com/search?q=%selected%",
+            "workingDir": "",
+            "name": "搜索"
+          }
+        ]
+      },
+      {
+        "matchType": "fileExt",
+        "matchValue": "jpg,png",
+        "entries": [
+          {
+            "key": 1,
+            "behavior": "open",
+            "action": "open",
+            "actionValue": "%selected%",
+            "workingDir": "",
+            "name": "程序打开"
+          }
+        ]
+      }
+    ]
+  },
+  "windowGroups": [
+    {
+      "id": 1,
+      "name": "Editor",
+      "value": "ahk_exe code.exe",
+      "conditionType": 1
+    },
+    {
+      "id": 2,
+      "name": "Browsers",
+      "value": "ahk_exe chrome.exe\nahk_exe firefox.exe",
+      "conditionType": 2
+    },
+    {
+      "id": 3,
+      "name": "Explorer",
+      "value": "ahk_class CabinetWClass",
+      "conditionType": 3
+    },
+    {
+      "id": 4,
+      "name": "NoPhotoshop",
+      "value": "ahk_exe photoshop.exe",
+      "conditionType": 4
+    },
+    {
+      "id": 5,
+      "name": "CustomExpr",
+      "value": "WinActive(\"A\") \u0026\u0026 GetKeyState(\"Shift\")",
+      "conditionType": 5
+    }
+  ],
+  "matchTypes": null
+}

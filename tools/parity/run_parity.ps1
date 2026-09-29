@@ -15,9 +15,15 @@
 #   ASCII-only on purpose -- `pwsh -File` misreads non-BOM UTF-8 (same rule as tools/oracle.ps1).
 #   Exit 0 = all pass, 1 = any mismatch/error. Final line is ASCII: "PARITY: n/n PASS [MODE]".
 #
-# NOTE: -Capture refuses to record when an item is not byte-deterministic across two runs
+# NOTE 1: -Capture refuses to record when an artifact is not byte-deterministic across two runs
 #   (the Go renderer has known map-iteration nondeterminism for configs with ties; the corpus
 #   must stay free of those, cf. golden_test.go "determinism constraints").
+#
+# NOTE 2: artifacts per item are declared in manifest.json ("artifacts"). Both outputs of the
+#   runtime generation pipeline are covered: bin/KeyFlux.ahk (keyflux.tmpl) and
+#   bin/CommandInputSkin.txt (CommandInputSkin.tmpl) -- the latter is produced by
+#   script.GenerateScripts via a second template, so leaving it out would leave half of the
+#   generated artifacts unguarded.
 
 param(
   [string]$Exe = '',
@@ -33,12 +39,31 @@ if (!(Test-Path $Exe)) { Write-Host "PARITY: 0/0 FAIL [exe not found: $Exe]"; ex
 
 $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $here 'manifest.json') | ConvertFrom-Json
 $template = Join-Path $repo $manifest.template
+$skinTemplate = Join-Path $repo $manifest.skinTemplate
 $refDir = Join-Path $here 'reference'
 $work = Join-Path $env:TEMP 'kfparity'
 if (Test-Path $work) { Remove-Item -Recurse -Force $work }
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 
+# Artifact kinds: id -> @{ Work = file name inside the item work dir; Ref = reference file suffix }
+$ArtifactMap = @{
+  plan = @{ Work = 'plan.json';   Ref = 'plan.json' }
+  ahk  = @{ Work = 'keyflux.ahk'; Ref = 'keyflux.ahk' }
+  skin = @{ Work = 'skin.txt';    Ref = 'skin.txt' }
+}
+
 function Get-Sha256([string]$p) { (Get-FileHash -Algorithm SHA256 -Path $p).Hash }
+
+# Produce one artifact; returns the child exit code (0 = ok).
+# Mirrors the runtime pipeline: DumpPlan / GenerateAHK both Preprocess + set BehaviorCatalog.
+function Invoke-Produce([string]$Kind, [string]$Cfg, [string]$Out) {
+  switch ($Kind) {
+    'plan' { & $Exe DumpPlan $Cfg $Out | Out-Null; return $LASTEXITCODE }
+    'ahk'  { & $Exe GenerateAHK $Cfg $template $Out | Out-Null; return $LASTEXITCODE }
+    'skin' { & $Exe GenerateAHK $Cfg $skinTemplate $Out | Out-Null; return $LASTEXITCODE }
+    default { return 127 }
+  }
+}
 
 $total = 0
 $pass = 0
@@ -49,6 +74,9 @@ try {
   foreach ($item in $manifest.items) {
     $name = $item.name
     $total++
+    $kinds = @($item.artifacts)
+    if ($kinds.Count -eq 0) { $kinds = @('plan', 'ahk') }
+
     $itemWork = Join-Path $work $name
     New-Item -ItemType Directory -Force -Path $itemWork | Out-Null
     Copy-Item (Join-Path $here $item.config) (Join-Path $itemWork 'config.json') -Force
@@ -59,37 +87,44 @@ try {
     }
 
     $cfg = Join-Path $itemWork 'config.json'
-    $planOut = Join-Path $itemWork 'plan.json'
-    $ahkOut = Join-Path $itemWork 'keyflux.ahk'
-
     $ok = $true
-    & $Exe DumpPlan $cfg $planOut | Out-Null
-    if ($LASTEXITCODE -ne 0) { $fail += ("$name : DumpPlan exit " + $LASTEXITCODE); $ok = $false }
-    & $Exe GenerateAHK $cfg $template $ahkOut | Out-Null
-    if ($LASTEXITCODE -ne 0) { $fail += ("$name : GenerateAHK exit " + $LASTEXITCODE); $ok = $false }
+    $outs = @{}
+    foreach ($kind in $kinds) {
+      if (-not $ArtifactMap.ContainsKey($kind)) { $fail += ("$name : unknown artifact '" + $kind + "'"); $ok = $false; break }
+      $outs[$kind] = Join-Path $itemWork $ArtifactMap[$kind].Work
+      $code = Invoke-Produce $kind $cfg $outs[$kind]
+      if ($code -ne 0) { $fail += ("$name : " + $kind + " exit " + $code); $ok = $false }
+    }
     if (!$ok) { continue }
 
     if ($Capture) {
-      $plan2 = Join-Path $itemWork 'plan2.json'
-      $ahk2 = Join-Path $itemWork 'keyflux2.ahk'
-      & $Exe DumpPlan $cfg $plan2 | Out-Null
-      & $Exe GenerateAHK $cfg $template $ahk2 | Out-Null
-      if ((Get-Sha256 $planOut) -ne (Get-Sha256 $plan2) -or (Get-Sha256 $ahkOut) -ne (Get-Sha256 $ahk2)) {
-        $fail += "$name : NONDETERMINISTIC (reference not recorded)"
-        continue
+      $deterministic = $true
+      foreach ($kind in $kinds) {
+        $second = Join-Path $itemWork ('second-' + $ArtifactMap[$kind].Work)
+        $code = Invoke-Produce $kind $cfg $second
+        if ($code -ne 0) {
+          $fail += ("$name : " + $kind + " exit " + $code + " (2nd run)")
+          $deterministic = $false
+        }
+        elseif ((Get-Sha256 $outs[$kind]) -ne (Get-Sha256 $second)) {
+          $fail += ("$name : NONDETERMINISTIC [" + $kind + "] (reference not recorded)")
+          $deterministic = $false
+        }
       }
+      if (!$deterministic) { continue }
       New-Item -ItemType Directory -Force -Path $refDir | Out-Null
-      Copy-Item $planOut (Join-Path $refDir "$name.plan.json") -Force
-      Copy-Item $ahkOut (Join-Path $refDir "$name.keyflux.ahk") -Force
+      foreach ($kind in $kinds) {
+        Copy-Item $outs[$kind] (Join-Path $refDir ($name + '.' + $ArtifactMap[$kind].Ref)) -Force
+      }
       $pass++
     }
     else {
-      $refPlan = Join-Path $refDir "$name.plan.json"
-      $refAhk = Join-Path $refDir "$name.keyflux.ahk"
-      if (!(Test-Path $refPlan) -or !(Test-Path $refAhk)) { $fail += "$name : reference missing"; continue }
       $bad = @()
-      if ((Get-Sha256 $planOut) -ne (Get-Sha256 $refPlan)) { $bad += 'plan' }
-      if ((Get-Sha256 $ahkOut) -ne (Get-Sha256 $refAhk)) { $bad += 'ahk' }
+      foreach ($kind in $kinds) {
+        $ref = Join-Path $refDir ($name + '.' + $ArtifactMap[$kind].Ref)
+        if (!(Test-Path $ref)) { $bad += ($kind + '(no-ref)'); continue }
+        if ((Get-Sha256 $outs[$kind]) -ne (Get-Sha256 $ref)) { $bad += $kind }
+      }
       if ($bad.Count -eq 0) { $pass++ } else { $fail += ("$name : MISMATCH [" + ($bad -join ',') + "]") }
     }
   }
