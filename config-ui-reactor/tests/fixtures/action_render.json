@@ -1,0 +1,1878 @@
+{
+  "abbrRegistry": [
+    {
+      "in": {
+        "bad": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 0
+          }
+        ],
+        "edit": [
+          {
+            "windowGroupID": 1,
+            "actionTypeID": 6,
+            "keysToSend": "{blind}code"
+          }
+        ],
+        "expr": [
+          {
+            "windowGroupID": 5,
+            "actionTypeID": 8,
+            "ahkCode": "Run(\"calc.exe\")"
+          }
+        ],
+        "jk": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 6,
+            "keysToSend": "{blind}jk"
+          }
+        ],
+        "multi": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 2,
+            "actionValueID": 1
+          },
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 6,
+            "keysToSend": "{enter}"
+          }
+        ],
+        "sys": [
+          {
+            "windowGroupID": 2,
+            "actionTypeID": 2,
+            "actionValueID": 5
+          }
+        ],
+        "web": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 1,
+            "target": "chrome.exe"
+          }
+        ]
+      },
+      "scope": "capslock",
+      "indent": "  ",
+      "out": "  CommandResolver.Register(\"capslock\", \"edit\", [CommandStep(() =\u003e Send(\"{blind}code\"), \"ahk_exe code.exe\", 1)])\n  CommandResolver.Register(\"capslock\", \"expr\", [CommandStep(() =\u003e Run(\"calc.exe\"), WinActive(\"A\") \u0026\u0026 GetKeyState(\"Shift\"), 5)])\n  CommandResolver.Register(\"capslock\", \"jk\", [CommandStep(() =\u003e Send(\"{blind}jk\"))])\n  CommandResolver.Register(\"capslock\", \"multi\", [CommandStep(() =\u003e SystemLockScreen()), CommandStep(() =\u003e Send(\"{enter}\"))])\n  CommandResolver.Register(\"capslock\", \"sys\", [CommandStep(() =\u003e SoundControl(), \"ahk_group MY_WINDOW_GROUP_2\", 2)])\n  CommandResolver.Register(\"capslock\", \"web\", [CommandStep(() =\u003e ActivateOrRun(\"\", \"chrome.exe\"))])\n"
+    },
+    {
+      "in": {
+        "only": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 42
+          }
+        ]
+      },
+      "scope": "semicolon",
+      "indent": "  ",
+      "out": ""
+    },
+    {
+      "in": {},
+      "scope": "capslock",
+      "indent": "  ",
+      "out": ""
+    }
+  ],
+  "cases": [
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 1,
+        "hotkey": "*a",
+        "target": "notepad.exe"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*a\", _ =\u003e ActivateOrRun(\"\", \"notepad.exe\"))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 1,
+        "hotkey": "*a",
+        "target": "notepad.exe"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "ActivateOrRun(\"\", \"notepad.exe\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 1,
+        "hotkey": "*b",
+        "target": "calc.exe",
+        "args": "/auto",
+        "workingDir": "D:\\tools",
+        "runAsAdmin": true,
+        "runInBackground": true,
+        "detectHiddenWindow": true
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*b\", _ =\u003e ActivateOrRun(\"\", \"calc.exe\", \"/auto\", \"D:\\tools\", true, true, true))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 1,
+        "hotkey": "*b",
+        "target": "calc.exe",
+        "args": "/auto",
+        "workingDir": "D:\\tools",
+        "runAsAdmin": true,
+        "runInBackground": true,
+        "detectHiddenWindow": true
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "ActivateOrRun(\"\", \"calc.exe\", \"/auto\", \"D:\\tools\", true, true, true)"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 1,
+        "hotkey": "*c",
+        "winTitle": "foo.exe",
+        "target": "x.exe"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "; [配置警告] winTitle \"foo.exe\" 以 .exe 结尾, 会被当作窗口标题匹配而永远失败, 应写 \"ahk_exe foo.exe\"\nkm.Map(\"*c\", _ =\u003e ActivateOrRun(\"foo.exe\", \"x.exe\"), , \"ahk_exe code.exe\", 1)"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 1,
+        "hotkey": "*c",
+        "winTitle": "foo.exe",
+        "target": "x.exe"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "ActivateOrRun(\"foo.exe\", \"x.exe\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 1,
+        "hotkey": "*d",
+        "winTitle": "ahk_exe foo.exe",
+        "target": "x.exe"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*d\", _ =\u003e ActivateOrRun(\"ahk_exe foo.exe\", \"x.exe\"), , \"ahk_group MY_WINDOW_GROUP_2\", 2)"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 1,
+        "hotkey": "*d",
+        "winTitle": "ahk_exe foo.exe",
+        "target": "x.exe"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "ActivateOrRun(\"ahk_exe foo.exe\", \"x.exe\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 2,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*1\", _ =\u003e SystemLockScreen())"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 2,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "SystemLockScreen()"
+    },
+    {
+      "in": {
+        "windowGroupID": 3,
+        "actionTypeID": 2,
+        "hotkey": "*2",
+        "actionValueID": 5
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*2\", _ =\u003e SoundControl(), , \"ahk_class CabinetWClass\", 3)"
+    },
+    {
+      "in": {
+        "windowGroupID": 3,
+        "actionTypeID": 2,
+        "hotkey": "*2",
+        "actionValueID": 5
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "SoundControl()"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 2,
+        "hotkey": "*3",
+        "actionValueID": 10
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*3\", _ =\u003e ShowActiveProcessInFolder())"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 2,
+        "hotkey": "*3",
+        "actionValueID": 10
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "ShowActiveProcessInFolder()"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 2,
+        "hotkey": "*4",
+        "actionValueID": 11
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 2,
+        "hotkey": "*4",
+        "actionValueID": 11
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 3,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*1\", _ =\u003e SmartCloseWindow())"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 3,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "SmartCloseWindow()"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 3,
+        "hotkey": "*2",
+        "actionValueID": 4
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*2\", _ =\u003e Send(\"^!{tab}\"), taskSwitch, , \"ahk_exe code.exe\", 1)"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 3,
+        "hotkey": "*2",
+        "actionValueID": 4
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.Map(\"*2\", _ =\u003e Send(\"^!{tab}\"), taskSwitch, , \"ahk_exe code.exe\", 1)"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 3,
+        "hotkey": "*3",
+        "actionValueID": 14
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*3\", BindWindow(), , \"ahk_group MY_WINDOW_GROUP_2\", 2)"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 3,
+        "hotkey": "*3",
+        "actionValueID": 14
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.Map(\"*3\", BindWindow(), , \"ahk_group MY_WINDOW_GROUP_2\", 2)"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 3,
+        "hotkey": "*4",
+        "actionValueID": 16
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*4\", _ =\u003e CloseSameClassWindows())"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 3,
+        "hotkey": "*4",
+        "actionValueID": 16
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "CloseSameClassWindows()"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 3,
+        "hotkey": "*5",
+        "actionValueID": 99
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 3,
+        "hotkey": "*5",
+        "actionValueID": 99
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 4,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*1\", fast.MoveMouseUp, slow), slow.Map(\"*1\", slow.MoveMouseUp)"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 4,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.Map(\"*1\", fast.MoveMouseUp, slow), slow.Map(\"*1\", slow.MoveMouseUp)"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 4,
+        "hotkey": "*2",
+        "actionValueID": 2
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*2\", fast.MoveMouseDown, slow, \"ahk_exe code.exe\", 1), slow.Map(\"*2\", slow.MoveMouseDown, , \"ahk_exe code.exe\", 1)"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 4,
+        "hotkey": "*2",
+        "actionValueID": 2
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.Map(\"*2\", fast.MoveMouseDown, slow, \"ahk_exe code.exe\", 1), slow.Map(\"*2\", slow.MoveMouseDown, , \"ahk_exe code.exe\", 1)"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 4,
+        "hotkey": "*3",
+        "actionValueID": 5
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*3\", fast.ScrollWheelUp), slow.Map(\"*3\", slow.ScrollWheelUp)"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 4,
+        "hotkey": "*3",
+        "actionValueID": 5
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.Map(\"*3\", fast.ScrollWheelUp), slow.Map(\"*3\", slow.ScrollWheelUp)"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 4,
+        "hotkey": "*4",
+        "actionValueID": 9
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*4\", fast.LButton(), , \"ahk_group MY_WINDOW_GROUP_2\", 2), slow.Map(\"*4\", slow.LButton(), , \"ahk_group MY_WINDOW_GROUP_2\", 2)"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 4,
+        "hotkey": "*4",
+        "actionValueID": 9
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.Map(\"*4\", fast.LButton(), , \"ahk_group MY_WINDOW_GROUP_2\", 2), slow.Map(\"*4\", slow.LButton(), , \"ahk_group MY_WINDOW_GROUP_2\", 2)"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 4,
+        "hotkey": "*5",
+        "actionValueID": 13
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*5\", _ =\u003e MoveMouseToCaret()), slow.Map(\"*5\", _ =\u003e MoveMouseToCaret())"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 4,
+        "hotkey": "*5",
+        "actionValueID": 13
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.Map(\"*5\", _ =\u003e MoveMouseToCaret()), slow.Map(\"*5\", _ =\u003e MoveMouseToCaret())"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 4,
+        "hotkey": "*6",
+        "actionValueID": 99
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 4,
+        "hotkey": "*6",
+        "actionValueID": 99
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 5,
+        "hotkey": "*t",
+        "remapToKey": "x"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.RemapKey(\"t\", \"x\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 5,
+        "hotkey": "*t",
+        "remapToKey": "x"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.RemapKey(\"t\", \"x\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 5,
+        "hotkey": "*u",
+        "remapToKey": "y"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.RemapKey(\"u\", \"y\", \"ahk_exe code.exe\", 1)"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 5,
+        "hotkey": "*u",
+        "remapToKey": "y"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.RemapKey(\"u\", \"y\", \"ahk_exe code.exe\", 1)"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 5,
+        "hotkey": "*v",
+        "remapToKey": "z"
+      },
+      "remapInHotIf": true,
+      "inAbbrContext": false,
+      "out": "km.RemapInHotIf(\"v\", \"z\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 5,
+        "hotkey": "*v",
+        "remapToKey": "z"
+      },
+      "remapInHotIf": true,
+      "inAbbrContext": true,
+      "out": "km.RemapInHotIf(\"v\", \"z\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 5,
+        "hotkey": "singlePress",
+        "remapToKey": "q"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"singlePress\", _ =\u003e (Send(\"{blind}{q}\")))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 5,
+        "hotkey": "singlePress",
+        "remapToKey": "q"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "Send(\"{blind}{q}\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 5,
+        "hotkey": "SinglePress",
+        "remapToKey": "q"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"SinglePress\", _ =\u003e (Send(\"{blind}{q}\")))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 5,
+        "hotkey": "SinglePress",
+        "remapToKey": "q"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "Send(\"{blind}{q}\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 6,
+        "hotkey": "*h",
+        "keysToSend": "hello\n{text}world"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*h\", _ =\u003e (Send(\"hello\"), Send(\"{text}world\")))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 6,
+        "hotkey": "*h",
+        "keysToSend": "hello\n{text}world"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "Send(\"hello\"), Send(\"{text}world\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 6,
+        "hotkey": "*i",
+        "keysToSend": "ahk:ToolTip(\"hi\")\nsleep 500\n{enter}"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*i\", _ =\u003e (ToolTip(\"hi\"), Sleep(500), Send(\"{enter}\")), , \"ahk_group MY_WINDOW_GROUP_2\", 2)"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 6,
+        "hotkey": "*i",
+        "keysToSend": "ahk:ToolTip(\"hi\")\nsleep 500\n{enter}"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "ToolTip(\"hi\"), Sleep(500), Send(\"{enter}\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 6,
+        "hotkey": "*j",
+        "keysToSend": "   \n\n"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 6,
+        "hotkey": "*j",
+        "keysToSend": "   \n\n"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.RemapKey(\"1\", \"up\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.RemapKey(\"1\", \"up\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 7,
+        "hotkey": "*2",
+        "actionValueID": 17
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.RemapKey(\"2\", \"appskey\", \"ahk_exe code.exe\", 1)"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 7,
+        "hotkey": "*2",
+        "actionValueID": 17
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.RemapKey(\"2\", \"appskey\", \"ahk_exe code.exe\", 1)"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*3",
+        "actionValueID": 7
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*3\", _ =\u003e (Send(\"{blind}^{left}\")))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*3",
+        "actionValueID": 7
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "Send(\"{blind}^{left}\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*4",
+        "actionValueID": 33
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*4\", _ =\u003e (Send(\"{home}+{end}{backspace}\")))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*4",
+        "actionValueID": 33
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "Send(\"{home}+{end}{backspace}\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*5",
+        "actionValueID": 19
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*5\", _ =\u003e HoldDownModifierKey(\"LShift\"))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*5",
+        "actionValueID": 19
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "HoldDownModifierKey(\"LShift\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*6",
+        "actionValueID": 99
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 7,
+        "hotkey": "*6",
+        "actionValueID": 99
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 8,
+        "hotkey": "*a",
+        "ahkCode": "MsgBox(\"hello\")"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*a\", _ =\u003e MsgBox(\"hello\"))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 8,
+        "hotkey": "*a",
+        "ahkCode": "MsgBox(\"hello\")"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "MsgBox(\"hello\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 5,
+        "actionTypeID": 8,
+        "hotkey": "*b",
+        "ahkCode": "Run(\"calc.exe\")"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*b\", _ =\u003e Run(\"calc.exe\"), , 'WinActive(\"A\") \u0026\u0026 GetKeyState(\"Shift\")', 5)"
+    },
+    {
+      "in": {
+        "windowGroupID": 5,
+        "actionTypeID": 8,
+        "hotkey": "*b",
+        "ahkCode": "Run(\"calc.exe\")"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "Run(\"calc.exe\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 8,
+        "hotkey": "*c"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*c\", _ =\u003e )"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 8,
+        "hotkey": "*c"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 3,
+        "actionTypeID": 8,
+        "hotkey": "*d",
+        "ahkCode": "x := A_Now"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*d\", _ =\u003e x := A_Now, , \"ahk_class CabinetWClass\", 3)"
+    },
+    {
+      "in": {
+        "windowGroupID": 3,
+        "actionTypeID": 8,
+        "hotkey": "*d",
+        "ahkCode": "x := A_Now"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "x := A_Now"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*1\", _ =\u003e KeyFluxToggleSuspend(), , , , \"S\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*1",
+        "actionValueID": 1
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "KeyFluxToggleSuspend()"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 9,
+        "hotkey": "*2",
+        "actionValueID": 2
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*2\", _ =\u003e KeyFluxReload(), , \"ahk_exe code.exe\", 1, \"S\")"
+    },
+    {
+      "in": {
+        "windowGroupID": 1,
+        "actionTypeID": 9,
+        "hotkey": "*2",
+        "actionValueID": 2
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "KeyFluxReload()"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*3",
+        "actionValueID": 5
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*3\", _ =\u003e EnterSemicolonAbbr(semiHook, semiHookAbbrWindow))"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*3",
+        "actionValueID": 5
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "EnterSemicolonAbbr(semiHook, semiHookAbbrWindow)"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*4",
+        "actionValueID": 6
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*4\", _ =\u003e EnterCapslockAbbr())"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*4",
+        "actionValueID": 6
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "EnterCapslockAbbr()"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*5",
+        "actionValueID": 8
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*5\", km.ToggleLock)"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*5",
+        "actionValueID": 8
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "km.ToggleLock"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 9,
+        "hotkey": "*6",
+        "actionValueID": 9
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": "km.Map(\"*6\", _ =\u003e QuickSwitchGoto(), , \"ahk_group MY_WINDOW_GROUP_2\", 2)"
+    },
+    {
+      "in": {
+        "windowGroupID": 2,
+        "actionTypeID": 9,
+        "hotkey": "*6",
+        "actionValueID": 9
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": "QuickSwitchGoto()"
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*7",
+        "actionValueID": 99
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 9,
+        "hotkey": "*7",
+        "actionValueID": 99
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 0,
+        "hotkey": "*a"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 0,
+        "hotkey": "*a"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 42,
+        "hotkey": "*b"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": false,
+      "out": ""
+    },
+    {
+      "in": {
+        "windowGroupID": 0,
+        "actionTypeID": 42,
+        "hotkey": "*b"
+      },
+      "remapInHotIf": false,
+      "inAbbrContext": true,
+      "out": ""
+    }
+  ],
+  "config": {
+    "keymaps": [
+      {
+        "id": 1,
+        "name": "Custom Hotkeys",
+        "enable": true,
+        "hotkey": "customHotkeys",
+        "parentID": 0,
+        "delay": 0,
+        "disableAt": "",
+        "hotkeys": {
+          "a": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 5,
+              "remapToKey": "b"
+            }
+          ],
+          "c": [
+            {
+              "windowGroupID": 1,
+              "actionTypeID": 5,
+              "remapToKey": "d"
+            }
+          ],
+          "e": [
+            {
+              "windowGroupID": 2,
+              "actionTypeID": 5,
+              "remapToKey": "f"
+            }
+          ],
+          "g": [
+            {
+              "windowGroupID": 3,
+              "actionTypeID": 5,
+              "remapToKey": "h"
+            }
+          ],
+          "i": [
+            {
+              "windowGroupID": 4,
+              "actionTypeID": 5,
+              "remapToKey": "j"
+            }
+          ],
+          "k": [
+            {
+              "windowGroupID": 5,
+              "actionTypeID": 5,
+              "remapToKey": "l"
+            }
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "name": "Command",
+        "enable": true,
+        "hotkey": "capslockAbbr",
+        "parentID": 0,
+        "delay": 0,
+        "disableAt": "",
+        "hotkeys": {
+          "edit": [
+            {
+              "windowGroupID": 1,
+              "actionTypeID": 6,
+              "keysToSend": "{blind}code"
+            }
+          ],
+          "expr": [
+            {
+              "windowGroupID": 5,
+              "actionTypeID": 8,
+              "ahkCode": "Run(\"calc.exe\")"
+            }
+          ],
+          "jk": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 6,
+              "keysToSend": "{blind}jk"
+            }
+          ],
+          "multi": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 2,
+              "actionValueID": 1
+            },
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 6,
+              "keysToSend": "{enter}"
+            }
+          ],
+          "web": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 1,
+              "target": "chrome.exe"
+            }
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "name": "Abbreviation",
+        "enable": true,
+        "hotkey": "semicolonAbbr",
+        "parentID": 0,
+        "delay": 0,
+        "disableAt": "",
+        "hotkeys": {
+          ",": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 6,
+              "keysToSend": "{enter}"
+            }
+          ],
+          "sys": [
+            {
+              "windowGroupID": 2,
+              "actionTypeID": 2,
+              "actionValueID": 1
+            }
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "name": "CapsLock",
+        "enable": true,
+        "hotkey": "*CapsLock",
+        "parentID": 0,
+        "delay": 0,
+        "disableAt": "ahk_exe steam.exe",
+        "hotkeys": {
+          "*0": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 8,
+              "ahkCode": "MsgBox(\"hello\")"
+            }
+          ],
+          "*1": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 1,
+              "target": "notepad.exe"
+            }
+          ],
+          "*2": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 2,
+              "actionValueID": 1
+            }
+          ],
+          "*3": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 3,
+              "actionValueID": 1
+            }
+          ],
+          "*4": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 3,
+              "actionValueID": 4
+            }
+          ],
+          "*5": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 4,
+              "actionValueID": 1
+            }
+          ],
+          "*6": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 4,
+              "actionValueID": 5
+            }
+          ],
+          "*7": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 6,
+              "keysToSend": "hello\n{text}world"
+            }
+          ],
+          "*8": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 7,
+              "actionValueID": 1
+            }
+          ],
+          "*9": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 7,
+              "actionValueID": 7
+            }
+          ],
+          "*e": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 9,
+              "actionValueID": 1
+            }
+          ],
+          "*q": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 9,
+              "actionValueID": 6
+            }
+          ],
+          "*r": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 9,
+              "actionValueID": 8
+            }
+          ],
+          "*t": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 5,
+              "remapToKey": "x"
+            }
+          ],
+          "*w": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 9,
+              "actionValueID": 5
+            }
+          ],
+          "*z": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 9,
+              "actionValueID": 9
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "name": "媒体控制",
+        "enable": true,
+        "hotkey": "*F13",
+        "parentID": 0,
+        "delay": 0,
+        "disableAt": "ahk_exe game1.exe\nahk_exe game2.exe",
+        "hotkeys": {
+          "m1": [
+            {
+              "windowGroupID": 1,
+              "actionTypeID": 1,
+              "winTitle": "ahk_exe calc.exe",
+              "target": "calc.exe",
+              "args": "/auto",
+              "workingDir": "D:\\tools",
+              "runAsAdmin": true
+            }
+          ],
+          "m2": [
+            {
+              "windowGroupID": 2,
+              "actionTypeID": 2,
+              "actionValueID": 5
+            }
+          ],
+          "m3": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 6,
+              "keysToSend": "ahk:ToolTip(\"hi\")\nsleep 500\n{enter}"
+            }
+          ],
+          "m4": [
+            {
+              "windowGroupID": 5,
+              "actionTypeID": 7,
+              "actionValueID": 19
+            }
+          ],
+          "m5": [
+            {
+              "windowGroupID": 1,
+              "actionTypeID": 4,
+              "actionValueID": 2
+            }
+          ],
+          "m6": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 9,
+              "actionValueID": 4
+            }
+          ],
+          "m7": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 9,
+              "actionValueID": 7
+            }
+          ]
+        }
+      }
+    ],
+    "options": {
+      "hideMatrix": false,
+      "keyfluxVersion": "",
+      "windowGroups": [
+        {
+          "id": 1,
+          "name": "Editor",
+          "value": "ahk_exe code.exe",
+          "conditionType": 1
+        },
+        {
+          "id": 2,
+          "name": "Browsers",
+          "value": "ahk_exe chrome.exe\nahk_exe firefox.exe",
+          "conditionType": 2
+        },
+        {
+          "id": 3,
+          "name": "Explorer",
+          "value": "ahk_class CabinetWClass",
+          "conditionType": 3
+        },
+        {
+          "id": 4,
+          "name": "NoPhotoshop",
+          "value": "ahk_exe photoshop.exe",
+          "conditionType": 4
+        },
+        {
+          "id": 5,
+          "name": "CustomExpr",
+          "value": "WinActive(\"A\") \u0026\u0026 GetKeyState(\"Shift\")",
+          "conditionType": 5
+        }
+      ],
+      "mouse": {
+        "keepMouseMode": false,
+        "showTip": true,
+        "tipSymbol": "🐶",
+        "delay1": "200",
+        "delay2": "600",
+        "fastSingle": "6",
+        "fastRepeat": "60",
+        "slowSingle": "30",
+        "slowRepeat": "150"
+      },
+      "scroll": {
+        "delay1": "200",
+        "delay2": "600",
+        "onceLineCount": "3"
+      },
+      "commandInputSkin": {
+        "backgroundColor": "",
+        "backgroundOpacity": "",
+        "borderWidth": "",
+        "borderColor": "",
+        "borderOpacity": "",
+        "borderRadius": "",
+        "cornerColor": "",
+        "cornerOpacity": "",
+        "gridlineColor": "",
+        "gridlineOpacity": "",
+        "keyColor": "",
+        "keyOpacity": "",
+        "hideAnimationDuration": "",
+        "windowYPos": "",
+        "windowWidth": "",
+        "windowShadowColor": "",
+        "windowShadowOpacity": "",
+        "windowShadowSize": ""
+      },
+      "pathVariables": [
+        {
+          "name": "editor",
+          "value": "D:\\tools\\edit.exe"
+        },
+        {
+          "name": "desktop",
+          "value": "ahk-expression: A_Desktop"
+        },
+        {
+          "name": "",
+          "value": "ignored-blank-name"
+        },
+        {
+          "name": "   ",
+          "value": "ignored-space-name"
+        }
+      ],
+      "startup": false,
+      "language": "",
+      "keyMapping": "",
+      "keyboardLayout": "",
+      "quickSwitch": {
+        "collectEnabled": true,
+        "autoShow": true,
+        "autoJumpOpen": true,
+        "autoJumpSave": false,
+        "pollIntervalMs": 800,
+        "maxHistory": 200,
+        "overlayRows": 8,
+        "overlayRowsCompact": 4,
+        "excludedPrefixes": [
+          "D:\\Archive",
+          "C:\\Temp"
+        ]
+      },
+      "plugins": {
+        "disabled": null
+      },
+      "commandFont": {
+        "sourcePath": "",
+        "weight": ""
+      }
+    },
+    "selectedAction": {
+      "hotkey": "\u003e^p",
+      "enable": true,
+      "mappings": [
+        {
+          "matchType": "textType",
+          "matchValue": "url",
+          "entries": [
+            {
+              "behavior": "open_url",
+              "options": {
+                "copyToClipboard": false,
+                "clearSelection": false,
+                "confirm": false
+              }
+            },
+            {
+              "behavior": "search",
+              "actionValue": "https://www.bing.com/search?q=%selected%",
+              "options": {
+                "copyToClipboard": true,
+                "clearSelection": false,
+                "confirm": false
+              }
+            }
+          ]
+        },
+        {
+          "matchType": "fileExt",
+          "matchValue": "jpg,png",
+          "entries": [
+            {
+              "behavior": "open",
+              "actionValue": "%selected%",
+              "options": {
+                "copyToClipboard": false,
+                "clearSelection": false,
+                "confirm": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "groupDisableKeyFlux": [
+    {
+      "in": [
+        {
+          "id": -1,
+          "name": "",
+          "value": "steam.exe"
+        },
+        {
+          "id": 1,
+          "name": "",
+          "value": "x.exe"
+        }
+      ],
+      "out": "\"steam.exe\""
+    },
+    {
+      "in": [
+        {
+          "id": 1,
+          "name": "",
+          "value": "x.exe"
+        },
+        {
+          "id": -1,
+          "name": "",
+          "value": "a.exe\nb.exe"
+        }
+      ],
+      "out": "\"ahk_group MY_WINDOW_GROUP__1\""
+    },
+    {
+      "in": [
+        {
+          "id": 1,
+          "name": "",
+          "value": "x.exe"
+        }
+      ],
+      "out": "\"\""
+    },
+    {
+      "in": null,
+      "out": "\"\""
+    }
+  ],
+  "renderKeymap": [
+    {
+      "in": {
+        "id": 5,
+        "name": "CapsLock",
+        "enable": true,
+        "hotkey": "*CapsLock",
+        "parentID": 0,
+        "delay": 1000,
+        "disableAt": "",
+        "hotkeys": {
+          "*1": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 2,
+              "actionValueID": 1
+            }
+          ],
+          "*2": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 6,
+              "keysToSend": "{enter}"
+            }
+          ]
+        }
+      },
+      "out": "\r\n  ; CapsLock\r\n  km5 := KeymapManager.NewKeymap(\"*CapsLock\", \"CapsLock\", \"1.000\", \"ahk_exe steam.exe\")\r\n  km := km5\r\n  km.Map(\"*1\", _ =\u003e SystemLockScreen())\r\n  km.Map(\"*2\", _ =\u003e (Send(\"{enter}\")))\r\n"
+    },
+    {
+      "in": {
+        "id": 6,
+        "name": "媒体控制",
+        "enable": true,
+        "hotkey": "*F13",
+        "parentID": 5,
+        "delay": 0,
+        "disableAt": "",
+        "hotkeys": {
+          "m6": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 9,
+              "actionValueID": 4
+            }
+          ]
+        }
+      },
+      "out": "\r\n  ; 媒体控制\r\n  km6 := KeymapManager.AddSubKeymap(km5, \"*F13\", \"媒体控制\", \"\")\r\n  km := km6\r\n  km.Map(\"m6\", _ =\u003e KeyFluxOpenSettings())\r\n"
+    },
+    {
+      "in": {
+        "id": 7,
+        "name": "Mods",
+        "enable": true,
+        "hotkey": "#!^",
+        "parentID": 0,
+        "delay": 500,
+        "disableAt": "",
+        "hotkeys": {
+          "q": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 2,
+              "actionValueID": 1
+            }
+          ],
+          "singlePress": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 2,
+              "actionValueID": 2
+            }
+          ],
+          "w": [
+            {
+              "windowGroupID": 0,
+              "actionTypeID": 6,
+              "keysToSend": "{enter}"
+            }
+          ]
+        }
+      },
+      "out": "\r\n  ; Mods\r\n  km7 := KeymapManager.NewKeymap(\"customHotkeys\", \"Mods\", \"0.500\", \"\")\r\n  km := km7\r\n  km.Map(\"#!^q\", _ =\u003e SystemLockScreen())\r\n  km.Map(\"#!^w\", _ =\u003e (Send(\"{enter}\")))\r\n"
+    },
+    {
+      "in": {
+        "id": 8,
+        "name": "Blank",
+        "enable": true,
+        "hotkey": "   ",
+        "parentID": 0,
+        "delay": 0,
+        "disableAt": "",
+        "hotkeys": null
+      },
+      "out": ""
+    }
+  ],
+  "selectedAction": [
+    {
+      "in": null,
+      "out": ""
+    },
+    {
+      "in": {
+        "hotkey": "\u003e^p",
+        "enable": false,
+        "mappings": null
+      },
+      "out": ""
+    },
+    {
+      "in": {
+        "hotkey": "",
+        "enable": true,
+        "mappings": null
+      },
+      "out": ""
+    },
+    {
+      "in": {
+        "hotkey": "\u003e^p",
+        "enable": true,
+        "mappings": [
+          {
+            "matchType": "textType",
+            "matchValue": "url",
+            "entries": [
+              {
+                "behavior": "open_url",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "search",
+                "actionValue": "https://www.bing.com/search?q=%selected%",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              }
+            ]
+          },
+          {
+            "matchType": "fileExt",
+            "matchValue": "jpg,png",
+            "entries": [
+              {
+                "behavior": "open",
+                "actionValue": "%selected%",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e1",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e2",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e3",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e4",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e5",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e6",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e7",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e8",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e9",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              },
+              {
+                "behavior": "e10",
+                "options": {
+                  "copyToClipboard": false,
+                  "clearSelection": false,
+                  "confirm": false
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "out": "  ; ===== 选中动作 (单键分发) =====\n  ; SelectedActionData 每项字段: matchType (匹配类型, 输出顺序 = 匹配优先级) / matchValue (条件值) / key (菜单序号 1-9) /\n  ;   behavior (行为库 ID) / action (展开后基础动作) / actionValue (展开后模板) / workingDir (工作目录) / name (显示名)\n  SelectedActionData := Array(\n    {matchType: \"textType\", matchValue: \"url\", key: 1, behavior: \"open_url\", action: \"open_url\", actionValue: \"\", workingDir: \"\", name: \"open_url\"},\n    {matchType: \"textType\", matchValue: \"url\", key: 2, behavior: \"search\", action: \"search\", actionValue: \"https://www.bing.com/search?q=%selected%\", workingDir: \"\", name: \"search\"},\n    {matchType: \"fileExt\", matchValue: \"jpg,png\", key: 1, behavior: \"open\", action: \"open\", actionValue: \"%selected%\", workingDir: \"\", name: \"open\"},\n    {matchType: \"fileExt\", matchValue: \"jpg,png\", key: 2, behavior: \"e1\", action: \"e1\", actionValue: \"\", workingDir: \"\", name: \"e1\"},\n    {matchType: \"fileExt\", matchValue: \"jpg,png\", key: 3, behavior: \"e2\", action: \"e2\", actionValue: \"\", workingDir: \"\", name: \"e2\"},\n    {matchType: \"fileExt\", matchValue: \"jpg,png\", key: 4, behavior: \"e3\", action: \"e3\", actionValue: \"\", workingDir: \"\", name: \"e3\"},\n    {matchType: \"fileExt\", matchValue: \"jpg,png\", key: 5, behavior: \"e4\", action: \"e4\", actionValue: \"\", workingDir: \"\", name: \"e4\"},\n    {matchType: \"fileExt\", matchValue: \"jpg,png\", key: 6, behavior: \"e5\", action: \"e5\", actionValue: \"\", workingDir: \"\", name: \"e5\"},\n    {matchType: \"fileExt\", matchValue: \"jpg,png\", key: 7, behavior: \"e6\", action: \"e6\", actionValue: \"\", workingDir: \"\", name: \"e6\"},\n    {matchType: \"fileExt\", matchValue: \"jpg,png\", key: 8, behavior: \"e7\", action: \"e7\", actionValue: \"\", workingDir: \"\", name: \"e7\"},\n    {matchType: \"fileExt\", matchValue: \"jpg,png\", key: 9, behavior: \"e8\", action: \"e8\", actionValue: \"\", workingDir: \"\", name: \"e8\"},\n    ; [selected-action] entry beyond key cap 9 skipped\n    ; [selected-action] entry beyond key cap 9 skipped\n  )\n  SelectedActionInit(\"\u003e^p\", SelectedActionData)\n"
+    }
+  ]
+}

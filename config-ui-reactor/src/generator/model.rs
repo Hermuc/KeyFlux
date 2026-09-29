@@ -360,7 +360,10 @@ pub fn config_from_json(raw: &str) -> serde_json::Result<Config> {
     serde_json::from_value(value)
 }
 
-fn strip_null_fields(value: &mut serde_json::Value) {
+/// 递归剔除**对象字段**里的 `null`（等价于"字段缺失" ⇒ 走 `#[serde(default)]` ⇒ 零值）。
+///
+/// `pub(crate)`：`actions` 的夹具单测复用同一容错口径（Go 的 nil map/slice ⇒ JSON `null`）。
+pub(crate) fn strip_null_fields(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(map) => {
             map.retain(|_, field| !field.is_null());
