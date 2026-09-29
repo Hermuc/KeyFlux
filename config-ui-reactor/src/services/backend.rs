@@ -113,14 +113,37 @@ pub fn settings_exe_candidates(exe_dir: &Path) -> Vec<PathBuf> {
     ]
 }
 
+/// 词法归一（Go `filepath.Clean` 口径）：消解 `.` 与 `..` 组件。
+///
+/// 必须在「对解析结果做 `parent()` 链推导」之前调用 —— `Path::parent` 是纯词法
+/// 操作，`bin\ui\..\settings.exe` 连续两次 `parent()` 会落在 `bin\ui` 而非部署根
+/// （2026-09-29 实测：使用指南直读因此落空，回退后端后 404 ⇒ 空态 banner）。
+/// 刻意不用 `fs::canonicalize`：它会引入 `\\?\` 前缀，可能泄漏进展示与派生路径。
+fn normalize_lexical(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for comp in path.components() {
+        match comp {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
 /// 解析 settings.exe 路径：显式优先，否则按候选顺序取第一个存在的。
+/// 返回值**已归一**（消费方普遍对其做 `parent()` 链推导，见 `resolve_deployment_root`）。
 pub fn resolve_settings_exe(options: &BackendSessionOptions, exe_dir: &Path) -> Option<PathBuf> {
     if let Some(explicit) = &options.settings_exe_path {
-        return Some(explicit.clone());
+        return Some(normalize_lexical(explicit));
     }
     settings_exe_candidates(exe_dir)
         .into_iter()
         .find(|candidate| candidate.is_file())
+        .as_deref()
+        .map(normalize_lexical)
 }
 
 /// 后端会话失败原因（对齐 C# 的 `FailureReason` 文案语义）。
@@ -458,6 +481,25 @@ mod tests {
             resolved.as_deref(),
             Some(Path::new("X:\\custom\\settings.exe"))
         );
+    }
+
+    #[test]
+    fn resolved_candidates_are_normalized_for_parent_chains() {
+        // 部署树：deploy/bin/settings.exe + deploy/bin/ui/（面板所在）。
+        // 候选 2 = bin/ui/../settings.exe 必须归一为 bin/settings.exe，
+        // 否则 resolve_deployment_root 的两次 parent() 落在 bin/ui（2026-09-29 实测 bug）。
+        let root = std::env::temp_dir().join(format!("kf-backend-norm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("bin").join("ui")).unwrap();
+        std::fs::write(root.join("bin").join("settings.exe"), b"MZ").unwrap();
+        let options = BackendSessionOptions::default();
+        let resolved = resolve_settings_exe(&options, &root.join("bin").join("ui")).unwrap();
+        assert_eq!(resolved, root.join("bin").join("settings.exe"));
+        assert_eq!(
+            resolved.parent().and_then(|p| p.file_name()),
+            Some(std::ffi::OsStr::new("bin"))
+        );
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
