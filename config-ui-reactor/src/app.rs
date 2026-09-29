@@ -2492,7 +2492,11 @@ impl Shell {
             context.message(Message::SaDeleteAsk),
         );
         let toggles_area: View = selected_action_view::toggles_row(&toggles, &sel_id, |id| {
-            context.message(Message::SaSelectToggle { match_type, id })
+            // 胶囊 = Border + on_pointer_pressed（Button 的 ControlCornerRadius 覆盖不生效）
+            context.callback(move |_info: PointerEventInfo| Message::SaSelectToggle {
+                match_type,
+                id: id.clone(),
+            })
         });
 
         // 详情面板

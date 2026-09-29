@@ -219,14 +219,14 @@ where
     P: IntoUnitCallback,
     D: IntoUnitCallback,
 {
+    // 旧截图：▶/✕ **右对齐到卡边**（无边框图形按钮；▶ 用 U+25B8 避开 emoji 回退）
     let ghost = ResourceOverrides::new()
         .set("ButtonBackground", Color::transparent())
         .set("ButtonBorderBrush", Color::transparent())
         .set("ButtonBackgroundPointerOver", Color::transparent())
         .set("ButtonBorderBrushPointerOver", Color::transparent());
-    StackPanel::new()
-        .orientation(Orientation::Horizontal)
-        .spacing(8.0)
+    Grid::new()
+        .columns([GridLength::STAR, GridLength::Auto, GridLength::Auto])
         .children((
             TextBlock::new()
                 .text(title.to_string())
@@ -234,8 +234,8 @@ where
                 .font_weight(FontWeight::SEMI_BOLD)
                 .foreground(theme::terracotta())
                 .vertical_alignment(VerticalAlignment::Center),
-            // ▶ 播放（U+25B8 单色小三角，避开 U+25B6 的彩色 emoji 回退——见 6.2.16 教训）
             Button::new()
+                .grid_column(1)
                 .is_enabled(can_play)
                 .resource_overrides(ghost.clone())
                 .on_click(on_play)
@@ -245,50 +245,87 @@ where
                         .font_size(16.0)
                         .foreground(theme::near_black()),
                 ),
-            Button::new()
-                .is_enabled(can_delete)
-                .resource_overrides(ghost)
-                .on_click(on_delete)
+            Border::new()
+                .grid_column(2)
+                .margin(Thickness::new(8.0, 0.0, 4.0, 0.0))
                 .content(
-                    TextBlock::new()
-                        .text("✕")
-                        .font_size(15.0)
-                        .foreground(theme::solid(theme::ERROR_CRIMSON)),
+                    Button::new()
+                        .is_enabled(can_delete)
+                        .resource_overrides(ghost)
+                        .on_click(on_delete)
+                        .content(
+                            TextBlock::new()
+                                .text("✕")
+                                .font_size(15.0)
+                                .foreground(theme::solid(theme::ERROR_CRIMSON)),
+                        ),
                 ),
         ))
 }
 
-/// 类型 toggle 行：chips 换行（`VariableSizedWrapGrid` 统一格宽，按最长标签估算）。
-/// 选中态 = Sand 底深字；状态点已随旧版 2026-09-22 定版移除。
+/// 类型 toggle 行：**自然宽度胶囊** + 按估宽手动换行。
+///
+/// 旧版为 `WrapPanel` 自然宽（reactor 无 WrapPanel ⇒ 按标签估宽分行，每行一个
+/// 横排 StackPanel）；胶囊 = Border 半径 18（Button 的 `ControlCornerRadius`
+/// 资源覆盖实测不生效，改用 Border + `on_pointer_pressed` 承载点击——全透明之外的
+/// 任意背景即可命中）。
 pub fn toggles_row<F, C>(toggles: &[TypeToggle], selected_id: &str, mut make_callback: F) -> View
 where
     F: FnMut(String) -> C,
-    C: IntoUnitCallback,
+    C: IntoPayloadCallback<PointerEventInfo>,
 {
-    let width = toggles
-        .iter()
-        .map(|toggle| estimate_width(&toggle.label))
-        .fold(0.0_f64, f64::max)
-        + 44.0; // 胶囊左右内边距（≈20×2，对齐旧版）
-    let width = width.clamp(TOGGLE_MIN_WIDTH, TOGGLE_MAX_WIDTH);
+    // 估算可用行宽：卡内容 ≈ 700（卡 760 − 内边距 40 − 卡边）
+    const LINE_WIDTH: f64 = 690.0;
+    const SPACING: f64 = 10.0;
 
-    let items: Vec<(String, View)> = toggles
+    // 贪心分行：宽度 = 估宽 + 胶囊左右内边距 44
+    let widths: Vec<f64> = toggles
         .iter()
-        .map(|toggle| {
-            let is_selected = toggle.id == selected_id;
-            let callback = make_callback(toggle.id.clone());
+        .map(|toggle| estimate_width(&toggle.label) + 44.0)
+        .collect();
+    let mut lines: Vec<Vec<usize>> = vec![Vec::new()];
+    let mut cursor = 0.0_f64;
+    for (index, width) in widths.iter().enumerate() {
+        let current = lines.last_mut().expect("至少一行");
+        if !current.is_empty() && cursor + SPACING + width > LINE_WIDTH {
+            lines.push(Vec::new());
+            cursor = 0.0;
+        }
+        if !lines.last().expect("至少一行").is_empty() {
+            cursor += SPACING;
+        }
+        lines.last_mut().expect("至少一行").push(index);
+        cursor += width;
+    }
+
+    let rows: Vec<(usize, View)> = lines
+        .into_iter()
+        .filter(|line| !line.is_empty())
+        .enumerate()
+        .map(|(row_index, line)| {
+            let chips: Vec<(usize, View)> = line
+                .into_iter()
+                .map(|index| {
+                    let toggle = &toggles[index];
+                    let is_selected = toggle.id == selected_id;
+                    let callback = make_callback(toggle.id.clone());
+                    (index, build_toggle_pill(toggle, is_selected, callback))
+                })
+                .collect();
             (
-                format!("{}|{is_selected}", toggle.id),
-                build_toggle_button(toggle, is_selected, width, callback),
+                row_index,
+                StackPanel::new()
+                    .orientation(Orientation::Horizontal)
+                    .spacing(SPACING)
+                    .keyed_children(chips),
             )
         })
         .collect();
 
-    VariableSizedWrapGrid::new()
-        .item_width(width)
-        .item_height(TOGGLE_HEIGHT)
-        .orientation(Orientation::Horizontal)
-        .keyed_children(items)
+    StackPanel::new()
+        .orientation(Orientation::Vertical)
+        .spacing(SPACING)
+        .keyed_children(rows)
 }
 
 fn estimate_width(label: &str) -> f64 {
@@ -298,47 +335,31 @@ fn estimate_width(label: &str) -> f64 {
         .sum()
 }
 
-fn build_toggle_button(
+/// 单个胶囊（Border 承载造型与命中；选中 = 陶土底白字，未选 = 白底暖边）。
+fn build_toggle_pill(
     toggle: &TypeToggle,
     is_selected: bool,
-    width: f64,
-    on_click: impl IntoUnitCallback,
+    on_click: impl IntoPayloadCallback<PointerEventInfo>,
 ) -> View {
-    // 旧胶囊造型：选中 = 陶土底白字；未选 = 白底暖边深字；半径 = 高度一半
-    let (background, foreground, border, border_over) = if is_selected {
-        (
-            theme::TERRACOTTA,
-            theme::WHITE,
-            theme::TERRACOTTA,
-            theme::CORAL,
-        )
+    let (background, foreground, border) = if is_selected {
+        (theme::TERRACOTTA, theme::WHITE, theme::TERRACOTTA)
     } else {
-        (
-            theme::WHITE,
-            theme::NEAR_BLACK,
-            theme::RING_WARM,
-            theme::RING_DEEP,
-        )
+        (theme::WHITE, theme::NEAR_BLACK, theme::RING_WARM)
     };
 
-    Button::new()
-        .height(TOGGLE_HEIGHT)
-        .width(width)
-        .resource_overrides(
-            ResourceOverrides::new()
-                .set("ButtonBackground", background)
-                .set("ButtonForeground", foreground)
-                .set("ButtonBorderBrush", border)
-                .set("ButtonBackgroundPointerOver", background)
-                .set("ButtonForegroundPointerOver", foreground)
-                .set("ButtonBorderBrushPointerOver", border_over)
-                .set("ControlCornerRadius", CornerRadius::uniform(TOGGLE_RADIUS)),
-        )
-        .on_click(on_click)
+    Border::new()
+        .corner_radius(CornerRadius::uniform(TOGGLE_RADIUS))
+        .background(theme::solid(background))
+        .border_brush(theme::solid(border))
+        .border_thickness(theme::hairline())
+        .padding(Thickness::new(20.0, 7.0, 20.0, 7.0))
+        .vertical_alignment(VerticalAlignment::Center)
+        .on_pointer_pressed(on_click)
         .content(
             TextBlock::new()
                 .text(toggle.label.clone())
                 .font_size(13.0)
+                .foreground(theme::solid(foreground))
                 .horizontal_alignment(HorizontalAlignment::Center)
                 .vertical_alignment(VerticalAlignment::Center),
         )
@@ -399,14 +420,14 @@ where
         .width(26.0)
         .height(26.0)
         .corner_radius(theme::radius_sm())
-        .background(theme::terracotta())
+        .background(theme::sand())
         .vertical_alignment(VerticalAlignment::Center)
         .content(
             TextBlock::new()
                 .text((index + 1).to_string())
                 .font_size(13.0)
                 .font_weight(FontWeight::SEMI_BOLD)
-                .foreground(theme::WHITE)
+                .foreground(theme::terracotta())
                 .horizontal_alignment(HorizontalAlignment::Center)
                 .vertical_alignment(VerticalAlignment::Center),
         );
@@ -414,25 +435,48 @@ where
     // 行为下拉：切换即重置该行为默认模板（复刻 `EntryRowVm` 的 `OnBehaviorChanged`）
     let switch_combo: View = ComboBox::new()
         .min_height(36.0)
+        .horizontal_alignment(HorizontalAlignment::Stretch)
         .items_source(switch_items)
         .selected_index(switch_selected)
         .on_selection_changed(on_switch)
         .into();
 
+    // ↑ ↓ ✕ = ghost 紧凑排（旧截图：无边框细符号）
+    let ghost = ResourceOverrides::new()
+        .set("ButtonBackground", Color::transparent())
+        .set("ButtonBorderBrush", Color::transparent())
+        .set("ButtonBackgroundPointerOver", Color::transparent())
+        .set("ButtonBorderBrushPointerOver", Color::transparent());
     let up: View = Button::new()
         .is_enabled(can_up)
+        .resource_overrides(ghost.clone())
         .on_click(on_up)
-        .content(TextBlock::new().text("↑"));
+        .content(
+            TextBlock::new()
+                .text("↑")
+                .font_size(15.0)
+                .foreground(theme::stone_gray()),
+        );
     let down: View = Button::new()
         .is_enabled(can_down)
+        .resource_overrides(ghost.clone())
         .on_click(on_down)
-        .content(TextBlock::new().text("↓"));
-    // 旧版删除 = 红 ✕（tooltip 1108 因 reactor 无 Tooltip API 暂缺）
-    let remove: View = Button::new().on_click(on_remove).content(
-        TextBlock::new()
-            .text("✕")
-            .foreground(theme::solid(theme::ERROR_CRIMSON)),
-    );
+        .content(
+            TextBlock::new()
+                .text("↓")
+                .font_size(15.0)
+                .foreground(theme::stone_gray()),
+        );
+    // 旧版删除 = 淡红 ✕（tooltip 1108 因 reactor 无 Tooltip API 暂缺）
+    let remove: View = Button::new()
+        .resource_overrides(ghost)
+        .on_click(on_remove)
+        .content(
+            TextBlock::new()
+                .text("✕")
+                .font_size(15.0)
+                .foreground(theme::solid(theme::ERROR_CRIMSON)),
+        );
 
     let selector: View = Grid::new()
         .columns([
@@ -456,11 +500,11 @@ where
                 .content(up),
             Border::new()
                 .grid_column(3)
-                .margin(Thickness::new(4.0, 0.0, 4.0, 0.0))
                 .vertical_alignment(VerticalAlignment::Center)
                 .content(down),
             Border::new()
                 .grid_column(4)
+                .margin(Thickness::new(4.0, 0.0, 4.0, 0.0))
                 .vertical_alignment(VerticalAlignment::Center)
                 .content(remove),
         ));
