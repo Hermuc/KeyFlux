@@ -7,6 +7,12 @@
       "name": "factory",
       "config": "corpus/factory/config.json",
       "artifacts": ["plan", "ahk"]
+    },
+    {
+      "name": "factory-plugins",
+      "config": "corpus/factory/config.json",
+      "plugins": "plugins/examples",
+      "artifacts": ["plan", "ahk"]
     }
   ]
 }
