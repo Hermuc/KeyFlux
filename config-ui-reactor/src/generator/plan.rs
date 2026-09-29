@@ -26,7 +26,8 @@ use crate::generator::text::{contains_only_modifier, divide, to_ahk_func_arg};
 pub const PLAN_VERSION: i32 = 1;
 
 /// Go `generators.selectedActionKeyCap`（与 `script.maxEntriesPerMapping` 同口径）。
-const SELECTED_ACTION_KEY_CAP: usize = 9;
+/// `pub(crate)`：`actions::selected_action_code` 与 plan 投影共用同一口径。
+pub(crate) const SELECTED_ACTION_KEY_CAP: usize = 9;
 
 #[derive(Debug, Serialize)]
 pub struct Plan {
@@ -349,7 +350,11 @@ fn to_plan_entry(config: &Config, action: &Action) -> PlanEntry {
 
 /// Go `generators.sortHotkeys`：摊平 `hotkey -> actions`，用 **非稳定**排序按
 /// (TypeID, 热键字节长度, 热键字典序) 排序。热键名取自 `ToAHKFuncArg` 去掉首末引号。
-fn sort_hotkeys(hotkey_map: &std::collections::HashMap<String, Vec<Action>>) -> Vec<Action> {
+///
+/// `pub(crate)`：`actions::render_keymap` 复用（与 Go 同源，避免第二份实现漂移）。
+pub(crate) fn sort_hotkeys(
+    hotkey_map: &std::collections::HashMap<String, Vec<Action>>,
+) -> Vec<Action> {
     let mut result: Vec<Action> = Vec::new();
     for (hotkey, actions) in hotkey_map {
         let stripped = strip_quotes(&to_ahk_func_arg(hotkey));
@@ -389,7 +394,9 @@ fn deterministic_sort(mut actions: Vec<Action>) -> Vec<Action> {
 
 /// Go `generators.sortActions`：把 `window_group_id == 0`（默认生效、优先级最低）挪到最后，
 /// 其余保持原有相对顺序（稳定分区）。
-fn sort_actions(actions: &[Action]) -> Vec<Action> {
+///
+/// `pub(crate)`：`actions::abbr_registry_code` 复用（Go 侧 `sortActions` 同时服务两者）。
+pub(crate) fn sort_actions(actions: &[Action]) -> Vec<Action> {
     let mut result = Vec::with_capacity(actions.len());
     let mut suffix = Vec::new();
     for action in actions {
