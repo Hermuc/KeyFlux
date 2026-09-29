@@ -16,14 +16,33 @@ use std::os::windows::process::CommandExt;
 /// Go `syscall.SysProcAttr{CreationFlags: 0x01000000}`：CREATE_BREAKAWAY_FROM_JOB。
 const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 
+/// Go `filepath.Abs` 的语义 = Join + **Clean**：Clean 会消解词法上的 `.` 与 `..`
+/// （`filepath.Abs("../")` 返回的是归一后的绝对路径）。Rust 的 `PathBuf::join`
+/// **不做归一**（`bin\..` 原样保留）—— 必须手工 Clean，否则 explorer.exe 中转拿到
+/// 含 `..` 的脏路径会把参数当不存在的文件夹处理，表现为弹出默认目录（文档）而非
+/// 拉起引擎。纯词法操作（不做 symlink 解析，避免 canonicalize 的 `\\?\` 前缀）。
+fn clean_path(p: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for comp in p.components() {
+        match comp {
+            std::path::Component::ParentDir => {
+                out.pop(); // 根上多余的 ".." 与 Go Clean 一致地保留为 ".."
+            }
+            std::path::Component::CurDir => {}
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
 /// Go `proc.ExecCmd`：启动子进程（相对 `../` 工作目录），返回是否成功启动。
 pub(crate) fn exec_cmd(exe: &str, args: &[&str]) -> bool {
-    // Go 用 cmd.Dir 指定子进程工作目录，避免修改全局 cwd；路径为词法 abs("../")
+    // Go 用 cmd.Dir 指定子进程工作目录，避免修改全局 cwd；路径为词法 abs("../") = Join+Clean
     let Ok(cwd) = std::env::current_dir() else {
         eprintln!("execCmd: 获取项目根目录失败");
         return false;
     };
-    let dir = cwd.join("..");
+    let dir = clean_path(&cwd.join(".."));
 
     match Command::new(exe)
         .args(args)
@@ -44,8 +63,8 @@ pub(crate) fn exec_cmd(exe: &str, args: &[&str]) -> bool {
 /// （WindowSpy 等短暂工具进程）保持普通启动。
 fn fallback_exec_cmd(dir: &Path, exe: &str, args: &[&str]) -> bool {
     if args.is_empty() {
-        // Go: filepath.Abs(filepath.Join(dir, exe)) —— dir 已是绝对词法路径
-        let abs_exe: PathBuf = dir.join(exe);
+        // Go: filepath.Abs(filepath.Join(dir, exe)) —— Join 之后还要 Clean（消解 ".."）
+        let abs_exe = clean_path(&dir.join(exe));
         match Command::new("explorer.exe").arg(&abs_exe).spawn() {
             Ok(_) => return true,
             Err(error) => eprintln!("execCmd: explorer 中转启动 {exe} 失败: {error}"),
@@ -77,5 +96,21 @@ pub(crate) fn stop_process_by_name(name: &str) -> bool {
             eprintln!("StopProcessByName: {name} 结束失败: {error}");
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clean_path_resolves_parent_and_current() {
+        // Go filepath.Abs = Join + Clean（消解 "." 与 ".."）
+        let p = Path::new("D:\\a\\bin\\..");
+        assert_eq!(clean_path(p), PathBuf::from("D:\\a"));
+        let p = Path::new("D:\\a\\bin\\..\\./KeyFlux.exe");
+        assert_eq!(clean_path(p), PathBuf::from("D:\\a\\KeyFlux.exe"));
+        let p = Path::new("D:\\a\\KeyFlux.exe");
+        assert_eq!(clean_path(p), PathBuf::from("D:\\a\\KeyFlux.exe"));
     }
 }
