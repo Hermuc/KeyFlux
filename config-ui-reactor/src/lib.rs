@@ -25,6 +25,7 @@
 #![allow(dead_code)]
 
 pub mod app;
+pub mod generator;
 pub mod models;
 pub mod platform;
 pub mod services;
