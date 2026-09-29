@@ -1751,6 +1751,9 @@ impl Component for Shell {
         let nav: View = NavigationView::new()
             .grid_row(1)
             .pane_title("KeyFlux")
+            // 侧栏宽度：WinUI NavigationView 默认 OpenPaneLength=320，明显宽于旧设计
+            // （旧 Avalonia `ColumnDefinitions="264,*"` ⇒ theme::SIDEBAR_WIDTH=264）⇒ 显式收紧。
+            .open_pane_length(theme::SIDEBAR_WIDTH)
             .is_settings_visible(false)
             .on_selected_tag_changed(context.callback(|tag: Option<String>| Message::Nav(tag)))
             .slots([
