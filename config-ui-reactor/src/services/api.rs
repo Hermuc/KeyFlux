@@ -219,7 +219,9 @@ impl HttpSettingsApi {
     }
 
     /// 非 2xx 时优先取响应体的 `message` 字段，取不到则回退原始体（对齐 C# `ExtractErrorMessage`）。
-    fn extract_error(raw: &str) -> String {
+    ///
+    /// 公开的理由：**HTTP 与 CLI（进程内桥）两个适配器共用**同一份错误提取语义。
+    pub fn extract_error(raw: &str) -> String {
         if let Ok(body) = serde_json::from_str::<MessageBody>(raw)
             && !body.message.is_empty()
         {
@@ -300,29 +302,36 @@ impl HttpSettingsApi {
             Err(error) => return ApiResponse::transport_error(error.to_string()),
         };
 
-        if (200..300).contains(&status) {
-            if raw.trim().is_empty() {
-                // 空体：尝试以默认值构造（如 EmptyJson）
-                match serde_json::from_str::<T>("{}") {
-                    Ok(value) => ApiResponse::ok(status, value, raw),
-                    Err(_) => ApiResponse {
-                        success: true,
-                        status,
-                        value: None,
-                        error_message: None,
-                        raw_body: raw,
-                    },
-                }
-            } else {
-                match serde_json::from_str::<T>(&raw) {
-                    Ok(value) => ApiResponse::ok(status, value, raw),
-                    Err(error) => ApiResponse::http_error(status, error.to_string(), raw),
-                }
+        finish_response(status, &raw)
+    }
+}
+
+/// 状态码 + 原始响应体 → `ApiResponse<T>`。
+///
+/// **HTTP 与 CLI（进程内桥）两个适配器共用**：传输层只负责拿到 (status, 原始体)，
+/// 语义映射只此一份，避免「第二真源」。
+pub fn finish_response<T: for<'de> Deserialize<'de>>(status: u16, raw: &str) -> ApiResponse<T> {
+    if (200..300).contains(&status) {
+        if raw.trim().is_empty() {
+            // 空体：尝试以默认值构造（如 EmptyJson）
+            match serde_json::from_str::<T>("{}") {
+                Ok(value) => ApiResponse::ok(status, value, raw),
+                Err(_) => ApiResponse {
+                    success: true,
+                    status,
+                    value: None,
+                    error_message: None,
+                    raw_body: raw.to_string(),
+                },
             }
         } else {
-            let message = Self::extract_error(&raw);
-            ApiResponse::http_error(status, message, raw)
+            match serde_json::from_str::<T>(raw) {
+                Ok(value) => ApiResponse::ok(status, value, raw),
+                Err(error) => ApiResponse::http_error(status, error.to_string(), raw),
+            }
         }
+    } else {
+        ApiResponse::http_error(status, HttpSettingsApi::extract_error(raw), raw)
     }
 }
 

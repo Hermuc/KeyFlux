@@ -120,7 +120,7 @@ impl Shell {
             return;
         };
         let _ = context.spawn_background(move |_token| {
-            let api = HttpSettingsApi::new(port);
+            let api = crate::services::transport::new_settings_api(port);
             let response = api.get_behaviors();
             match response.value {
                 Some(value) => Message::BehaviorsLoaded(Ok(Box::new(sa::Catalog {
@@ -292,7 +292,7 @@ impl Shell {
         self.market_error = None;
         let _ = context.spawn_background(move |_token| {
             // 已装集合取本地后端目录；目录本体走外部网络（后端不出网）
-            let installed: Vec<String> = HttpSettingsApi::new(port)
+            let installed: Vec<String> = crate::services::transport::new_settings_api(port)
                 .get_plugins()
                 .value
                 .map(|catalog| {
@@ -544,7 +544,7 @@ impl Shell {
         self.plugins_loading = true;
         self.plugins_error = None;
         let _ = context.spawn_background(move |_token| {
-            let api = HttpSettingsApi::new(port);
+            let api = crate::services::transport::new_settings_api(port);
             let response = api.get_plugins();
             match response.value {
                 Some(catalog) => Message::PluginsLoaded(Ok(Box::new(catalog))),

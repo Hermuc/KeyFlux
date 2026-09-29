@@ -35,6 +35,10 @@ fn main() {
     // 随包 MiSans 进程内私有加载（须在首个 DirectWrite 字体解析前完成）；
     // 加载后由 fork 的 install_global_ui_font 覆盖全局字体键生效。
     let _loaded = platform::fonts::load_private_fonts();
+
+    // 传输选择：`--api=cli` 走进程内 CLI 桥（无端口 / 无常驻后端）；缺省 http（行为与改动前一致）。
+    let args: Vec<String> = std::env::args().collect();
+    services::transport::set_transport(services::transport::parse_transport(&args));
     // GUI 子系统下 panic/Err 不可见（无控制台）⇒ 顶层错误先落盘再传播，
     // 否则「面板启动即退出」没有任何现场可查（2026-09-28 黑窗排查的教训）。
     if let Err(error) = windows_reactor::App::run_component::<app::Shell>(()) {
