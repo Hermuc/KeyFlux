@@ -1,4 +1,4 @@
-//! `settings.exe` 的 Rust 版（**drop-in 替代**，P3）—— 目前只实现 `DumpPlan`。
+//! `settings.exe` 的 Rust 版（**drop-in 替代**，P3）—— 目前实现 `DumpPlan` 与 `GenerateAHK`。
 //!
 //! 契约（**逐字不变**，见 `docs/plan-rust-migration.md` §2）：
 //! * 二进制名最终必须叫 `settings.exe`（`bin/Launcher.ahk` / `tools/oracle.ps1` /
@@ -14,7 +14,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use config_ui_reactor::generator::{behaviors, config as config_parse, plan};
+use config_ui_reactor::generator::{behaviors, config as config_parse, plan, template};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -25,7 +25,7 @@ fn main() -> ExitCode {
 
     match command {
         "DumpPlan" => dump_plan(&args),
-        "GenerateAHK" => unsupported("GenerateAHK"),
+        "GenerateAHK" => generate_ahk(&args),
         "GenerateScripts" => unsupported("GenerateScripts"),
         "ChangeVersion" => unsupported("ChangeVersion"),
         "UseOriginalAHK" => unsupported("UseOriginalAHK"),
@@ -74,6 +74,71 @@ fn dump_plan(args: &[String]) -> ExitCode {
     config_parse::preprocess(&mut config);
 
     if let Err(error) = plan::write_plan(&mut config, Some(&catalog), output_file) {
+        eprintln!("{error}");
+        return ExitCode::from(1);
+    }
+    ExitCode::SUCCESS
+}
+
+/// Go `command.GenerateAHK`：`GenerateAHK <config.json> <template> <output>`。
+///
+/// **模板路径是参数**（`tools/parity` 正是这样调的：`ahk` 用 `keyflux.tmpl`、`skin` 用
+/// `CommandInputSkin.tmpl`），故必须**按模板文件名分派**到对应渲染器；不认识的文件名
+/// **显式报错退出 2**（绝不静默用错渲染器 → 产出错字节）。
+///
+/// 与 Go `SaveAHK` 的字节口径一致：行尾统一 CRLF、`keyflux.tmpl` 产物带 UTF-8 BOM
+/// （模板首字符）；这些都在 `generator::template` 内完成。
+fn generate_ahk(args: &[String]) -> ExitCode {
+    // Go 用 os.Args[2]/[3]/[4]，故 len(os.Args) < 5 即报错（args[0]=exe, args[1]=子命令）。
+    if args.len() < 5 {
+        eprintln!(
+            "GenerateAHK requires 3 arguments, for example: GenerateAHK ./config.json ./templates/script.ahk ./output.ahk"
+        );
+        return ExitCode::from(2);
+    }
+    let config_file = Path::new(&args[2]);
+    let template_file = Path::new(&args[3]);
+    let output_file = Path::new(&args[4]);
+
+    let version = option_env!("KEYFLUX_VERSION").unwrap_or("");
+    let mut config = match config_parse::parse_config(config_file, version) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::from(1);
+        }
+    };
+
+    // 与运行时路径（GenerateScripts）保持一致：先设行为目录，再 Preprocess。
+    // 行为目录口径同 Go：内置包取 `<settings.exe 目录>/behaviors`，用户/插件包取 config 同级。
+    let catalog = behaviors::load_catalog_for_config(config_file, &exe_dir());
+    // 插件注入目录 = `<config.json 目录>/plugins`（与 behaviors 的插件贡献包同口径）。
+    let plugins_dir = config_file
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join("plugins");
+    config_parse::preprocess(&mut config);
+
+    // ⚠️ `InstallCommandFont`（Go GenerateAHK 会调用但**丢弃返回值**）**有意不实现**：
+    // 它只把用户字体复制到 `bin/font/font.ttf`（纯表现层资源），**不影响产物字节**，
+    // 对 P3 的逐字节对账无意义，故此处不落盘字体文件。
+
+    let template_name = template_file
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default();
+    let rendered = match template_name {
+        "keyflux.tmpl" => template::render_keyflux_ahk(&mut config, Some(&catalog), &plugins_dir),
+        "CommandInputSkin.tmpl" => template::render_command_input_skin(&config),
+        other => {
+            eprintln!(
+                "GenerateAHK: unsupported template {other:?} (expected keyflux.tmpl or CommandInputSkin.tmpl)"
+            );
+            return ExitCode::from(2);
+        }
+    };
+
+    if let Err(error) = std::fs::write(output_file, rendered.as_bytes()) {
         eprintln!("{error}");
         return ExitCode::from(1);
     }
