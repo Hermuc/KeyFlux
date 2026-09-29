@@ -37,11 +37,14 @@ pub enum InlinePlan {
 
 /// 链接 URI 解析（复刻 `LinkOpener`）：以 `/` 开头的视为**后端站点内部路径**，拼本机地址。
 pub fn resolve_link_uri(url: &str, port: u16) -> String {
-    if url.starts_with('/') {
-        format!("http://127.0.0.1:{port}{url}")
-    } else {
-        url.to_string()
+    if !url.starts_with('/') {
+        return url.to_string();
     }
+    // CLI 传输（已登记本地静态站）没有端口 ⇒ 内部链接退化为 file:///（交系统默认程序打开）
+    if let Some(path) = crate::ui::doc_assets::asset_path(url) {
+        return crate::ui::doc_assets::file_uri(&path);
+    }
+    format!("http://127.0.0.1:{port}{url}")
 }
 
 /// 图片 URL（复刻 `HomePageViewModel.LoadImageAsync`）：相对路径拼到后端静态站点根。
@@ -171,15 +174,28 @@ fn image_view(src: &str, alt: &str, port: u16) -> View {
         .horizontal_alignment(HorizontalAlignment::Left)
         .margin(Thickness::new(0.0, 8.0, 0.0, 12.0));
 
+    // CLI 传输（已登记本地静态站）：无端口 ⇒ 直读文件 + `source_data`
+    // （reactor 内建的 WinRT 流式加载，不依赖 `BitmapImage` 接受哪种 URI 方案）。
+    if let Some(path) = crate::ui::doc_assets::asset_path(src) {
+        return match std::fs::read(&path) {
+            Ok(bytes) => builder.source_data(EncodedImage::new(bytes)).into(),
+            Err(_) => image_placeholder(alt),
+        };
+    }
+
     match builder.source(image_url(src, port)) {
         Ok(image) => image.into(),
-        // 拉取失败占位（旧版行为 = 失败返回 null 保持空白；此处保留 alt 更可诊断）
-        Err(_) => TextBlock::new()
-            .text(format!("[图片不可用：{alt}]"))
-            .font_size(theme::FONT_CAPTION)
-            .foreground(theme::stone_gray())
-            .into(),
+        Err(_) => image_placeholder(alt),
     }
+}
+
+/// 图片不可用占位（旧版行为 = 失败返回 null 保持空白；此处保留 alt 更可诊断）。
+fn image_placeholder(alt: &str) -> View {
+    TextBlock::new()
+        .text(format!("[图片不可用：{alt}]"))
+        .font_size(theme::FONT_CAPTION)
+        .foreground(theme::stone_gray())
+        .into()
 }
 
 fn bold_run(text: impl Into<String>) -> RichTextRun {

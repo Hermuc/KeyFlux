@@ -31,8 +31,17 @@ pub fn transport() -> Transport {
     *TRANSPORT.get().unwrap_or(&Transport::Http)
 }
 
-/// 从启动参数解析传输（`--api=cli` / `--api=http`；缺省 Http）。
+/// 从启动参数解析传输（`--api=cli` / `--api=http`）。
+///
+/// 优先级：命令行 > 环境变量 `KEYFLUX_API`（`cli`/`http`）> 默认 [`Transport::Http`]。
+/// 环境变量这条通道是**免重建的逃生阀**：面板由引擎拉起（不传参），出问题时
+/// 设 `KEYFLUX_API=http` 即可立刻回到旧传输。
 pub fn parse_transport(args: &[String]) -> Transport {
+    parse_transport_with_env(args, std::env::var("KEYFLUX_API").ok().as_deref())
+}
+
+/// 纯函数版（环境变量作为入参传入）—— 便于确定性单测（不碰进程环境）。
+fn parse_transport_with_env(args: &[String], env: Option<&str>) -> Transport {
     for arg in args {
         match arg.as_str() {
             "--api=cli" => return Transport::Cli,
@@ -40,7 +49,11 @@ pub fn parse_transport(args: &[String]) -> Transport {
             _ => {}
         }
     }
-    Transport::Http
+    match env {
+        Some("cli") => Transport::Cli,
+        Some("http") => Transport::Http,
+        _ => Transport::default(),
+    }
 }
 
 /// 统一工厂：所有 `SettingsApi` 构造都应走这里。
@@ -57,21 +70,29 @@ mod tests {
 
     #[test]
     fn parse_transport_defaults_to_http() {
-        assert_eq!(parse_transport(&[]), Transport::Http);
+        assert_eq!(parse_transport_with_env(&[], None), Transport::Http);
         assert_eq!(
-            parse_transport(&["--headless".to_string()]),
+            parse_transport_with_env(&["--headless".to_string()], Some("bogus")),
             Transport::Http
         );
     }
 
     #[test]
-    fn parse_transport_reads_cli_flag() {
-        assert_eq!(parse_transport(&["--api=cli".to_string()]), Transport::Cli);
-        // 后出现者不覆盖先出现者之后仍以显式 `--api=http` 收口
+    fn parse_transport_args_beat_env() {
+        // 优先级：命令行 > 环境变量
         assert_eq!(
-            parse_transport(&["--api=cli".to_string(), "--api=http".to_string()]),
-            Transport::Cli,
-            "首个命中即返回（显式声明优先）"
+            parse_transport_with_env(&["--api=http".to_string()], Some("cli")),
+            Transport::Http
         );
+        assert_eq!(
+            parse_transport_with_env(&["--api=cli".to_string()], Some("http")),
+            Transport::Cli
+        );
+    }
+
+    #[test]
+    fn parse_transport_reads_env_valve() {
+        assert_eq!(parse_transport_with_env(&[], Some("cli")), Transport::Cli);
+        assert_eq!(parse_transport_with_env(&[], Some("http")), Transport::Http);
     }
 }

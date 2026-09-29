@@ -8,6 +8,7 @@ use windows_reactor::*;
 
 pub mod abbr_view;
 pub mod action_editor;
+pub mod doc_assets;
 pub mod keymap_view;
 pub mod markdown_view;
 pub mod plugins_view;

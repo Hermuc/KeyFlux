@@ -366,6 +366,17 @@ impl Component for Shell {
                 self.doc_md = doc_md;
                 self.shortcuts = shortcuts;
                 self.data_root = data_root;
+                // CLI 传输没有端口 ⇒ 登记本地静态站目录：指南图片走直读 + `source_data`、
+                // 内部链接走 `file:///`。HTTP 模式**不登记** ⇒ 行为与改动前完全一致。
+                if crate::services::transport::transport()
+                    == crate::services::transport::Transport::Cli
+                {
+                    crate::ui::doc_assets::set_site_dir(
+                        self.data_root
+                            .as_ref()
+                            .map(|root| root.join("bin").join("site")),
+                    );
+                }
                 self.page_index = 0;
                 self.loading = false;
                 self.error = None;
