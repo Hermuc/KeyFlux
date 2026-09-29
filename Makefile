@@ -172,7 +172,7 @@ parity:
 #   前置: make parity 须 4/4 PASS (Rust 与 Go 双向)。切换后下一次 deploy/sync-out 生效;
 #   回退 = 重新 make buildServer (Go 源码保留至 Go 退役)。
 drop-in-rust:
-	@pwsh -NoProfile -Command '. config-ui-reactor/env.ps1; Set-Location config-ui-reactor; cargo fmt --all --check; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] fmt"; exit 1}; cargo clippy --all-targets -- -D warnings; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] clippy"; exit 1}; cargo test --quiet; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] test"; exit 1}; cargo build --release; if($$LASTEXITCODE -ne 0){Write-Error "[FAIL] build"; exit 1}; Copy-Item target/release/settings.exe ../bin/settings.exe -Force; Write-Host "[OK] Rust settings.exe -> bin/settings.exe (drop-in 完成; 下一次 deploy/sync-out 生效; 回退 = make buildServer)"
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/drop-in-rust.ps1
 
 # check-cs: (已退役) 原 C# 设置界面单测随 config-ui-avalonia 一并移除;
 #   等价契约覆盖在 config-ui-reactor 的 cargo test (models/services 单测) 中。
