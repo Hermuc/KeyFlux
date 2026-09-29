@@ -10,6 +10,15 @@ publish = false
 name = "keyflux-settings"
 path = "src/main.rs"
 
+[lib]
+# P3（Rust 迁移）起 crate = lib + bin：
+# * lib 承载面板各层（app/models/platform/services/theme/ui），并作为后续 **Rust 生成器**
+#   （同名 settings.exe drop-in）的落点 —— 生成器要被 bin 与单测共享，放 bin 里会因
+#   "未被引用的 pub 项" 触发 dead_code，而 `clippy -D warnings` 是闸门。
+# * bin `keyflux-settings` 仍是唯一二进制入口（`src/main.rs`，保留 GUI 子系统属性）。
+name = "config_ui_reactor"
+path = "src/lib.rs"
+
 [dependencies]
 regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
