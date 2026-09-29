@@ -1746,10 +1746,12 @@ impl Component for Shell {
         context.window_title(&spec.title);
 
         // 自绘标题栏：`grid_row` 必须在收尾（`.into()`）之前设置。
+        // ⚠️ 高度用 Standard（32px）：Tall（48px）的三键会超出 TitleBar 行的分隔线
+        // （用户实测截图）；Standard 与行内分隔线对齐，且与常规桌面应用观感一致。
         let title_bar: View = TitleBar::new()
             .grid_row(0)
             .title("KeyFlux 设置面板")
-            .preferred_height(WindowTitleBarHeight::Tall)
+            .preferred_height(WindowTitleBarHeight::Standard)
             .into();
 
         // 导航项：tag 驱动选中匹配，文案来自配置/ i18n。
