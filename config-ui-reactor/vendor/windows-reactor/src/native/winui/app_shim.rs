@@ -75,10 +75,21 @@ pub fn install_xaml_controls_resources(application: &Application) -> Result<()> 
 /// 前置条件：宿主进程已把 MiSans ttf 私有加载（GDI AddFontResourceW）或系统可解析
 /// `MiSans` 家族名；否则回落 Microsoft YaHei UI（字体链兜底，不致渲染失败）。
 pub fn install_global_ui_font(application: &Application) -> Result<()> {
+    // 2026-09-29 修正：普通合并字典条目**压不过** XamlControlsResources 自身主题字典里的
+    // 同名键（TextBlock 默认样式的 {ThemeResource} 引用在库字典内部解析——真机截图实证
+    // 全面板仍是雅黑回退）。文档化的主题资源覆盖姿势 = 在 App 级字典里放
+    // **ThemeDictionaries**（末位合并优先，且按激活主题命中）。
     const FONT_DICT_XAML: &str = r#"<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <FontFamily x:Key="ContentControlThemeFontFamily">MiSans, Microsoft YaHei UI, Segoe UI Emoji</FontFamily>
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <FontFamily x:Key="ContentControlThemeFontFamily">MiSans, Microsoft YaHei UI, Segoe UI Emoji</FontFamily>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Default">
+            <FontFamily x:Key="ContentControlThemeFontFamily">MiSans, Microsoft YaHei UI, Segoe UI Emoji</FontFamily>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>"#;
 
     let value = XamlReader::Load(FONT_DICT_XAML)?;
