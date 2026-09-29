@@ -60,7 +60,7 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 | 阶段 | 交付物 | 验收门 | 回退 |
 |---|---|---|---|
 | **P0 护栏** | `tools/parity/` 差分 harness：Go=reference，固定语料（golden + 真实 config + 插件变体 + 异常输入）两版产物**逐字节**比对；`Makefile` 加 `parity`；CI 加一步 | harness 能抓假等价（先造一处"故意不等"验证会红） | 纯新增 |
-| **P1 面板去 HTTP** | `LocalCliApi` 直读 `config.json`；保存/辅助走 **Go CLI**；`--api=http\|local` 开关 | 直读 == `GET /config`；175 测试 + parity 全绿 | 切回 HTTP 适配器 |
+| **P1 面板去 HTTP** | ✅ 已落地「换传输」骨架：Go 进程内桥 `server.Call` + `CliSettingsApi`（18 方法全覆盖）+ `new_settings_api` 统一工厂 + `--api=cli`（**缺省仍 http**）。⏳ 待办：先解静态资源（§5 第 12 条）再切默认 | CLI/HTTP 同源（**共用同一套 gin handler**）；cargo 182 全绿；Go `Call` 冒烟实测 | `--api=http`（缺省即回退） |
 | **P2 Rust 接管外围** | config 解析/默认值、shortcuts、plugins、behaviors、指南（文件与模型层） | 与 Go 输出逐字段对账相等 | 同上 |
 | **P3 Rust 重写生成器 + drop-in** | 生成器 **与校验**（同源）迁 Rust；产出同名 `settings.exe`；Go 退为 reference（不进部署包） | **全语料 parity 100%** + golden + Oracle diff | 换回 Go 二进制（开关） |
 | **P4 Go 退役** | 消费方全指向 Rust；golden/CONTRACTS/Oracle 随迁；CI 由 `go test` → cargo + parity | 三闸门 + parity 全绿 | git 历史 |
@@ -82,6 +82,7 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 | 9 | 保存副作用遗漏：缓存失效 / 外观变更 kill CommandInput / `restartFailed` 提示 | CLI 子命令逐条等价，用例 + parity 覆盖 |
 | 10 | `options.startup` 直读失真（现靠后端查 `schtasks` 回填） | 面板自查计划任务 |
 | 11 | 并发写 / 半写文件（面板被杀留 `*.tmp`） | `*.tmp` + 原子 rename；读侧容忍半写 |
+| 12 | **静态资源（使用指南 4 张图片 + 内部链接）依赖 `127.0.0.1:<port>`**：`Image` 经 `BitmapImage.UriSource` 取 URL，无端口即无 URL（CLI 模式实测限制） | 去 HTTP 前必须先定方案：① 验证 WinUI `BitmapImage` 能否加载 `file:///` URI；② 或给 vendor fork 的 reactor 加「按字节设源」（`SetSourceAsync`）；③ 或保留一个极小本地静态服务（只服务 `bin/site/**`） |
 
 ## 6. 安全机制（四点保证）
 
