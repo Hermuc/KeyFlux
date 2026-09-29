@@ -1,0 +1,6 @@
+# tools/api-parity captures BYTE-EXACT HTTP response baselines (see README.md).
+# Same rationale as tools/parity (repo-root .gitattributes): with core.autocrlf=true a
+# plain checkout converts LF to CRLF and would make the byte-level diff fail spuriously.
+# -text => no EOL conversion; store and check out the exact bytes we captured.
+reference/** -text
+corpus/** -text
