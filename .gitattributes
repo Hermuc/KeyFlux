@@ -1,0 +1,9 @@
+# tools/parity is a BYTE-LEVEL differential gate (docs/plan-rust-migration.md, P0).
+# The reference artifacts must round-trip through git byte-exact: with core.autocrlf=true
+# a plain checkout converts the stored LF into CRLF, which makes the gate fail on CI only
+# (the freshly generated plan.json is LF while the checked-out reference became CRLF).
+# -text => no EOL conversion; store and check out the exact bytes we captured.
+#   NOTE: do NOT use "text eol=lf" here -- the generated KeyFlux.ahk is CRLF by design,
+#   so forcing LF would break that artifact instead.
+tools/parity/reference/** -text
+tools/parity/corpus/** -text
