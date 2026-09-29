@@ -34,7 +34,7 @@ const TEXT_FEATURES: [(&str, &str); 5] = [
 ];
 
 /// Go `behaviors.FindTextFeature`：归一化（去空白 + 小写）后精确匹配。
-fn find_text_feature(value: &str) -> Option<&'static str> {
+pub(crate) fn find_text_feature(value: &str) -> Option<&'static str> {
     let v = value.trim().to_lowercase();
     TEXT_FEATURES
         .iter()
@@ -43,12 +43,12 @@ fn find_text_feature(value: &str) -> Option<&'static str> {
 }
 
 /// Go `behaviors.IsKnownTextType`（含 plain）。
-fn is_known_text_type(value: &str) -> bool {
+pub(crate) fn is_known_text_type(value: &str) -> bool {
     find_text_feature(value).is_some()
 }
 
 /// Go `behaviors.TextFeatureHint`："链接 / 路径 / 磁力链接 / B 站 / 纯文本"。
-fn text_feature_hint() -> String {
+pub(crate) fn text_feature_hint() -> String {
     let labels: Vec<&str> = TEXT_FEATURES.iter().map(|(_, label)| *label).collect();
     labels.join(" / ")
 }
@@ -58,21 +58,33 @@ fn text_feature_hint() -> String {
 /// Go `behaviors.AppliesToEntry` 的校验面投影。
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
-struct RawAppliesToEntry {
+pub(crate) struct RawAppliesToEntry {
     #[serde(rename = "type")]
-    kind: String,
-    exts: Vec<String>,
-    value: String,
+    pub(crate) kind: String,
+    pub(crate) exts: Vec<String>,
+    pub(crate) value: String,
 }
 
-/// Go `behaviors.Pack` 的校验面投影（只取 Covers 所需字段）。
+/// Go `behaviors.Pack` 的校验面投影（只取 Covers / ValidateDelete 所需字段）。
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
-struct RawPack {
-    id: String,
-    name: String,
+pub(crate) struct RawPack {
+    pub(crate) id: String,
+    pub(crate) name: String,
     #[serde(rename = "appliesTo")]
-    applies_to: Vec<RawAppliesToEntry>,
+    pub(crate) applies_to: Vec<RawAppliesToEntry>,
+    /// Go `Pack.Source`：由加载目录决定（builtin = exe 同级、user = config 同级），
+    /// manifest 里不写（同 Go `json:"-"`），故 serde 跳过。
+    #[serde(skip)]
+    pub(crate) source: String,
+}
+
+/// Go `behaviors.RuleRef`（behaviors.go:438-443）：删除校验所需的规则投影。
+#[derive(Debug, Clone)]
+pub(crate) struct RuleRef {
+    pub(crate) match_type: String,
+    pub(crate) match_value: String,
+    pub(crate) action_type: String,
 }
 
 /// Go `behaviors.Catalog` 的校验面投影：`Get` + `Covers`。
@@ -83,7 +95,7 @@ pub(crate) struct ValidationCatalog {
 
 impl ValidationCatalog {
     /// Go `(*Catalog).Get`：线性查找，先到者胜（builtin 在前）。
-    fn get(&self, id: &str) -> Option<&RawPack> {
+    pub(crate) fn get(&self, id: &str) -> Option<&RawPack> {
         self.packs.iter().find(|pack| pack.id == id)
     }
 
@@ -145,6 +157,95 @@ impl ValidationCatalog {
             .map(|pack| pack.name.clone())
             .unwrap_or_else(|| id.to_string())
     }
+
+    /// Go `behaviors.coveredBy`（behaviors.go:501-510）：其他包任一前提
+    /// 覆盖单值即真。
+    fn covered_by(packs: &[&RawPack], match_type: &str, v: &str) -> bool {
+        packs.iter().any(|pack| {
+            pack.applies_to.iter().any(|entry| {
+                Self::entry_covers(entry, match_type, std::slice::from_ref(&v.to_string()))
+            })
+        })
+    }
+
+    /// Go `behaviors.ValidateDelete`（behaviors.go:450-499）逐字移植：
+    ///  1. 内置包不可删除；
+    ///  2. 被任何规则 actionType 引用 → 拒绝（引用会悬空）；
+    ///  3. 值级覆盖检查：删除后，若该包前提覆盖的某个值仍被引用（其他规则或
+    ///     其他行为前提）且再无任何启用行为覆盖 → 拒绝（防空前提桶）。
+    pub(crate) fn validate_delete(&self, id: &str, refs: &[RuleRef]) -> Result<(), String> {
+        let Some(p) = self.get(id) else {
+            return Err(format!("行为「{id}」不存在"));
+        };
+        if p.source != "user" {
+            return Err(format!("内置行为「{}」不可删除", p.name));
+        }
+        let mut ref_count = 0usize;
+        // Go `referenced map[[2]string]bool`：(matchType, value) 有序对集合
+        let mut referenced: std::collections::HashSet<(String, String)> =
+            std::collections::HashSet::new();
+        for r in refs {
+            if r.action_type == id {
+                ref_count += 1;
+            }
+            for v in ref_values(&r.match_type, &r.match_value) {
+                referenced.insert((r.match_type.clone(), v));
+            }
+        }
+        if ref_count > 0 {
+            return Err(format!(
+                "行为「{}」仍被 {} 条映射引用，请先修改或删除相应映射",
+                p.name, ref_count
+            ));
+        }
+        let others: Vec<&RawPack> = self.packs.iter().filter(|o| o.id != id).collect();
+        for o in &others {
+            for e in &o.applies_to {
+                for v in entry_values(e) {
+                    referenced.insert((e.kind.clone(), v));
+                }
+            }
+        }
+        let mut uncovered: Vec<String> = Vec::new();
+        for e in &p.applies_to {
+            for v in entry_values(e) {
+                if !referenced.contains(&(e.kind.clone(), v.clone())) {
+                    continue; // 无任何引用的前提值随包一并消失, 不构成空桶
+                }
+                if !Self::covered_by(&others, &e.kind, &v) {
+                    uncovered.push(display_value(&e.kind, &v));
+                }
+            }
+        }
+        if !uncovered.is_empty() {
+            return Err(format!(
+                "删除「{}」后以下匹配条件将没有可用行为：{}",
+                p.name,
+                uncovered.join("、")
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Go `behaviors.entryValues`（behaviors.go）：fileExt 取扩展名表，其余取单值。
+fn entry_values(e: &RawAppliesToEntry) -> Vec<String> {
+    if e.kind == "fileExt" {
+        e.exts.clone()
+    } else {
+        vec![e.value.clone()]
+    }
+}
+
+/// Go `behaviors.displayValue`（behaviors.go:512-520）。
+fn display_value(match_type: &str, v: &str) -> String {
+    if match_type == "textType" {
+        return format!("文本特征 {v}");
+    }
+    if v == "*" {
+        return "任意文件".to_string();
+    }
+    format!("后缀 .{}", v.strip_prefix('.').unwrap_or(v))
 }
 
 /// 内置基础动作保留 ID 集。Go `behaviors.BuiltinActionIDs`（逐字搬运；
@@ -162,7 +263,7 @@ const BUILTIN_ACTION_IDS: [&str; 10] = [
     "copy",
 ];
 
-fn is_builtin_action(id: &str) -> bool {
+pub(crate) fn is_builtin_action(id: &str) -> bool {
     BUILTIN_ACTION_IDS.contains(&id)
 }
 
@@ -178,8 +279,9 @@ fn read_validation_pack(dir: &Path) -> Option<RawPack> {
     Some(pack)
 }
 
-/// 扫描一个来源目录：缺失/不可读 ⇒ 空（正常场景）。
-fn load_validation_dir(dir: &Path) -> Vec<RawPack> {
+/// 扫描一个来源目录：缺失/不可读 ⇒ 空（正常场景）。`source` 标记包来源
+/// （同 Go `LoadCatalog` 按目录赋 `Pack.Source`）。
+fn load_validation_dir(dir: &Path, source: &str) -> Vec<RawPack> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -188,6 +290,9 @@ fn load_validation_dir(dir: &Path) -> Vec<RawPack> {
         .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
         .filter_map(|entry| read_validation_pack(&entry.path()))
         .collect();
+    for pack in &mut packs {
+        pack.source = source.to_string();
+    }
     packs.sort_by(|a, b| a.id.cmp(&b.id)); // 稳定排序，同 Go sortPacks
     packs
 }
@@ -195,20 +300,26 @@ fn load_validation_dir(dir: &Path) -> Vec<RawPack> {
 /// Go `server.loadBehaviorCatalog`（behaviors.go:41-47）：内置 = exe 同级
 /// `behaviors/`，用户 = `../data/behaviors`。两来源拼接，先到者胜。
 pub(crate) fn load_validation_catalog(builtin_dir: &Path, user_dir: &Path) -> ValidationCatalog {
-    let mut packs = load_validation_dir(builtin_dir);
-    packs.extend(load_validation_dir(user_dir));
+    let mut packs = load_validation_dir(builtin_dir, "builtin");
+    packs.extend(load_validation_dir(user_dir, "user"));
+    ValidationCatalog { packs }
+}
+
+/// 从完整 manifest 投影构建校验目录（服务端 CRUD 链路复用同一覆盖/删除语义；
+/// Go 侧 behaviors.Pack 本就全字段，此处按需投影到校验面）。
+pub(crate) fn catalog_from_packs(packs: Vec<RawPack>) -> ValidationCatalog {
     ValidationCatalog { packs }
 }
 
 // --------------------------------------------------------------------------- 引用解析
 
 /// Go `behaviors.IsCustomRef`：`type:` 前缀 = 自定义类型引用。
-fn is_custom_ref(v: &str) -> bool {
+pub(crate) fn is_custom_ref(v: &str) -> bool {
     v.starts_with("type:")
 }
 
 /// Go `behaviors.normalizeExt`：去空白、去两端点。
-fn normalize_ext(v: &str) -> String {
+pub(crate) fn normalize_ext(v: &str) -> String {
     v.trim().trim_matches('.').to_string()
 }
 
@@ -609,6 +720,7 @@ mod tests {
                 exts: vec![],
                 value: "plain".into(),
             }],
+            source: "user".into(),
         });
         let mut sa2 = SelectedAction {
             hotkey: "^!s".into(),
@@ -670,5 +782,117 @@ mod tests {
         assert!(!e.options.copy_to_clipboard);
         assert!(!e.options.clear_selection);
         assert!(!e.options.confirm);
+    }
+
+    // --------------------------------------------------------------- ValidateDelete
+
+    fn pack(id: &str, name: &str, source: &str, kind: &str, value: &str) -> RawPack {
+        RawPack {
+            id: id.into(),
+            name: name.into(),
+            applies_to: vec![RawAppliesToEntry {
+                kind: kind.into(),
+                exts: if kind == "fileExt" {
+                    value.split(',').map(|s| s.to_string()).collect()
+                } else {
+                    vec![]
+                },
+                value: if kind == "fileExt" {
+                    String::new()
+                } else {
+                    value.into()
+                },
+            }],
+            source: source.into(),
+        }
+    }
+
+    fn rref(match_type: &str, match_value: &str, action_type: &str) -> RuleRef {
+        RuleRef {
+            match_type: match_type.into(),
+            match_value: match_value.into(),
+            action_type: action_type.into(),
+        }
+    }
+
+    #[test]
+    fn validate_delete_rejects_missing_builtin_and_referenced() {
+        let mut cat = ValidationCatalog::default();
+        cat.packs
+            .push(pack("p1", "包一", "user", "textType", "url"));
+        cat.packs
+            .push(pack("sys", "系统", "builtin", "textType", "path"));
+
+        assert_eq!(
+            cat.validate_delete("nope", &[]).unwrap_err(),
+            "行为「nope」不存在"
+        );
+        assert_eq!(
+            cat.validate_delete("sys", &[]).unwrap_err(),
+            "内置行为「系统」不可删除"
+        );
+        assert_eq!(
+            cat.validate_delete(
+                "p1",
+                &[
+                    rref("textType", "url", "p1"),
+                    rref("textType", "path", "p1")
+                ]
+            )
+            .unwrap_err(),
+            "行为「包一」仍被 2 条映射引用，请先修改或删除相应映射"
+        );
+    }
+
+    /// 值级覆盖三态：引用值仍被引用且无他人覆盖 → 拒绝；引用但他人覆盖 → 放行；
+    /// 前提值无任何引用 → 随包消失不构成空桶。
+    /// 注意映射引用 actionType 指向被删包本身时先被「仍被引用」拦截（前一测试），
+    /// 值级覆盖场景的引用 actionType 指向其他行为。
+    #[test]
+    fn validate_delete_value_level_coverage() {
+        let mut cat = ValidationCatalog::default();
+        cat.packs
+            .push(pack("img", "图片", "user", "fileExt", "jpg,png"));
+        cat.packs
+            .push(pack("img2", "图片2", "user", "fileExt", "png"));
+        let refs = [rref("fileExt", "jpg,png", "img2")];
+
+        // jpg/png 均被引用；png 有 img2 前提覆盖，jpg 无 → uncovered = ["后缀 .jpg"]
+        assert_eq!(
+            cat.validate_delete("img", &refs).unwrap_err(),
+            "删除「图片」后以下匹配条件将没有可用行为：后缀 .jpg"
+        );
+
+        // img3 前提覆盖 jpg → 放行
+        cat.packs
+            .push(pack("img3", "图片3", "user", "fileExt", "jpg"));
+        assert!(cat.validate_delete("img", &refs).is_ok());
+
+        // 前提值无任何引用（值随包消失）→ 放行
+        let mut cat2 = ValidationCatalog::default();
+        cat2.packs
+            .push(pack("only", "孤包", "user", "textType", "magnet"));
+        assert!(cat2.validate_delete("only", &[]).is_ok());
+
+        // 通配值展示形态：任意文件（映射引用指向 w2，包 w 前提的 * 无他人覆盖）
+        let mut cat3 = ValidationCatalog::default();
+        cat3.packs.push(pack("w", "通配", "user", "fileExt", "*"));
+        cat3.packs
+            .push(pack("w2", "通配2", "builtin", "fileExt", "jpg"));
+        let refs3 = [rref("fileExt", "*", "w2")];
+        assert_eq!(
+            cat3.validate_delete("w", &refs3).unwrap_err(),
+            "删除「通配」后以下匹配条件将没有可用行为：任意文件"
+        );
+
+        // 文本特征展示形态
+        let mut cat4 = ValidationCatalog::default();
+        cat4.packs
+            .push(pack("t", "文本包", "user", "textType", "url"));
+        let refs4 = [rref("textType", "url", "other")];
+        assert_eq!(
+            cat4.validate_delete("t", &refs4).unwrap_err(),
+            "删除「文本包」后以下匹配条件将没有可用行为：文本特征 url"
+        );
     }
 }

@@ -22,9 +22,15 @@
 //!
 //! 架构铁律：本模块组全部在 **lib**，`bin/settings.rs` 只做参数分派。
 
+pub mod bridge;
 pub mod dto;
+pub mod handlers_behaviors;
 pub mod handlers_config;
+pub mod handlers_plugins;
+pub mod handlers_selected_action;
+pub mod handlers_shortcuts;
 pub mod proc;
+pub mod settings_store;
 pub mod validate;
 
 use std::io::Write as _;
@@ -84,6 +90,8 @@ pub(crate) struct ServerPaths {
     pub builtin_behaviors: std::path::PathBuf,
     /// Go `userBehaviorsDir`：`../data/behaviors`（相对进程 cwd）。
     pub user_behaviors: std::path::PathBuf,
+    /// Go `userPluginsDir`：`../data/plugins`（相对进程 cwd）。
+    pub user_plugins: std::path::PathBuf,
 }
 
 impl ServerPaths {
@@ -103,14 +111,17 @@ impl ServerPaths {
             config_file: cwd.join("../data/config.json"),
             builtin_behaviors: exe_dir.join("behaviors"),
             user_behaviors: cwd.join("../data/behaviors"),
+            user_plugins: cwd.join("../data/plugins"),
         }
     }
 }
 
-/// 服务上下文：路径 + 启动缓存 + 可注入副作用。
+/// 服务上下文：路径 + 启动缓存 + 插件设置存储 + 可注入副作用。
 pub(crate) struct ServerContext {
     pub paths: ServerPaths,
     pub startup: handlers_config::StartupCache,
+    /// Go 包级单例 `pluginSettings`（内部自带互斥锁；路径 = `../data/plugin-settings.json`）。
+    pub plugin_settings: settings_store::SettingsStore,
     pub hooks: handlers_config::Hooks,
 }
 
@@ -123,9 +134,15 @@ impl ServerContext {
     }
 
     pub(crate) fn with_hooks(paths: ServerPaths, hooks: handlers_config::Hooks) -> Self {
+        let plugin_settings = settings_store::SettingsStore::new(
+            paths
+                .config_file
+                .with_file_name(settings_store::SETTINGS_FILE_NAME),
+        );
         ServerContext {
             paths,
             startup: handlers_config::StartupCache::default(),
+            plugin_settings,
             hooks,
         }
     }
@@ -133,12 +150,78 @@ impl ServerContext {
 
 /// 路由分发（纯函数，socket 无关）。方法/路径之外的部分（查询串）已剥除。
 /// 未知路径/方法一律 404 空 body（gin NoRoute → indexHandler 在 site 缺失时同形）。
-pub(crate) fn dispatch(ctx: &ServerContext, method: &str, path: &str, body: &[u8]) -> HttpReply {
+///
+/// `content_type` 仅 `POST /api/plugins/import`（multipart 解析）消费 ——
+/// gin `c.FormFile` 从请求头取 boundary；Call 桥与 HTTP 服务分别从
+/// `--content-type` / 请求头注入。
+pub(crate) fn dispatch(
+    ctx: &ServerContext,
+    method: &str,
+    path: &str,
+    body: &[u8],
+    content_type: &str,
+) -> HttpReply {
     let path = path.split('?').next().unwrap_or(path);
+    // gin `:id` 段语义：非空且不含 '/'
+    let last_segment = |rest: &str| !rest.is_empty() && !rest.contains('/');
+    // `<id>/settings` 尾缀形态（GET/PUT /api/plugins/:id/settings）
+    fn plugin_settings_id(rest: &str) -> Option<&str> {
+        let id = rest.strip_suffix("/settings")?;
+        if !id.is_empty() && !id.contains('/') {
+            Some(id)
+        } else {
+            None
+        }
+    }
     match (method, path) {
         ("GET", "/health") => HttpReply::text(200, "ok"),
         ("GET", "/config") => handlers_config::get_config(ctx),
         ("PUT", "/config") => handlers_config::put_config(ctx, body),
+        ("GET", "/shortcuts") => handlers_shortcuts::get_shortcuts(ctx),
+        ("POST", "/api/selected-action/test") => {
+            handlers_selected_action::test_selected_action(ctx, body)
+        }
+        ("POST", "/api/selected-action/play") => {
+            handlers_selected_action::play_selected_action(ctx, body)
+        }
+        ("GET", "/api/behaviors") => handlers_behaviors::get_behaviors(ctx),
+        ("POST", "/api/behaviors") => handlers_behaviors::create_behavior(ctx, body),
+        ("POST", "/api/behaviors/apply") => handlers_behaviors::apply_behaviors(ctx),
+        ("PUT", p) if p.starts_with("/api/behaviors/") => {
+            let id = &p["/api/behaviors/".len()..];
+            if !last_segment(id) {
+                return HttpReply::empty(404);
+            }
+            handlers_behaviors::update_behavior(ctx, id, body)
+        }
+        ("DELETE", p) if p.starts_with("/api/behaviors/") => {
+            let id = &p["/api/behaviors/".len()..];
+            if !last_segment(id) {
+                return HttpReply::empty(404);
+            }
+            handlers_behaviors::delete_behavior(ctx, id)
+        }
+        ("GET", "/api/plugins") => handlers_plugins::get_plugins(ctx),
+        ("POST", "/api/plugins/import") => handlers_plugins::import_plugin(ctx, content_type, body),
+        ("DELETE", p) if p.starts_with("/api/plugins/") => {
+            let id = &p["/api/plugins/".len()..];
+            if !last_segment(id) {
+                return HttpReply::empty(404);
+            }
+            handlers_plugins::delete_plugin(ctx, id)
+        }
+        ("GET", p) if p.starts_with("/api/plugins/") => {
+            match plugin_settings_id(&p["/api/plugins/".len()..]) {
+                Some(id) => handlers_plugins::get_plugin_settings(ctx, id),
+                None => HttpReply::empty(404),
+            }
+        }
+        ("PUT", p) if p.starts_with("/api/plugins/") => {
+            match plugin_settings_id(&p["/api/plugins/".len()..]) {
+                Some(id) => handlers_plugins::save_plugin_settings(ctx, id, body),
+                None => HttpReply::empty(404),
+            }
+        }
         ("POST", p) if p.starts_with("/server/command/") => {
             server_command(ctx, &p["/server/command/".len()..])
         }
@@ -249,7 +332,18 @@ fn handle_request(ctx: Arc<ServerContext>, mut request: tiny_http::Request) {
     if std::io::Read::read_to_end(request.as_reader(), &mut body).is_err() {
         body.clear();
     }
-    let reply = dispatch(&ctx, &method, &url, &body);
+    let reply = dispatch(
+        &ctx,
+        &method,
+        &url,
+        &body,
+        request
+            .headers()
+            .iter()
+            .find(|header| header.field.equiv("Content-Type"))
+            .map(|header| header.value.as_str())
+            .unwrap_or(""),
+    );
 
     let mut response = tiny_http::Response::from_data(reply.body).with_status_code(reply.status);
     if let Some(header) = reply.content_type.and_then(|content_type| {
@@ -283,7 +377,7 @@ mod tests {
     /// GET /health → 200 "ok"（text/plain），gin c.String 同形。
     #[test]
     fn health_returns_ok() {
-        let reply = dispatch(&ctx(), "GET", "/health", b"");
+        let reply = dispatch(&ctx(), "GET", "/health", b"", "");
         assert_eq!(reply.status, 200);
         assert_eq!(reply.body, b"ok");
         assert_eq!(reply.content_type, Some("text/plain; charset=utf-8"));
@@ -292,22 +386,22 @@ mod tests {
     /// 未知路径/方法 → 404 空 body（含查询串剥离、:id 边界）。
     #[test]
     fn unknown_routes_return_404() {
-        assert_eq!(dispatch(&ctx(), "GET", "/", b"").status, 404);
-        assert_eq!(dispatch(&ctx(), "GET", "/nope", b"").status, 404);
+        assert_eq!(dispatch(&ctx(), "GET", "/", b"", "").status, 404);
+        assert_eq!(dispatch(&ctx(), "GET", "/nope", b"", "").status, 404);
         // 查询串被剥除后 /config 仍命中（沙箱无配置 → handler 层 500 而非 404）
-        assert_eq!(dispatch(&ctx(), "GET", "/config?x=1", b"").status, 500);
-        let health = dispatch(&ctx(), "GET", "/health?probe=1", b"");
+        assert_eq!(dispatch(&ctx(), "GET", "/config?x=1", b"", "").status, 500);
+        let health = dispatch(&ctx(), "GET", "/health?probe=1", b"", "");
         assert_eq!(health.status, 200);
         // 方法不匹配 → 404（gin 只注册了对应方法）
-        assert_eq!(dispatch(&ctx(), "POST", "/config", b"").status, 404);
-        assert_eq!(dispatch(&ctx(), "PUT", "/health", b"").status, 404);
+        assert_eq!(dispatch(&ctx(), "POST", "/config", b"", "").status, 404);
+        assert_eq!(dispatch(&ctx(), "PUT", "/health", b"", "").status, 404);
         // :id 空段 / 含斜杠 → 404（gin 路由参数边界）
         assert_eq!(
-            dispatch(&ctx(), "POST", "/server/command/", b"").status,
+            dispatch(&ctx(), "POST", "/server/command/", b"", "").status,
             404
         );
         assert_eq!(
-            dispatch(&ctx(), "POST", "/server/command/2/extra", b"").status,
+            dispatch(&ctx(), "POST", "/server/command/2/extra", b"", "").status,
             404
         );
     }
@@ -315,7 +409,7 @@ mod tests {
     /// POST /server/command/未知 id → 200 `{}`（不触发 spawn）。
     #[test]
     fn unknown_command_id_returns_empty_object() {
-        let reply = dispatch(&ctx(), "POST", "/server/command/99", b"");
+        let reply = dispatch(&ctx(), "POST", "/server/command/99", b"", "");
         assert_eq!(reply.status, 200);
         assert_eq!(reply.body, b"{}");
         assert_eq!(reply.content_type, Some("application/json; charset=utf-8"));

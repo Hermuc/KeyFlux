@@ -32,6 +32,9 @@ serde_json = "1.0.151"
 # R1「面板后端 HTTP 服务模式」（settings.exe --headless）：轻量 HTTP/1.1 服务端，
 # 支持 keep-alive 与并发连接，替代 Go gin 的最小子集（/health /config /server/command/:id）。
 tiny_http = "0.12"
+# R2 插件导入（POST /api/plugins/import）：解包 zip 到临时目录再原子落盘。
+# 只开 deflate（Go archive/zip 同样只支持 store/deflate），关掉默认的全部加密/压缩特性。
+zip = { version = "2", default-features = false, features = ["deflate"] }
 ureq = "3.4.2"
 windows-reactor = "0.100"
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_UI_Controls_Dialogs", "Win32_UI_WindowsAndMessaging"] }
