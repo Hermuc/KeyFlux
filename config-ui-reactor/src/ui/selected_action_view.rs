@@ -94,7 +94,11 @@ where
                             theme::stone_gray()
                         })
                         .vertical_alignment(VerticalAlignment::Center),
-                    ToggleSwitch::new().is_on(enable).on_toggled(on_enable),
+                    // 内置「开/关」文案置空（只保留左侧 ON/OFF 指示，避免重复）
+                    ToggleSwitch::new()
+                        .is_on(enable)
+                        .on_toggled(on_enable)
+                        .slots(crate::ui::empty_on_off_slots()),
                 )),
         ));
 
