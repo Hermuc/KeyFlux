@@ -142,9 +142,17 @@ fn generate_ahk(args: &[String]) -> ExitCode {
         .join("plugins");
     config_parse::preprocess(&mut config);
 
-    // ⚠️ `InstallCommandFont`（Go GenerateAHK 会调用但**丢弃返回值**）**有意不实现**：
-    // 它只把用户字体复制到 `bin/font/font.ttf`（纯表现层资源），**不影响产物字节**，
-    // 对 P3 的逐字节对账无意义，故此处不落盘字体文件。
+    // Go: `if outDir := filepath.Dir(outputFile); outDir != "" && outDir != "." { _ = InstallCommandFont(...) }`
+    // 字体落点跟随**输出文件所在目录**（部署树的 bin/，`font/font.ttf` 是命令框 exe 硬编码的
+    // 相对路径）；CLI 的 cwd 是仓库根，故 baseDir 必须显式传。调用方忽略错误（Go 的静默跳过）。
+    // 只影响 `font/font.ttf`（表现层），不影响产物字节。
+    let out_dir = output_file.parent().unwrap_or_else(|| Path::new(""));
+    if !out_dir.as_os_str().is_empty() && out_dir != Path::new(".") {
+        let _ = config_ui_reactor::generator::font::install_command_font(
+            &config.options.command_font,
+            &out_dir.to_string_lossy(),
+        );
+    }
 
     let template_name = template_file
         .file_name()

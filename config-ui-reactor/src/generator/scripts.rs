@@ -8,11 +8,8 @@
 //!   （读 `../data/config.json`、`../data/plugins`，写 `../bin/KeyFlux.ahk`、`../bin/CommandInputSkin.txt`）；
 //! * `UseOriginalAHK` 的 cwd 必须是部署树**根**（`bin\AutoHotkey64.exe` → `KeyFlux.exe`）。
 //!
-//! ⚠️ **`InstallCommandFont` 有意未移植**：Go `GenerateScripts` 会调用它，把选中的命令框
-//! 字体复制到 `bin/font/font.ttf`（该文件被命令框 exe 在启动时**只读一次**）。它的核心
-//! `classifyFontKinds`（TTF `glyf`/CFF 轮廓解析）尚未移植 ⇒ 若静默跳过会造成
-//! 「换字体不生效」的**静默回归**。故此处当 `options.commandFont.sourcePath` 非空时
-//! **向 stderr 大声警告**（可见、可查），P4 drop-in 前必须补齐或改由外部流程负责。
+//! 字体安装已移植到 font 模块：InstallCommandFont 的调用方**忽略错误**
+//! （Go 的静默跳过口径），故这里同样 `let _ =`。
 
 use std::io;
 use std::path::Path;
@@ -31,13 +28,8 @@ pub fn generate_scripts(config: &mut Config, exe_dir: &Path) -> io::Result<()> {
     // Go: generators.SetPluginsDir("../data/plugins") ⇒ 由 render_keyflux_ahk 内部消费
     preprocess(config);
 
-    // Go: `_ = InstallCommandFont(config.Options.CommandFont, "")` —— 见模块头注。
-    if !config.options.command_font.source_path.is_empty() {
-        eprintln!(
-            "警告: 命令框字体安装 (InstallCommandFont) 尚未在 Rust settings.exe 中实现, 本次未更新 font/font.ttf (sourcePath={})",
-            config.options.command_font.source_path
-        );
-    }
+    // Go: `_ = InstallCommandFont(config.Options.CommandFont, "")` —— 调用方忽略错误（静默跳过）。
+    let _ = crate::generator::font::install_command_font(&config.options.command_font, "");
 
     let keyflux = render_keyflux_ahk(config, Some(&catalog), Path::new("../data/plugins"));
     std::fs::write(Path::new("../bin/KeyFlux.ahk"), keyflux)?;
