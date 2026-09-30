@@ -73,12 +73,19 @@ fn assemble(api: &dyn SettingsApi, port: u16, options: &BackendSessionOptions) -
                 .collect()
         });
 
+    // 面板私有 UI 偏好：部署根可得时读取（缺失/损坏 ⇒ 默认值，不影响装载）。
+    let ui_prefs = data_root
+        .as_deref()
+        .map(crate::services::ui_prefs::load)
+        .unwrap_or_default();
+
     Message::Ready {
         config: Box::new(config),
         port,
         doc_md,
         shortcuts,
         data_root,
+        ui_prefs,
     }
 }
 

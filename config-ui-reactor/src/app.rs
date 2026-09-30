@@ -119,6 +119,8 @@ pub struct Shell {
     sa_save_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// 键位/缩写页右侧备注汇总是否折叠（默认展开；折叠以优先保证键盘网格完整显示）。
     comments_collapsed: bool,
+    /// 选项页「亚克力毛玻璃效果」状态（持久化于面板私有偏好文件 `data/ui-prefs.json`）。
+    acrylic: bool,
     /// 导航窗格是否展开（true = Left 模式带文字并推开内容；false = LeftCompact 图标窄轨）。
     /// 默认 true（保持原有「展开带文字」的默认观感），汉堡点击后由事件回写翻转。
     pane_overlay_open: bool,
@@ -224,6 +226,7 @@ impl Component for Shell {
             sa_add: None,
             sa_save_gen: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             comments_collapsed: false,
+            acrylic: false,
             pane_overlay_open: true,
             mt_dialog: false,
             mt_draft: None,
@@ -278,6 +281,18 @@ impl Component for Shell {
             }
             Message::PaneOverlay(open) => {
                 self.pane_overlay_open = open;
+            }
+            Message::AcrylicToggle(value) => {
+                self.acrylic = value;
+                // 持久化失败不阻断交互：状态已生效，仅以页内提示告知无法记住选择。
+                if let Some(root) = self.data_root.as_deref()
+                    && let Err(error) = crate::services::ui_prefs::save(
+                        root,
+                        crate::services::ui_prefs::UiPrefs { acrylic: value },
+                    )
+                {
+                    self.settings_notice = Some(format!("{}: {error}", i18n::t("2594")));
+                }
             }
             Message::SelectKey(hotkey) => {
                 if hotkey.is_empty() {
@@ -372,7 +387,9 @@ impl Component for Shell {
                 doc_md,
                 shortcuts,
                 data_root,
+                ui_prefs,
             } => {
+                self.acrylic = ui_prefs.acrylic;
                 self.nav = build_nav(&config);
                 self.config = Some(*config);
                 self.port = Some(port);
@@ -1748,7 +1765,10 @@ impl Component for Shell {
     }
 
     fn view(&self, _input: &(), context: &mut ViewContext<Self>) -> View {
-        let spec = WindowSpec::default();
+        // 亚克力模式同步到主题层（唯一写入点）：开启时自绘表面按 alpha 稀释，材质透出。
+        theme::set_acrylic(self.acrylic);
+        // 窗口视觉随状态派生（背板材质的 select 语义收在 `platform::WindowSpec`）。
+        let spec = WindowSpec::default().with_acrylic(self.acrylic);
         context.window_visuals(spec.visuals());
         context.window_title(&spec.title);
 
@@ -1800,6 +1820,10 @@ impl Component for Shell {
                 NavigationViewPaneDisplayMode::LeftCompact
             })
             .is_pane_open(self.pane_overlay_open)
+            // 亚克力：覆盖 NavigationView 的三处主题资源（内容区透明 + 窗格轻玻璃）——
+            // 框架自带的内容区不透明底会盖住系统背板材质（MS Learn 官方口径：
+            // 「不要给 Window / NavigationView / 页面 Grid 设不透明背景」）。
+            .resource_overrides(self.acrylic.then(theme::navigation_glass_resources))
             .on_is_pane_open_changed(context.callback(Message::PaneOverlay))
             .is_settings_visible(false)
             .on_selected_tag_changed(context.callback(|tag: Option<String>| Message::Nav(tag)))

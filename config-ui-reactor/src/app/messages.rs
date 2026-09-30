@@ -120,6 +120,8 @@ pub enum Message {
     ToggleComments,
     /// 导航窗格浮层展开态回写（LeftCompact 模式下汉堡切换；驱动页脚窄轨/完整切换）。
     PaneOverlay(bool),
+    /// 选项页「亚克力毛玻璃效果」开关：更新状态并持久化到面板私有偏好文件。
+    AcrylicToggle(bool),
     /// 缩写页命令框输入。
     CmdText(String),
     /// 缩写页命令框回车执行（`del <缩写>` / `rn <新名>` / 其余视为选中）。
@@ -143,6 +145,8 @@ pub enum Message {
     Notice(Result<String, String>),
 
     Ready {
+        /// 面板私有 UI 偏好（`<deploy>/data/ui-prefs.json`，与共享 config 解耦）。
+        ui_prefs: crate::services::ui_prefs::UiPrefs,
         config: Box<Config>,
         port: u16,
         doc_md: String,

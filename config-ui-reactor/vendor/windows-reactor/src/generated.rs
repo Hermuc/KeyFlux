@@ -1849,6 +1849,7 @@ pub mod public {
         pane_title: Property<String>,
         open_pane_length: Property<f64>,
         is_pane_open: Property<bool>,
+        resource_overrides: Property<ResourceOverrides>,
         events: Option<std::rc::Rc<NavigationViewEvents>>,
         element_state: Option<std::rc::Rc<ElementState>>,
     }
@@ -1917,6 +1918,18 @@ pub mod public {
         pub fn is_pane_open(mut self, value: impl Into<Option<bool>>) -> Self {
             let value = value.into();
             self.is_pane_open = Property::from(value);
+            self
+        }
+        /// 覆盖控件实例资源字典里的主题资源（如 `NavigationViewContentBackground` /
+        /// `NavigationViewExpandedPaneBackground`）—— WinUI 用**主题资源**而非属性控制
+        /// NavigationView 的窗格/内容区背景，这是官方推荐的覆盖方式。
+        ///
+        /// ⚠️ 本 vendored 版本复用 `PropertyId::ButtonResources` 通道：native 侧的应用器
+        /// 只看 `PropertyValue::ResourceOverrides` 类型，与元素种类无关（见
+        /// `native/winui/mod.rs` 中对 `PropertyId::ButtonResources` 的通用分支）。
+        pub fn resource_overrides(mut self, value: impl Into<Option<ResourceOverrides>>) -> Self {
+            let value = value.into();
+            self.resource_overrides = Property::from(value);
             self
         }
         pub fn on_is_pane_open_changed(mut self, callback: impl IntoPayloadCallback<bool>) -> Self {
@@ -6826,6 +6839,7 @@ pub mod public {
                         pane_title,
                         open_pane_length,
                         is_pane_open,
+                        resource_overrides,
                         events,
                         element_state,
                     } = value;
@@ -6842,6 +6856,7 @@ pub mod public {
                                 pane_title,
                                 open_pane_length,
                                 is_pane_open,
+                                resource_overrides,
                                 events,
                             },
                         )),
@@ -8352,6 +8367,7 @@ pub mod public {
                         && value.pane_title == mounted.pane_title
                         && f64_property_eq(&value.open_pane_length, &mounted.open_pane_length)
                         && value.is_pane_open == mounted.is_pane_open
+                        && value.resource_overrides == mounted.resource_overrides
                         && value.events == mounted.events
                 }
                 (Self::NavigationViewItem(value), MountedProps::NavigationViewItem(mounted)) => {
@@ -9988,6 +10004,14 @@ impl MountedPropsExt for MountedProps {
                     match &values.is_pane_open {
                         Property::Inherited => None,
                         Property::Set(value) => Some(PropertyValueRef::Bool(*value)),
+                    },
+                );
+                // 复用通用资源覆盖通道（native 应用器按 PropertyValue 类型分派）。
+                visit(
+                    PropertyId::ButtonResources,
+                    match &values.resource_overrides {
+                        Property::Inherited => None,
+                        Property::Set(value) => Some(PropertyValueRef::ResourceOverrides(value)),
                     },
                 );
             }
@@ -12885,6 +12909,7 @@ pub(crate) struct NavigationViewMountedProps {
     pane_title: Property<String>,
     open_pane_length: Property<f64>,
     is_pane_open: Property<bool>,
+    resource_overrides: Property<ResourceOverrides>,
     events: Option<std::rc::Rc<NavigationViewEvents>>,
 }
 impl PartialEq for NavigationViewMountedProps {
@@ -12898,6 +12923,7 @@ impl PartialEq for NavigationViewMountedProps {
             && self.pane_title == other.pane_title
             && f64_property_eq(&self.open_pane_length, &other.open_pane_length)
             && self.is_pane_open == other.is_pane_open
+            && self.resource_overrides == other.resource_overrides
             && self.events == other.events
     }
 }

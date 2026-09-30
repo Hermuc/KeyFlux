@@ -33,3 +33,4 @@ pub mod selected_action;
 pub mod settings;
 pub mod store;
 pub mod transport;
+pub mod ui_prefs;

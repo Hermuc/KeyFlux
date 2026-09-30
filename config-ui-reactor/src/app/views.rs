@@ -563,6 +563,11 @@ impl Shell {
                             .unwrap_or(false),
                         context.callback(|value: bool| Message::Opt(OptEdit::HideMatrix(value))),
                     ),
+                    settings_view::toggle_row(
+                        i18n::t("2593"),
+                        this.acrylic,
+                        context.callback(|value: bool| Message::AcrylicToggle(value)),
+                    ),
                     settings_view::combo_row(
                         i18n::t("781"),
                         &languages,
