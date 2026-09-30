@@ -163,6 +163,9 @@ jobs:
       # data/plugins 是忽略项 (部署/启动产物), 这里用官方示例插件补齐, 否则 GET /api/plugins
       # 会因「少一个内置插件」在 step 5 报 MISMATCH。
       - name: Stage plugin examples for the sandbox
+        shell: bash  # `cp -r src/. dst` 是 POSIX 语义; Windows runner 缺省 shell 是
+                     # pwsh, Copy-Item 对结尾的 `/.` 解析为空拷贝 (CI 实测 data/plugins
+                     # 落空 -> GET /api/plugins 19/23 假红)。
         run: |
           mkdir -p data/plugins
           cp -r plugins/examples/. data/plugins/
