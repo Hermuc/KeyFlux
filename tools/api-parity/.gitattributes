@@ -4,3 +4,6 @@
 # -text => no EOL conversion; store and check out the exact bytes we captured.
 reference/** -text
 corpus/** -text
+# The no-op engine stub is a committed BINARY (see assets/keyflux_stub.c): EOL
+# conversion must never touch it, and the .c source is compared in review diffs.
+assets/** -text
