@@ -123,6 +123,12 @@ pwsh -File tools/api-parity/run_api_parity.ps1 -Check -Exe <rust>/bin/settings.e
 
 ## GET /config 基线要点
 
+- **夹具模式（`KEYFLUX_API_PARITY=1`）**：harness 全程设置该环境变量（本脚本顶部注入，
+  子进程继承），Go `startupFixture` / Rust `query_startup_from_task` 据此跳过
+  `schtasks` 真实查询、`options.startup` 恒为 `false`。否则计划任务存在性这一
+  **机器态**会冻进基线 —— 实测本机（有任务）`"startup":true` 29184 字节，CI（无任务）
+  `"startup":false` 29185 字节，恰差 1 字节 ⇒ step 2 在任何其他机器必挂。
+  **重录基线也必须带此模式**（-Capture 同样注入）。
 - 顶层 JSON 键（gin.H / DTO map 键按字典序输出）：
   `fileGroups`、`keymaps`、`matchTypes`、`options`、`selectedAction`。
 - 出厂样例 `data/config.json` 顶层只有 `keymaps/options/selectedAction`，但 DTO

@@ -52,7 +52,14 @@ impl Default for Hooks {
 /// Go `queryStartupFromTask`（handlers.go:42-45）：`schtasks /query /tn KeyFlux`
 /// 成功且 stdout 含 "KeyFlux" ⇒ 任务存在。任何失败（任务不存在返回非零/权限等）
 /// 均回 `false`，不报错。
+///
+/// 夹具模式（`KEYFLUX_API_PARITY=1`）：跳过真实查询恒回 `false` —— 与 Go 侧
+/// `startupFixture` 同构。计划任务存在性是机器态，会冻进 api-parity 基线；
+/// 基线与被测 exe 都在 harness 的夹具模式下运行，GET /config 才能跨机器逐字节等价。
 fn query_startup_from_task() -> bool {
+    if std::env::var("KEYFLUX_API_PARITY").as_deref() == Ok("1") {
+        return false;
+    }
     match std::process::Command::new("schtasks")
         .args(["/query", "/tn", "KeyFlux"])
         .output()

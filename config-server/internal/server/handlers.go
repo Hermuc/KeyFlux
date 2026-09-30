@@ -39,7 +39,19 @@ var (
 	startupCacheAt  time.Time
 )
 
+// startupFixture 报告「API 对账夹具模式」是否开启 (KEYFLUX_API_PARITY=1)。
+// 该模式下 startup 回填跳过 schtasks 真实查询、恒为 false —— 计划任务存在性是
+// **机器态**, 会冻进 api-parity 基线 (实测: 本机有任务 startup:true, CI 无任务
+// startup:false, "startup":false 比 true 长 1 字节 ⇒ step 2 在任何其他机器必挂)。
+// 基线与被测 exe 都在 harness 的夹具模式下运行, GET /config 才能跨机器逐字节等价。
+func startupFixture() bool {
+	return os.Getenv("KEYFLUX_API_PARITY") == "1"
+}
+
 func queryStartupFromTask() bool {
+	if startupFixture() {
+		return false
+	}
 	out, err := exec.Command("schtasks", "/query", "/tn", "KeyFlux").Output()
 	return err == nil && bytes.Contains(out, []byte("KeyFlux"))
 }
@@ -82,6 +94,10 @@ func getCachedStartupState() bool {
 // 确定性, 回填只应作用于对外 HTTP 响应。
 // 查询失败 (任务不存在返回非零/权限等) 均回 false, 不报错 (与注册表行为一致)。
 func syncStartupFromTask(startup *bool) {
+	if startupFixture() {
+		*startup = false
+		return
+	}
 	out, err := exec.Command("schtasks", "/query", "/tn", "KeyFlux").Output()
 	if err != nil || !bytes.Contains(out, []byte("KeyFlux")) {
 		*startup = false
