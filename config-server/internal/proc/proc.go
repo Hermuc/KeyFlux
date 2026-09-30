@@ -6,6 +6,7 @@ package proc
 import (
 	"errors"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
@@ -36,21 +37,47 @@ func ExecCmd(exe string, args ...string) bool {
 	return true
 }
 
+// relayTarget 是无参数降级启动的**纯决策函数**: 目标确实存在才返回可交给 explorer.exe
+// 中转的绝对路径 (ok=true); 目标不存在 (或是目录) 返回 ("", false)。
+//
+// 由来 (用户报「保存设置后成批弹出『文档』资源管理器窗口」): explorer.exe 收到一个
+// **不存在的路径**时会把它当文件夹打开, 转而弹出默认目录「文档」—— 每调用一次弹一个
+// 窗口。故目标不存在时调用方必须**不要**调用 explorer, 直接按启动失败返回
+// (引擎缺失/路径错误只会得到 restartFailed=true, 绝不产生打开文件夹的副作用)。
+//
+// 路径口径: filepath.Abs(filepath.Join(dir, exe)) —— 与 Rust relay_target 同构 (Join 内含 Clean)。
+func relayTarget(dir, exe string) (string, bool) {
+	absExe, err := filepath.Abs(filepath.Join(dir, exe))
+	if err != nil {
+		return "", false
+	}
+	info, err := os.Stat(absExe)
+	if err != nil || info.IsDir() {
+		return "", false
+	}
+	return absExe, true
+}
+
 // FallbackExecCmd: breakaway 失败后的降级启动。
 // 无参数调用 (保存设置后的托盘重启) 改经 explorer.exe 中转: explorer 不在本进程的
 // Job 层级内, 由它拉起的进程彻底脱离任何 Job, 保证托盘不被设置窗口关闭连带终止;
 // 代价是目标不继承本进程的提权状态 (由 KeyFlux 启动器自行 RunAs 提权)。
+// 目标存在时才中转 (relayTarget); 不存在则按启动失败返回, 绝不调用 explorer
+// (否则 explorer 会把不存在的路径当文件夹打开, 弹出默认目录「文档」)。
 // 带参数调用 (WindowSpy/GenerateShortcuts 等短暂工具进程) 保持普通启动。
 func FallbackExecCmd(dir, exe string, args []string) bool {
 	if len(args) == 0 {
-		absExe, err := filepath.Abs(filepath.Join(dir, exe))
-		if err == nil {
-			c := exec.Command("explorer.exe", absExe)
-			if err := c.Start(); err == nil {
-				return true
-			}
-			log.Println("execCmd: explorer 中转启动", exe, "失败:", err)
+		absExe, ok := relayTarget(dir, exe)
+		if !ok {
+			log.Println("execCmd: 未找到", exe, ", 跳过 explorer 中转")
+			return false
 		}
+		c := exec.Command("explorer.exe", absExe)
+		err := c.Start()
+		if err == nil {
+			return true
+		}
+		log.Println("execCmd: explorer 中转启动", exe, "失败:", err)
 	}
 	c := exec.Command(exe, args...)
 	c.Dir = dir
