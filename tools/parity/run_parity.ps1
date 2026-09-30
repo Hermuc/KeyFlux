@@ -14,6 +14,8 @@
 # CONVENTION:
 #   ASCII-only on purpose -- `pwsh -File` misreads non-BOM UTF-8 (same rule as tools/oracle.ps1).
 #   Exit 0 = all pass, 1 = any mismatch/error. Final line is ASCII: "PARITY: n/n PASS [MODE]".
+#   Repo root, sandbox creation, SHA256 and the determinism gate come from
+#   tools/lib/kf-tools.ps1 (shared with run_api_parity.ps1 and drop-in-rust.ps1).
 #
 # NOTE 1: -Capture refuses to record when an artifact is not byte-deterministic across two runs
 #   (the Go renderer has known map-iteration nondeterminism for configs with ties; the corpus
@@ -36,8 +38,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repo = Split-Path -Parent (Split-Path -Parent $here)
+$here = $PSScriptRoot
+# Shared helpers (repo root / %TEMP% sandbox / SHA256 / determinism gate).
+. (Join-Path (Split-Path -Parent $here) 'lib\kf-tools.ps1')
+$repo = Get-KfRepoRoot
 if ([string]::IsNullOrEmpty($Exe)) { $Exe = Join-Path $repo 'bin\settings.exe' }
 if (!(Test-Path $Exe)) { Write-Host "PARITY: 0/0 FAIL [exe not found: $Exe]"; exit 1 }
 
@@ -45,11 +49,9 @@ $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $here 'manifest.json') | 
 $template = Join-Path $repo $manifest.template
 $skinTemplate = Join-Path $repo $manifest.skinTemplate
 $refDir = Join-Path $here 'reference'
-# Unique work dir per run: two concurrent invocations must not clobber each other's
-# scratch tree (the dir is deleted on start, so a fixed name is a real foot-gun).
-$work = Join-Path $env:TEMP ('kfparity-' + [guid]::NewGuid().ToString('N'))
-if (Test-Path $work) { Remove-Item -Recurse -Force $work }
-New-Item -ItemType Directory -Force -Path $work | Out-Null
+# Unique work dir per run (New-KfSandbox): two concurrent invocations must not clobber
+# each other's scratch tree (the dir is deleted on start, so a fixed name is a foot-gun).
+$work = New-KfSandbox 'kfparity'
 
 # Artifact kinds: id -> @{ Work = file name inside the item work dir; Ref = reference file suffix }
 $ArtifactMap = @{
@@ -57,8 +59,6 @@ $ArtifactMap = @{
   ahk  = @{ Work = 'keyflux.ahk'; Ref = 'keyflux.ahk' }
   skin = @{ Work = 'skin.txt';    Ref = 'skin.txt' }
 }
-
-function Get-Sha256([string]$p) { (Get-FileHash -Algorithm SHA256 -Path $p).Hash }
 
 # Produce one artifact; returns the child exit code (0 = ok).
 # Mirrors the runtime pipeline: DumpPlan / GenerateAHK both Preprocess + set BehaviorCatalog.
@@ -73,7 +73,8 @@ function Invoke-Produce([string]$Kind, [string]$Cfg, [string]$Out) {
 
 $total = 0
 $pass = 0
-$fail = @()
+# ArrayList (not @()): Assert-KfDeterministic appends the drift message itself.
+$fail = New-Object System.Collections.ArrayList
 
 Push-Location $repo
 try {
@@ -98,10 +99,10 @@ try {
     $ok = $true
     $outs = @{}
     foreach ($kind in $itemKinds) {
-      if (-not $ArtifactMap.ContainsKey($kind)) { $fail += ("$name : unknown artifact '" + $kind + "'"); $ok = $false; break }
+      if (-not $ArtifactMap.ContainsKey($kind)) { [void]$fail.Add("$name : unknown artifact '" + $kind + "'"); $ok = $false; break }
       $outs[$kind] = Join-Path $itemWork $ArtifactMap[$kind].Work
       $code = Invoke-Produce $kind $cfg $outs[$kind]
-      if ($code -ne 0) { $fail += ("$name : " + $kind + " exit " + $code); $ok = $false }
+      if ($code -ne 0) { [void]$fail.Add("$name : " + $kind + " exit " + $code); $ok = $false }
     }
     if (!$ok) { continue }
 
@@ -111,11 +112,10 @@ try {
         $second = Join-Path $itemWork ('second-' + $ArtifactMap[$kind].Work)
         $code = Invoke-Produce $kind $cfg $second
         if ($code -ne 0) {
-          $fail += ("$name : " + $kind + " exit " + $code + " (2nd run)")
+          [void]$fail.Add("$name : " + $kind + " exit " + $code + " (2nd run)")
           $deterministic = $false
         }
-        elseif ((Get-Sha256 $outs[$kind]) -ne (Get-Sha256 $second)) {
-          $fail += ("$name : NONDETERMINISTIC [" + $kind + "] (reference not recorded)")
+        elseif (-not (Assert-KfDeterministic $outs[$kind] $second -Message ("$name : NONDETERMINISTIC [" + $kind + "] (reference not recorded)") -Collect $fail)) {
           $deterministic = $false
         }
       }
@@ -131,9 +131,9 @@ try {
       foreach ($kind in $itemKinds) {
         $ref = Join-Path $refDir ($name + '.' + $ArtifactMap[$kind].Ref)
         if (!(Test-Path $ref)) { $bad += ($kind + '(no-ref)'); continue }
-        if ((Get-Sha256 $outs[$kind]) -ne (Get-Sha256 $ref)) { $bad += $kind }
+        if ((Get-KfSha256 $outs[$kind]) -ne (Get-KfSha256 $ref)) { $bad += $kind }
       }
-      if ($bad.Count -eq 0) { $pass++ } else { $fail += ("$name : MISMATCH [" + ($bad -join ',') + "]") }
+      if ($bad.Count -eq 0) { $pass++ } else { [void]$fail.Add("$name : MISMATCH [" + ($bad -join ',') + "]") }
     }
   }
 }

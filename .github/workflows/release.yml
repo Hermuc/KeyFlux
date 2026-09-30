@@ -2,8 +2,11 @@ name: release
 
 # 打 tag (v*) 才构建并发布正式 Release; workflow_dispatch 用于手动验证构建 (可跳过发布)。
 # 产物: KeyFlux-<version>.7z (自包含, 解压即用)。
-# 注意: Oracle 对账脚本 (tools/oracle.ps1) 内含本机硬编码路径, 不在 CI 运行;
+# 注意: Oracle 对账脚本 (tools/oracle.ps1) 不在 CI 运行 —— 它需要 AutoHotkey 运行时 +
+#       一棵**活着的部署树** (被校验的实例不该在被覆盖时持有文件锁), 这两样 CI 都没有;
 #       生成契约由 golden 快照测试 + /Validate 覆盖。
+#       (2026-09-30: 该脚本内的本机硬编码路径已改为参数/环境变量, 默认值等价 —— 但它仍
+#        不属于 CI, 上 CI 需要先解决上面两条, 属独立议题。)
 
 on:
   push:
@@ -49,11 +52,6 @@ jobs:
           go-version-file: config-server/go.mod
           cache-dependency-path: config-server/go.sum
 
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
       - name: Go unit tests
         working-directory: config-server
         run: go test ./...
@@ -84,22 +82,16 @@ jobs:
           cp -r config-server/templates bin/templates
 
       # 2026-09-28 Avalonia 退役: 设置界面改由 config-ui-reactor (Rust + WinUI3) 提供。
-      # 三道闸门与 Makefile 的 buildClientReactor 严格一致; 产物必须改名
-      # KeyFlux.Settings.exe (引擎按该名拉起, 见 bin/lib/core/Functions.ahk)。
+      # 2026-09-30: 三道闸门 (fmt --check / clippy -D warnings / test) + release 构建改为
+      #   调用 tools/cargo-gates.ps1 —— 与本地 make buildClientReactor、analyzers.yml 的
+      #   reactor-gates 用同一份实现, 避免「CI 与本地各写一份闸门」漂移。
+      #   刻意不传 -Version: 与退役前的 CI 口径保持一致 (本 workflow 从不注入
+      #   KEYFLUX_VERSION); 需要时显式加 `-Version <版本>` (GET /config 的 keyfluxVersion)。
       # 自包含: build.rs 的 as_self_contained() 把 pinned Windows App Runtime stage 进
       # target/release, robocopy 排除 cargo 中间产物后整体拷入 bin/ui (实测 207 文件 / 65MB)。
-      - name: Build reactor UI (fmt + clippy + test + release)
+      - name: Build reactor UI (cargo gates + release)
         shell: pwsh
-        working-directory: config-ui-reactor
-        run: |
-          cargo fmt --all --check
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          cargo clippy --all-targets -- -D warnings
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          cargo test --quiet
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          cargo build --release
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release
 
       - name: Deploy reactor UI to bin/ui (self-contained, renamed)
         shell: pwsh

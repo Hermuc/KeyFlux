@@ -3,15 +3,49 @@
 # TODO(selected-action): extend to the selectedAction data array once the AHK side
 # SelectedActionInit consumer lands (task #30) - compare DumpPlan selectedAction
 # projection vs the rendered SelectedActionData rows (same ResolveRuleAction source).
+#
+# PATHS (2026-09-30): the two machine-specific paths that used to be hardcoded here are
+# now parameters with equivalent defaults, so the script is no longer tied to one host:
+#   -Repo   repo root.       default: $env:KEYFLUX_REPO_ROOT, else the checkout this
+#                            script lives in (tools/lib/kf-tools.ps1 Get-KfRepoRoot).
+#   -Config deploy config.   default: $env:KEYFLUX_DEPLOY_CONFIG, else
+#                            $env:KEYFLUX_DEPLOY_DIR/data/config.json, else
+#                            D:\PortableApps\KeyFlux-1.0-beta1\data\config.json
+#                            (the live deploy tree whose config.json the instance uses).
+#   -Take   register lines   (previously parsed by hand from $args) limit for bisection.
+param(
+  [string]$Repo = '',
+  [string]$Config = '',
+  [int]$Take = 0
+)
 $ErrorActionPreference = 'Stop'
-$repo = 'D:\PortableApps\KeyFlux-main'
+
+# Shared helpers (repo root / %TEMP% sandbox / SHA256 / determinism gate).
+. (Join-Path $PSScriptRoot 'lib\kf-tools.ps1')
+if ([string]::IsNullOrEmpty($Repo)) { $Repo = Get-KfRepoRoot }
+$repo = (Resolve-Path -LiteralPath $Repo).Path
+if ([string]::IsNullOrEmpty($Config)) {
+  if (![string]::IsNullOrEmpty($env:KEYFLUX_DEPLOY_CONFIG)) {
+    $Config = $env:KEYFLUX_DEPLOY_CONFIG
+  }
+  else {
+    $deployDir = $env:KEYFLUX_DEPLOY_DIR
+    if ([string]::IsNullOrEmpty($deployDir)) { $deployDir = 'D:\PortableApps\KeyFlux-1.0-beta1' }
+    $Config = Join-Path $deployDir 'data\config.json'
+  }
+}
+$config = $Config
+if (!(Test-Path -LiteralPath $config)) {
+  Write-Host "ORACLE DIFF: FAIL [deploy config not found: $config]"
+  Write-Host '  hint: -Config <path> / $env:KEYFLUX_DEPLOY_CONFIG / $env:KEYFLUX_DEPLOY_DIR'
+  exit 1
+}
 $tmp = "$env:TEMP\mk_baseline"
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 Copy-Item "$repo\bin\settings.exe" "$tmp\settings.exe" -Force
 
 # 1. Extract register lines from regenerated script (-Take N for bisection)
-$take = 0
-for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '-Take') { $take = [int]$args[$i + 1] } }
+$take = $Take
 $gen = [IO.File]::ReadAllLines("$repo\bin\KeyFlux.ahk", [Text.Encoding]::UTF8)
 $regs = @($gen | Where-Object { $_ -match '^\s*CommandResolver\.Register\(' })
 if ($take -gt 0) { $regs = $regs[0..($take - 1)] }
@@ -62,7 +96,7 @@ if (!$p.WaitForExit(20000)) { $p | Stop-Process -Force; Get-Content "$tmp\oracle
 if (!(Test-Path "$tmp\resolver_dump.json")) { Get-Content "$tmp\oracle_err.txt"; throw 'no resolver dump' }
 
 # 3. Go side plan
-& "$tmp\settings.exe" DumpPlan 'D:\PortableApps\KeyFlux-1.0-beta1\data\config.json' "$tmp\plan.json"
+& "$tmp\settings.exe" DumpPlan $config "$tmp\plan.json"
 
 # 4. Compare: command set + step count
 $plan = [IO.File]::ReadAllText("$tmp\plan.json", [Text.Encoding]::UTF8) | ConvertFrom-Json

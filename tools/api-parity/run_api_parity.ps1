@@ -16,6 +16,8 @@
 # CONVENTIONS:
 #   - ASCII-only on purpose: `pwsh -File` / PS 5.1 misparse non-BOM UTF-8 (same rule as
 #     tools/parity/run_parity.ps1). Human-readable Chinese docs live in README.md.
+#   - Repo root, %TEMP% sandbox naming, SHA256 and the determinism gate come from
+#     tools/lib/kf-tools.ps1 (shared with run_parity.ps1 / drop-in-rust.ps1).
 #   - Steps run in a FIXED order inside ONE sandbox per pass (stateful steps depend on
 #     earlier steps; manifest.json items carry the "step" number and "stateful" flag).
 #   - Sandbox always under %TEMP%, unique per run, deleted afterwards.
@@ -31,8 +33,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repo = Split-Path -Parent (Split-Path -Parent $here)
+$here = $PSScriptRoot
+# Shared helpers (repo root / %TEMP% sandbox / SHA256 / determinism gate).
+. (Join-Path (Split-Path -Parent $here) 'lib\kf-tools.ps1')
+$repo = Get-KfRepoRoot
 $corpusDir = Join-Path $here 'corpus'
 $refDir = Join-Path $here 'reference'
 $refGoDir = Join-Path $refDir 'go'
@@ -164,7 +168,7 @@ function New-EngineStub([string]$root) {
 #   <sandbox>/data/config.json  <sandbox>/data/plugins/   <sandbox>/KeyFlux.exe (stub)
 # cwd for every Call = <sandbox>/bin (deploy-tree convention; see bridge.go).
 function New-Sandbox([string]$exeSrc) {
-  $root = Join-Path $env:TEMP ('kfapiparity-' + [guid]::NewGuid().ToString('N'))
+  $root = New-KfSandbox 'kfapiparity'
   $bin = Join-Path $root 'bin'
   $data = Join-Path $root 'data'
   New-Item -ItemType Directory -Force -Path $bin, $data | Out-Null
@@ -338,16 +342,19 @@ if ($Capture) {
   Write-Host '[capture] pass 2 (determinism gate) ...'
   $pass2 = Invoke-CapturePass $Exe
 
-  $drift = @()
+  # Determinism gate: both passes must agree on exit code, status line and response
+  # bytes -- otherwise the reference is NOT written. Byte equality is delegated to the
+  # shared Assert-KfDeterministic (tools/lib/kf-tools.ps1).
+  $drift = New-Object System.Collections.ArrayList
   for ($i = 0; $i -lt $items.Count; $i++) {
     $a = $pass1[$i]; $b = $pass2[$i]
-    $same = ($a.exit -eq $b.exit) -and ($a.callLine -eq $b.callLine)
-    if ($same) {
-      if ($null -eq $a.bytes -and $null -eq $b.bytes) { $same = $true }
-      elseif ($null -eq $a.bytes -or $null -eq $b.bytes) { $same = $false }
-      else { $same = ([Convert]::ToBase64String($a.bytes) -eq [Convert]::ToBase64String($b.bytes)) }
+    $msg = ('step {0}: {1} {2}' -f $a.step, $a.method, $a.path)
+    if (($a.exit -ne $b.exit) -or ($a.callLine -ne $b.callLine)) {
+      [void]$drift.Add($msg)
     }
-    if (-not $same) { $drift += ('step {0}: {1} {2}' -f $a.step, $a.method, $a.path) }
+    else {
+      [void](Assert-KfDeterministic $a.bytes $b.bytes -Message $msg -Collect $drift)
+    }
   }
   if ($drift.Count -gt 0) {
     Write-Host '[capture] NON-DETERMINISTIC OUTPUT, reference NOT written:'
@@ -371,7 +378,7 @@ if ($Capture) {
   }
 
   # manifest.json -- ordered index of the frozen baseline (deterministic, no timestamp).
-  $exeHash = (Get-FileHash -Algorithm SHA256 -Path $Exe).Hash.ToLower()
+  $exeHash = (Get-KfSha256 $Exe).ToLower()
   $mf = '{' + "`n" +
     '  "schema": "api-parity-manifest/2",' + "`n" +
     '  "transport": "Call",' + "`n" +
