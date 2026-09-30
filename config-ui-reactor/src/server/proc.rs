@@ -53,8 +53,29 @@ pub(crate) fn exec_cmd(exe: &str, args: &[&str]) -> bool {
         Ok(_) => true,
         Err(error) => {
             eprintln!("execCmd: breakaway 启动 {exe} 失败: {error}");
+            probe_log(&format!(
+                "direct-spawn FAILED exe={exe} args={args:?} dir={} error={error}",
+                dir.display()
+            ));
             fallback_exec_cmd(&dir, exe, args)
         }
+    }
+}
+
+/// 诊断日志（临时）：把 spawn/relay 的真实参数与结果落到 `%TEMP%\keyflux-proc.log`。
+///
+/// 背景：用户报「保存设置后总弹资源管理器到 Documents」。生产复现（Call PUT /config）时
+/// relay 静默成功、无弹窗 ⇒ 需在**下次真实复现**时拿到确切参数（exe / dir / abs / 结果）。
+/// 诊断完成后应移除本函数与其调用点。
+fn probe_log(message: &str) {
+    use std::io::Write as _;
+    let path = std::env::temp_dir().join("keyflux-proc.log");
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        let _ = writeln!(file, "[pid {}] {message}", std::process::id());
     }
 }
 
@@ -65,9 +86,22 @@ fn fallback_exec_cmd(dir: &Path, exe: &str, args: &[&str]) -> bool {
     if args.is_empty() {
         // Go: filepath.Abs(filepath.Join(dir, exe)) —— Join 之后还要 Clean（消解 ".."）
         let abs_exe = clean_path(&dir.join(exe));
+        let abs_exists = abs_exe.is_file();
         match Command::new("explorer.exe").arg(&abs_exe).spawn() {
-            Ok(_) => return true,
-            Err(error) => eprintln!("execCmd: explorer 中转启动 {exe} 失败: {error}"),
+            Ok(_) => {
+                probe_log(&format!(
+                    "explorer-relay SPAWNED exe={exe} abs={} exists={abs_exists}",
+                    abs_exe.display()
+                ));
+                return true;
+            }
+            Err(error) => {
+                eprintln!("execCmd: explorer 中转启动 {exe} 失败: {error}");
+                probe_log(&format!(
+                    "explorer-relay FAILED exe={exe} abs={} exists={abs_exists} error={error}",
+                    abs_exe.display()
+                ));
+            }
         }
     }
     match Command::new(exe).args(args).current_dir(dir).spawn() {
