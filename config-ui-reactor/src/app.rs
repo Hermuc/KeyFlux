@@ -119,7 +119,8 @@ pub struct Shell {
     sa_save_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// 键位/缩写页右侧备注汇总是否折叠（默认展开；折叠以优先保证键盘网格完整显示）。
     comments_collapsed: bool,
-    /// 导航窗格浮层是否展开（LeftCompact 常驻窄轨模式下，汉堡展开浮层时为 true）。
+    /// 导航窗格是否展开（true = Left 模式带文字并推开内容；false = LeftCompact 图标窄轨）。
+    /// 默认 true（保持原有「展开带文字」的默认观感），汉堡点击后由事件回写翻转。
     pane_overlay_open: bool,
     /// 「管理匹配类型」对话框是否打开。
     mt_dialog: bool,
@@ -223,7 +224,7 @@ impl Component for Shell {
             sa_add: None,
             sa_save_gen: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             comments_collapsed: false,
-            pane_overlay_open: false,
+            pane_overlay_open: true,
             mt_dialog: false,
             mt_draft: None,
             mt_status: None,
@@ -1785,11 +1786,20 @@ impl Component for Shell {
             // 侧栏宽度：WinUI NavigationView 默认 OpenPaneLength=320，明显宽于旧设计
             // （旧 Avalonia `ColumnDefinitions="264,*"` ⇒ theme::SIDEBAR_WIDTH=264）⇒ 显式收紧。
             .open_pane_length(theme::SIDEBAR_WIDTH)
-            // 常驻窄轨（LeftCompact）：折叠态 = 仅图标窄轨（~48px，内容区铺满），
-            // 汉堡 = 浮层展开完整窗格（含文字）。**不用** Left/Auto 的 IsPaneOpen 折叠 ——
-            // 实测（2026-09-29）该路径只隐藏条目文字、窗格宽度不缩（内容区不左移）。
-            .pane_display_mode(NavigationViewPaneDisplayMode::LeftCompact)
-            .is_pane_open(false)
+            // 展开/折叠由**状态驱动显示模式切换**（实测口径，2026-09-29/30）：
+            //  * 展开态 = Left + IsPaneOpen(true)：带文字并推开内容（原默认观感）；
+            //  * 折叠态 = LeftCompact + IsPaneOpen(false)：~48px 图标窄轨、内容区铺满。
+            //  为什么不只用 Left + IsPaneOpen(false)：该路径只隐藏条目文字、宽度不缩、
+            //  内容不左移；为什么不只用 LeftCompact + IsPaneOpen(true)：本环境**不会**
+            //  展开浮层（探针构建初始 true 仍渲染为窄轨）。
+            //  ⚠️ is_pane_open 必须受控于状态：写死会在事件回写后的重渲染中把原生刚置上
+            //  的值打回，表现为「点汉堡毫无反应」。
+            .pane_display_mode(if self.pane_overlay_open {
+                NavigationViewPaneDisplayMode::Left
+            } else {
+                NavigationViewPaneDisplayMode::LeftCompact
+            })
+            .is_pane_open(self.pane_overlay_open)
             .on_is_pane_open_changed(context.callback(Message::PaneOverlay))
             .is_settings_visible(false)
             .on_selected_tag_changed(context.callback(|tag: Option<String>| Message::Nav(tag)))
