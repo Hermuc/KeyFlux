@@ -11,20 +11,26 @@
 ;   收敛成 EverythingExplorerRunner.Launch; 探针把 Impl 换成记录器, 于是能对「到底启动了几次
 ;   explorer / 命令串长什么样」做硬断言。
 ;
-; 反向敏感度 (2026-09-30 实测, 守卫链整段拆回旧行为后再跑本探针): 20 项里 13 项变红 ——
-;   2a-2c / 3a-3c / 4c / 4d / 5a / 5b / 6 / 7 / 8。其中
-;   * 2b/3b/6 = 「空/失效路径也照样 Run」—— 就是 `explorer.exe ""` 打开「文档」目录的直接来源;
-;   * 5a    = 同一会话内 400ms 内的重复通知第二次照样打开 —— 即「成批窗口」的第二道闸;
-;   * 4c/4d = 相对路径原样喂 explorer / 尾反斜杠把命令行引号吃掉。
+; 反向敏感度 (2026-09-30 实测; 两组对照都跑在临时副本上, 未提交) —— 本探针不是恒绿:
+;   * 守卫链整段拆回旧行为 => 27 项里 **16 项变红** (2a-2c / 3a-3c / 4c / 4d / 5a / 5b / 6 /
+;     7 / 9b / 9c / 9d / 9e)。其中
+;       2b/3b/6 = 「空/失效路径照样 Run」—— 就是 `explorer.exe ""` 打开「文档」目录的直接来源;
+;       5a      = 同一会话内 400ms 内的重复通知第二次照样打开 —— 即「成批窗口」的第二道闸;
+;       4c/4d   = 相对路径原样喂 explorer / 尾反斜杠把命令行引号吃掉;
+;       9c/9d   = 失败路径还会把浮层和输入钩子一起收掉 (提示看不见 = 用户视角「回车没反应」)。
+;   * 只把 Enter 分支退回「无条件 Close + ih.Stop」(其余保持新代码) => 恰好 9c/9d 两项变红
+;     ⇒ 第 9 组精确锁住「失败可见」这一条, 不会靠别的断言兜住。
 ;   ⚠ 断言 1 在旧行为下同样是绿的: OnKey 入口**早已**有 `closed` 守卫, 重复通知根本到不了
 ;   Enter 分支 ⇒ 1 是「别把这道既有守卫改坏」的回归护栏; 真正判别「重复通知去抖」的是 5a。
 ;
-; 断言 (覆盖修复要求 1-4, 另加 2 组补充):
+; 断言 (覆盖修复要求 1-4 + 收尾两项, 另加 4 组补充):
 ;   1) 连走 3 次 Enter 分支 => Launch 只被调用 1 次 (关闭守卫生效), 会话关闭, 后续通知被拒;
 ;   2) path 为空 => 返回 false 且 Launch 调用数不增加;
-;   3) path 指向不存在的路径 => 返回 false 且 Launch 调用数不增加 (并出一行既有提示);
+;   3) path 指向不存在的路径 => 返回 false 且 Launch 调用数不增加 (并出一行提示);
 ;   4) 文件夹/文件两形态分别产生 `explorer.exe "<绝对路径>"` 与 `explorer.exe /select,"<绝对路径>"`;
-;   5) 去抖窗口本身 (要求 2); 6) 全空白 path; 7) 会话关闭后无副作用; 8) 缝的默认实现仍走 Run (不过修)。
+;   5) 去抖窗口本身; 6) 全空白 path; 7) 会话关闭后无副作用; 8) 缝的默认实现仍走 Run (不过修);
+;   9) 失败不静默: 路径失效时浮层不 Hide / ih.Stop 不调 / 会话仍 active (9a-9e), 成功时各 1 次 (9f);
+;  10) 新键 err_item_missing 中英双分支都有真文案 (无回落键名)。
 ;
 ; 用法 (MSYS_NO_PATHCONV 必须有: Git Bash 会把 /ErrorStdOut 当路径改写):
 ;   MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut plugins/examples/everything_search/tests/open_guard_probe.ahk
@@ -64,6 +70,7 @@ Verify(cond, label, detail := "") {
 
 class EverythingDropdown {
     static Hints := []          ; 记录 ShowHint 收到的文案
+    static HideCount := 0       ; 记录 Hide 次数 (浮层是否被收起)
     static Callback := 0
     static SetCallback(cb) {
         EverythingDropdown.Callback := cb
@@ -76,6 +83,7 @@ class EverythingDropdown {
     static Select(index) {
     }
     static Hide() {
+        EverythingDropdown.HideCount += 1
     }
 }
 
@@ -203,6 +211,8 @@ PressEnter(s) {
 ResetObservers() {
     ExplorerRecorder.Reset()
     EverythingDropdown.Hints := []
+    EverythingDropdown.HideCount := 0
+    StubInputHook.StopCount := 0
 }
 
 ; ============================================================
@@ -218,7 +228,6 @@ Emit("")
 
 ; --- 断言 1: 连按 3 次回车 => explorer 只启动 1 次 (关闭守卫) ---
 ResetObservers()
-StubInputHook.StopCount := 0
 s1 := NewSession([ItemFolder(DIR_EXISTS), ItemFile(FILE_EXISTS), ItemFile(PATH_MISSING)], 1)
 r1 := PressEnter(s1)
 r2 := PressEnter(s1)
@@ -241,8 +250,8 @@ Verify(ok2 = false, "2a path 为空: OpenSelected 返回 false", "实际 " ok2)
 Verify(ExplorerRecorder.Calls.Length = 0,
     '2b path 为空: explorer 未被启动 (旧实现 explorer.exe "" 会打开「文档」)',
     "实际 " ExplorerRecorder.Calls.Length " 次")
-Verify(EverythingDropdown.Hints.Length = 1 && EverythingDropdown.Hints[1] = EverythingMessages.T("hint_empty"),
-    "2c path 为空: 出一行既有提示文案 (hint_empty)",
+Verify(EverythingDropdown.Hints.Length = 1 && EverythingDropdown.Hints[1] = EverythingMessages.T("err_item_missing"),
+    "2c path 为空: 出一行提示文案 (err_item_missing)",
     "实际 " ((EverythingDropdown.Hints.Length = 1) ? "'" EverythingDropdown.Hints[1] "'" : "提示数 " EverythingDropdown.Hints.Length))
 
 ; --- 断言 3: path 不存在 => 不启动 explorer, 返回 false ---
@@ -253,8 +262,8 @@ Verify(ok3 = false, "3a 路径不存在: OpenSelected 返回 false", "实际 " o
 Verify(ExplorerRecorder.Calls.Length = 0,
     "3b 路径不存在: explorer 未被启动",
     "实际 " ExplorerRecorder.Calls.Length " 次")
-Verify(EverythingDropdown.Hints.Length = 1 && EverythingDropdown.Hints[1] = EverythingMessages.T("hint_empty"),
-    "3c 路径不存在: 出一行既有提示文案 (hint_empty)",
+Verify(EverythingDropdown.Hints.Length = 1 && EverythingDropdown.Hints[1] = EverythingMessages.T("err_item_missing"),
+    "3c 路径不存在: 出一行提示文案 (err_item_missing)",
     "实际 " ((EverythingDropdown.Hints.Length = 1) ? "'" EverythingDropdown.Hints[1] "'" : "提示数 " EverythingDropdown.Hints.Length))
 
 ; --- 断言 4: 两种形态的命令串 + 绝对路径规范化 ---
@@ -336,6 +345,40 @@ Verify(threw,
     "8 未替换 Impl 时走内置 Run (生产路径): 非法目标抛错",
     "实际 threw=" threw)
 EverythingExplorerRunner.Impl := RecorderLaunch          ; 复原缝
+
+; --- 断言 9: 失败不再静默 (Enter 分支改成「仅成功才 Close + ih.Stop」) ---
+;     9a-9e: 路径失效 -> explorer 不启动、浮层不 Hide、输入钩子不 Stop (= 提示留在屏上)、
+;            会话仍 active (可继续改检索词); 9f: 成功 -> 两者各恰好 1 次。
+ResetObservers()
+s11 := NewSession([ItemFile(PATH_MISSING)], 1)
+r11 := PressEnter(s11)
+Verify(r11 = true, "9a 路径失效的 Enter 仍被消费 (OnKey 返回 true)", "实际 " r11)
+Verify(ExplorerRecorder.Calls.Length = 0,
+    "9b 路径失效: explorer 未被启动", "实际 " ExplorerRecorder.Calls.Length " 次")
+Verify(EverythingDropdown.HideCount = 0 && StubInputHook.StopCount = 0,
+    "9c 路径失效: 浮层未 Hide、输入钩子未 Stop (= 提示留在屏上, 用户看得见)",
+    "实际 Hide=" EverythingDropdown.HideCount " Stop=" StubInputHook.StopCount)
+Verify(s11.closed = false && s11.active = true,
+    "9d 路径失效: 会话保持打开, 可继续改检索词或按 Esc 退出",
+    "实际 closed=" s11.closed " active=" s11.active)
+Verify(EverythingDropdown.Hints.Length = 1 && EverythingDropdown.Hints[1] = EverythingMessages.T("err_item_missing"),
+    "9e 路径失效: 提示文案 = err_item_missing",
+    "实际提示数 " EverythingDropdown.Hints.Length)
+ResetObservers()
+s12 := NewSession([ItemFolder(DIR_EXISTS)], 1)
+r12 := PressEnter(s12)
+Verify(r12 = true && s12.closed = true && EverythingDropdown.HideCount = 1 && StubInputHook.StopCount = 1,
+    "9f 成功: 会话关闭, Hide 与 ih.Stop 各调用 1 次",
+    "实际 Hide=" EverythingDropdown.HideCount " Stop=" StubInputHook.StopCount " closed=" s12.closed)
+
+; --- 断言 10: 新键 err_item_missing 在中英两条分支都是真文案 (不是回落成键名) ---
+keyZh := EverythingMessages.T("err_item_missing")
+EverythingMessages.En := true     ; 强行切英文分支 (静态字段可写; _ready 已 true, 不会再探测系统语言)
+keyEn := EverythingMessages.T("err_item_missing")
+EverythingMessages.En := false    ; 复原中文分支
+Verify(keyZh != "err_item_missing" && keyEn != "err_item_missing" && keyZh != keyEn,
+    "10 err_item_missing 中英双分支都有真文案 (无回落键名)",
+    "zh='" keyZh "' en='" keyEn "'")
 
 ; ============================================================
 ; 汇总
