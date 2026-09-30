@@ -33,6 +33,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Fixture mode: the backend's options.startup backfill queries the REAL "KeyFlux"
+# scheduled task -- machine state that would freeze into the GET /config baseline
+# (measured: this QA box has the task -> "startup":true, CI has not -> "startup":false,
+# exactly 1 byte longer -> step 2 failed on every other machine). With the flag set,
+# BOTH the recorded reference and the exe under test skip the query (startup=false),
+# making GET /config byte-identical across machines. Must be set BEFORE any
+# settings.exe is spawned (children inherit the environment).
+$env:KEYFLUX_API_PARITY = '1'
+
 $here = $PSScriptRoot
 # Shared helpers (repo root / %TEMP% sandbox / SHA256 / determinism gate).
 . (Join-Path (Split-Path -Parent $here) 'lib\kf-tools.ps1')
