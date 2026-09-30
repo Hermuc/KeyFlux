@@ -13,9 +13,10 @@
 //!   `quickSwitch.excludedPrefixes` 在 Go 侧 nil 时输出 `null`，Rust 模型
 //!   （`Vec`）无法区分 nil 与空，恒输出 `[]`（真实配置无 null 形态，见下）。
 //! * **`hotkeys` map**：Go nil map 输出 `null`、空 map 输出 `{}`；Rust 模型
-//!   `HashMap` 同样无法区分，恒输出 `{}`（真实 config.json 16 个 keymap 中
+//!   （`BTreeMap`）同样无法区分，恒输出 `{}`（真实 config.json 16 个 keymap 中
 //!   0 个 null、1 个 `{}`，按真实语料取 `{}` 口径）。map 键序：Go 按字节字典序，
-//!   用 `BTreeMap` 对齐（`String` 的 `Ord` 即字节序）。
+//!   两端均用 `BTreeMap` 对齐（`String` 的 `Ord` 即字节序）—— generator 模型
+//!   `Keymap.hotkeys` 亦为 `BTreeMap`，故 DTO 与落盘同序。
 //! * **HTML 转义**：gin `c.JSON` 走 `json.Marshal` 默认口径，`<` `>` `&`
 //!   （及 U+2028/2029）转义为 `\u003c` 等 —— 见 [`marshal_go_json`]。
 //!   与落盘相反：`SaveConfigFile` 是 `SetEscapeHTML(false)`（generator 侧已实现）。
@@ -676,7 +677,7 @@ pub fn dto_to_config(dto: &ConfigDto) -> m::Config {
 /// Go `dtoToKeymap`。DTO 的 `hotkeys` 为空 ⇒ 模型空 map（Go nil map 的落盘形态
 /// 差异见模块头注释）。
 fn dto_to_keymap(km: &KeymapDto) -> m::Keymap {
-    let mut hotkeys = std::collections::HashMap::new();
+    let mut hotkeys = std::collections::BTreeMap::new();
     for (key, actions) in &km.hotkeys {
         hotkeys.insert(key.clone(), actions.iter().map(dto_to_action).collect());
     }

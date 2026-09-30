@@ -300,6 +300,162 @@ mod tests {
         assert_eq!(config.keymaps[0].hotkeys["!f17"].len(), 1);
     }
 
+    /// 键序确定化回归（改动前 `Keymap.hotkeys` 是 `HashMap`，两处断言均为 false）：
+    /// ① 同一输入的两次独立 parse→save 必须逐字节相同（`HashMap` 随机迭代序 ⇒ 不同）；
+    /// ② 落盘文件中 hotkeys 键的**出现顺序 = 字节序**（与 Go `encoding/json` 的 map 键序
+    ///    一致）。用例覆盖四类字节序陷阱：标点(`*,` 先于 `*0`/`,`)、大小写(`A`<`a`)、
+    ///    前缀(`*z` 早于 `A`)、非 ASCII(`网盘`/`🔥key` 恒在全部 ASCII 之后)。
+    #[test]
+    fn hotkeys_key_order_is_deterministic_and_byte_sorted() {
+        let input = r#"{
+  "keymaps": [{
+    "id": 5, "name": "键序", "enable": true, "hotkey": "*CapsLock",
+    "parentID": 0, "delay": 0, "disableAt": "",
+    "hotkeys": {
+      "z": [], "A": [], "*z": [], "singlePress": [], "*,"
+      : [], "网盘": [], "a": [], "*0": [], ",": [], "*A": [], "🔥key": []
+    }
+  }],
+  "options": {},
+  "selectedAction": {"hotkey": "", "enable": false, "mappings": []}
+}"#;
+        let dir = std::env::temp_dir().join(format!("kf-cfg-keyorder-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let in_path = dir.join("config.json");
+        std::fs::write(&in_path, input).unwrap();
+
+        // ① 两次独立 parse→save 字节完全相同
+        let out_a = dir.join("a.json");
+        let out_b = dir.join("b.json");
+        let cfg_a = parse_config(&in_path, "").unwrap();
+        let cfg_b = parse_config(&in_path, "").unwrap();
+        save_config_file(&cfg_a, &out_a).unwrap();
+        save_config_file(&cfg_b, &out_b).unwrap();
+        let a = std::fs::read(&out_a).unwrap();
+        let b = std::fs::read(&out_b).unwrap();
+        assert_eq!(a, b, "同一配置两次落盘字节不同（键序不确定）");
+        let text = String::from_utf8(a).unwrap();
+
+        // ② 落盘键序 = 字节序（Rust `str` 的 Ord 即 UTF-8 字节序，等于 Go 的 map 键序口径）
+        let mut expected: Vec<&str> = vec![
+            "z",
+            "A",
+            "*z",
+            "singlePress",
+            "*,",
+            "网盘",
+            "a",
+            "*0",
+            ",",
+            "*A",
+            "🔥key",
+        ];
+        expected.sort_unstable();
+        assert_eq!(
+            expected,
+            vec![
+                "*,",
+                "*0",
+                "*A",
+                "*z",
+                ",",
+                "A",
+                "a",
+                "singlePress",
+                "z",
+                "网盘",
+                "🔥key"
+            ],
+            "用例本身应覆盖四类字节序陷阱"
+        );
+
+        let mut cursor = 0usize;
+        for key in &expected {
+            let needle = format!("\"{key}\":");
+            let rel = text[cursor..].find(&needle).unwrap_or_else(|| {
+                panic!("键 {key:?} 未按字节序出现（cursor={cursor}）：\n{text}")
+            });
+            cursor += rel + needle.len();
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 跨语言逐字节：同一输入经 Go / Rust 的「ParseConfig → 落盘」后字节必须完全相同。
+    /// 夹具真源 `config-server/internal/script/config_save_export_test.go`（再生成：
+    /// `cd config-server && UPDATE_CONFIGSAVE_FIXTURE=1 go test ./internal/script/ -run TestExportConfigSave -count=1`）。
+    /// 覆盖 16 keymap / 55KB 的真实出厂配置 + 覆盖字节序陷阱的合成用例。
+    ///
+    /// 已知且**先于本次改动**存在的形态差异（本次不修，已单独上报）：Go 的 nil slice 落盘为
+    /// `null`，Rust 的 `Vec` 无 nil 概念、落盘为 `[]`（亦见 `server/dto.rs` 模块头）。下表把两种
+    /// 形态归一后再比对，且**两侧都归一** —— 一旦出现别的任何差异（键序 / 转义 / 缩进 / 尾换行 /
+    /// 字段集 / 数值）仍会红；nil 语义统一后本表自动退化为无操作，可从表中清空。
+    #[test]
+    fn save_bytes_match_go_across_languages() {
+        /// (Go 的 nil 形态, Rust 的空集合形态)
+        const NIL_SLICE_FORMS: [(&str, &str); 1] = [("\"disabled\": null", "\"disabled\": []")];
+
+        let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/config_save.json");
+        let raw = std::fs::read_to_string(&fixture_path).unwrap_or_else(|error| {
+            panic!(
+                "读取跨语言夹具 {} 失败: {error}\n重新生成: cd config-server && \
+                 UPDATE_CONFIGSAVE_FIXTURE=1 go test ./internal/script/ -run TestExportConfigSave -count=1",
+                fixture_path.display()
+            )
+        });
+        let fixture: serde_json::Value = serde_json::from_str(&raw).expect("夹具 JSON 解析失败");
+        let cases = fixture["cases"].as_array().expect("夹具缺少 cases");
+        assert!(!cases.is_empty(), "夹具没有用例");
+
+        let normalize = |text: &str| -> String {
+            let mut out = text.to_string();
+            for (go_form, rust_form) in NIL_SLICE_FORMS {
+                out = out.replace(go_form, rust_form);
+            }
+            out
+        };
+
+        for case in cases {
+            let name = case["name"].as_str().unwrap();
+            let version = case["version"].as_str().unwrap();
+            let input = case["input"].as_str().unwrap();
+            let want = normalize(case["saved"].as_str().unwrap());
+
+            let dir =
+                std::env::temp_dir().join(format!("kf-cfgsave-{}-{name}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            let in_path = dir.join("config.json");
+            std::fs::write(&in_path, input).unwrap();
+
+            let config = parse_config(&in_path, version)
+                .unwrap_or_else(|error| panic!("[{name}] parse_config 失败: {error}"));
+            let out_path = dir.join("saved.json");
+            save_config_file(&config, &out_path).unwrap();
+            let got = normalize(&std::fs::read_to_string(&out_path).unwrap());
+
+            if got != want {
+                // 首处差异 + 前后窗口：把「键序漂移」这类差异定位到具体字节
+                let (gb, wb) = (got.as_bytes(), want.as_bytes());
+                let at = (0..gb.len().min(wb.len()))
+                    .find(|&i| gb[i] != wb[i])
+                    .unwrap_or(gb.len().min(wb.len()));
+                let lo = at.saturating_sub(120);
+                panic!(
+                    "[{name}] Rust 落盘字节与 Go 参考字节不一致（{} vs {} 字节，首处差异 @{at}）\n\
+                     rust: ...{}...\n  go: ...{}...",
+                    gb.len(),
+                    wb.len(),
+                    String::from_utf8_lossy(&gb[lo..(at + 120).min(gb.len())]),
+                    String::from_utf8_lossy(&wb[lo..(at + 120).min(wb.len())]),
+                );
+            }
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
     #[test]
     fn legacy_action_schemes_is_rejected_not_silently_dropped() {
         let path = write_temp(

@@ -253,7 +253,7 @@ fn plan_abbr(config: &Config) -> PlanAbbr {
 
 fn plan_abbr_entries(
     config: &Config,
-    abbr_map: &std::collections::HashMap<String, Vec<Action>>,
+    abbr_map: &std::collections::BTreeMap<String, Vec<Action>>,
 ) -> Vec<PlanAbbrEntry> {
     // 与 AbbrRegistryCode 一致：按缩写字典序，动作经 sortActions，跳过未注册 TypeID
     let mut abbr_list: Vec<(String, Vec<Action>)> = abbr_map
@@ -353,7 +353,7 @@ fn to_plan_entry(config: &Config, action: &Action) -> PlanEntry {
 ///
 /// `pub(crate)`：`actions::render_keymap` 复用（与 Go 同源，避免第二份实现漂移）。
 pub(crate) fn sort_hotkeys(
-    hotkey_map: &std::collections::HashMap<String, Vec<Action>>,
+    hotkey_map: &std::collections::BTreeMap<String, Vec<Action>>,
 ) -> Vec<Action> {
     let mut result: Vec<Action> = Vec::new();
     for (hotkey, actions) in hotkey_map {
@@ -416,7 +416,7 @@ pub const REMAP_TYPE_ID: i32 = REMAP_KEY;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     fn action(type_id: i32, window_group: i32) -> Action {
         Action {
@@ -439,7 +439,7 @@ mod tests {
 
     #[test]
     fn sort_hotkeys_strips_quotes_and_orders_by_type_then_length() {
-        let mut map: HashMap<String, Vec<Action>> = HashMap::new();
+        let mut map: BTreeMap<String, Vec<Action>> = BTreeMap::new();
         map.insert("bb".to_string(), vec![action(6, 0)]);
         map.insert("a".to_string(), vec![action(6, 0)]);
         map.insert("z".to_string(), vec![action(1, 0)]);

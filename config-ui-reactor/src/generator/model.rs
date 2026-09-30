@@ -13,7 +13,7 @@
 //! （`window_groups` / `path_variables` / `custom_match_types` 的 AHK 片段）。
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
 
 use crate::generator::text::{ahk_string, not_blank_lines, to_ahk_func_arg};
@@ -55,7 +55,10 @@ pub struct Keymap {
     pub delay: i32,
     #[serde(rename = "disableAt")]
     pub disable_at: String,
-    pub hotkeys: HashMap<String, Vec<Action>>,
+    /// ⚠️ 必须是 `BTreeMap`（不可换回 `HashMap`）：Go `encoding/json` 对 **map** 键按
+    /// 字典序（UTF-8 字节序）输出，`HashMap` 的随机迭代序会让同一份配置两次落盘字节不同，
+    /// 也与 Go 的产出不一致（`save_config_file` 的确定性由此保证，有单测守护）。
+    pub hotkeys: BTreeMap<String, Vec<Action>>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -522,23 +525,23 @@ impl Config {
     }
 
     /// Go `(*Config).CapslockAbbr`：`Hotkey == "capslockAbbr"` 的模式的热键表。
-    pub fn capslock_abbr(&self) -> HashMap<String, Vec<Action>> {
+    pub fn capslock_abbr(&self) -> BTreeMap<String, Vec<Action>> {
         for km in &self.keymaps {
             if km.hotkey == "capslockAbbr" {
                 return km.hotkeys.clone();
             }
         }
-        HashMap::new()
+        BTreeMap::new()
     }
 
     /// Go `(*Config).SemicolonAbbr`。
-    pub fn semicolon_abbr(&self) -> HashMap<String, Vec<Action>> {
+    pub fn semicolon_abbr(&self) -> BTreeMap<String, Vec<Action>> {
         for km in &self.keymaps {
             if km.hotkey == "semicolonAbbr" {
                 return km.hotkeys.clone();
             }
         }
-        HashMap::new()
+        BTreeMap::new()
     }
 
     /// Go `(*Config).CapslockAbbrEnabled`：任一启用模式里存在 TypeID9/ValueID6。
@@ -681,7 +684,7 @@ fn has_abbr_trigger(keymaps: &[Keymap], value_id: i32) -> bool {
 }
 
 /// Go `CapslockAbbrKeys` / `SemicolonAbbrKeys` 的公共实现。
-fn abbr_keys(abbr: &HashMap<String, Vec<Action>>) -> String {
+fn abbr_keys(abbr: &BTreeMap<String, Vec<Action>>) -> String {
     let mut keys: Vec<String> = abbr.keys().map(|key| key.replace(',', ",,")).collect();
     keys.sort();
     keys.join(",")
@@ -890,7 +893,7 @@ mod tests {
     /// Go `CapslockAbbrEnabled` / `SemicolonAbbrEnabled` 只看启用模式里的 TypeID9 触发动作。
     #[test]
     fn abbr_enabled_detects_typeid9_triggers() {
-        let mut hotkeys = HashMap::new();
+        let mut hotkeys = BTreeMap::new();
         hotkeys.insert(
             "*CapsLock".to_string(),
             vec![Action {
@@ -930,7 +933,7 @@ mod tests {
             keymaps: vec![Keymap {
                 id: 2,
                 hotkey: "capslockAbbr".into(),
-                hotkeys: HashMap::from([
+                hotkeys: BTreeMap::from([
                     ("web".to_string(), vec![]),
                     (",".to_string(), vec![]),
                     ("jk".to_string(), vec![]),
@@ -956,7 +959,7 @@ mod tests {
     /// Go `handleKeyRemapping` 的副作用：`remap_in_hot_if` 置位 + `key_mapping` 前缀 `\n`。
     #[test]
     fn handle_key_remapping_sets_flags_and_renders() {
-        let mut keymaps_hotkeys: HashMap<String, Vec<Action>> = HashMap::new();
+        let mut keymaps_hotkeys: BTreeMap<String, Vec<Action>> = BTreeMap::new();
         keymaps_hotkeys.insert(
             "a".to_string(),
             vec![Action {
