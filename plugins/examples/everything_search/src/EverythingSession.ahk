@@ -182,12 +182,16 @@ class EverythingSession {
       return true
     }
     if (vk = EverythingSession.VK_RETURN) {
-      ; 「打开一次 → 收会话」: 成功/失败都走到 Close (守卫链在 OpenSelected 里, 见其注释)。
-      ; 关闭后 closed/active 双保险会吃掉同一批重复通知 —— 这是「成批弹出资源管理器窗口」
-      ; 的第一道闸; 第二道是 OpenSelected 内的 400ms 去抖。
-      this.OpenSelected()
-      this.Close()
-      try ih.Stop()      ; 结束输入 -> 引擎走 HIDE 分支隐藏命令框
+      ; 「打开一次 → 收会话」只在**成功**时收尾 (2026-09-30 收尾补丁): 旧写法无条件 Close +
+      ; ih.Stop, 于是失败路径 (空/失效路径) 出的那行提示会被紧随其后的 Hide() 立刻收起 ——
+      ; 用户视角是「按回车毫无反应」(OpenSelected 的守卫链见其注释)。
+      ; 失败时保留浮层与输入钩子: 提示留在屏上, 用户可以继续改检索词或按 Esc 退出。
+      ; 成功时 Close 掉的会话会以 closed/active 双保险吃掉同一批重复通知 —— 那正是
+      ; 「成批弹出资源管理器窗口」的第一道闸; 第二道是 OpenSelected 内的 400ms 去抖。
+      if (this.OpenSelected()) {
+        this.Close()
+        try ih.Stop()    ; 结束输入 -> 引擎走 HIDE 分支隐藏命令框
+      }
       return true
     }
     return false
@@ -277,7 +281,8 @@ class EverythingSession {
    *     ① 会话状态: 未激活 或 已关闭 => 直接拒绝 (关闭后到达的重复通知走这里);
    *     ② 高亮有效性: index 越界 => 拒绝 (空结果/无高亮时不打开任何东西);
    *     ③ 重复通知去抖: 距上次成功打开 < DEBOUNCE_MS 的通知一律丢弃;
-   *     ④ 路径校验: 空路径 / 路径已不存在 => **不调用 explorer**, 只出一行提示。
+   *     ④ 路径校验: 空路径 / 路径已不存在 => **不调用 explorer**, 只出一行提示
+   *        (err_item_missing; 调用方在失败时保留浮层, 故这行提示是可见的)。
    *   通过四道闸才经唯一调用缝 EverythingExplorerRunner.Launch 启动 explorer, 且参数用
    *   规范化后的**绝对路径**。
    *
@@ -294,9 +299,10 @@ class EverythingSession {
     it := this.items[this.index]
     path := this._AbsPath(it.path)
     ; 空路径 = 最危险的一种 (explorer.exe "" 就是「文档」窗口的来源), 与「路径已失效」
-    ; 合并为同一条出口: 不启动 explorer, 出一行既有提示文案, 返回 false。
+    ; 合并为同一条出口: 不启动 explorer, 出一行提示 (err_item_missing), 返回 false。
+    ; 失败不再静默: Enter 分支只在成功时 Close/ih.Stop, 故这行提示会**留在屏上**。
     if (path = "" || (!FileExist(path) && !DirExist(path))) {
-      EverythingDropdown.ShowHint(EverythingMessages.T("hint_empty"))
+      EverythingDropdown.ShowHint(EverythingMessages.T("err_item_missing"))
       return false
     }
 

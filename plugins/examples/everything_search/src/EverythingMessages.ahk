@@ -33,6 +33,7 @@ class EverythingMessages {
     switch key {
       case "hint_no_selection": return "没有选中文字 — 继续输入检索词"
       case "hint_empty": return "没有匹配的文件或文件夹"
+      case "err_item_missing": return "该项路径已失效，请重新检索"
       case "err_es_not_found": return "未找到 es.exe（命令行通道不可用）"
       case "err_not_running": return "Everything 未运行，且未能自动拉起（请检查 Everything 路径）"
       case "err_no_path": return "未配置 everything.exe 路径（点插件卡片填写）"
@@ -47,6 +48,7 @@ class EverythingMessages {
     switch key {
       case "hint_no_selection": return "Nothing selected — type your query"
       case "hint_empty": return "No matching files or folders"
+      case "err_item_missing": return "This item's path is no longer valid — search again"
       case "err_es_not_found": return "es.exe not found (CLI channel unavailable)"
       case "err_not_running": return "Everything is not running and could not be launched (check the path setting)"
       case "err_no_path": return "everything.exe path is not configured (click the plugin card)"
