@@ -161,6 +161,16 @@ func SaveConfigHandler(debug bool) gin.HandlerFunc {
 			return
 		}
 
+		// 校验自定义匹配类型表结构 (id 合法/唯一/不与内置文本特征名及文件分组名冲突;
+		// label 非空; kind ∈ {text,fileExt}; 文本类型的 rules 与文件类型的 exts 结构完整)。
+		// 该守卫此前只在单测中被调用、生产路径零调用, 而 ParseConfig (config.go) 的注释声明
+		// 「保存期由 ValidateMatchTypes 严格校验」—— 本次接回该既定意图, 非法表拒绝保存。
+		// 置于 ValidateFileGroups 之后: 冲突判定依赖已校验过的分组名。
+		if err := script.ValidateMatchTypes(config.MatchTypes, config.FileGroups); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "保存失败: " + err.Error()})
+			return
+		}
+
 		// 命令框外观「保存即生效」: 必须在**覆盖写之前**记下旧值才能对比。
 		// 命令框 (KeyFlux-CommandInput.exe) 只在**启动时**读一次 bin/font/font.ttf 与
 		// bin/CommandInputSkin.txt (DirectWrite 私有字体集合与皮肤参数在进程内常驻;

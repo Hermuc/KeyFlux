@@ -15,7 +15,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::generator::model::{Config, FileGroup, SelectedAction, SelectedMapping};
+use crate::generator::model::{Config, FileGroup, MatchType, SelectedAction, SelectedMapping};
 
 /// 单个 mapping 的 entries 上限（菜单序号 1-9）。Go `maxEntriesPerMapping`。
 const MAX_ENTRIES_PER_MAPPING: usize = 9;
@@ -436,6 +436,100 @@ pub(crate) fn validate_file_groups(groups: &[FileGroup]) -> Result<(), String> {
     Ok(())
 }
 
+/// Go `script.validMatchOps`：封闭 4 算子。
+const VALID_MATCH_OPS: [&str; 4] = ["equals", "prefix", "suffix", "contains"];
+
+/// Go `script.reservedTextTypeNames`：内置文本特征名，自定义类型不得占用。
+/// 由 [`TEXT_FEATURES`] 派生，与 Go `behaviors.TextFeatureValues()` 同源。
+fn is_reserved_text_type(id: &str) -> bool {
+    TEXT_FEATURES.iter().any(|(value, _)| *value == id)
+}
+
+/// Go `script.ValidateMatchTypes`（actionscheme.go:266-327）逐字移植：自定义匹配类型表
+/// 的结构校验（保存期严格）。规则：id 合法/唯一/不与内置名及文件分组名冲突；label 非空；
+/// kind ∈ {text,fileExt}；kind=text 时 rules ≥1 且每条 op 合法、value 非空且 ≤256 字符；
+/// kind=fileExt 时 exts 归一化后非空。**错误文案与 Go 逐字节一致**（400 响应体依赖）。
+pub(crate) fn validate_match_types(
+    types: &[MatchType],
+    groups: &[FileGroup],
+) -> Result<(), String> {
+    // Go: ^[a-z][a-z0-9_]{0,23}$（长度 1-24，非多行模式下 $ = 文本末尾，与 Go 同口径）
+    let id_re = regex::Regex::new(r"^[a-z][a-z0-9_]{0,23}$").expect("内置正则不应编译失败");
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    let group_names: std::collections::HashSet<&str> =
+        groups.iter().map(|group| group.name.as_str()).collect();
+
+    for mt in types {
+        let id = mt.id.trim();
+        if !id_re.is_match(id) {
+            // 文案取**原文**（未 trim），与 Go 一致
+            return Err(format!(
+                "内部标识「{}」格式不正确（需以小写字母开头，仅含小写字母、数字与下划线，长度 1-24）",
+                mt.id
+            ));
+        }
+        if is_reserved_text_type(id) {
+            // 注意：括注仅列 4 项（未含「B 站」）系 Go 侧既有文案，逐字保留
+            return Err(format!(
+                "内部标识「{id}」与内置文本特征（链接／路径／磁力链接／纯文本）冲突，请更换"
+            ));
+        }
+        if !seen.insert(id) {
+            return Err(format!("内部标识「{id}」重复，同一类型的标识必须唯一"));
+        }
+        if group_names.contains(id) {
+            return Err(format!("内部标识「{id}」与文件分组同名，请更换"));
+        }
+        if mt.label.trim().is_empty() {
+            return Err(format!("匹配类型「{id}」缺少名称"));
+        }
+        if mt.kind != "text" && mt.kind != "fileExt" {
+            return Err(format!(
+                "匹配类型「{id}」的分类无效（可选：文本内容 / 文件类型）"
+            ));
+        }
+        if mt.kind == "text" {
+            if mt.rules.is_empty() {
+                return Err(format!("文本类型「{id}」缺少匹配条件，至少需要 1 条"));
+            }
+            for (index, rule) in mt.rules.iter().enumerate() {
+                let n = index + 1;
+                if !VALID_MATCH_OPS.contains(&rule.op.as_str()) {
+                    return Err(format!(
+                        "匹配类型「{id}」第 {n} 条匹配条件的匹配方式无效「{}」（可选：包含该文字 / 完全相同 / 以该文字开头 / 以该文字结尾）",
+                        rule.op
+                    ));
+                }
+                if rule.value.trim().is_empty() {
+                    return Err(format!("匹配类型「{id}」第 {n} 条匹配内容为空"));
+                }
+                if rule.value.chars().count() > 256 {
+                    return Err(format!(
+                        "匹配类型「{id}」第 {n} 条匹配内容过长（最多 256 个字符）"
+                    ));
+                }
+                if has_control_char(&rule.value) {
+                    return Err(format!("匹配类型「{id}」第 {n} 条匹配内容不能包含换行符"));
+                }
+            }
+        } else {
+            let has_ext = mt.exts.iter().any(|ext| !normalize_ext(ext).is_empty());
+            if !has_ext {
+                return Err(format!("文件类型「{id}」缺少文件扩展名（如 psd, ai）"));
+            }
+            for (index, ext) in mt.exts.iter().enumerate() {
+                if has_control_char(ext) {
+                    return Err(format!(
+                        "匹配类型「{id}」第 {} 个文件扩展名不能包含换行符",
+                        index + 1
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Go `script.ValidateSelectedAction`（selectedaction.go:81-136）：
 /// PUT /config 保存链路的组合合法性校验。`cat` 为 `None` 时跳过覆盖检查
 /// （镜像 Go 对目录缺失/异常部署的容忍）。
@@ -755,6 +849,146 @@ mod tests {
         assert!(ref_values("fileExt", " , ").is_empty());
         assert_eq!(ref_values("textType", " URL "), vec!["URL"]);
         assert!(ref_values("textType", "  ").is_empty());
+    }
+
+    /// Go `script.TestValidateMatchTypes` 的镜像：三类非法（重复 id / label 空 / op 非法）
+    /// 逐一断言**逐字节一致**的错误文案，另加合法形态放行 + fileExt/kind/超长等分支。
+    #[test]
+    fn validate_match_types_rejects_invalid_with_go_identical_messages() {
+        let groups: Vec<FileGroup> = vec![FileGroup {
+            name: "design".into(),
+            label: "设计".into(),
+            exts: vec!["psd".into()],
+        }];
+        let text_type = |id: &str, label: &str, op: &str, value: &str| MatchType {
+            id: id.into(),
+            label: label.into(),
+            kind: "text".into(),
+            rules: vec![MatchRule {
+                op: op.into(),
+                value: value.into(),
+            }],
+            ..Default::default()
+        };
+
+        // 合法（文本 / 文件）放行
+        assert!(
+            validate_match_types(
+                &[text_type("netdisk", "网盘", "contains", "pan.baidu.com")],
+                &groups
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_match_types(
+                &[MatchType {
+                    id: "imgs".into(),
+                    label: "图片".into(),
+                    kind: "fileExt".into(),
+                    exts: vec!["jpg".into(), "png".into()],
+                    ..Default::default()
+                }],
+                &groups
+            )
+            .is_ok()
+        );
+
+        // ── 三类要求用例（与 Go 400 文案逐字节相同）──
+        // ① 重复 id（取重复的第二个，与 Go 一致）
+        assert_eq!(
+            validate_match_types(
+                &[
+                    text_type("dup", "甲", "contains", "a"),
+                    text_type("dup", "乙", "contains", "b"),
+                ],
+                &groups
+            )
+            .unwrap_err(),
+            "内部标识「dup」重复，同一类型的标识必须唯一"
+        );
+        // ② label 为空（仅空白）
+        assert_eq!(
+            validate_match_types(&[text_type("empty", "   ", "contains", "a")], &groups)
+                .unwrap_err(),
+            "匹配类型「empty」缺少名称"
+        );
+        // ③ op 非法
+        assert_eq!(
+            validate_match_types(&[text_type("badop", "算子", "regex", "a")], &groups).unwrap_err(),
+            "匹配类型「badop」第 1 条匹配条件的匹配方式无效「regex」（可选：包含该文字 / 完全相同 / 以该文字开头 / 以该文字结尾）"
+        );
+
+        // 其余分支的文案对齐（Go 侧 matchtypes_test.go 覆盖同一集合）
+        assert_eq!(
+            validate_match_types(&[text_type("NetDisk", "x", "contains", "a")], &groups)
+                .unwrap_err(),
+            "内部标识「NetDisk」格式不正确（需以小写字母开头，仅含小写字母、数字与下划线，长度 1-24）"
+        );
+        assert_eq!(
+            validate_match_types(&[text_type("url", "x", "contains", "a")], &groups).unwrap_err(),
+            "内部标识「url」与内置文本特征（链接／路径／磁力链接／纯文本）冲突，请更换"
+        );
+        assert_eq!(
+            validate_match_types(&[text_type("design", "x", "contains", "a")], &groups)
+                .unwrap_err(),
+            "内部标识「design」与文件分组同名，请更换"
+        );
+        assert_eq!(
+            validate_match_types(
+                &[MatchType {
+                    id: "a".into(),
+                    label: "x".into(),
+                    kind: "weird".into(),
+                    ..Default::default()
+                }],
+                &groups
+            )
+            .unwrap_err(),
+            "匹配类型「a」的分类无效（可选：文本内容 / 文件类型）"
+        );
+        assert_eq!(
+            validate_match_types(
+                &[MatchType {
+                    id: "a".into(),
+                    label: "x".into(),
+                    kind: "text".into(),
+                    ..Default::default()
+                }],
+                &groups
+            )
+            .unwrap_err(),
+            "文本类型「a」缺少匹配条件，至少需要 1 条"
+        );
+        assert_eq!(
+            validate_match_types(&[text_type("a", "x", "contains", "   ")], &groups).unwrap_err(),
+            "匹配类型「a」第 1 条匹配内容为空"
+        );
+        assert_eq!(
+            validate_match_types(
+                &[text_type("a", "x", "contains", &"x".repeat(257))],
+                &groups
+            )
+            .unwrap_err(),
+            "匹配类型「a」第 1 条匹配内容过长（最多 256 个字符）"
+        );
+        assert_eq!(
+            validate_match_types(&[text_type("a", "x", "contains", "x\ny")], &groups).unwrap_err(),
+            "匹配类型「a」第 1 条匹配内容不能包含换行符"
+        );
+        assert_eq!(
+            validate_match_types(
+                &[MatchType {
+                    id: "a".into(),
+                    label: "x".into(),
+                    kind: "fileExt".into(),
+                    exts: vec![".".into(), " ".into()],
+                    ..Default::default()
+                }],
+                &groups
+            )
+            .unwrap_err(),
+            "文件类型「a」缺少文件扩展名（如 psd, ai）"
+        );
     }
 
     #[test]

@@ -18,7 +18,9 @@ use crate::generator::config::{parse_config, save_config_file};
 use crate::generator::model::{CommandFontOption, CommandInputSkin};
 
 use super::dto::{bind_config_dto, config_to_dto, dto_to_config, marshal_go_json};
-use super::validate::{load_validation_catalog, validate_file_groups, validate_selected_action};
+use super::validate::{
+    load_validation_catalog, validate_file_groups, validate_match_types, validate_selected_action,
+};
 use super::{HttpReply, ServerPaths, VERSION};
 
 /// 开机自启显示态缓存的 TTL。Go `getCachedStartupState`（handlers.go:63-74）。
@@ -180,9 +182,9 @@ fn command_font_eq(a: &CommandFontOption, b: &CommandFontOption) -> bool {
 // --------------------------------------------------------------------------- PUT /config
 
 /// Go `SaveConfigHandler`（handlers.go:142-191）：
-/// 绑定 DTO → DTOToConfig → ValidateSelectedAction + ValidateFileGroups（失败
-/// 400 `{"message":"保存失败: …"}`）→ 读旧外观 → SaveConfigFile → 缓存失效 →
-/// 外观变了结束命令框 → 重启引擎 → 200 `{"message":"ok","restartFailed":bool}`。
+/// 绑定 DTO → DTOToConfig → ValidateSelectedAction + ValidateFileGroups +
+/// ValidateMatchTypes（失败 400 `{"message":"保存失败: …"}`）→ 读旧外观 → SaveConfigFile →
+/// 缓存失效 → 外观变了结束命令框 → 重启引擎 → 200 `{"message":"ok","restartFailed":bool}`。
 pub(crate) fn put_config(ctx: &super::ServerContext, body: &[u8]) -> HttpReply {
     let dto = match bind_config_dto(body) {
         Ok(dto) => dto,
@@ -201,6 +203,11 @@ pub(crate) fn put_config(ctx: &super::ServerContext, body: &[u8]) -> HttpReply {
     }
     // 校验文件分组表结构（名称/显示名/后缀列表非空）
     if let Err(error) = validate_file_groups(&config.file_groups) {
+        return save_failure(format!("保存失败: {error}"));
+    }
+    // 校验自定义匹配类型表结构（id 合法/唯一/不与内置名及文件分组名冲突；label/kind/rules/exts）。
+    // 紧接 ValidateFileGroups 之后（冲突判定依赖已校验的分组名），与 Go handlers.go 同序。
+    if let Err(error) = validate_match_types(&config.match_types, &config.file_groups) {
         return save_failure(format!("保存失败: {error}"));
     }
 
@@ -357,6 +364,68 @@ mod tests {
             std::fs::read_to_string(sandbox.root.join("data").join("config.json")).unwrap(),
             r#"{"keymaps":[]}"#
         );
+    }
+
+    /// PUT /config：三类非法 matchTypes（重复 id / label 空 / op 非法）→ 400，
+    /// 文案与 Go `handlers_save_test.go` 逐字节一致，且**不落盘、无副作用**。
+    #[test]
+    fn put_config_rejects_invalid_match_types_with_400() {
+        let cases: [(&str, &str, &str); 3] = [
+            (
+                "重复 id",
+                r#"{"keymaps":[],"matchTypes":[
+                    {"id":"dup","label":"甲","kind":"text","rules":[{"op":"contains","value":"a"}]},
+                    {"id":"dup","label":"乙","kind":"text","rules":[{"op":"contains","value":"b"}]}]}"#,
+                r#"{"message":"保存失败: 内部标识「dup」重复，同一类型的标识必须唯一"}"#,
+            ),
+            (
+                "label 为空",
+                r#"{"keymaps":[],"matchTypes":[
+                    {"id":"empty","label":"   ","kind":"text","rules":[{"op":"contains","value":"a"}]}]}"#,
+                r#"{"message":"保存失败: 匹配类型「empty」缺少名称"}"#,
+            ),
+            (
+                "op 非法",
+                r#"{"keymaps":[],"matchTypes":[
+                    {"id":"badop","label":"算子","kind":"text","rules":[{"op":"regex","value":"a"}]}]}"#,
+                r#"{"message":"保存失败: 匹配类型「badop」第 1 条匹配条件的匹配方式无效「regex」（可选：包含该文字 / 完全相同 / 以该文字开头 / 以该文字结尾）"}"#,
+            ),
+        ];
+        for (index, (tag, body, want)) in cases.into_iter().enumerate() {
+            let sandbox = Sandbox::new(&format!("put-bad-mt-{index}"));
+            sandbox.write_config(r#"{"keymaps":[]}"#);
+            let (hooks, calls) = counting_hooks(true);
+            let ctx = super::super::ServerContext::with_hooks(sandbox.paths(), hooks);
+            let reply = super::put_config(&ctx, body.as_bytes());
+            assert_eq!(reply.status, 400, "{tag}");
+            assert_eq!(String::from_utf8(reply.body).unwrap(), want, "{tag}");
+            // 校验失败先于任何文件写/进程副作用
+            assert!(calls.lock().unwrap().is_empty(), "{tag}");
+            assert_eq!(
+                std::fs::read_to_string(sandbox.root.join("data").join("config.json")).unwrap(),
+                r#"{"keymaps":[]}"#,
+                "{tag}"
+            );
+        }
+    }
+
+    /// PUT /config：合法 matchTypes（文本 + 文件类型）仍可保存成功（不误伤）。
+    #[test]
+    fn put_config_accepts_valid_match_types() {
+        let sandbox = Sandbox::new("put-good-mt");
+        sandbox.write_config(r#"{"keymaps":[]}"#);
+        let (hooks, calls) = counting_hooks(true);
+        let ctx = super::super::ServerContext::with_hooks(sandbox.paths(), hooks);
+        let body = r#"{"keymaps":[],"matchTypes":[
+            {"id":"netdisk","label":"网盘","kind":"text","rules":[{"op":"contains","value":"pan.baidu.com"}]},
+            {"id":"imgs","label":"图片","kind":"fileExt","exts":["jpg","png"]}]}"#;
+        let reply = super::put_config(&ctx, body.as_bytes());
+        assert_eq!(reply.status, 200);
+        assert_eq!(
+            String::from_utf8(reply.body).unwrap(),
+            "{\"message\":\"ok\",\"restartFailed\":false}"
+        );
+        assert_eq!(calls.lock().unwrap().len(), 1, "合法保存应重启引擎一次");
     }
 
     /// PUT /config：selectedAction 组合非法（重复 mapping）→ 400。
