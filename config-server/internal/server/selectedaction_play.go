@@ -51,7 +51,7 @@ func PlaySelectedActionHandler(c *gin.Context) {
 
 	// 白名单校验 + group 折叠 (需读运行配置确认类型已存在)
 	cfg := &model.Config{}
-	if diskCfg, err := script.ParseConfig("../data/config.json"); err == nil {
+	if diskCfg, err := script.ParseConfig(script.ConfigRelPath); err == nil {
 		cfg = diskCfg
 	}
 	resolved := resolvePlayTypeId(typeId, cfg)

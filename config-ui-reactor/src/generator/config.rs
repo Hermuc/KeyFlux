@@ -142,10 +142,79 @@ pub fn parse_config(path: &Path, keyflux_version: &str) -> io::Result<Config> {
 /// Go `script.SaveConfigFile`：全量落盘 + **不转义 HTML**（`SetEscapeHTML(false)`）+ 2 空格缩进 + 尾换行。
 ///
 /// 与 [`crate::generator::plan`] 的 `WritePlan` 相反：后者要 Go 默认的 HTML 转义，此处**不要**。
+///
+/// 落盘改为「同目录临时文件 -> 刷盘 -> 关闭 -> rename」**原子替换**（对齐 Go
+/// `script.saveConfigFileTo` 与 `internal/plugins/store.go` 的 `writeAll`）：直接 `fs::write`
+/// 是截断写，引擎在写入途中读到就是半截 JSON。同卷 rename 为原子替换，读者要么看到旧内容
+/// 要么看到新内容。**落盘字节与改前逐字节一致**（编码口径未动）。
 pub fn save_config_file(config: &Config, path: &Path) -> io::Result<()> {
     let json = serde_json::to_string_pretty(config)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-    std::fs::write(path, format!("{json}\n"))
+    write_atomic(path, format!("{json}\n").as_bytes())
+}
+
+/// 进程内自增序号：与 pid / 时间戳拼出临时文件名，避免并发保存互相覆盖。
+static TEMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// 在 `dir` 下创建唯一临时文件（`create_new` 保证不覆盖既有文件）。
+fn create_temp_file(
+    dir: &Path,
+    target_name: &str,
+) -> io::Result<(std::fs::File, std::path::PathBuf)> {
+    for _ in 0..16 {
+        let seq = TEMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let candidate = dir.join(format!(
+            ".{target_name}.{}.{seq}.{nanos}.tmp",
+            std::process::id()
+        ));
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(file) => return Ok((file, candidate)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        "无法分配唯一的临时文件名",
+    ))
+}
+
+/// 原子写入：临时文件落在目标同目录（保证 rename 同卷）→ 写入 → 刷盘 → 关闭 → rename。
+/// 失败路径清理临时文件；成功 rename 后目标路径即为新内容。
+fn write_atomic(path: &Path, data: &[u8]) -> io::Result<()> {
+    use std::io::Write as _;
+
+    let dir = match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+        _ => std::path::PathBuf::from("."),
+    };
+    let target_name = path
+        .file_name()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "目标路径缺少文件名"))?
+        .to_string_lossy()
+        .into_owned();
+
+    let (mut file, tmp_path) = create_temp_file(&dir, &target_name)?;
+    let write_result = file.write_all(data).and_then(|()| file.sync_all());
+    // 必须先关闭句柄再 rename（Windows 不允许替换仍被占用的文件）。
+    drop(file);
+    if let Err(error) = write_result {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(error);
+    }
+    if let Err(error) = std::fs::rename(&tmp_path, path) {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(error);
+    }
+    Ok(())
 }
 
 /// 供调用方构造最小配置（测试/迁移用）。
@@ -240,5 +309,46 @@ mod tests {
         let error = parse_config(&path, "").unwrap_err();
         let _ = std::fs::remove_file(&path);
         assert_eq!(error.kind(), io::ErrorKind::Unsupported);
+    }
+
+    /// SaveConfigFile 原子化后：①字节与编码口径逐字节一致（HTML 不转义 + 尾换行）
+    /// ②不残留 *.tmp ③覆盖已存在文件成功。固化字面量含 `<>&` 与中文，锚定编码口径。
+    #[test]
+    fn save_config_file_is_atomic_and_byte_stable() {
+        let dir = std::env::temp_dir().join(format!("kf-cfg-atomic-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.json");
+
+        let config = Config {
+            keymaps: vec![Keymap {
+                id: 1,
+                name: "网页<>&\"引号\"".into(),
+                enable: true,
+                hotkey: "^!a".into(),
+                ..Default::default()
+            }],
+            overview_doc_md: "# 指南\n编辑 <b>配置</b> & 保存\n".into(),
+            ..Default::default()
+        };
+        // 「旧实现」= to_string_pretty + 尾换行（本函数改前口径）
+        let expected = format!("{}\n", serde_json::to_string_pretty(&config).unwrap());
+        assert!(!expected.contains("\\u003c"), "HTML 不应被转义: {expected}");
+
+        // ③ 覆盖已存在文件
+        std::fs::write(&path, "旧内容应被整体替换").unwrap();
+        save_config_file(&config, &path).unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), expected);
+        assert!(expected.ends_with("}\n"), "缺少尾换行");
+
+        // ② 不残留 *.tmp（目录内只应有目标文件）
+        let mut names: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        assert_eq!(names, vec!["config.json".to_string()], "残留临时文件");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
