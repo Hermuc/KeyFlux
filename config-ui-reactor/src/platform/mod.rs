@@ -38,6 +38,16 @@ impl Default for WindowSpec {
 }
 
 impl WindowSpec {
+    /// 按「亚克力开关」派生窗口背景材质：开 = Acrylic（毛玻璃），关 = 保持既有 Mica。
+    ///
+    /// reactor 的 `WindowBackdrop` 枚举只允许在本层出现（平台互操作边界），上层只传布尔语义。
+    pub fn with_acrylic(mut self, acrylic: bool) -> Self {
+        if acrylic {
+            self.backdrop = WindowBackdrop::Acrylic;
+        }
+        self
+    }
+
     /// 转成 reactor 的窗口视觉声明。
     pub fn visuals(&self) -> WindowVisuals {
         assert!(

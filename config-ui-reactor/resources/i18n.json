@@ -1590,5 +1590,13 @@
   "2549": {
     "zh": "细",
     "en": "Light"
+  },
+  "2593": {
+    "zh": "亚克力毛玻璃效果",
+    "en": "Acrylic blur effect"
+  },
+  "2594": {
+    "zh": "亚克力效果设置无法保存",
+    "en": "Failed to save acrylic setting"
   }
 }
