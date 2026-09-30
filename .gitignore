@@ -29,3 +29,6 @@ __pycache__/
 #   读 bin/font/。故这些副本对流水线毫无作用, 提交它们只会让仓库虚胖。
 # 需要重建时: python tools/font_weight_prebake.py <源字体> (烘焙到源字体同目录)。
 bin/font/font.*.ttf
+
+# 本机 CodeBuddy/WorkBuddy 环境的本地工作数据 (不入库)
+.codebuddy/
