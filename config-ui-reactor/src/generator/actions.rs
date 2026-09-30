@@ -29,7 +29,7 @@
 //! cd config-server && UPDATE_ACTION_FIXTURE=1 go test ./internal/script/ -run TestExportActionRender
 //! ```
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use crate::generator::behaviors::{self, Catalog};
@@ -440,7 +440,7 @@ fn keyflux_actions9(config: &Config, action: &Action, in_abbr_context: bool) -> 
 /// ⚠️ 与 Go 一致：本函数**不**做 CRLF 归一（交由 `SaveAHK` 模板层）。
 pub fn abbr_registry_code(
     config: &Config,
-    abbr_map: &HashMap<String, Vec<Action>>,
+    abbr_map: &BTreeMap<String, Vec<Action>>,
     scope: &str,
     indent: &str,
 ) -> String {
@@ -655,7 +655,7 @@ mod tests {
     #[derive(Deserialize)]
     struct AbbrCase {
         #[serde(rename = "in")]
-        abbr_map: HashMap<String, Vec<Action>>,
+        abbr_map: BTreeMap<String, Vec<Action>>,
         scope: String,
         indent: String,
         out: String,
