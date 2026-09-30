@@ -8,6 +8,7 @@ import (
 	"settings/internal/command"
 	"settings/internal/matrix"
 	"settings/internal/proc"
+	"settings/internal/script"
 	"settings/internal/server"
 )
 
@@ -54,7 +55,7 @@ func hideMatrix() bool {
 		} `json:"options"`
 	}
 
-	data, err := os.ReadFile("../data/config.json")
+	data, err := os.ReadFile(script.ConfigRelPath)
 	if err != nil {
 		return false
 	}

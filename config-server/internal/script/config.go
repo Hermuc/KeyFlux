@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"settings/internal/script/generators"
 	"settings/internal/script/model"
 )
@@ -142,16 +143,63 @@ func isQuickSwitchZero(q QuickSwitchOption) bool {
 const ConfigRelPath = "../data/config.json"
 
 func SaveConfigFile(config *Config) {
-	// 先写到缓冲区,  如果直接写文件的话, 当编码过程遇到错误时, 会导致文件损坏
+	if err := saveConfigFileTo(config, ConfigRelPath); err != nil {
+		panic(err)
+	}
+}
+
+// saveConfigFileTo 把 config 编码并原子落盘到 path (path 可注入, 便于单测)。
+//
+// 两步都必要, 缺一不可:
+//  1. 先编码进缓冲区 —— 编码过程遇到错误时绝不触碰目标文件 (原实现已有此保护);
+//  2. 再经「同目录临时文件 -> 刷盘 -> 关闭 -> rename」原子替换 —— 原实现直接
+//     os.WriteFile (O_TRUNC 截断写), 写大文件期间被读者 (引擎) 撞见就是半截 JSON。
+//     同盘内 rename 为原子替换, 读者要么看到旧内容要么看到新内容, 不存在中间态。
+//
+// 范式同 internal/plugins/store.go 的 writeAll 与 internal/server/selectedaction_play.go
+// 的 writePlayRequestFile。落盘字节与旧实现逐字节一致 (SetEscapeHTML(false) +
+// 2 空格缩进 + Encoder 自带尾换行), 由 config_atomic_test.go 固定字面量守护。
+func saveConfigFileTo(config *Config, path string) error {
 	buf := new(bytes.Buffer)
 	encoder := json.NewEncoder(buf)
 	encoder.SetIndent("", "  ")
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(config); err != nil {
-		panic(err)
+		return err
 	}
+	return writeFileAtomic(path, buf.Bytes())
+}
 
-	if err := os.WriteFile(ConfigRelPath, buf.Bytes(), 0644); err != nil {
-		panic(err)
+// writeFileAtomic 原子写入: 同目录临时文件 -> 写入 -> 刷盘 -> 关闭 -> rename 替换。
+// 临时文件与目标同目录, 保证 rename 落在同一卷 (跨卷 rename 不是原子替换)。
+// 失败路径下 defer 清理临时文件 (成功 rename 后 os.Remove 为空操作)。
+func writeFileAtomic(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("创建临时文件失败: %w", err)
 	}
+	tmpName := tmp.Name()
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName) // rename 成功后这里是空操作
+	}()
+
+	// 与旧实现 os.WriteFile(..., 0644) 的建文件权限口径对齐
+	if err := tmp.Chmod(0o644); err != nil {
+		return fmt.Errorf("设置临时文件权限失败: %w", err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		return fmt.Errorf("写临时文件失败: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("刷盘失败: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("关闭临时文件失败: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("替换配置文件失败: %w", err)
+	}
+	return nil
 }

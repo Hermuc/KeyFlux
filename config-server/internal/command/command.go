@@ -79,7 +79,7 @@ func DumpPlan(args ...string) {
 }
 
 func ChangeVersion(args ...string) {
-	config, err := script.ParseConfig("../data/config.json")
+	config, err := script.ParseConfig(script.ConfigRelPath)
 	if err != nil {
 		panic(err)
 	}
@@ -90,7 +90,7 @@ func ChangeVersion(args ...string) {
 }
 
 func GenerateScripts(args ...string) {
-	config, err := script.ParseConfig("../data/config.json")
+	config, err := script.ParseConfig(script.ConfigRelPath)
 	if err != nil {
 		panic(err)
 	}

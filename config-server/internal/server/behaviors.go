@@ -25,7 +25,7 @@ const userBehaviorsDir = "../data/behaviors"
 // 两者共用同一 "type:" 命名空间, 故任一命中即视为存在。
 // 配置读取失败时返回 nil: 退化为"不校验存在性"(容忍口径), 不因读不到配置而阻塞保存。
 func matchTypeResolver() func(string) bool {
-	cfg, err := script.ParseConfig("../data/config.json")
+	cfg, err := script.ParseConfig(script.ConfigRelPath)
 	if err != nil {
 		return nil
 	}

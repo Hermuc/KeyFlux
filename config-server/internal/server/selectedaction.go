@@ -16,7 +16,7 @@ import (
 
 // loadSelectedAction 读取磁盘配置中的 selectedAction (ParseConfig 保证非 nil, 迁移后返回)。
 func loadSelectedAction() *model.SelectedAction {
-	config, err := script.ParseConfig("../data/config.json")
+	config, err := script.ParseConfig(script.ConfigRelPath)
 	if err != nil {
 		panic(err)
 	}
@@ -47,7 +47,7 @@ func TestSelectedActionHandler(c *gin.Context) {
 	// 注册表: 优先用请求体携带的未保存类型, 否则回退磁盘运行配置 (容忍缺失, 不 panic),
 	// 保证"编辑中自定义类型"与"已保存运行配置"两种场景都能解析 type: 引用。
 	cfg := &model.Config{}
-	if diskCfg, err := script.ParseConfig("../data/config.json"); err == nil {
+	if diskCfg, err := script.ParseConfig(script.ConfigRelPath); err == nil {
 		cfg = diskCfg
 	}
 	if req.MatchTypes != nil {

@@ -17,7 +17,7 @@ import (
 )
 
 func GetConfigHandler(c *gin.Context) {
-	config, err := script.ParseConfig("../data/config.json")
+	config, err := script.ParseConfig(script.ConfigRelPath)
 	if err != nil {
 		panic(err)
 	}
