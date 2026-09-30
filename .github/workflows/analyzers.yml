@@ -11,6 +11,16 @@ name: analyzers
 #   (fmt --check / clippy -D warnings / cargo test), 与 Makefile 的 buildClientReactor
 #   严格一致 —— 本地 `make analyzers` 复现前两道, `make buildClientReactor` 复现全部。
 #   旧 C# 单测的契约覆盖已迁移为 config-ui-reactor 的 cargo 单测 (models/services)。
+#
+# 2026-09-30 审计补口 (P1「防流程腐化」):
+#   - reactor-gates 不再内联 cargo 序列, 改为调用 tools/cargo-gates.ps1 (单一真源),
+#     否则「闸门在本地与 CI 各写一份」必然漂移;
+#   - 新增 lint / check-texttypes / api-parity 三个 job —— 这三个 make 目标此前在 CI
+#     零引用: 其中 api-parity 是唯一同时覆盖「Go 基线漂移」与「Go/Rust 双实现分叉」的闸门,
+#     躺在仓库里没人跑 (Makefile 里也刚补上同名目标)。
+#
+# 注: 本 workflow 假定 runner 自带 GNU make (windows-latest 镜像的 Build Tools 含 make),
+#   lint / check-texttypes / api-parity job 直接复用 Makefile 目标, 避免把配方抄第二份。
 
 on:
   push:
@@ -21,13 +31,12 @@ jobs:
   # Rust/WinUI3 客户端 (config-ui-reactor) 三道闸门。
   # 说明: build.rs 的 windows_reactor_setup 在构建期会拉取 pinned Windows App Runtime
   #   (NuGet 缓存), GitHub 托管机自带网络与 MSVC, 无需额外准备。
+  #   cargo-gates.ps1 自己切到 config-ui-reactor 目录, 故不需要 defaults.working-directory。
+  #   刻意**不传** -EnvScript: config-ui-reactor/env.ps1 钉的是本机的 MSVC/SDK 路径,
+  #   在 runner 上找不到会直接 throw (runner 的 cargo/rustc 本来就在 PATH 上)。
   reactor-gates:
     runs-on: windows-latest
     timeout-minutes: 30
-    defaults:
-      run:
-        shell: bash
-        working-directory: config-ui-reactor
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -46,14 +55,34 @@ jobs:
             config-ui-reactor/target
           key: cargo-${{ runner.os }}-${{ hashFiles('config-ui-reactor/Cargo.lock') }}
 
-      - name: Fmt gate
-        run: cargo fmt --all --check
+      - name: 'Cargo gates (fmt + clippy + test) -- single source: tools/cargo-gates.ps1'
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1
 
-      - name: Clippy gate (-D warnings)
-        run: cargo clippy --all-targets -- -D warnings
+  # 标识符冲突静态闸门 = `make lint`。
+  #   AHK 大小写不敏感, 「局部变量遮蔽同名函数」是纯运行时崩溃, /Validate 查不出;
+  #   扫描 bin/lib 下全部 AHK 源, 有 ERROR 即非零退出。
+  lint:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
 
-      - name: Test gate
-        run: cargo test --quiet
+      - name: make lint
+        run: make lint
+
+  # 内置文本特征三端一致性闸门 = `make check-texttypes`。
+  #   Go 注册表 ⇄ AHK TextFeatureSpecs ⇄ 共享向量 (值/大小写/正则/顺序 + 运行时逐字提取)。
+  check-texttypes:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: make check-texttypes
+        run: make check-texttypes
 
   # 生成端差分对账 (P0, docs/plan-rust-migration.md §4)。
   #   用当前构建的 settings.exe 复现 tools/parity/reference 的逐字节基线:
@@ -80,3 +109,69 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./tools/parity/run_parity.ps1
 
+  # API 级差分对账 (P0/P1) —— 唯一覆盖「Go 基线漂移 + Go/Rust 双实现分叉」的闸门。
+  #   两侧各自 -Check 一次 (与本地 `make api-parity` 同一语义):
+  #     [1] Go   : bin/settings.exe (make buildServer, 版本号取自 Makefile ⇒ 与基线一致)
+  #     [2] Rust : config-ui-reactor/target/release/settings.exe
+  #   脚本口径: 候选 exe 未实现的端点记 MISSING_ENDPOINT (不算工具失败), 字节不一致记
+  #   MISMATCH (exit 1)。故 Rust 迁移未完成时本 job 仍可绿, 真正分叉才会红。
+  #   ⚠️ 两个构建都必须注入 KEYFLUX_VERSION (GET /config 的 keyfluxVersion 字段在基线内),
+  #      否则 step 2 会因版本串不同而报 MISMATCH —— 那是构建口径问题, 不是实现分叉。
+  api-parity:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go (version pinned by config-server/go.mod)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: config-server/go.mod
+          cache-dependency-path: config-server/go.sum
+
+      - name: Setup Rust toolchain (version pinned by rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            config-ui-reactor/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('config-ui-reactor/Cargo.lock') }}
+
+      - name: 'Read version (single source: Makefile)'
+        id: ver
+        shell: bash
+        run: |
+          VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*//p' Makefile | head -1)"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "KeyFlux version from Makefile: ${VERSION}"
+
+      - name: Build Go settings.exe (version via ldflags, also stages bin/templates)
+        run: make buildServer
+
+      - name: Build Rust settings.exe (cargo gates + release, version via option_env!)
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release -Version ${{ steps.ver.outputs.version }}
+
+      # 沙箱源树: bin/behaviors 与 data/config.json 已入库; bin/templates 由 buildServer 产出;
+      # data/plugins 是忽略项 (部署/启动产物), 这里用官方示例插件补齐, 否则 GET /api/plugins
+      # 会因「少一个内置插件」在 step 5 报 MISMATCH。
+      - name: Stage plugin examples for the sandbox
+        run: |
+          mkdir -p data/plugins
+          cp -r plugins/examples/. data/plugins/
+          ls data/plugins
+
+      - name: API parity [1/2] vs Go settings.exe
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/api-parity/run_api_parity.ps1 -Check -Exe bin/settings.exe
+
+      - name: API parity [2/2] vs Rust settings.exe
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/api-parity/run_api_parity.ps1 -Check -Exe config-ui-reactor/target/release/settings.exe
