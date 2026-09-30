@@ -32,6 +32,18 @@ impl PageKind {
             Self::Abbr(_) | Self::Keymap(_) => String::new(),
         }
     }
+
+    /// 导航图标（Segoe Fluent Icons 字形；折叠窄轨仅显示图标，展开浮层图标+文字）。
+    pub(super) fn glyph(self) -> &'static str {
+        match self {
+            Self::Guide => "\u{E8E9}",          // Read（使用指南）
+            Self::SelectedAction => "\u{E73E}", // CheckMark（选中动作）
+            Self::Plugins => "\u{E8C8}",        // Puzzle（插件）
+            Self::Settings => "\u{E713}",       // Setting（选项）
+            Self::Abbr(_) => "\u{E8C1}",        // Link（缩写）
+            Self::Keymap(_) => "\u{E765}",      // Keyboard（按键矩阵）
+        }
+    }
 }
 
 /// 导航条目。
@@ -106,6 +118,8 @@ pub enum Message {
     SelectKey(String),
     /// 键位/缩写页右侧备注汇总折叠 ⇄ 展开（布局优先保证键盘网格完整显示）。
     ToggleComments,
+    /// 导航窗格浮层展开态回写（LeftCompact 模式下汉堡切换；驱动页脚窄轨/完整切换）。
+    PaneOverlay(bool),
     /// 缩写页命令框输入。
     CmdText(String),
     /// 缩写页命令框回车执行（`del <缩写>` / `rn <新名>` / 其余视为选中）。

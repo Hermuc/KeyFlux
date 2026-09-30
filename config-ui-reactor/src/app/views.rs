@@ -7,6 +7,15 @@ use super::*;
 impl Shell {
     /// 侧栏底部：分隔线 + 保存提示（成功绿 / 失败红）+ 保存按钮（旧 `DockPanel.Dock="Bottom"` 区）。
     pub(super) fn pane_footer(&self, context: &mut ViewContext<Self>) -> View {
+        // 紧凑窄轨（浮层未展开）：只放得下图标按钮 —— 完整页脚（分隔线/提示/文字按钮）
+        // 在 48px 轨内会被裁成窄条（2026-09-29 实测）。
+        if !self.pane_overlay_open {
+            return Button::new()
+                .on_click(context.message(Message::Save))
+                .horizontal_alignment(HorizontalAlignment::Center)
+                .margin(theme::pad_md())
+                .content(FontIcon::new().glyph("\u{E74E}")); // Save
+        }
         let notice: View = match &self.notice {
             Some(text) => TextBlock::new()
                 .text(text.clone())
