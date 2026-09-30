@@ -38,6 +38,13 @@ import subprocess
 import sys
 import tempfile
 
+# CI 的 Windows runner 上 stdout 默认继承 locale 编码 (cp1252), 打印中文即
+# UnicodeEncodeError —— 本脚本所有诊断文案都是中文, 这里统一强制 UTF-8
+# (reconfigure 幂等; errors=replace 兜底, 保证闸门永不因编码问题误红)。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # ---------------------------------------------------------------- 源文件定位
 
 GO_SRC = os.path.join("config-server", "internal", "behaviors", "textfeatures.go")
