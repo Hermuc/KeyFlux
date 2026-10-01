@@ -31,16 +31,6 @@ pub struct MdInline {
     pub url: String,
 }
 
-impl MdInline {
-    fn text(text: impl Into<String>) -> Self {
-        Self {
-            kind: MdInlineKind::Text,
-            text: text.into(),
-            url: String::new(),
-        }
-    }
-}
-
 /// 列表项（`ordered` 为 true 时 `ordinal` 是原文编号，否则是 `"-"`）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MdListItem {

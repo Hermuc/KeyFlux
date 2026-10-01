@@ -23,11 +23,6 @@ use crate::services::i18n;
 use crate::services::selected_action::TypeToggle;
 use crate::theme;
 
-/// toggle 胶囊格宽下限/上限（旧版胶囊按标签自然宽；reactor 无 WrapPanel ⇒ 统一格宽）。
-const TOGGLE_MIN_WIDTH: f64 = 78.0;
-const TOGGLE_MAX_WIDTH: f64 = 180.0;
-/// 旧版胶囊高度（截图实测 ≈36）。
-const TOGGLE_HEIGHT: f64 = 36.0;
 /// 胶囊圆角（= 高度一半，old pill 造型）。
 const TOGGLE_RADIUS: f64 = 18.0;
 
@@ -342,6 +337,7 @@ fn estimate_width(label: &str) -> f64 {
 }
 
 /// 单个胶囊（Border 承载造型与命中；选中 = 强调蓝底白字，未选 = 白底冷边）。
+/// 高度不显式设定，由 `padding(20,7,20,7)` + 13px 文字自然撑出（旧版截图实测 ≈36）。
 fn build_toggle_pill(
     toggle: &TypeToggle,
     is_selected: bool,

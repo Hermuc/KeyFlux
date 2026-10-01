@@ -79,16 +79,6 @@ fn is_zero_i32(value: &i32) -> bool {
     *value == 0
 }
 
-/// Go float64 的 JSON 形态：整数值输出整数（`1` 而非 `1.0`）。min/max 经
-/// `validateSettings` 强制整数，恒走整数路径；非整数兜底 serde 形态。
-fn go_f64(value: f64) -> serde_json::Value {
-    if value.fract() == 0.0 && value.abs() < 9.007_199_254_740_992e15 {
-        serde_json::json!(value as i64)
-    } else {
-        serde_json::json!(value)
-    }
-}
-
 /// Go `*float64` 的序列化：整数值输出整数形态（`1` 而非 `1.0`）。
 fn serialize_go_f64_opt<S: serde::Serializer>(
     value: &Option<f64>,
