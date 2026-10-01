@@ -33,17 +33,44 @@ pub fn empty_on_off_slots() -> Vec<SlotView<windows_reactor::ToggleSwitchSlot>> 
     ]
 }
 
+/// ON/OFF 状态指示字的**唯一取色点**（纯函数 —— 把"配色契约"变成可断言的函数，
+/// 而不是埋在构造器里的三元表达式）。
+///
+/// * `ON` → [`crate::theme::ACCENT`]（**主题强调色**）。2026-10-01 由状态绿 `MUTED_GREEN`
+///   改为 `ACCENT`：开关本身渲染的就是系统强调蓝，紧挨着它的 `ON` 字再用绿，等于在同一行
+///   并列两种强调色，与「整体配色统一协调」相悖。对照度（相对卡片底 `Ivory`）：
+///   绿 4.38 → 蓝 3.70；仍高于同为 12px 小字的 `OFF` 次级墨色（`STONE_GRAY` 3.47），
+///   即"未劣化到本页既有的可读性基线以下"。
+/// * `OFF` → [`crate::theme::stone_gray`]：表示"未启用"，**不应**抢强调。
+pub fn on_off_color(is_on: bool) -> Color {
+    if is_on {
+        crate::theme::ACCENT
+    } else {
+        crate::theme::STONE_GRAY
+    }
+}
+
 /// ON/OFF 状态指示字（配合 [`empty_on_off_slots`] 使用，替代内置「开/关」）。
+///
+/// 措辞取 i18n `2423`/`2424`（现值 zh/en 均为 `ON`/`OFF`），字号 =
+/// [`crate::theme::FONT_CAPTION`]（12）。
+///
+/// **本函数是 ON/OFF 指示字的唯一实现**，三处开关（快捷键方案 / 选中动作 / 插件卡）都必须走它：
+/// 前两页曾各复制一份同规格的私有拷贝；插件卡那第三份还**漏了
+/// [`VerticalAlignment::Center`]** —— 横向 `StackPanel` 给子级的槽位高 = 面板高（开关 ≈32 DIP），
+/// `TextBlock` 默认 `Stretch` 于是占满槽位、文本贴上沿，`ON` 比开关中心高约 10 DIP
+/// （2026-10-01 用户报障「ON 的文字提示和开关按钮没有对齐」）。
+/// 教训：**别在页面里手搓状态字** —— 拷贝越少，"某一页漏了某个属性"的漂移入口越少。
 pub fn on_off_indicator(is_on: bool) -> View {
     TextBlock::new()
-        .text(if is_on { "ON" } else { "OFF" })
-        .font_size(12.0)
-        .font_weight(FontWeight::SEMI_BOLD)
-        .foreground(if is_on {
-            crate::theme::solid(crate::theme::MUTED_GREEN)
+        .text(crate::services::i18n::t(if is_on {
+            "2423"
         } else {
-            crate::theme::stone_gray()
-        })
+            "2424"
+        }))
+        .font_size(crate::theme::FONT_CAPTION)
+        .font_weight(FontWeight::SEMI_BOLD)
+        .foreground(crate::theme::solid(on_off_color(is_on)))
         .vertical_alignment(VerticalAlignment::Center)
         .into()
 }
@@ -64,4 +91,25 @@ pub fn compact_switch<C: IntoPayloadCallback<bool>>(is_on: bool, on_toggle: C) -
         .on_toggled(on_toggle)
         .min_width(0.0)
         .slots(empty_on_off_slots())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 配色契约：`ON` 指示字必须取**主题强调色**，`OFF` 取次级墨色。
+    ///
+    /// 钉住这条是因为 `ON` 的颜色曾长期是状态绿 `MUTED_GREEN` —— 开关本身渲染的是系统
+    /// 强调蓝，紧挨着的 `ON` 字再用绿，等于同一行并列两种强调色（2026-10-01 用户报障：
+    /// `ON` 应"与主题色一致"）。`assert_ne!` 是防回退闸门：改回绿即红。
+    #[test]
+    fn on_off_indicator_uses_theme_accent_for_on() {
+        assert_eq!(on_off_color(true), crate::theme::ACCENT);
+        assert_eq!(on_off_color(false), crate::theme::STONE_GRAY);
+        assert_ne!(
+            on_off_color(true),
+            crate::theme::MUTED_GREEN,
+            "ON 不应回到状态绿"
+        );
+    }
 }

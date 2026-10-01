@@ -156,27 +156,29 @@ where
 
     // 紧凑开关（修 WinUI 默认 MinWidth=154，否则状态字被推远；见 ui::compact_switch）
     let switch: View = crate::ui::compact_switch(card.enabled, on_toggle);
-    let status: View = TextBlock::new()
-        .text(card.status_text())
-        .font_size(theme::FONT_MICRO)
-        .font_weight(FontWeight::SEMI_BOLD)
-        .foreground(if card.enabled {
-            theme::solid(theme::SLATE_GRAY)
-        } else {
-            theme::stone_gray()
-        })
-        .margin(Thickness::new(0.0, 0.0, 12.0, 0.0))
-        .horizontal_alignment(HorizontalAlignment::Center)
-        .into();
-    // 状态字在开关**正右边**（用户定版：不再放开关下方）
+    // 状态字在开关**正右边**（用户定版：不再放开关下方），且走共享实现 `ui::on_off_indicator`
+    // —— 措辞/字号/字重/取色/垂直居中与「快捷键方案」页、「选中动作」页**同源**。
+    //
+    // 🔴 这里此前是**第三份**私有拷贝，且漏了 `vertical_alignment(Center)`：横向 StackPanel 给
+    //    子级的槽位高 = 面板高（开关 ≈32 DIP），`TextBlock` 默认 `Stretch` ⇒ 占满槽位、文本贴
+    //    上沿，「ON」比开关中心高约 10 DIP（2026-10-01 用户报障："ON 的文字提示和开关按钮没有
+    //    对齐"）。修法不是就地补一句对齐，而是**回到唯一实现**：拷贝少一份，"某一页漏了某个
+    //    属性"的漂移入口就少一个。
+    // 开关块右侧 12px 留白挂到列 1 的 `Border.margin` 上（原挂在状态字自己的 margin 上，等效）。
     let toggle_block: View = StackPanel::new()
         .orientation(Orientation::Horizontal)
         .spacing(10.0)
-        .children((switch, status));
+        .children((switch, crate::ui::on_off_indicator(card.enabled)));
 
     let header: View = Grid::new()
         .columns([GridLength::STAR, GridLength::Auto])
-        .children((title, Border::new().grid_column(1).content(toggle_block)));
+        .children((
+            title,
+            Border::new()
+                .grid_column(1)
+                .margin(Thickness::new(0.0, 0.0, 12.0, 0.0))
+                .content(toggle_block),
+        ));
 
     // 卸载入口：旧版 `IsVisible=CanDelete`（内置卡**不渲染**此钮），tooltip 912
     let delete: View = if card.can_delete {

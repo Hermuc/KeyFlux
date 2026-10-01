@@ -69,7 +69,6 @@ where
     C3: IntoUnitCallback,
 {
     // 卡头：标题（15 SemiBold）+ 右侧 [ON/OFF 指示 + 开关]（复刻旧 `.axaml:388-400`）
-    let state = if enable { "ON" } else { "OFF" };
     let head: View = Grid::new()
         .columns([GridLength::STAR, GridLength::Auto])
         .children((
@@ -86,16 +85,9 @@ where
                 .children((
                     // 紧凑开关（修 WinUI 默认 MinWidth=154）；指示字在开关**正右边**
                     crate::ui::compact_switch(enable, on_enable),
-                    TextBlock::new()
-                        .text(state)
-                        .font_size(theme::FONT_CAPTION)
-                        .font_weight(FontWeight::SEMI_BOLD)
-                        .foreground(if enable {
-                            theme::solid(theme::MUTED_GREEN)
-                        } else {
-                            theme::stone_gray()
-                        })
-                        .vertical_alignment(VerticalAlignment::Center),
+                    // 指示字走共享实现 `ui::on_off_indicator`（此前此处复制过一份同规格的
+                    // 私有拷贝，导致"改 ON 颜色要改两处"；字号/字重/取色现与快捷键方案页同源）
+                    crate::ui::on_off_indicator(enable),
                 )),
         ));
 

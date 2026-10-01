@@ -140,37 +140,93 @@ pub fn hint_row(text: impl Into<String>) -> View {
         .into()
 }
 
+// ------------------------------------------- 「快捷键方案」三列契约（表头 ⇄ 数据行共用）
+
+/// 第 2 列（触发键）宽。
+const SCHEME_COL_HOTKEY: f64 = 130.0;
+/// 第 3 列（开关）宽 —— 取值见 [`scheme_columns`] 的推导：贴近数据行原本 `Auto` 的实测宽度，
+/// 这样「把列宽钉死」不会挪动开关自身的位置。
+const SCHEME_COL_SWITCH: f64 = 96.0;
+/// 第 2 列内容左缩进（表头与数据行经 [`scheme_inset`] 共用，不可能只改一边）。
+const SCHEME_INSET_HOTKEY: f64 = 8.0;
+/// 第 3 列内容左缩进（表头与数据行经 [`scheme_inset`] 共用，不可能只改一边）。
+const SCHEME_INSET_SWITCH: f64 = 16.0;
+
+/// 「快捷键方案」三列宽度（**表头与数据行共用同一份**）。
+///
+/// 🔴 表头与数据行是**两个独立的 Grid**（卡片里隔着 StackPanel 的间距），而 WinUI 的 `Auto`
+/// 列只能按**各自 Grid 内**的内容测量 —— 第 3 列曾用 `Auto`：表头量到的是「开关」二字，
+/// 数据行量到的是 [开关 + 8 间隔 + ON/OFF 字]，两张 Grid 的第 3 列**实测相差 ≈56 DIP**。
+/// 该差值把表头的前两列整体右推，于是「触发键」「开关」不再落在其组件的正上方
+/// （用户报障；像素实测 @125%：`触发键` 偏右 61px、`开关` 偏右 69px）。
+/// 叠加第 2 列缩进表头漏了那 8px ⇒ 再偏 8。**修法 = 列宽一律固定 + 逐列缩进两边相同。**
+///
+/// 第 3 列取 96：数据行原 `Auto` 的宽度实测落在 **92~96 DIP**（两条互相独立的像素实测：
+/// ① 由"第 3 列宽度差 56 DIP + 表头自身 ≈40 DIP"反解得 ≈95；② 由"卡片内容宽 503 − 名称列
+/// 281 − 触发键列 130"直接解得 ≈92）。**取上界 96** ⇒ 开关位置最多比旧观感左移 4 DIP、
+/// 绝不会右移去挤 `ON` 字，同时给「`OFF` 比 `ON` 宽」留出余量。
+///
+/// 第 1 列仍是 STAR：它没有"需要与另一个 Grid 对齐的同名列头"之外的约束，且固定 124px 会把
+/// 「CapsLock + Space」截断（旧注释的结论仍然成立）。
+///
+/// ⚠️ 更彻底的做法是把表头与数据行合进**同一个** Grid（表头行 + N 个数据行），那样用 `Auto`
+/// 也能对齐；但那是页面结构的重构（`views.rs::settings_page` 的组装方式也要改），收益不抵风险，
+/// 故本轮只固化列契约。**改动本页布局时，表头与数据行必须继续共用本函数与 [`scheme_inset`]。**
+fn scheme_columns() -> [GridLength; 3] {
+    [
+        GridLength::STAR,
+        GridLength::Pixel(SCHEME_COL_HOTKEY),
+        GridLength::Pixel(SCHEME_COL_SWITCH),
+    ]
+}
+
+/// 第 `column` 列**内容容器**的左缩进 —— 表头与数据行的唯一来源。
+///
+/// 把缩进收进一个函数（而不是两边各写一遍 `Thickness::new(...)`）是刻意的：列宽固定只解决了
+/// 大半偏移，剩下的第 2 列 8px 差正是"表头没抄数据行那个 margin"造成的。共用本函数后，
+/// **两边缩进不可能再分叉**。
+fn scheme_inset(column: usize) -> Thickness {
+    match column {
+        1 => Thickness::new(SCHEME_INSET_HOTKEY, 0.0, 0.0, 0.0),
+        2 => Thickness::new(SCHEME_INSET_SWITCH, 0.0, 0.0, 0.0),
+        _ => Thickness::new(0.0, 0.0, 0.0, 0.0),
+    }
+}
+
 /// 「快捷键方案」表头（501 名称 / 502 触发键 / 504 开关）。
-/// 名称列 **STAR 自适应**：卡片宽 560（旧版同宽 + 1.12 缩放），固定 124px 会把
-/// 「CapsLock + Space」截断；开关列补 504 表头。
+///
+/// 列定义与逐列缩进一律走 [`scheme_columns`] / [`scheme_inset`]（与 [`scheme_row`] 同源）——
+/// 这是「标题落在组件正上方、且与组件左边缘对齐」的**唯一保证**。
 pub fn scheme_header() -> View {
-    Grid::new()
-        .columns([GridLength::STAR, GridLength::Pixel(130.0), GridLength::Auto])
-        .children((
-            TextBlock::new()
-                .text(i18n::t("501"))
-                .font_size(theme::FONT_CAPTION)
-                .foreground(theme::stone_gray()),
-            Border::new().grid_column(1).content(
+    Grid::new().columns(scheme_columns()).children((
+        TextBlock::new()
+            .text(i18n::t("501"))
+            .font_size(theme::FONT_CAPTION)
+            .foreground(theme::stone_gray()),
+        Border::new()
+            .grid_column(1)
+            .margin(scheme_inset(1))
+            .content(
                 TextBlock::new()
                     .text(i18n::t("502"))
                     .font_size(theme::FONT_CAPTION)
                     .foreground(theme::stone_gray()),
             ),
-            Border::new()
-                .grid_column(2)
-                .margin(Thickness::new(16.0, 0.0, 0.0, 0.0))
-                .content(
-                    TextBlock::new()
-                        .text(i18n::t("504"))
-                        .font_size(theme::FONT_CAPTION)
-                        .foreground(theme::stone_gray()),
-                ),
-        ))
+        Border::new()
+            .grid_column(2)
+            .margin(scheme_inset(2))
+            .content(
+                TextBlock::new()
+                    .text(i18n::t("504"))
+                    .font_size(theme::FONT_CAPTION)
+                    .foreground(theme::stone_gray()),
+            ),
+    ))
 }
 
 /// 「快捷键方案」行：名称(501) / 触发键(502) / 开关(504) 三列内联编辑。
-/// 行距 8px（此前 2px 过挤，12 行连成一片）；开关列左留 16px。
+/// 行距 8px（此前 2px 过挤，12 行连成一片）；开关列左留 [`scheme_inset`]`(2)`。
+/// 列定义与缩进与 [`scheme_header`] 同源（见 [`scheme_columns`] 的"为什么必须固定"）。
 pub fn scheme_row<N, H, E>(
     name: &str,
     hotkey: &str,
@@ -205,17 +261,17 @@ where
         ));
 
     Grid::new()
-        .columns([GridLength::STAR, GridLength::Pixel(130.0), GridLength::Auto])
+        .columns(scheme_columns())
         .margin(Thickness::new(0.0, 0.0, 0.0, 8.0))
         .children((
             name_box,
             Border::new()
                 .grid_column(1)
-                .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                .margin(scheme_inset(1))
                 .content(hotkey_box),
             Border::new()
                 .grid_column(2)
-                .margin(Thickness::new(16.0, 0.0, 0.0, 0.0))
+                .margin(scheme_inset(2))
                 .vertical_alignment(VerticalAlignment::Center)
                 .content(switch),
         ))
@@ -400,4 +456,30 @@ pub fn skin_row<C: IntoPayloadCallback<String>>(
     on_change: C,
 ) -> View {
     text_field(label, value, on_change)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 列契约：开关列的**固定**宽度必须容得下「缩进 + 开关轨道 + 间隔 + ON/OFF 字」。
+    ///
+    /// 列宽被钉死之后就不再随内容自适应 ⇒ 窄了会把开关或指示字裁掉（这是"固化列宽"引入的
+    /// **新**风险，用它兜住）。
+    ///
+    /// 说明：本用例**不**（也无法）证明表头与数据行对齐 —— `View` 不可内省，比对不了两张 Grid
+    /// 的实测列宽。对齐由结构保证（两边同走 [`scheme_columns`] / [`scheme_inset`]），
+    /// 真值由**像素回读**判定。数值用 `let` 而非 `const` 绑定，避免 clippy 的
+    /// `assertions_on_constants`（与 `keymap_view::grid_max_height_fits_default_layout_with_margin` 同法）。
+    #[test]
+    fn scheme_switch_column_fits_switch_and_indicator() {
+        let track = 40.0; // WinUI ToggleSwitch 轨道宽
+        let gap = 8.0; // 开关与指示字之间 StackPanel::spacing
+        let indicator = 24.0; // ON/OFF 字的排版宽度上界（"ON" 实测墨迹 ≈18.4）
+        let needed = SCHEME_INSET_SWITCH + track + gap + indicator;
+        assert!(
+            SCHEME_COL_SWITCH >= needed,
+            "SCHEME_COL_SWITCH({SCHEME_COL_SWITCH}) 容不下开关列内容（需要 {needed}）"
+        );
+    }
 }

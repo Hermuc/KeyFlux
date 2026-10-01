@@ -30,8 +30,10 @@
 //! * hover `CORAL → ACCENT_HOVER`：`#D97757` → `#6591E7`（保 L* 60.5 / C 49.1、同 h 282°）。
 //! * 墨阶（近黑 / dark / charcoal / olive / stone）：保 L*、镜像 b*，暖灰 → 冷灰。
 //! * **不动**：三个**表面**令牌（parchment / ivory / sand）与 `WHITE`；
-//!   以及**语义色** `ERROR_CRIMSON`（✕ 删除 / 错误）、`MUTED_GREEN*`（ON / 已绑定）
-//!   —— 危险红与状态绿属功能语义，不随装饰色冷色化（如需一并冷化请单独裁定）。
+//!   以及**语义色** `ERROR_CRIMSON`（✕ 删除 / 错误）、`MUTED_GREEN*`（键格「已绑定」底 /
+//!   保存成功回显）—— 危险红与状态绿属功能语义，不随装饰色冷色化（如需一并冷化请单独裁定）。
+//!   ⚠️ 例外：**状态指示字 `ON` 不算语义色**（2026-10-01 由绿改为 [`ACCENT`]）——
+//!   它表示"当前处于开启"，与开关本体（系统强调蓝）同排出现，取主题强调色才统一。
 //!
 //! 对比度基线（WCAG 非文字元素 3:1；相对卡片底 `Ivory`）——Phase 5 视觉验收判据：
 //! `BorderFaint` 1.10（几乎不可见，仅作分隔）· `BorderSoft` 1.19 · `RingSoft` 1.48 ·
@@ -77,7 +79,9 @@ pub const RING_SOFT: Color = Color::rgb(0xca, 0xcf, 0xd8);
 /// 控件强环 / 按下态 —— 旧 `ClaudeRingDeep` 的冷色对应（L* 77.61 → 77.57）。
 pub const RING_STRONG: Color = Color::rgb(0xbb, 0xc0, 0xc9);
 
-/// 正向语义色（状态点 / ON 指示）—— 语义色，**不参与冷色化**。
+/// 正向语义色（键格「已绑定」底 / 保存成功回显）—— 语义色，**不参与冷色化**。
+/// ⚠️ 已**不再**承载 ON 指示字：`ON` 走 [`ACCENT`]（主题强调色），
+/// 见 `crate::ui::on_off_indicator` / `crate::ui::on_off_color`。
 pub const MUTED_GREEN: Color = Color::rgb(0x5e, 0x7d, 0x5a);
 
 // ---------------------------------------------------------------- 画刷
@@ -205,8 +209,9 @@ pub const FONT_SECTION_TITLE: f64 = 16.0;
 pub const FONT_CARD_TITLE: f64 = 15.0;
 /// 徽标/小注文字（旧版本徽标、运行时标注 = 11）。
 pub const FONT_BADGE: f64 = 11.0;
-/// 开关状态等微字号（旧 ON/OFF 状态文字 = 10）。
-pub const FONT_MICRO: f64 = 10.0;
+// 旧 `FONT_MICRO`（10，唯一消费点是插件卡的 ON/OFF 状态字）已于 2026-10-01 删除：
+// 三处开关的指示字统一走 `ui::on_off_indicator` ⇒ 字号统一为 `FONT_CAPTION`(12)，
+// 10 这个尺度零消费。（旧版 ON/OFF = 10，是"每页各写一份"时代的残留。）
 
 // ---------------------------------------------------------------- 尺寸（旧 MainWindow）
 
