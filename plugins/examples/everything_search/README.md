@@ -83,7 +83,8 @@ everything.exe -startup
 对照探针 `es_compare_test.ahk` 跑 `bare` / `startup` 两模式各 40 秒，逐秒采样
 进程数与 IPC 退出码 —— 两者**完全等价**，唯一差异就是窗口是否出现。
 另有 `es_silent_launch_test.ahk` 双场景断言 9/9 通过（未运行 → 静默拉起且不抢焦点；
-已运行 → 不重启且 PID 不变）。
+已运行 → 不重启且 PID 不变）。（两个探针均为开发期临时脚本，**未入库** ——
+入库的回归探针只有 `tests/open_guard_probe.ahk`，其余证据见 §4.3 的开发期约定。）
 
 ---
 
@@ -100,7 +101,11 @@ everything.exe -startup
 | `src/EverythingSession.ahk` | 命令框会话状态机 + 控制器（`CommandInputHooks` provider） |
 
 依赖引擎侧接口：`CommandInputHooks`（`bin/lib/core/CommandInputHooks.ahk`）、
-`SelectionContext`、`APIBridge` 的 `selection` / `run` / `settings` 三个命名空间。
+`CommandDisplay`（回显收口：`EchoChar` / `EchoBackspace` / `ActivateCommandWindow`，
+契约见 `docs/CONTRACTS.md` §3.11）、`CommandImeGuard`（触发搜索时 `UnlockForSearch` 放开中文输入）、
+`SelectionContext`；APIBridge 侧实际只消费 **`settings`** 一个命名空间（`api.GetSetting`）——
+selection / run 两种能力分别走引擎全局 `SelectionContext` 与原生 `Run`/`RunWait`
+（L1 插件与引擎同进程编译期包含，不需要绕 APIBridge；manifest 仍如实声明三项 permissions）。
 
 ---
 
@@ -202,7 +207,7 @@ es.exe 查询会读取 Everything.ini 的 `sort=` / `sort_ascending=`（便携�
 | `triggerKey` | char | `" "` | 前置触发键，单个可打印字符 |
 | `everythingPath` | file | 空 | `everything.exe` 完整路径，未运行时用它**静默**拉起 |
 | `esPath` | file | 空 | `es.exe` 路径（可选，留空走 §1 的探测链） |
-| `limit` | number | `20` | 下拉条数上限（1–100） |
+| `limit` | number | `20` | 下拉条数上限（1–300，与 `plugin.json` 的 min/max 及 `EverythingSettings.NormLimit` 同口径） |
 
 **热重载**：`EverythingSettings.Load()` 在**每次命令框会话开始时**重读该文件，故设置面板保存后
 **无需重启引擎**即刻生效。`Load` 只在值真的变了才返回 `true`，调用方据此决定是否让
@@ -239,7 +244,44 @@ es.exe 查询会读取 Everything.ini 的 `sort=` / `sort_ascending=`（便携�
 - 检索词里的双引号会被替换为空格、连续空白折叠为一个空格（AHK 的 `Run` 无法表达嵌套引号，
   而引号在 Everything 语法里只是短语包裹）；以 `-` 开头的词会前置 `--` 关闭开关解析。
 - 下拉浮层是独立窗口，**不**跟随命令框在会话中移动（只在显示时锚定一次）。
-- 浮层**可见高度上限 10 行**（`ED_ROWS`），而 `limit` 默认 20 ⇒ 默认场景下就会有结果落在
-  可视区之外，需要靠 ListView 自身的滚动条访问（该滚动行为未做专门验证）。若希望
-  「看到多少就配多少」，把 `limit` 设为 10。
+- 浮层**可见高度上限 30 行**（`ED_ROWS`；2026-09-21 由 16 提高，本文旧版所写「10 行」系更早数值）。
+  `limit` 默认 20 时结果全部落在可视区内；`limit` 上限 300 > 30 ⇒ 配大上限后仍会有结果在
+  可视区之外 —— `↑`/`↓` 移动高亮时经 `LVM_ENSUREVISIBLE` 把高亮行**自动滚入可视区**
+  （`EverythingDropdown.Select`，2026-09-21 补）；ListView 自身滚动条的鼠标滚轮行为本仓库未做专门验证。
 
+
+---
+
+## 9. 状态自检（2026-10-01，示例 → 插件本体打磨）
+
+审计方法：逐功能点对照本文 §1 的「文档声称」与源码现实（逐文件读码对账 + 引擎侧依赖只读核对），
+动态验证以三道门禁为准（全部在 worktree 根目录执行，命令与结果如下）：
+
+- `python tools/lint_ident.py <main + src 七文件>` → `TOTAL_FINDINGS=0`（exit 0）
+- `MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate plugins/examples/everything_search/main.ahk` → exit 0
+- `MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut plugins/examples/everything_search/tests/open_guard_probe.ahk` → **31/31 PASS**（exit 0；
+  本次扩第 11 组后由 27 项增至 31 项，反向敏感度已实测：把 OnPick 退回旧的无条件 Close
+  时**恰好 11c 一项变红**（Hide=1 / closed=1），其余 30 项不受影响 ⇒ 新断言精确锁住「点选失败提示可见」这一条）
+
+| 功能点 | 落实情况 |
+|---|---|
+| **触发键配置** | ✅ 代码与文档一致：`plugin.json` 声明与 `EverythingSettings.NormKey`（可打印 ASCII 单字符，否则回落空格）与 `EverythingSession.OnChar` 的前置键判定逐条对账通过；`limit` 范围文档漂移（1–100 → 1–300）已订正（§6、§8 与 `plugin.json` min/max 及 `NormLimit` 三处同口径） |
+| **选中文字获取** | ✅ 一致：`SeedFromSelection` → `SelectionContext.Get(true)`（引擎真身返回 `{type, content}`，已只读核对 `bin/lib/context/SelectionContext.ahk`）、`capturing` 捕获锁、文件取首文件主名（去扩展名）均与 §1/§4.1 描述相符 |
+| **结果下拉展示** | ✅ 一致（本次修一处缺口）：`-Caption +ToolWindow +E0x08000000` + `Show("NA")`、命令框锚定（可见白框对齐 + 隐藏窗口二次探测）与文档相符；**发现并修复**：鼠标点选路径 `OnPick` 在 `OpenSelected` 失败时仍无条件 `Close()`，失效提示被立刻收起 —— 与 2026-09-30 Enter 分支修的是同一症状，已对齐为「仅成功才收浮层」并补探针第 11 组；`ED_ROWS` 文档漂移（10 → 30）已订正 |
+| **未启动时静默拉起** | ✅ 代码与文档一致：`ProcessExist` 探活 → `-startup` 拉起 → 250ms × 6s 轮询 → `HideMainWindowIfAny` 兜底（类名黑名单）；「没配路径 vs 配了拉不起来」双提示在 `EverythingSearch.Run` + `_ErrorKey` 落实 |
+| **路径配置** | ✅ 一致：四键声明（`Settings []Setting` 数组形，已对 `internal/plugins/plugins.go:126` 核对）、`ResolveEs` 四级探测链与 `es.exe -version` 实测、GUI 降级通道及 `err_launched_gui` 提示均在；§2 依赖清单已补 `CommandDisplay` / `CommandImeGuard`（引擎侧文件均已只读核对存在）并订正 APIBridge 实际消费面（仅 `settings`） |
+
+### 遗留项
+
+1. **端到端真机验证未跑**：触发键 → 取词 → 浮层 → ↑↓/回车全链路需要运行中的 KeyFlux 引擎 +
+   真实 Everything 实例 + 按键注入，本工作区不满足条件（部署目录禁触、`make check-ime` 在禁令清单）。
+   门禁覆盖的是静态检查 + 会话状态机/守卫链回归。
+2. `_SortArgs` 读 `Everything.ini` 的排序跟随（§5）依赖真实 ini 与 GUI 对照，本次未实测（解析整体
+   try/catch 兜底，异常退回 es 默认排序，不影响查询）。
+3. ListView 鼠标滚轮滚动行为仍未专门验证（§8 如实标注）；↑↓ 高亮的自动滚入可视区有
+   `LVM_ENSUREVISIBLE` 代码落实但无自动化断言（GUI 控件行为，探针桩无法覆盖）。
+4. 设置热重载的**写入端**（设置面板 → `PUT /api/plugins/:id/settings` → 后端原子落盘）属跨端链路，
+   本次只验证了 AHK 侧读端（`EverythingSettings.Load` 每会话重读 + 值变更才失效探测缓存）。
+5. `plugins/marketplace.json` **有意未**加入 everything_search 条目：插件随软件分发
+   （`make sync-plugins`），市场目录是发布侧下载清单（条目需真实 zip 地址），且内置插件集合
+   `BUILTIN_PLUGIN_IDS` 在 `config-ui-reactor/`（本次禁改范围）——是否上架属产品决策，非缺口。
