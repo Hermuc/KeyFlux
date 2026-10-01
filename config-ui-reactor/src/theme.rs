@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(WHITE, Color::rgb(0xff, 0xff, 0xff));
         assert_eq!(MUTED_GREEN_SOFT, Color::rgb(0xe7, 0xeb, 0xe3));
         // 描边色板 = 冷色版（2026-10-01 第一轮）：旧暖值为 #F0EEE6 / #E8E6DC / #D1CFC5 / #C2C0B6，
-        // 见模块头「描边色板」；L* 与 WCAG 对比度必须与旧值一致，仅色相翻到冷侧。
+        // 见模块头「### ① 描边」；L* 与 WCAG 对比度必须与旧值一致，仅色相翻到冷侧。
         assert_eq!(BORDER_FAINT, Color::rgb(0xea, 0xee, 0xf6));
         assert_eq!(BORDER_SOFT, Color::rgb(0xe1, 0xe6, 0xef));
         assert_eq!(RING_SOFT, Color::rgb(0xca, 0xcf, 0xd8));
