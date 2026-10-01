@@ -18,7 +18,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct UiPrefs {
-    /// `true` = 亚克力毛玻璃（Acrylic）；`false` = 系统 Mica（默认，与改动前一致）。
+    /// `true` = 毛玻璃（Mica Alt 背板 + 表面稀释，策略见 `crate::glass`）；
+    /// `false` = 系统 Mica + 不透明表面（默认，与改动前一致）。字段名沿用首版
+    /// 落盘键 `acrylic`（持久化兼容），语义已从 Acrylic 扩展为毛玻璃策略。
     pub acrylic: bool,
 }
 

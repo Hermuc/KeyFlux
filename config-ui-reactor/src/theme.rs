@@ -49,74 +49,25 @@ pub fn solid(color: Color) -> Brush {
     Brush::Solid(color)
 }
 
-// ---------------------------------------------------------------- 亚克力（毛玻璃）表面
-
-/// 亚克力模式开关（进程级；唯一写入点 = ，每帧按状态同步）。
-///
-/// 依据（MS Learn「Structure a modern WinUI 3 desktop app」/「Windows 应用中的材料」）：
-/// 系统背板材质（Mica / Desktop Acrylic）只在**自身表面不完全不透明**处可见 ——
-/// 任何不透明背景都会盖住材质。要让「透明度高一点」，须把应用自绘的大面积表面按
-/// alpha 稀释（保持色相），材质与桌面才会透出来。
-static ACRYLIC: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-/// 由 UI 层同步当前是否启用亚克力（关闭时所有表面恢复不透明 = 与改动前逐像素一致）。
-pub fn set_acrylic(on: bool) {
-    ACRYLIC.store(on, std::sync::atomic::Ordering::Relaxed);
-}
-
-pub fn is_acrylic() -> bool {
-    ACRYLIC.load(std::sync::atomic::Ordering::Relaxed)
-}
-
-/// 表面色 → 玻璃色：亚克力开启时按  稀释（保留色相），否则原样返回。
-fn surface(color: Color, alpha: u8) -> Color {
-    if is_acrylic() {
-        Color::argb(alpha, color.r, color.g, color.b)
-    } else {
-        color
-    }
-}
-
-/// 卡片面（承载正文，读性优先）：~38% 不透明（2026-09-30 由 59% 下调，
-/// 用户反馈「还是不够透明」；正文为近黑字，仍满足可读性）。
-const GLASS_CARD_ALPHA: u8 = 97;
-/// 次级面（内嵌块/弱化卡）：~30%。
-const GLASS_SECONDARY_ALPHA: u8 = 77;
-/// 大面积底（页面底）：~12%，材质透出最明显。
-const GLASS_PAGE_ALPHA: u8 = 31;
-
-/// 亚克力模式下给 NavigationView 的资源覆盖。
-///
-/// WinUI 用**主题资源**（不是属性）控制 NavigationView 的内容区/窗格背景：
-/// * `NavigationViewContentBackground` —— 内容区；覆盖为全透明后系统背板材质才整窗可见
-///   （官方文档明确：任何不透明背景都会盖住材质）；
-/// * `NavigationViewExpandedPaneBackground` / `NavigationViewDefaultPaneBackground` ——
-///   Left / LeftCompact 两态的窗格底：给一层很淡的白（~14%）保留层次，又高度透光。
-///
-/// 资源键名与显示模式对应关系见 MS Learn《NavigationView / Pane Backgrounds》。
-pub fn navigation_glass_resources() -> windows_reactor::ResourceOverrides {
-    windows_reactor::ResourceOverrides::new()
-        .set("NavigationViewContentBackground", Color::transparent())
-        .set(
-            "NavigationViewExpandedPaneBackground",
-            Color::argb(0x24, 0xFF, 0xFF, 0xFF),
-        )
-        .set(
-            "NavigationViewDefaultPaneBackground",
-            Color::argb(0x24, 0xFF, 0xFF, 0xFF),
-        )
-}
+// 表面画刷的透明度全部由 `crate::glass` 策略决定（毛玻璃开 = alpha 稀释，
+// 关 = 原色）；色板令牌与透明度参数在此解耦。
 
 pub fn parchment() -> Brush {
-    solid(surface(PARCHMENT, GLASS_PAGE_ALPHA))
+    solid(crate::glass::dilute(
+        PARCHMENT,
+        crate::glass::current().page,
+    ))
 }
 
 pub fn ivory() -> Brush {
-    solid(surface(IVORY, GLASS_CARD_ALPHA))
+    solid(crate::glass::dilute(IVORY, crate::glass::current().card))
 }
 
 pub fn sand() -> Brush {
-    solid(surface(SAND, GLASS_SECONDARY_ALPHA))
+    solid(crate::glass::dilute(
+        SAND,
+        crate::glass::current().secondary,
+    ))
 }
 
 pub fn terracotta() -> Brush {
@@ -294,40 +245,5 @@ mod tests {
         assert_eq!(WINDOW_HEIGHT, 760.0);
         assert_eq!(SIDEBAR_WIDTH, 264.0);
         assert_eq!(TITLE_BAR_HEIGHT, 36.0);
-    }
-}
-
-#[cfg(test)]
-mod glass_tests {
-    use super::*;
-
-    /// 亚克力开关改变表面 alpha；关闭时不透明度必须回到 255（保证默认外观逐像素不变）。
-    /// 该用例触碰进程级开关 ⇒ 与任何其他读该开关的用例互斥（当前仅此一处）。
-    #[test]
-    fn acrylic_dilutes_surface_alpha_only() {
-        set_acrylic(false);
-        for brush in [parchment(), ivory(), sand()] {
-            let Brush::Solid(color) = brush else {
-                panic!("surface brushes are solid colors");
-            };
-            assert_eq!(color.a, 255);
-        }
-
-        set_acrylic(true);
-        let Brush::Solid(card) = ivory() else {
-            panic!()
-        };
-        assert_eq!(card.a, GLASS_CARD_ALPHA);
-        assert_eq!(
-            (card.r, card.g, card.b),
-            (IVORY.r, IVORY.g, IVORY.b),
-            "色相不得改变"
-        );
-        let Brush::Solid(page) = parchment() else {
-            panic!()
-        };
-        assert_eq!(page.a, GLASS_PAGE_ALPHA);
-
-        set_acrylic(false);
     }
 }
