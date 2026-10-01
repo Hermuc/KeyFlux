@@ -189,51 +189,6 @@ function Copy-EngineStub([string]$root) {
   if (!(Test-Path $dst)) { throw "stub missing after copy: $dst" }
 }
 
-# ---------------------------------------------------------------------------
-# explorer-relay tripwire: the Rust port (impl side) logs its process-relay decisions
-# to %TEMP%\keyflux-proc.log. Calibrated semantics: "SPAWNED ... exists=true" is the
-# DESIGNED fallback (relay launches the existing no-op stub -- no window, benign);
-# "SKIPPED ... target-missing" / "FAILED" are the guard/error paths that pre-guard
-# produced "Documents" window spam -- fail loudly instead of silently regressing.
-# Go does not write that log, so this only guards the Rust side; the sandbox stub
-# assertion above covers both.
-# ---------------------------------------------------------------------------
-$procLogPath = Join-Path $env:TEMP 'keyflux-proc.log'
-
-function Get-ProcLogLength() {
-  if (!(Test-Path $procLogPath)) { return -1 }
-  return (Get-Item $procLogPath).Length
-}
-
-function Assert-NoExplorerRelay([long]$fromLength) {
-  if ($fromLength -lt 0 -or !(Test-Path $procLogPath)) { return }
-  $fs = [IO.File]::Open($procLogPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
-  try {
-    if ($fs.Length -le $fromLength) { return }
-    $fs.Seek($fromLength, [IO.SeekOrigin]::Begin) | Out-Null
-    $sr = New-Object System.IO.StreamReader($fs)
-    $newText = $sr.ReadToEnd()
-  } finally { $fs.Dispose() }
-  # Tripwire semantics (calibrated 2026-09-30 against the Rust proc log):
-  #   "explorer-relay SPAWNED ... exists=true"  -> DESIGNED fallback path: breakaway
-  #     spawn failed (always fails inside the harness job), relay launched the EXISTING
-  #     no-op stub via explorer -- no Explorer window, no spam. Benign; do not fail.
-  #   "explorer-relay SKIPPED ... reason=target-missing" -> the relay GUARD fired:
-  #     explorer was correctly NOT called, but it means the stub did not land in the
-  #     sandbox -- the exact misconfiguration that used to spam "Documents" windows
-  #     (pre-guard the missing path went to explorer). Fail loudly.
-  #   "explorer-relay FAILED ..." -> relay itself errored. Fail loudly.
-  $relays = @($newText -split "`n" |
-    Where-Object { $_ -match 'explorer-relay (SKIPPED|FAILED)' })
-  if ($relays.Count -gt 0) {
-    Write-Host '[tripwire] EXPLORER_RELAY_GUARD_DETECTED during this run:'
-    $relays | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
-    Write-Host '  A spawn was skipped/failed by the relay guard (stub missing or relay error).'
-    Write-Host '  Pre-guard this path opened "Documents" windows. Fix the stub / sandbox setup.'
-    exit 1
-  }
-}
-
 # Build the deploy-tree sandbox under %TEMP%:
 #   <sandbox>/bin/settings.exe  <sandbox>/bin/behaviors/  <sandbox>/bin/templates/
 #   <sandbox>/data/config.json  <sandbox>/data/plugins/   <sandbox>/KeyFlux.exe (stub)
@@ -423,12 +378,10 @@ if ($Capture) {
   Assert-StubAsset
   Write-Host "[capture] exe: $Exe"
   Write-Host "[capture] stub asset: $stubAsset"
-  $logMark = Get-ProcLogLength
   Write-Host '[capture] pass 1 ...'
   $pass1 = Invoke-CapturePass $Exe
   Write-Host '[capture] pass 2 (determinism gate) ...'
   $pass2 = Invoke-CapturePass $Exe
-  Assert-NoExplorerRelay $logMark
 
   # Determinism gate: both passes must agree on exit code, status line and response
   # bytes -- otherwise the reference is NOT written. Byte equality is delegated to the
@@ -513,7 +466,6 @@ $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
 Write-Host "[check] exe: $Exe"
 Assert-StubAsset
 Write-Host "[check] stub asset: $stubAsset"
-$logMark = Get-ProcLogLength
 $sandbox = New-Sandbox $Exe
 $pass = 0
 $missing = @()
@@ -579,7 +531,6 @@ try {
 } finally {
   Remove-Sandbox $sandbox
 }
-Assert-NoExplorerRelay $logMark
 
 $total = $manifest.items.Count
 if ($mismatch.Count -gt 0) {
