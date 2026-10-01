@@ -199,6 +199,14 @@ class APIView {
     return MsgBox(msg, "KeyFlux 插件", "OKCancel Icon?") = "OK"
   }
 
+  ; ---- 插件动作注册 (不门控, 2026-10-01 P2: 动作自描述是插件基础能力) ----
+  ; 插件入口内把自身动作挂到 PluginManager.Actions 注册表, 核心侧 (生成端 callMap /
+  ; 内置薄壳) 经 PluginManager.InvokeAction("<pluginId>", "<actionId>") 间接寻址 ——
+  ; 核心对插件实现零静态引用, 插件被删除/停用时调用点静默返回 false (可删除性保证)。
+  RegisterAction(actionId, fn) {
+    return PluginManager.RegisterAction(this._pluginId, actionId, fn)
+  }
+
   ; ---- config.* (委托 ConfigProvider, 契约 §3.8; 按插件 ID 作用域隔离) ----
   GetSetting(key) {
     if (!this._has("config"))

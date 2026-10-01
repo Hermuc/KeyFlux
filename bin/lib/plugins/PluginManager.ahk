@@ -12,6 +12,52 @@ class PluginManager {
   ; permissions 词表 (冻结, 契约 §4)
   static PERMISSIONS := ["selection", "run", "clipboard", "window", "settings", "events"]
 
+  ; ---- 插件动作注册表 (命令注册表范式; 2026-10-01 QuickSwitch 插件化 P2 落地) ----
+  ; 核心对插件实现**零静态引用**: 生成端 callMap 只产出 InvokeAction("<pluginId>",
+  ; "<actionId>"), 插件在入口内经 APIView.RegisterAction("<actionId>", <fn>) 注册实现。
+  ; 🔴 为什么必须经表间接寻址而不能直调: AHK v2 直调未定义函数是**加载期致命错误**
+  ;   (2026-10-01 探针实测, 见提案 docs/contracts-proposals/quickswitch-pluginization.md
+  ;   §0.5) —— 若核心薄壳直调插件符号, 插件被删除/停用后整个引擎无法启动。
+  ;   缺席 => 记日志返回 false, 绝不抛错 (可删除性保证)。
+  static Actions := Map()        ; "<pluginId>:<actionId>" -> Func
+
+  /**
+   * 插件入口内注册动作实现 (经 APIView.RegisterAction 调用)。
+   * @param fn 函数引用 (Func 对象 / 闭包), 无参调用
+   * @return true = 注册成功; false = 插件未注册 (拒绝孤儿注册)
+   */
+  static RegisterAction(pluginId, actionId, fn) {
+    if (!this.Plugins.Has(pluginId)) {
+      this._recordError(pluginId, "RegisterAction rejected: plugin not registered")
+      return false
+    }
+    this.Actions[pluginId ":" actionId] := fn
+    this._log("action registered: " pluginId ":" actionId)
+    return true
+  }
+
+  /**
+   * 调用插件动作 (核心侧唯一入口; 生成端 callMap 与薄壳走这里)。
+   * 插件未加载/未注册该动作 => 日志 + false (静默, 不打断调用方)。
+   * 动作异常 => 错误隔离 (recordError), 不冒泡 (约束 4)。
+   * @return true = 动作已执行 (无论内部结果); false = 动作不可用或执行失败
+   */
+  static InvokeAction(pluginId, actionId) {
+    key := pluginId ":" actionId
+    if (!this.Actions.Has(key)) {
+      this._log("action not available: " key " (插件未加载或未注册该动作)")
+      return false
+    }
+    fn := this.Actions[key]
+    try {
+      fn.Call()
+    } catch as err {
+      this._recordError(pluginId, "action '" actionId "' failed: " err.Message " @ " err.What " line " err.Line)
+      return false
+    }
+    return true
+  }
+
   /**
    * 注册插件。manifest 为生成端渲染的 AHK Map (无需 AHK 侧 JSON 解析)。
    * 必需字段: id, entry。permissions 须在词表内。

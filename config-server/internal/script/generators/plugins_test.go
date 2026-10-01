@@ -12,19 +12,19 @@ import (
 // 生成产物与历史字节一致 (不破坏现有 Oracle/golden 基线)。
 func TestRenderPluginBlocks_Empty(t *testing.T) {
 	SetPluginsDir("")
-	inc, boot := pluginBlocks()
-	if inc != "" || boot != "" {
-		t.Fatalf("未注入目录时应为空块: inc=%q boot=%q", inc, boot)
+	inc, boot, late := pluginBlocks()
+	if inc != "" || boot != "" || late != "" {
+		t.Fatalf("未注入目录时应为空块: inc=%q boot=%q late=%q", inc, boot, late)
 	}
 	SetPluginsDir(t.TempDir()) // 空目录
-	inc, boot = pluginBlocks()
-	if inc != "" || boot != "" {
-		t.Fatalf("空目录应为空块: inc=%q boot=%q", inc, boot)
+	inc, boot, late = pluginBlocks()
+	if inc != "" || boot != "" || late != "" {
+		t.Fatalf("空目录应为空块: inc=%q boot=%q late=%q", inc, boot, late)
 	}
 	SetPluginsDir(filepath.Join(t.TempDir(), "不存在"))
-	inc, boot = pluginBlocks()
-	if inc != "" || boot != "" {
-		t.Fatalf("缺失目录应为空块: inc=%q boot=%q", inc, boot)
+	inc, boot, late = pluginBlocks()
+	if inc != "" || boot != "" || late != "" {
+		t.Fatalf("缺失目录应为空块: inc=%q boot=%q late=%q", inc, boot, late)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestRenderPluginBlocks_ScriptPlugin(t *testing.T) {
 	os.WriteFile(filepath.Join(pdir, "main.ahk"), []byte("SampleGreeterMain(api) {}"), 0o644)
 
 	SetPluginsDir(dir)
-	inc, boot := pluginBlocks()
+	inc, boot, late := pluginBlocks()
 
 	if inc != "\n#Include ../data/plugins/sample_greeter/main.ahk" {
 		t.Fatalf("Include 块不符:\n%q", inc)
@@ -60,6 +60,10 @@ func TestRenderPluginBlocks_ScriptPlugin(t *testing.T) {
 	if strings.Contains(boot, "\n\", ") || strings.Count(boot, "`")%2 != 0 {
 		t.Fatalf("字面量转义异常:\n%q", boot)
 	}
+	// 非 quick_switch 插件不得产出晚初始化行 (晚初始化扩展点当前唯一消费方)
+	if late != "" {
+		t.Fatalf("非 quick_switch 不得产出晚初始化行:\n%q", late)
+	}
 }
 
 // 入口文件缺失: 生成期拦截 (AHK #Include 指向缺失文件会拖垮整个脚本加载),
@@ -74,7 +78,7 @@ func TestRenderPluginBlocks_MissingEntryFile(t *testing.T) {
 	}`), 0o644)
 
 	SetPluginsDir(dir)
-	inc, boot := pluginBlocks()
+	inc, boot, _ := pluginBlocks()
 	if inc != "" {
 		t.Fatalf("入口缺失时不得产出 Include:\n%q", inc)
 	}
@@ -98,7 +102,7 @@ func TestRenderPluginBlocks_PathEscape(t *testing.T) {
 		}`), 0o644)
 
 		SetPluginsDir(dir)
-		inc, boot := pluginBlocks()
+		inc, boot, _ := pluginBlocks()
 		if inc != "" {
 			t.Fatalf("路径逃逸 %q 不得产出 Include:\n%q", evil, inc)
 		}
@@ -125,7 +129,7 @@ func TestRenderPluginBlocks_Disabled(t *testing.T) {
 	Cfg = &model.Config{Options: model.Options{Plugins: model.PluginsOption{Disabled: []string{"off"}}}}
 	defer func() { Cfg = nil }()
 	SetPluginsDir(dir)
-	inc, boot := pluginBlocks()
+	inc, boot, _ := pluginBlocks()
 
 	if strings.Contains(inc, "/off/") {
 		t.Fatalf("停用插件不得产出 Include:\n%q", inc)
@@ -156,11 +160,95 @@ func TestRenderPluginBlocks_NonScriptEntry(t *testing.T) {
 	}`), 0o644)
 
 	SetPluginsDir(dir)
-	inc, boot := pluginBlocks()
+	inc, boot, _ := pluginBlocks()
 	if inc != "" {
 		t.Fatalf("非 script 入口不得产出 Include:\n%q", inc)
 	}
 	if !strings.Contains(boot, "[插件错误] decl") || !strings.Contains(boot, "仅支持 script") {
 		t.Fatalf("缺校验错误注释:\n%q", boot)
+	}
+}
+
+// quick_switch 晚初始化行: 插件存在时产出 InitQuickSwitch(...) 调用,
+// 字节形态必须与迁移前模板硬编码行完全一致 (字段顺序/分隔符/bool 文本/转义)。
+func TestPluginLateInit_QuickSwitch(t *testing.T) {
+	dir := t.TempDir()
+	pdir := filepath.Join(dir, "quick_switch")
+	os.MkdirAll(pdir, 0o755)
+	os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
+		"id": "quick_switch", "name": "快速切换", "nameEn": "Quick Switch",
+		"version": "1.0.0", "specVersion": 1, "description": "内置插件化",
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"},
+		"permissions": ["window"]
+	}`), 0o644)
+	os.WriteFile(filepath.Join(pdir, "main.ahk"), []byte("QuickSwitchMain(api) {}"), 0o644)
+
+	// 注入配置: Cfg 为 generators 包的全局 (SaveAHK 在模板执行前注入)
+	oldCfg := Cfg
+	Cfg = &model.Config{}
+	Cfg.Options.QuickSwitch = model.QuickSwitchOption{
+		CollectEnabled: true, AutoShow: true, AutoJumpOpen: true, AutoJumpSave: false,
+		PollIntervalMs: 800, MaxHistory: 20, OverlayRows: 8, OverlayRowsCompact: 4,
+		ExcludedPrefixes: []string{"C:\\Temp", "D:\\「引号」"},
+	}
+	defer func() { Cfg = oldCfg }()
+
+	SetPluginsDir(dir)
+	_, boot, late := pluginBlocks()
+
+	want := "\nInitQuickSwitch({collectEnabled: true, autoShow: true, autoJumpOpen: true, autoJumpSave: false, pollIntervalMs: 800, maxHistory: 20, overlayRows: 8, overlayRowsCompact: 4, excludedPrefixes: [\"C:\\Temp\", \"D:\\「引号」\"]})"
+	if late != want {
+		t.Fatalf("晚初始化行字节不符:\n got=%q\nwant=%q", late, want)
+	}
+	// 引导行照常产出 (真插件身份)
+	if !strings.Contains(boot, "\nPluginManager.LoadEntry(\"quick_switch\")") {
+		t.Fatalf("quick_switch 应注册引导行:\n%q", boot)
+	}
+}
+
+// quick_switch 被禁用/入口缺失时晚初始化行不得产出 (可删除性保证: AHK v2 直调
+// 未定义函数是加载期致命错误, 删除插件后 InitQuickSwitch 符号不存在)。
+func TestPluginLateInit_QuickSwitchAbsent(t *testing.T) {
+	oldCfg := Cfg
+	Cfg = &model.Config{}
+	Cfg.Options.QuickSwitch = model.QuickSwitchOption{CollectEnabled: true}
+	defer func() { Cfg = oldCfg }()
+
+	// 入口缺失
+	dir := t.TempDir()
+	pdir := filepath.Join(dir, "quick_switch")
+	os.MkdirAll(pdir, 0o755)
+	os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
+		"id": "quick_switch", "name": "快速切换", "specVersion": 1,
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"}
+	}`), 0o644)
+	SetPluginsDir(dir)
+	_, boot, late := pluginBlocks()
+	if late != "" {
+		t.Fatalf("入口缺失时不得产出晚初始化行:\n%q", late)
+	}
+	if !strings.Contains(boot, "入口文件缺失") {
+		t.Fatalf("缺入口缺失警告:\n%q", boot)
+	}
+
+	// 配置禁用 (options.plugins.disabled)
+	dir2 := t.TempDir()
+	pdir2 := filepath.Join(dir2, "quick_switch")
+	os.MkdirAll(pdir2, 0o755)
+	os.WriteFile(filepath.Join(pdir2, "plugin.json"), []byte(`{
+		"id": "quick_switch", "name": "快速切换", "specVersion": 1,
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"}
+	}`), 0o644)
+	os.WriteFile(filepath.Join(pdir2, "main.ahk"), []byte("QuickSwitchMain(api) {}"), 0o644)
+	oldDisabled := Cfg.Options.Plugins.Disabled
+	Cfg.Options.Plugins.Disabled = []string{"quick_switch"}
+	defer func() { Cfg.Options.Plugins.Disabled = oldDisabled }()
+	SetPluginsDir(dir2)
+	_, boot2, late2 := pluginBlocks()
+	if late2 != "" {
+		t.Fatalf("禁用插件不得产出晚初始化行:\n%q", late2)
+	}
+	if !strings.Contains(boot2, "已在配置中停用") {
+		t.Fatalf("缺停用注释:\n%q", boot2)
 	}
 }

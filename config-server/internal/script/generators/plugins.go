@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"settings/internal/plugins"
+	"settings/internal/script/model"
 	"strings"
 	"sync"
 )
@@ -22,6 +23,7 @@ var (
 	pluginMu             sync.Mutex
 	pluginIncludeBlock   string
 	pluginBootstrapBlock string
+	pluginLateInitBlock  string
 	pluginScanDone       bool
 )
 
@@ -30,31 +32,45 @@ func SetPluginsDir(dir string) {
 	pluginMu.Lock()
 	defer pluginMu.Unlock()
 	PluginsDir = dir
-	pluginIncludeBlock, pluginBootstrapBlock = "", ""
+	pluginIncludeBlock, pluginBootstrapBlock, pluginLateInitBlock = "", "", ""
 	pluginScanDone = false
 }
 
 // PluginIncludes 模板函数 {{ PLUGIN_INCLUDES }}: 各插件入口 #Include 行,
 // 每行以 \n 前导 (行尾拼接约定), 末行不带换行。
 func PluginIncludes() string {
-	inc, _ := pluginBlocks()
+	inc, _, _ := pluginBlocks()
 	return inc
 }
 
 // PluginBootstrap 模板函数 {{ PLUGIN_BOOTSTRAP }}: Register + LoadEntry 引导行。
 func PluginBootstrap() string {
-	_, boot := pluginBlocks()
+	_, boot, _ := pluginBlocks()
 	return boot
 }
 
-func pluginBlocks() (string, string) {
+// PluginLateInit 模板函数 {{ PLUGIN_LATE_INIT }}: 插件晚初始化扩展点
+// (2026-10-01 QuickSwitch 插件化 P2 引入; 模板中位于 InitKeymap() 与 OnExit 之间)。
+// 产出「必须晚于 InitKeymap()」的插件初始化行, 每行以 \n 前导, 空块 = 零字节
+// (行尾拼接约定, 与 PLUGIN_INCLUDES/BOOTSTRAP 同款)。
+// 当前唯一消费方 = quick_switch 的 InitQuickSwitch(...) 调用行: 代码已随插件搬入
+// data/plugins/quick_switch/ (提案 docs/contracts-proposals/quickswitch-pluginization.md),
+// 调用时机与参数来源 (config.json options.quickSwitch 的生成期渲染) 保持与硬编码时期
+// 逐字节一致; 插件被禁用/入口缺失 => 不产出 (可删除性保证)。配置段迁移到
+// plugin-settings.json + 声明式设置属 P5, 届时本函数对 quick_switch 的特判移除。
+func PluginLateInit() string {
+	_, _, late := pluginBlocks()
+	return late
+}
+
+func pluginBlocks() (string, string, string) {
 	pluginMu.Lock()
 	defer pluginMu.Unlock()
 	if !pluginScanDone {
 		pluginScanDone = true
-		pluginIncludeBlock, pluginBootstrapBlock = renderPluginBlocks(PluginsDir)
+		pluginIncludeBlock, pluginBootstrapBlock, pluginLateInitBlock = renderPluginBlocks(PluginsDir)
 	}
-	return pluginIncludeBlock, pluginBootstrapBlock
+	return pluginIncludeBlock, pluginBootstrapBlock, pluginLateInitBlock
 }
 
 // disabledPluginSet 读取 config.options.plugins.disabled (启停持久化, 契约 §1 数据进配置)。
@@ -72,13 +88,15 @@ func disabledPluginSet() map[string]bool {
 // renderPluginBlocks 单插件失败只产注释行, 不影响其他插件 (契约约束 4 错误隔离)。
 // 入口文件在生成期做存在性与路径安全校验: AHK 的 #Include 指向缺失文件会让整个
 // 脚本加载失败 (拖垮引擎), 必须在生成期拦下。
-func renderPluginBlocks(dir string) (includes, bootstrap string) {
+// 第三块 = 晚初始化行 (PluginLateInit / {{ PLUGIN_LATE_INIT }}), 与前两块共享同一
+// 存在性/禁用判定 —— 插件被跳过时三块同步跳过, 保证「插件不可用 ⇒ 初始化行不产出」。
+func renderPluginBlocks(dir string) (includes, bootstrap, lateInit string) {
 	if dir == "" {
-		return "", ""
+		return "", "", ""
 	}
 	cat := plugins.LoadCatalog(dir)
 	disabled := disabledPluginSet()
-	var inc, boot strings.Builder
+	var inc, boot, late strings.Builder
 	for _, m := range cat.Plugins {
 		if disabled[m.ID] {
 			// 启停持久化 (config.options.plugins.disabled): 停用插件不注入不注册,
@@ -103,11 +121,45 @@ func renderPluginBlocks(dir string) (includes, bootstrap string) {
 		inc.WriteString(fmt.Sprintf("\n#Include ../data/plugins/%s/%s", m.ID, m.Entry.File))
 		boot.WriteString(fmt.Sprintf("\nPluginManager.Register(%s)", ahkManifestLiteral(m)))
 		boot.WriteString(fmt.Sprintf("\nPluginManager.LoadEntry(%s)", ahkStringLit(m.ID)))
+		if m.ID == "quick_switch" && Cfg != nil {
+			late.WriteString(renderQuickSwitchLateInit(Cfg.Options.QuickSwitch))
+		}
 	}
 	for _, e := range cat.Errors {
 		boot.WriteString(fmt.Sprintf("\n; [插件错误] %s", e))
 	}
-	return inc.String(), boot.String()
+	return inc.String(), boot.String(), late.String()
+}
+
+// renderQuickSwitchLateInit 渲染 quick_switch 的晚初始化行 (InitQuickSwitch 调用)。
+// 🔴 字节等价约束: 字段顺序 / 分隔符 / bool 文本 (%t) / ahkString 转义 必须与迁移前
+// 模板硬编码行完全一致 (否则 parity 12 份基线全漂)。迁移前形态见 git 历史
+// keyflux.tmpl (InitQuickSwitch({...}), 2026-10-01 P2 前最后一版)。
+// 参数来源 = config.json options.quickSwitch (Go 模板引擎原渲染点), 非 plugin-settings
+// (迁移属 P5)。
+func renderQuickSwitchLateInit(q model.QuickSwitchOption) string {
+	var b strings.Builder
+	b.WriteString("\nInitQuickSwitch({collectEnabled: ")
+	b.WriteString(fmt.Sprintf("%t", q.CollectEnabled))
+	b.WriteString(", autoShow: ")
+	b.WriteString(fmt.Sprintf("%t", q.AutoShow))
+	b.WriteString(", autoJumpOpen: ")
+	b.WriteString(fmt.Sprintf("%t", q.AutoJumpOpen))
+	b.WriteString(", autoJumpSave: ")
+	b.WriteString(fmt.Sprintf("%t", q.AutoJumpSave))
+	b.WriteString(fmt.Sprintf(", pollIntervalMs: %d", q.PollIntervalMs))
+	b.WriteString(fmt.Sprintf(", maxHistory: %d", q.MaxHistory))
+	b.WriteString(fmt.Sprintf(", overlayRows: %d", q.OverlayRows))
+	b.WriteString(fmt.Sprintf(", overlayRowsCompact: %d", q.OverlayRowsCompact))
+	b.WriteString(", excludedPrefixes: [")
+	for i, p := range q.ExcludedPrefixes {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(model.AhkString(p))
+	}
+	b.WriteString("]})")
+	return b.String()
 }
 
 // ahkManifestLiteral 把 manifest 渲染为 AHK Map 字面量

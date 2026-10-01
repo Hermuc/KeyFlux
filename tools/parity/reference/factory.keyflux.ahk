@@ -20,12 +20,6 @@
 #Include lib/context/SelectionContext.ahk
 #Include lib/rules/SelectedAction.ahk
 #Include lib/commands/CommandResolver.ahk
-#Include lib/quickswitch/FolderRanker.ahk
-#Include lib/quickswitch/HistoryStore.ahk
-#Include lib/quickswitch/FolderHistory.ahk
-#Include lib/quickswitch/DialogInspector.ahk
-#Include lib/quickswitch/QuickSwitchUI.ahk
-#Include lib/quickswitch/QuickSwitch.ahk
 #Include lib/plugins/Plugins.ahk
 
 ; #WinActivateForce   ; 先关了遇到相关问题再打开试试
@@ -59,7 +53,6 @@ ImeInputHost.Enable()
 ; 见 docs/design-ime-guard.md。
 CommandInputHooks.Register(CommandImeGuard)
 InitKeymap()
-InitQuickSwitch({collectEnabled: true, autoShow: true, autoJumpOpen: true, autoJumpSave: false, pollIntervalMs: 800, maxHistory: 200, overlayRows: 8, overlayRowsCompact: 4, excludedPrefixes: []})
 OnExit(KeyFluxExit)
 #include ../data/custom_functions.ahk
 

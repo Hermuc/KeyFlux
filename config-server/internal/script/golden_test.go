@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"settings/internal/script/generators"
 )
 
 // 黄金文件测试: 用 Go 字面量合成的最小配置走完整渲染管线 (Preprocess -> SaveAHK),
@@ -147,6 +149,28 @@ func TestSyntheticConfigCoversMatrix(t *testing.T) {
 // 从而 100% 复用 SaveAHK 的字节管线 (CRLF 归一化 + 模板自带 BOM 随渲染进产物)。
 func generateAHK(t *testing.T) string {
 	t.Helper()
+
+	// 插件目录 (2026-10-01 P2 插件化): quick_switch 已以标准插件形态经
+	// data/plugins/ 分发, 黄金基线覆盖「插件注入 + 晚初始化扩展点」双路径。
+	// 桩包与仓库 plugins/examples/quick_switch 同构 (entry.func = QuickSwitchMain)。
+	base := t.TempDir()
+	pdir := filepath.Join(base, "quick_switch")
+	if err := os.MkdirAll(pdir, 0o755); err != nil {
+		t.Fatalf("建插件目录失败: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
+		"id": "quick_switch", "name": "快速切换", "nameEn": "Quick Switch",
+		"version": "1.0.0", "specVersion": 1, "description": "黄金快照桩包",
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"},
+		"permissions": ["window"]
+	}`), 0o644); err != nil {
+		t.Fatalf("写桩 manifest 失败: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pdir, "main.ahk"), []byte("QuickSwitchMain(api) {}"), 0o644); err != nil {
+		t.Fatalf("写桩入口失败: %v", err)
+	}
+	generators.SetPluginsDir(base)
+	defer generators.SetPluginsDir("")
 
 	cfg := syntheticConfig()
 	Preprocess(cfg) // 必须与 SaveAHK 保持同序, 否则 !f17 不会出现在快照里
