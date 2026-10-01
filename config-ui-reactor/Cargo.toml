@@ -42,7 +42,8 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graph
 # vendor 补丁（2026-09-28）：上游 0.100.0 无字体通道（无 font_family builder /
 # ResourceOverrides 仅色值 / AppContext 不暴露 Resources），fork 在装完 Fluent
 # 资源后经 XamlReader 覆盖 ContentControlThemeFontFamily 全局字体键（MiSans）。
-# 补丁面：app_shim.rs 新增 install_global_ui_font + app.rs 一行调用；其余与上游一致。
+# 补丁面与升级步骤见 vendor/windows-reactor/PATCHES.md —— 该文件是**唯一清单**，
+# 勿在此处重复维护（历史教训：本注释曾停留在 P1 时代，P2~P5 一直没写进来）。
 [patch.crates-io]
 windows-reactor = { path = "vendor/windows-reactor" }
 
