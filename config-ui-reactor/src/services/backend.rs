@@ -192,6 +192,11 @@ pub struct BackendSession {
     diagnostics: Arc<Mutex<Vec<String>>>,
     /// Job Object：GUI 进程死亡（含被强杀）时由 OS 连带回收后端进程树。
     /// 字段在 `Drop::drop` 之后才析构 ⇒ 先 kill 子进程，再关 Job 句柄。
+    ///
+    /// ⚠️ 本字段**从不被读取**（语义全在析构里）⇒ `dead_code` 对 RAII 守卫是误报。
+    /// 刻意用 `expect` 而非 `allow`：一旦将来真有人读它，本行会因
+    /// `unfulfilled_lint_expectations` 报错，强制把这条豁免删掉。
+    #[expect(dead_code, reason = "RAII 守卫：只在 Drop 中生效，没有读取点")]
     job: Option<JobObject>,
 }
 
