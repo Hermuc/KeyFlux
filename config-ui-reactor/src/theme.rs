@@ -221,8 +221,11 @@ pub const TITLE_BAR_HEIGHT: f64 = 36.0;
 mod tests {
     use super::*;
 
+    /// 色板钉值：每个令牌必须等于其登记值 —— 改值即视为主题重设计，必须同步改本断言。
+    /// （原误名为 `palette_matches_legacy_skin_values`：冷色化后断言的一半是**刻意不对齐**
+    /// 旧暖皮肤的冷色值，名字与事实相反，故订正。）
     #[test]
-    fn palette_matches_legacy_skin_values() {
+    fn palette_tokens_match_pinned_values() {
         // 表面色逐色对齐旧 Claude.axaml / ClaudePalette.cs（改值即视为主题重设计，需同步此断言）
         assert_eq!(PARCHMENT, Color::rgb(0xf5, 0xf4, 0xed));
         assert_eq!(IVORY, Color::rgb(0xfa, 0xf9, 0xf5));
