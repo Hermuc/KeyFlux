@@ -38,7 +38,9 @@ pub type BridgeRunner = Arc<
 /// CLI 传输的 `SettingsApi` 实现。
 pub struct CliSettingsApi {
     exe: PathBuf,
-    work_dir: PathBuf,
+    /// ⚠️ 刻意**不存**工作目录：它已被 `runner` 闭包捕获（见 `with_paths` 的 `run_dir`）。
+    /// 曾并存的 `work_dir` 字段是同一事实的冗余第二副本（永远不读，`with_paths` 只写），
+    /// 属 drift 隐患 —— 改它不会影响任何行为 —— 故删除。
     runner: BridgeRunner,
 }
 
@@ -67,21 +69,13 @@ impl CliSettingsApi {
         let runner: BridgeRunner = Arc::new(move |method, path, body, content_type| {
             run_bridge(&run_exe, &run_dir, method, path, body, content_type)
         });
-        Self {
-            exe,
-            work_dir,
-            runner,
-        }
+        Self { exe, runner }
     }
 
     /// 测试替身：注入自定义桥执行器（不启进程）。
     #[cfg(test)]
-    pub fn with_runner(exe: PathBuf, work_dir: PathBuf, runner: BridgeRunner) -> Self {
-        Self {
-            exe,
-            work_dir,
-            runner,
-        }
+    pub fn with_runner(exe: PathBuf, runner: BridgeRunner) -> Self {
+        Self { exe, runner }
     }
 
     /// 统一收口：把一次桥调用折成 `ApiResponse<T>`（语义映射复用 `finish_response`）。
@@ -384,11 +378,8 @@ mod tests {
     }
 
     fn api_with(runner: BridgeRunner) -> CliSettingsApi {
-        CliSettingsApi::with_runner(
-            PathBuf::from("X:/bin/settings.exe"),
-            PathBuf::from("X:/bin"),
-            runner,
-        )
+        // 只需 exe（用于 `describe()` 的标识串）；工作目录由注入的 runner 自理。
+        CliSettingsApi::with_runner(PathBuf::from("X:/bin/settings.exe"), runner)
     }
 
     #[test]
