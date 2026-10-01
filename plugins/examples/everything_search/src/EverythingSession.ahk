@@ -319,13 +319,19 @@ class EverythingSession {
     }
   }
 
-  /** 鼠标点选浮层某行 (回调来自 EverythingDropdown)。同样走 OpenSelected 的守卫链。 */
+  /**
+   * 鼠标点选浮层某行 (回调来自 EverythingDropdown)。同样走 OpenSelected 的守卫链。
+   * 与 Enter 分支同款「仅成功才收尾」(2026-10-01 对齐): 失败 (路径空/已失效/被去抖) 时
+   * 保留浮层, 让 OpenSelected 出的提示留在屏上 —— 旧写法无条件 Close, 点一个已失效的
+   * 结果 = 浮层闪一下就消失, 用户视角「点了没反应」且不知原因 (与 2026-09-30 Enter
+   * 分支修的是同一症状, 见 OnKey 的 VK_RETURN 分支注释)。
+   */
   OnPick(path) {
     for i, it in this.items {
       if (it.path = path) {
         this.index := i
-        this.OpenSelected()
-        this.Close()
+        if (this.OpenSelected())
+          this.Close()
         return
       }
     }

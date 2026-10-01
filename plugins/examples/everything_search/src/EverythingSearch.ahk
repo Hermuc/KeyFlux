@@ -120,7 +120,9 @@ class EverythingSearch {
   }
 
   /**
-   * 执行一次搜索 (同步; 调用方在命令框输入期, 单次 es 调用约 10-60ms)。
+   * 执行一次搜索 (同步; 调用方在命令框输入期, 每次追加/退格都会重跑本方法)。
+   * 耗时: 单次 es 调用本机实测约 141ms (含 -timeout 4000 与导出落盘, 见 README §8) ——
+   * 输入期同步执行是有意为之 (简化状态机), 不做增量/防抖。
    * @param query 检索词
    * @param limit 结果条数上限
    * @returns {{ok:Boolean, error:String, items:Array<{path,name,isFolder}>}}
