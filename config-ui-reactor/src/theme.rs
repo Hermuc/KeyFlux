@@ -77,11 +77,6 @@ pub const RING_SOFT: Color = Color::rgb(0xca, 0xcf, 0xd8);
 /// 控件强环 / 按下态 —— 旧 `ClaudeRingDeep` 的冷色对应（L* 77.61 → 77.57）。
 pub const RING_STRONG: Color = Color::rgb(0xbb, 0xc0, 0xc9);
 
-/// 兼容旧命名（Phase 1 PoC 用的 `TEXT_PRIMARY`/`TEXT_MUTED`/`BORDER`）。
-pub const TEXT_PRIMARY: Color = NEAR_BLACK;
-pub const TEXT_MUTED: Color = STONE_GRAY;
-pub const BORDER: Color = RING_STRONG;
-
 /// 正向语义色（状态点 / ON 指示）—— 语义色，**不参与冷色化**。
 pub const MUTED_GREEN: Color = Color::rgb(0x5e, 0x7d, 0x5a);
 
@@ -113,6 +108,8 @@ pub fn sand() -> Brush {
 }
 
 /// 强调色刷（CTA / 选中胶囊 / 选中键格 / 分区指示符）。
+/// ⚠️ 与 **WinUI 系统强调色**（`ThemeBrush::Accent`，开关/系统控件用）区分：此处是本皮肤
+/// **自绘**强调色；二者色相刻意同族（见模块头 ②），故不再单独暴露系统强调色通路。
 pub fn accent_solid() -> Brush {
     solid(ACCENT)
 }
@@ -130,18 +127,7 @@ pub fn border_faint() -> Brush {
     solid(BORDER_FAINT)
 }
 
-/// 次级描边刷。
-pub fn border_soft() -> Brush {
-    solid(BORDER_SOFT)
-}
-
-/// 系统主题画刷通路（验证 `ThemeBrush`）：Accent / 卡片底 / 卡片描边。
-/// ⚠️ 与自绘 [`ACCENT`] 区分：本函数取的是 **WinUI 系统强调色**（开关、系统控件用），
-/// [`accent_solid`] 是本皮肤自绘的强调色。二者色相刻意同族（见模块头 ②）。
-pub fn system_accent() -> Brush {
-    Brush::Theme(windows_reactor::ThemeBrush::Accent)
-}
-
+/// 系统主题画刷通路（验证 `ThemeBrush`）：卡片底 / 卡片描边。
 pub fn card_background() -> Brush {
     Brush::Theme(windows_reactor::ThemeBrush::CardBackground)
 }
@@ -181,10 +167,6 @@ pub fn radius_panel() -> CornerRadius {
 
 // ---------------------------------------------------------------- 间距 / 描边
 
-pub fn pad_sm() -> Thickness {
-    Thickness::uniform(8.0)
-}
-
 pub fn pad_md() -> Thickness {
     Thickness::uniform(16.0)
 }
@@ -203,26 +185,14 @@ pub fn card_border() -> Thickness {
     Thickness::uniform(2.0)
 }
 
-/// 侧栏分隔线（单向）。
-pub fn divider_right() -> Thickness {
-    Thickness::new(0.0, 0.0, 1.0, 0.0)
-}
-
-/// 窗口外框（无边框窗口的 1px 暖环）。
-pub fn window_frame_ring() -> Thickness {
-    Thickness::uniform(1.0)
-}
-
 // ---------------------------------------------------------------- 排版（旧 App.axaml 令牌）
 
-/// UI 字体栈（单源事实）：随包 MiSans 四字重经 `platform::fonts` 进程内私有加载，
-/// 由 fork `install_global_ui_font` 覆盖 `ContentControlThemeFontFamily` 全局生效
-/// （reactor 无 per-control font_family builder，故不在此消费；此处仅作事实记录）。
-pub const UI_FONT: &str = "MiSans, Segoe UI Emoji";
-/// 标题（衬线）字体栈（旧版 DESIGN 的 serif 档；reactor 无 font_family 暂不可达）。
-pub const SERIF_FONT: &str = "Georgia, Segoe UI Variable, serif";
+// 字体栈**不在此出令牌**（旧 `UI_FONT` 与 `SERIF_FONT` 均为零消费常量，已删）：
+// 随包 MiSans 四字重经 `platform::fonts` 进程内私有加载，再由 fork
+// `install_global_ui_font` 覆盖 `ContentControlThemeFontFamily` 全局主题字典键生效；
+// reactor 无 per-control font_family builder ⇒ Rust 侧没有消费点。
+// 族名真源 = `vendor/windows-reactor/src/native/winui/app_shim.rs` 的 XAML 字面量。
 
-pub const FONT_TITLE: f64 = 18.0;
 pub const FONT_SUBTITLE: f64 = 20.0;
 pub const FONT_BODY: f64 = 14.0;
 pub const FONT_CAPTION: f64 = 12.0;
@@ -246,7 +216,6 @@ pub const WINDOW_HEIGHT: f64 = 760.0;
 pub const SIDEBAR_WIDTH: f64 = 264.0;
 /// 旧自绘标题栏高度（改用 `TitleBar` 后为 `WindowTitleBarHeight::Tall`）。
 pub const TITLE_BAR_HEIGHT: f64 = 36.0;
-pub const LOGO_SIZE: f64 = 52.0;
 
 #[cfg(test)]
 mod tests {
