@@ -30,7 +30,9 @@
 ;   4) 文件夹/文件两形态分别产生 `explorer.exe "<绝对路径>"` 与 `explorer.exe /select,"<绝对路径>"`;
 ;   5) 去抖窗口本身; 6) 全空白 path; 7) 会话关闭后无副作用; 8) 缝的默认实现仍走 Run (不过修);
 ;   9) 失败不静默: 路径失效时浮层不 Hide / ih.Stop 不调 / 会话仍 active (9a-9e), 成功时各 1 次 (9f);
-;  10) 新键 err_item_missing 中英双分支都有真文案 (无回落键名)。
+;  10) 新键 err_item_missing 中英双分支都有真文案 (无回落键名);
+;  11) 鼠标点选 (OnPick) 与 Enter 走同一条守卫链 (2026-10-01 扩): 成功才收浮层 (11a),
+;      失效路径不启动 explorer + 出提示 (11b) 且浮层/会话保留 (11c), 未匹配 path 无副作用 (11d)。
 ;
 ; 用法 (MSYS_NO_PATHCONV 必须有: Git Bash 会把 /ErrorStdOut 当路径改写):
 ;   MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut plugins/examples/everything_search/tests/open_guard_probe.ahk
@@ -379,6 +381,34 @@ EverythingMessages.En := false    ; 复原中文分支
 Verify(keyZh != "err_item_missing" && keyEn != "err_item_missing" && keyZh != keyEn,
     "10 err_item_missing 中英双分支都有真文案 (无回落键名)",
     "zh='" keyZh "' en='" keyEn "'")
+
+; --- 断言 11: 鼠标点选 (OnPick) 走同一守卫链 (2026-10-01 扩) ---
+;     OnPick 旧实现无条件 OpenSelected + Close —— 失效路径的提示被紧随的 Hide 立刻收起,
+;     与 2026-09-30 Enter 分支修的是同一症状。新实现「仅成功才 Close」。
+ResetObservers()
+s13 := NewSession([ItemFolder(DIR_EXISTS)], 1)
+s13.OnPick(DIR_EXISTS)                               ; 点选一个有效文件夹
+Verify(ExplorerRecorder.Calls.Length = 1 && s13.closed = true && EverythingDropdown.HideCount = 1,
+    "11a 点选有效项: Launch 1 次, 会话关闭, 浮层 Hide 1 次",
+    "实际 Launch=" ExplorerRecorder.Calls.Length " closed=" s13.closed " Hide=" EverythingDropdown.HideCount)
+
+ResetObservers()
+s14 := NewSession([ItemFile(PATH_MISSING)], 1)
+s14.OnPick(PATH_MISSING)                             ; 点选一个已失效的结果
+Verify(ExplorerRecorder.Calls.Length = 0 && EverythingDropdown.Hints.Length = 1
+    && EverythingDropdown.Hints[1] = EverythingMessages.T("err_item_missing"),
+    "11b 点选失效项: explorer 未启动, 出 err_item_missing 提示",
+    "实际 Launch=" ExplorerRecorder.Calls.Length " 提示数 " EverythingDropdown.Hints.Length)
+Verify(EverythingDropdown.HideCount = 0 && StubInputHook.StopCount = 0 && s14.closed = false && s14.active = true,
+    "11c 点选失效项: 浮层未收、会话保留 (提示留在屏上, 可继续检索)",
+    "实际 Hide=" EverythingDropdown.HideCount " closed=" s14.closed " active=" s14.active)
+
+ResetObservers()
+s15 := NewSession([ItemFolder(DIR_EXISTS)], 1)
+s15.OnPick(A_ScriptDir "\__kf_not_in_list__.txt")    ; 点选不在结果里的 path
+Verify(ExplorerRecorder.Calls.Length = 0 && EverythingDropdown.HideCount = 0 && s15.closed = false,
+    "11d 点选未匹配 path: 循环不命中, 无任何副作用",
+    "实际 Launch=" ExplorerRecorder.Calls.Length " Hide=" EverythingDropdown.HideCount " closed=" s15.closed)
 
 ; ============================================================
 ; 汇总
