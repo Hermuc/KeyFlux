@@ -26,7 +26,7 @@
 #Include lib/quickswitch/DialogInspector.ahk
 #Include lib/quickswitch/QuickSwitchUI.ahk
 #Include lib/quickswitch/QuickSwitch.ahk
-#Include lib/plugins/Plugins.ahk{{ PLUGIN_INCLUDES }}
+#Include lib/plugins/Plugins.ahk{{ PLUGIN_INCLUDES }}{{ CUSTOM_SCRIPT_INCLUDES }}
 
 ; #WinActivateForce   ; 先关了遇到相关问题再打开试试
 ; InstallKeybdHook    ; 这个可以重装 keyboard hook, 提高自己的 hook 优先级, 以后可能会用到
@@ -40,7 +40,7 @@ A_MaxHotkeysPerInterval := 256                            ; 默认 70 可能有�
 SendMode "Event"                                          ; 执行 SendInput 的期间会短暂卸载 Hook, 这时候松开引导键会丢失 up 事件, 所以 Event 模式更适合 KeyFlux
 SetKeyDelay 0                                             ; 默认 10 太慢了, https://www.reddit.com/r/AutoHotkey/comments/gd3z4o/possible_unreliable_detection_of_the_keyup_event/
 ProcessSetPriority "High"
-SetWorkingDir("../"){{ PLUGIN_BOOTSTRAP }}
+SetWorkingDir("../"){{ PLUGIN_BOOTSTRAP }}{{ CUSTOM_SCRIPT_BOOTSTRAP }}
 ; 引擎级未捕获异常兜底: 替代「错误弹窗 + 线程死亡 + Suspend 残留 (热键全灭)」,
 ; 记录全文到 logs\engine_error.log (见 Functions.ahk 的 EngineOnError 注释)。
 OnError(EngineOnError)
@@ -61,7 +61,7 @@ CommandInputHooks.Register(CommandImeGuard)
 InitKeymap()
 InitQuickSwitch({collectEnabled: {{ .Options.QuickSwitch.CollectEnabled }}, autoShow: {{ .Options.QuickSwitch.AutoShow }}, autoJumpOpen: {{ .Options.QuickSwitch.AutoJumpOpen }}, autoJumpSave: {{ .Options.QuickSwitch.AutoJumpSave }}, pollIntervalMs: {{ .Options.QuickSwitch.PollIntervalMs }}, maxHistory: {{ .Options.QuickSwitch.MaxHistory }}, overlayRows: {{ .Options.QuickSwitch.OverlayRows }}, overlayRowsCompact: {{ .Options.QuickSwitch.OverlayRowsCompact }}, excludedPrefixes: [{{ range $i, $p := .Options.QuickSwitch.ExcludedPrefixes }}{{ if $i }}, {{ end }}{{ ahkString $p }}{{ end }}]})
 OnExit(KeyFluxExit)
-#include ../data/custom_functions.ahk
+#include ../data/custom_functions.ahk{{ CUSTOM_SCRIPT_BLOCKS }}
 
 InitKeymap()
 {
