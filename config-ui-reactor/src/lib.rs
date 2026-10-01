@@ -22,7 +22,13 @@
 //!   并且是 **P3 的 Rust 生成器**（与 `settings.exe` drop-in）的落点 —— 生成器必须能被
 //!   bin 与单测共享，故不能留在 bin crate 内（bin 里未被引用的 `pub` 项会触发 `dead_code`，
 //!   而 `clippy -D warnings` 是闸门）。
-#![allow(dead_code)]
+//!
+//! ⚠️ 本文件此前有 crate 级 `#![allow(dead_code)]`（**2026-10-01 移除**）：它让所有私有
+//!   死码对 `clippy -D warnings` 永久隐身 —— 2026-10-01 清理时必须叠加
+//!   `--force-warn dead_code` 压过它，才看到当时实存的 9 条死码。**不要恢复它**。
+//!   确需保留的未读项（如 RAII 守卫字段）请在**该项就地**写
+//!   `#[expect(dead_code, reason = "…")]`：`expect` 会在该项将来被真实消费时报
+//!   `unfulfilled_lint_expectations` 迫使清理，`allow` 不会（会一直烂在那里）。
 
 pub mod app;
 pub mod generator;
