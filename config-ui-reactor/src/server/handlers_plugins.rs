@@ -188,19 +188,6 @@ impl WireManifest {
     }
 }
 
-/// Go `ShouldBindJSON` 等价绑定（`null` ⇒ 零值 manifest；字段级 null 归零）。
-fn bind_wire_manifest(body: &[u8]) -> Result<WireManifest, ()> {
-    let raw = body.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(body);
-    let mut value: serde_json::Value = serde_json::from_slice(raw).map_err(|_| ())?;
-    if value.is_null() {
-        return Ok(WireManifest::default());
-    }
-    crate::generator::model::strip_null_fields(&mut value);
-    let mut manifest: WireManifest = serde_json::from_value(value).map_err(|_| ())?;
-    manifest.canonicalize();
-    Ok(manifest)
-}
-
 // --------------------------------------------------------------------------- 目录加载
 
 /// Go `plugins.Catalog`：wire manifest + 错误累积（nil → 响应 `null`）。
