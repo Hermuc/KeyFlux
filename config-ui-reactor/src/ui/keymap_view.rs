@@ -2,7 +2,9 @@
 //!
 //! 几何与配色逐项对齐旧 `KeymapPageView.axaml` + `KeyCellVm`（键格 43 高、单字符 43×43
 //! 正方形、多字符最小 58、间距 4、圆角 6、字号 20/15.7）；
-//! 状态色沿用 Claude 令牌（选中=白底陶土字、禁用=奶油底、已绑定=柔和暖绿底、空键=象牙底）。
+//! 状态色沿用主题令牌（选中=白底强调蓝字、禁用=冷灰底、已绑定=柔和暖绿底、空键=象牙底）。
+//! ⚠️ 2026-10-01 冷色化：强调色 terracotta → [`theme::ACCENT`]（冷蓝，与系统强调色同族）；
+//!    「柔和暖绿底」是**语义色**（已绑定），不参与冷色化。
 //!
 //! 与旧版的有意差异：旧版左列用 `Viewbox Stretch=Uniform` **整列等比缩放**（窗口变小时文字一起缩），
 //! 新版按 Fluent 习惯改为**自然尺寸 + 滚动**（不再缩放文字）。
@@ -23,6 +25,13 @@ const SINGLE_CHAR_SIZE: f64 = 43.0;
 /// 多字符键格最小宽度（旧 58）。
 const MULTI_CHAR_MIN_WIDTH: f64 = 58.0;
 
+/// 键盘网格自身滚动区的高度上限（2026-10-01）。
+///
+/// 模式页左列 = 页头（Auto）/ 网格（**Auto = 自然高度**，本值封顶）/ 动作面板（STAR）。
+/// 网格按自然高度占位 ⇒ 只要布局不超过本上限就**整张网格全显示**、不被面板挤压；
+/// 超过（如 9 行以上的自定义布局）才在网格内滚动。当前 5 行布局自然高 231 DIP。
+pub const GRID_MAX_HEIGHT: f64 = 400.0;
+
 /// 键格配色（静止态必填；悬停/按下可选，`None` 表示沿用 Fluent 默认）。
 struct CellPalette {
     background: Color,
@@ -40,7 +49,7 @@ impl CellPalette {
         Self {
             background,
             foreground: theme::NEAR_BLACK,
-            border: theme::RING_WARM,
+            border: theme::RING_SOFT,
             hover_background: None,
             hover_foreground: None,
             pressed_background: None,
@@ -50,21 +59,21 @@ impl CellPalette {
 }
 
 /// 状态 → 配色。对齐旧 `KeyCellVm` + `KeymapPageView.axaml` 的
-/// `.selected:pointerover/.pressed` 样式：选中键悬停转陶土底白字、按下转 Coral 底白字。
+/// `.selected:pointerover/.pressed` 样式：选中键悬停转强调蓝底白字、按下转更亮的 `ACCENT_HOVER` 底白字。
 fn cell_palette(state: CellState) -> CellPalette {
     match state {
-        // 选中：白底 + 陶土字 + 陶土描边（2026-09-13 用户指定）
+        // 选中：白底 + 强调蓝字 + 强调蓝描边（2026-09-13 用户指定；2026-10-01 色相冷色化）
         CellState::Selected => CellPalette {
             background: theme::WHITE,
-            foreground: theme::TERRACOTTA,
-            border: theme::TERRACOTTA,
-            hover_background: Some(theme::TERRACOTTA),
+            foreground: theme::ACCENT,
+            border: theme::ACCENT,
+            hover_background: Some(theme::ACCENT),
             hover_foreground: Some(theme::WHITE),
-            pressed_background: Some(theme::CORAL),
+            pressed_background: Some(theme::ACCENT_HOVER),
             pressed_foreground: Some(theme::WHITE),
         },
-        // 禁用：奶油底（触发键自身不可点）
-        CellState::Disabled => CellPalette::static_only(theme::BORDER_CREAM),
+        // 禁用：冷灰底（触发键自身不可点，2026-10-01 随描边令牌冷色化）
+        CellState::Disabled => CellPalette::static_only(theme::BORDER_FAINT),
         // 已绑定：柔和暖绿底
         CellState::Bound => CellPalette::static_only(theme::MUTED_GREEN_SOFT),
         // 空键：象牙底
@@ -252,7 +261,7 @@ pub fn comment_summary(entries: &[CommentEntry]) -> View {
             let block: View = TextBlock::new()
                 .text(text)
                 .font_size(theme::FONT_BODY)
-                .foreground(theme::solid(theme::CHARCOAL_WARM))
+                .foreground(theme::solid(theme::CHARCOAL))
                 .text_wrapping(TextWrapping::Wrap)
                 .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
                 .into();
@@ -288,4 +297,23 @@ pub fn comment_empty_hint() -> View {
         .font_size(theme::FONT_CAPTION)
         .foreground(theme::stone_gray())
         .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 网格自然高度上限必须**容得下当前布局并留一行余量**。
+    ///
+    /// 2026-10-01 的 bug 是「面板把网格挤没」；修法靠模式页左列的「网格行 Auto（受本常量
+    /// 封顶）+ 面板行 STAR」结构。若日后有人为了给面板腾地方把这个上限改小到布局高度
+    /// 以下，网格就会被迫在自己的滚动区里滚 —— 直接违背「键盘网格始终完整可见」，此断言即红。
+    #[test]
+    fn grid_max_height_fits_default_layout_with_margin() {
+        let seven_rows = 7.0 * CELL_HEIGHT + 6.0 * CELL_SPACING; // 当前布局 5 行 = 231，留到 7 行 = 325
+        assert!(
+            GRID_MAX_HEIGHT >= seven_rows,
+            "GRID_MAX_HEIGHT({GRID_MAX_HEIGHT}) 太小：应至少容纳 7 行布局（{seven_rows}）"
+        );
+    }
 }

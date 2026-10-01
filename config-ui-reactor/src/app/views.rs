@@ -36,7 +36,7 @@ impl Shell {
             .children((
                 Border::new()
                     .height(1.0)
-                    .background(theme::border_cream())
+                    .background(theme::border_faint())
                     .content(TextBlock::new().text("")),
                 notice,
                 Button::new()
@@ -235,7 +235,7 @@ impl Shell {
                     .text(sa::match_type_label(match_type))
                     .font_size(theme::FONT_CARD_TITLE)
                     .font_weight(FontWeight::SEMI_BOLD)
-                    .foreground(theme::terracotta())
+                    .foreground(theme::accent_solid())
                     .into(),
             );
         }
@@ -423,7 +423,7 @@ impl Shell {
                     .foreground(if *is_error {
                         theme::solid(theme::ERROR_CRIMSON)
                     } else {
-                        theme::terracotta()
+                        theme::accent_solid()
                     })
                     .text_wrapping(TextWrapping::Wrap)
                     .into(),
@@ -489,13 +489,13 @@ impl Shell {
             ));
         }
 
-        // 左列卡：旧 `Border.leftPanel`（Ivory 面 + cream 边 2px + 圆角 14 + Padding 16）；
+        // 左列卡：旧 `Border.leftPanel`（Ivory 面 + 淡冷边 2px + 圆角 14 + Padding 16）；
         // 标题 915 旧 16 SemiBold + 底距 12
         let left: View = Border::new()
             .padding(theme::pad_md())
             .margin(Thickness::new(0.0, 0.0, 16.0, 0.0))
             .background(theme::ivory())
-            .border_brush(theme::border_cream())
+            .border_brush(theme::border_faint())
             .border_thickness(theme::card_border())
             .corner_radius(theme::radius_card())
             .vertical_alignment(VerticalAlignment::Top)
@@ -1490,25 +1490,45 @@ impl Shell {
             context.message(Message::SelectKey(hotkey))
         });
 
-        // 左列三段式：页头 / 键盘网格（占满剩余高度 ⇒ ScrollViewer 才有界可滚）/ 动作面板
+        // 左列三段式：页头（Auto）/ 键盘网格（**Auto = 自然高度**）/ 动作面板（STAR）。
         // ⚠️ `View` 不实现 `LayoutControl` ⇒ `grid_row` 只能设在未收尾的 builder 上；
         //    已构建的 `View` 用 `Border` 包裹后再定位。
+        //
+        // ⚠️ 2026-10-01 修「点已绑定键后动作面板铺满整页、键盘网格被挤没」：
+        //    旧结构 = 网格行 STAR + 面板行 **Auto**。Grid 的 Auto 行按**无限高度**测量子级 ⇒
+        //    面板内容要多少给多少（实测单选表 ≈900 DIP），网格行被压到 0 高度；面板底部还会
+        //    溢出窗口被裁，且**滚不动**（ScrollViewer 自认拿到全额高度，无滚动区间）。
+        //    新结构 = **网格行 Auto**（自然高度，`max_height` 封顶防超大自定义布局）+
+        //    **面板行 STAR**：① 网格永远拿满自己的自然高度 ⇒ 不被面板挤压、整张可见；
+        //    ② 面板拿到「剩余高度」这个**有界**视口 ⇒ 内容再高也只滚不溢出；
+        //    ③ 面板内容不足时**贴底**（`VerticalAlignment::Bottom`）⇒ 观感与旧版一致
+        //       （小卡片仍在页面底部），内容一多就填满该区并滚轮浏览。
+        //    两者都是纯**布局约束**：两个滚动区各自独立（指针落在哪个区就滚哪个），
+        //    网格的显示与交互不受任何影响。
         let left: View = Border::new().grid_column(0).content(
             Grid::new()
-                .rows([GridLength::Auto, GridLength::STAR, GridLength::Auto])
+                .rows([GridLength::Auto, GridLength::Auto, GridLength::STAR])
                 .margin(Thickness::new(24.0, 20.0, 12.0, 28.0))
                 .children((
                     Border::new().grid_row(0).content(keymap_view::page_header(
                         &keymap::header_title(keymap),
                         keymap::parent_info(keymap, config).as_deref(),
                     )),
-                    Border::new()
-                        .grid_row(1)
-                        .content(ScrollViewer::new().content(grid)),
+                    Border::new().grid_row(1).content(
+                        ScrollViewer::new()
+                            .max_height(keymap_view::GRID_MAX_HEIGHT)
+                            .content(grid),
+                    ),
                     Border::new()
                         .grid_row(2)
                         .margin(Thickness::new(0.0, 12.0, 0.0, 0.0))
-                        .content(self.action_editor_panel(context)),
+                        .content(
+                            ScrollViewer::new().content(
+                                Border::new()
+                                    .vertical_alignment(VerticalAlignment::Bottom)
+                                    .content(self.action_editor_panel(context)),
+                            ),
+                        ),
                 )),
         );
 
@@ -1694,7 +1714,7 @@ impl Shell {
                 TextBlock::new()
                     .text(format!("后端已连接 · keymap {keymap_count} 个"))
                     .font_size(theme::FONT_CAPTION)
-                    .foreground(theme::solid(theme::OLIVE_GRAY)),
+                    .foreground(theme::solid(theme::SLATE_GRAY)),
                 Border::new()
                     .padding(theme::pad_md())
                     .background(theme::card_background())

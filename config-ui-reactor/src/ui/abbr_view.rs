@@ -56,9 +56,9 @@ fn chip_button<C: IntoUnitCallback>(chip: &AbbrChip, on_click: C) -> View {
             ResourceOverrides::new()
                 .set("ButtonBackground", background)
                 .set("ButtonForeground", theme::NEAR_BLACK)
-                .set("ButtonBorderBrush", theme::RING_WARM)
-                .set("ButtonBackgroundPointerOver", theme::RING_WARM)
-                .set("ButtonBackgroundPressed", theme::RING_DEEP),
+                .set("ButtonBorderBrush", theme::RING_SOFT)
+                .set("ButtonBackgroundPointerOver", theme::RING_SOFT)
+                .set("ButtonBackgroundPressed", theme::RING_STRONG),
         )
         .on_click(on_click)
         .content(

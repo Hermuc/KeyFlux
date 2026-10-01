@@ -147,7 +147,7 @@ fn list_item_view(item: &MdListItem, port: u16) -> View {
     let marker: View = TextBlock::new()
         .text(list_marker(item))
         .font_size(theme::FONT_BODY)
-        .foreground(theme::solid(theme::CHARCOAL_WARM))
+        .foreground(theme::solid(theme::CHARCOAL))
         .width(24.0)
         .into();
     let body: View = RichTextBlock::new()

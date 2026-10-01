@@ -1,46 +1,88 @@
-//! 主题令牌（Claude 暖色体系 → reactor 基元）。
+//! 主题令牌（reactor 基元）。
 //!
 //! ⚠️ reactor 0.100 没有 `ResourceDictionary`/`Style`/`Setter`，也没有阴影 API，
 //! 所以旧版「覆盖 Fluent 资源键」的换肤路线**不存在**；本模块用 reactor 基元
 //! （`Color` / `Brush` / `CornerRadius` / `Thickness` / `WindowTheme`）自建主题层。
 //!
-//! 取值与旧 `Styles/Skins/Claude.axaml` + `ViewModels/ClaudePalette.cs` **逐色对齐**
-//! （便于迁移期 A/B 对照）；阴影改用 1px 描边替代（见 [`hairline`] 与 `border_warm`）。
+//! **表面色**取值与旧 `Styles/Skins/Claude.axaml` + `ViewModels/ClaudePalette.cs`
+//! **逐色对齐**（便于迁移期 A/B 对照）；阴影改用 1px 描边替代（见 [`hairline`]）。
+//!
+//! ## 冷色化沿革（2026-10-01，两轮用户裁定，同一口径）
+//!
+//! 旧皮肤是 Claude 暖色体系，但**运行态是毛玻璃 + 冷色壁纸**：`glass::dilute` 只作用于
+//! 表面（parchment / ivory / sand），页面与卡面被 Mica Alt 采样的壁纸染成冷色
+//! （截图实测页面 `(208,221,228)`、卡面 `(246,248,249)`，Lab b* ≈ −1 ~ −5），
+//! 于是残留暖相的令牌就成了「和 UI 不匹配」的那一层。两轮修法同一口径：
+//! **保 CIELAB 亮度 L（WCAG 对比度只由 L 决定，故随之逐位不变），只把色相搬到冷侧。**
+//!
+//! ### ① 描边（裁定：「组件框描边是暖色调的，和 UI 不匹配」）
+//!
+//! 描边是唯一**不参与 alpha 稀释**的一层，旧暖奶白 `(240,238,230)`（b* = +4.1，色相 100°）
+//! 与四周 216~245° 的冷色相族相差约 120° ⇒ 冷底上一条暖线。
+//! 修法 = **镜像 b\***：相对 `Ivory` 的对比度 1.10 / 1.19 / 1.48 / 1.73 一个不差。
+//!
+//! ### ② 强调色 + 墨阶（裁定：「选中动作页面出现大量暖色，全部换成冷色」）
+//!
+//! * 强调色 `TERRACOTTA → ACCENT`：`#C96442`（L* 54.0 / C 53.0 / h 45°）→
+//!   `#4980DB`（L* 54.0 / C 53.1 / **h 282°**）。色相刻意对齐 **WinUI 系统强调色**
+//!   `#005FB8`（h 282°），使自绘强调色与开关/系统控件的蓝**同族**，不再出现
+//!   「陶土 + 系统蓝」两种强调色互相打架；对白字对比度 3.90 → 3.89（只由 L* 决定）。
+//! * hover `CORAL → ACCENT_HOVER`：`#D97757` → `#6591E7`（保 L* 60.5 / C 49.1、同 h 282°）。
+//! * 墨阶（近黑 / dark / charcoal / olive / stone）：保 L*、镜像 b*，暖灰 → 冷灰。
+//! * **不动**：三个**表面**令牌（parchment / ivory / sand）与 `WHITE`；
+//!   以及**语义色** `ERROR_CRIMSON`（✕ 删除 / 错误）、`MUTED_GREEN*`（ON / 已绑定）
+//!   —— 危险红与状态绿属功能语义，不随装饰色冷色化（如需一并冷化请单独裁定）。
 //!
 //! 对比度基线（WCAG 非文字元素 3:1；相对卡片底 `Ivory`）——Phase 5 视觉验收判据：
-//! `BorderCream` 1.10（几乎不可见，仅作分隔）· `BorderWarm` 1.19 · `RingWarm` 1.48 ·
-//! `RingDeep` 1.73 · `StoneGray` 3.47 ✅ · `Terracotta` 3.70 ✅ · `Coral` 2.96（聚焦环）。
+//! `BorderFaint` 1.10（几乎不可见，仅作分隔）· `BorderSoft` 1.19 · `RingSoft` 1.48 ·
+//! `RingStrong` 1.73 · `StoneGray` 3.47 ✅ · `Accent` 3.70 ✅ · `AccentHover` 2.96（聚焦环）。
 
 use windows_reactor::{Brush, Color, CornerRadius, Thickness};
 
-// ---------------------------------------------------------------- 色板（逐色对齐旧皮肤）
+// ---------------------------------------------------------------- 色板
+// 表面三色逐色对齐旧皮肤；描边 / 墨阶 / 强调色为冷色（见模块头「冷色化沿革」）。
 
 pub const PARCHMENT: Color = Color::rgb(0xf5, 0xf4, 0xed);
 pub const IVORY: Color = Color::rgb(0xfa, 0xf9, 0xf5);
 pub const SAND: Color = Color::rgb(0xe8, 0xe6, 0xdc);
-pub const NEAR_BLACK: Color = Color::rgb(0x14, 0x14, 0x13);
-pub const CHARCOAL_WARM: Color = Color::rgb(0x4d, 0x4c, 0x48);
-pub const OLIVE_GRAY: Color = Color::rgb(0x5e, 0x5d, 0x59);
-pub const STONE_GRAY: Color = Color::rgb(0x87, 0x86, 0x7f);
-pub const DARK_WARM: Color = Color::rgb(0x3d, 0x3d, 0x3a);
-pub const TERRACOTTA: Color = Color::rgb(0xc9, 0x64, 0x42);
-pub const CORAL: Color = Color::rgb(0xd9, 0x77, 0x57);
+/// 正文墨色（旧 `#141413` 冷色对位，L* 6.3 不变）。
+pub const NEAR_BLACK: Color = Color::rgb(0x12, 0x14, 0x15);
+/// 次级墨色（旧 `ClaudeCharcoalWarm #4D4C48` 的冷色对位，L* 32.3 → 32.2）。
+pub const CHARCOAL: Color = Color::rgb(0x46, 0x4d, 0x50);
+/// 三级墨色（旧 `ClaudeOliveGray #5E5D59` 的冷色对位，L* 39.5 → 39.4）。
+pub const SLATE_GRAY: Color = Color::rgb(0x57, 0x5e, 0x61);
+/// 弱化文字（旧 `ClaudeStoneGray #87867F` 的冷色对位，L* 55.8 → 55.8）。
+pub const STONE_GRAY: Color = Color::rgb(0x7b, 0x88, 0x8c);
+/// 深墨色（旧 `ClaudeDarkWarm #3D3D3A` 的冷色对位，L* 25.7 → 25.7）。
+pub const DARK_SLATE: Color = Color::rgb(0x38, 0x3e, 0x40);
+/// **品牌强调色**（旧 `ClaudeTerracotta #C96442` 的冷色对位：保 L* 54.0 / C 53.0，
+/// 色相 45° → 282°，即与 WinUI 系统强调色 `#005FB8` 同族）。用于 CTA 实底、选中胶囊、
+/// 选中键格、分区指示符、链接式文本。
+pub const ACCENT: Color = Color::rgb(0x49, 0x80, 0xdb);
+/// 强调色 hover / 按下档（旧 `ClaudeCoral #D97757` 的冷色对位，保 L* 60.5 / C 49.1）。
+pub const ACCENT_HOVER: Color = Color::rgb(0x65, 0x91, 0xe7);
+/// 语义危险色（✕ 删除 / 错误提示）—— **不参与冷色化**。
 pub const ERROR_CRIMSON: Color = Color::rgb(0xb5, 0x33, 0x33);
 /// 纯白（键格选中态底色）。
 pub const WHITE: Color = Color::rgb(0xff, 0xff, 0xff);
-/// 柔和暖绿（键格「已绑定」底色）。
+/// 柔和暖绿（键格「已绑定」底色）—— 语义色，**不参与冷色化**。
 pub const MUTED_GREEN_SOFT: Color = Color::rgb(0xe7, 0xeb, 0xe3);
-pub const BORDER_CREAM: Color = Color::rgb(0xf0, 0xee, 0xe6);
-pub const BORDER_WARM: Color = Color::rgb(0xe8, 0xe6, 0xdc);
-pub const RING_WARM: Color = Color::rgb(0xd1, 0xcf, 0xc5);
-pub const RING_DEEP: Color = Color::rgb(0xc2, 0xc0, 0xb6);
+/// 组件框淡描边（2px 卡框）—— 旧 `ClaudeBorderCream` 的**冷色对应**（L* 94.05 → 94.01）。
+pub const BORDER_FAINT: Color = Color::rgb(0xea, 0xee, 0xf6);
+/// 次级描边 / 分隔线 —— 旧 `ClaudeBorderWarm` 的冷色对应（L* 91.20 → 91.16）。
+/// ⚠️ 旧版此值曾与表面令牌 `SAND` 同值 `#E8E6DC`；冷色化后二者**不再相等**，勿再互用。
+pub const BORDER_SOFT: Color = Color::rgb(0xe1, 0xe6, 0xef);
+/// 控件细环（1px 胶囊/键格边框）—— 旧 `ClaudeRingWarm` 的冷色对应（L* 83.03 → 82.99）。
+pub const RING_SOFT: Color = Color::rgb(0xca, 0xcf, 0xd8);
+/// 控件强环 / 按下态 —— 旧 `ClaudeRingDeep` 的冷色对应（L* 77.61 → 77.57）。
+pub const RING_STRONG: Color = Color::rgb(0xbb, 0xc0, 0xc9);
 
 /// 兼容旧命名（Phase 1 PoC 用的 `TEXT_PRIMARY`/`TEXT_MUTED`/`BORDER`）。
 pub const TEXT_PRIMARY: Color = NEAR_BLACK;
 pub const TEXT_MUTED: Color = STONE_GRAY;
-pub const BORDER: Color = RING_DEEP;
+pub const BORDER: Color = RING_STRONG;
 
-/// 正向语义色（低饱和暖绿，仅用于状态点）。
+/// 正向语义色（状态点 / ON 指示）—— 语义色，**不参与冷色化**。
 pub const MUTED_GREEN: Color = Color::rgb(0x5e, 0x7d, 0x5a);
 
 // ---------------------------------------------------------------- 画刷
@@ -70,8 +112,9 @@ pub fn sand() -> Brush {
     ))
 }
 
-pub fn terracotta() -> Brush {
-    solid(TERRACOTTA)
+/// 强调色刷（CTA / 选中胶囊 / 选中键格 / 分区指示符）。
+pub fn accent_solid() -> Brush {
+    solid(ACCENT)
 }
 
 pub fn near_black() -> Brush {
@@ -82,16 +125,20 @@ pub fn stone_gray() -> Brush {
     solid(STONE_GRAY)
 }
 
-pub fn border_warm() -> Brush {
-    solid(BORDER_WARM)
+/// 组件框描边刷（2px 卡框 / 分隔线）。
+pub fn border_faint() -> Brush {
+    solid(BORDER_FAINT)
 }
 
-pub fn border_cream() -> Brush {
-    solid(BORDER_CREAM)
+/// 次级描边刷。
+pub fn border_soft() -> Brush {
+    solid(BORDER_SOFT)
 }
 
 /// 系统主题画刷通路（验证 `ThemeBrush`）：Accent / 卡片底 / 卡片描边。
-pub fn accent() -> Brush {
+/// ⚠️ 与自绘 [`ACCENT`] 区分：本函数取的是 **WinUI 系统强调色**（开关、系统控件用），
+/// [`accent_solid`] 是本皮肤自绘的强调色。二者色相刻意同族（见模块头 ②）。
+pub fn system_accent() -> Brush {
     Brush::Theme(windows_reactor::ThemeBrush::Accent)
 }
 
@@ -207,26 +254,80 @@ mod tests {
 
     #[test]
     fn palette_matches_legacy_skin_values() {
-        // 逐色对齐旧 Claude.axaml / ClaudePalette.cs（改值即视为主题重设计，需同步此断言）
+        // 表面色逐色对齐旧 Claude.axaml / ClaudePalette.cs（改值即视为主题重设计，需同步此断言）
         assert_eq!(PARCHMENT, Color::rgb(0xf5, 0xf4, 0xed));
         assert_eq!(IVORY, Color::rgb(0xfa, 0xf9, 0xf5));
         assert_eq!(SAND, Color::rgb(0xe8, 0xe6, 0xdc));
-        assert_eq!(NEAR_BLACK, Color::rgb(0x14, 0x14, 0x13));
-        assert_eq!(TERRACOTTA, Color::rgb(0xc9, 0x64, 0x42));
-        assert_eq!(CORAL, Color::rgb(0xd9, 0x77, 0x57));
+        // 强调色 / 墨阶 = 冷色版（2026-10-01 第二轮）：旧暖值为 NEAR_BLACK #141413 /
+        // DARK_WARM #3D3D3A / CHARCOAL_WARM #4D4C48 / OLIVE_GRAY #5E5D59 / STONE_GRAY #87867F /
+        // TERRACOTTA #C96442 / CORAL #D97757。L* 必须与旧值一致，仅色相搬到冷侧。
+        assert_eq!(NEAR_BLACK, Color::rgb(0x12, 0x14, 0x15));
+        assert_eq!(DARK_SLATE, Color::rgb(0x38, 0x3e, 0x40));
+        assert_eq!(CHARCOAL, Color::rgb(0x46, 0x4d, 0x50));
+        assert_eq!(SLATE_GRAY, Color::rgb(0x57, 0x5e, 0x61));
+        assert_eq!(STONE_GRAY, Color::rgb(0x7b, 0x88, 0x8c));
+        assert_eq!(ACCENT, Color::rgb(0x49, 0x80, 0xdb));
+        assert_eq!(ACCENT_HOVER, Color::rgb(0x65, 0x91, 0xe7));
+        // 语义色不参与冷色化
         assert_eq!(ERROR_CRIMSON, Color::rgb(0xb5, 0x33, 0x33));
-        assert_eq!(BORDER_CREAM, Color::rgb(0xf0, 0xee, 0xe6));
-        assert_eq!(BORDER_WARM, Color::rgb(0xe8, 0xe6, 0xdc));
-        assert_eq!(RING_WARM, Color::rgb(0xd1, 0xcf, 0xc5));
-        assert_eq!(RING_DEEP, Color::rgb(0xc2, 0xc0, 0xb6));
-        assert_eq!(STONE_GRAY, Color::rgb(0x87, 0x86, 0x7f));
-        assert_eq!(
-            OLIVE_GRAY,
-            Color::rgb(0x5e, 0x5d, 0x59),
-            "皮肤 ClaudeOliveGrayBrush"
-        );
+        assert_eq!(MUTED_GREEN, Color::rgb(0x5e, 0x7d, 0x5a));
         assert_eq!(WHITE, Color::rgb(0xff, 0xff, 0xff));
         assert_eq!(MUTED_GREEN_SOFT, Color::rgb(0xe7, 0xeb, 0xe3));
+        // 描边色板 = 冷色版（2026-10-01 第一轮）：旧暖值为 #F0EEE6 / #E8E6DC / #D1CFC5 / #C2C0B6，
+        // 见模块头「描边色板」；L* 与 WCAG 对比度必须与旧值一致，仅色相翻到冷侧。
+        assert_eq!(BORDER_FAINT, Color::rgb(0xea, 0xee, 0xf6));
+        assert_eq!(BORDER_SOFT, Color::rgb(0xe1, 0xe6, 0xef));
+        assert_eq!(RING_SOFT, Color::rgb(0xca, 0xcf, 0xd8));
+        assert_eq!(RING_STRONG, Color::rgb(0xbb, 0xc0, 0xc9));
+    }
+
+    /// 冷色化防回退闸门（2026-10-01）：描边 / 墨阶 / 强调色必须落在冷侧
+    /// （蓝分量 >= 红分量），表面色必须仍为暖色（红 > 蓝）。
+    /// 语义色（危险红 / 状态绿）**不在此闸门内** —— 它们是功能语义，允许偏暖。
+    #[test]
+    fn decorative_palette_is_cool_surfaces_stay_warm() {
+        for (name, c) in [
+            ("BORDER_FAINT", BORDER_FAINT),
+            ("BORDER_SOFT", BORDER_SOFT),
+            ("RING_SOFT", RING_SOFT),
+            ("RING_STRONG", RING_STRONG),
+            ("NEAR_BLACK", NEAR_BLACK),
+            ("DARK_SLATE", DARK_SLATE),
+            ("CHARCOAL", CHARCOAL),
+            ("SLATE_GRAY", SLATE_GRAY),
+            ("STONE_GRAY", STONE_GRAY),
+            ("ACCENT", ACCENT),
+            ("ACCENT_HOVER", ACCENT_HOVER),
+        ] {
+            assert!(
+                c.b > c.r,
+                "{name} 应为冷色（蓝 > 红），实测 r={} b={}",
+                c.r,
+                c.b
+            );
+        }
+        for (name, c) in [("PARCHMENT", PARCHMENT), ("IVORY", IVORY), ("SAND", SAND)] {
+            assert!(
+                c.r > c.b,
+                "{name} 为表面令牌，应保持暖色（红 > 蓝），实测 r={} b={}",
+                c.r,
+                c.b
+            );
+        }
+    }
+
+    /// 强调色族必须与 WinUI 系统强调色同族（Lab 色相 ≈ 282°），否则自绘强调色会与
+    /// 开关/系统控件的蓝打架 —— 这正是第二轮冷色化选 282° 的理由（见模块头 ②）。
+    #[test]
+    fn accent_shares_hue_family_with_system_accent() {
+        for (name, c) in [("ACCENT", ACCENT), ("ACCENT_HOVER", ACCENT_HOVER)] {
+            // 冷蓝判据：蓝分量显著高于红分量（≥ 0x28 ≈ 40），保证蓝色相明确而非灰蓝
+            assert!(
+                c.b as i32 - c.r as i32 >= 0x28,
+                "{name} 蓝色相不足（b-r={}），应贴近 WinUI 系统强调色蓝",
+                c.b as i32 - c.r as i32
+            );
+        }
     }
 
     #[test]

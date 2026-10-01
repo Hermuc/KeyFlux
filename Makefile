@@ -173,7 +173,7 @@ check: buildServer lint check-texttypes check-hooks sync-plugins | check-deploy-
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./config-server/templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
-	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/oracle.ps1
+	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/oracle.ps1 -Config "$(CHECK_CONFIG)"
 
 # parity: 生成端差分对账闸门 (P0, 见 docs/plan-rust-migration.md)。
 #   用当前 bin/settings.exe 复现 tools/parity/reference 的逐字节基线 —— 守护「基准不漂移」；

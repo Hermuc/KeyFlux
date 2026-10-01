@@ -28,7 +28,7 @@ pub struct KeyboardRow {
 /// 键格视觉状态（颜色映射在 UI 层）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellState {
-    /// 当前选中（旧：白底 + 陶土字/描边）。
+    /// 当前选中（白底 + 强调蓝字/描边）。
     Selected,
     /// 触发键自身 ⇒ 禁用不可点（旧：BorderCream 底）。
     Disabled,

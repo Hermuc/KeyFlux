@@ -4,9 +4,13 @@
 //! 页面骨架 = 页头 + 热键卡（手输热键 + 启用开关）+ **两张聚合卡**（文本特征 / 文件后缀：
 //! toggle 行 + 详情编辑器）。
 //!
+//! ⚠️ 2026-10-01 冷色化：本页曾「出现大量暖色」（截图实测 terracotta `#C96442` 约 1.1 万像素），
+//!   现已全部换成 [`theme::ACCENT`] / `ACCENT_HOVER`（冷蓝，与 WinUI 系统强调色同族，
+//!   开关的蓝不再与自绘强调色打架）。语义色（✕ 危险红 / ON 状态绿）保持不变。
+//!
 //! 几何以旧版截图为基线复刻（2026-09-29 对齐轮）：页头标题与三入口同排、说明条
 //! Sand 横幅、热键卡（标题+开关同排 / 全宽输入行 + ✕ 清除）、类型 toggle **胶囊**
-//! （高 36 / 半径 18 / 选中陶土底白字）、行编辑器（行为名胶囊头 + 序号方块 +
+//! （高 36 / 半径 18 / 选中强调蓝底白字）、行编辑器（行为名胶囊头 + 序号方块 +
 //! 下拉 + ↑↓✕ / 无参提示 1013+1014 / 工作目录占位 1015）。
 //!
 //! ⚠️ 与旧版的结构性差异（0.100.0 能力约束，已记 `16/18 号`）：
@@ -27,15 +31,16 @@ const TOGGLE_HEIGHT: f64 = 36.0;
 /// 胶囊圆角（= 高度一半，old pill 造型）。
 const TOGGLE_RADIUS: f64 = 18.0;
 
-/// 旧页级输入框描边色（2026-09-23 三轮定色：Sand 与 StoneGray 之间的暖中灰）。
-const INPUT_STROKE: Color = Color::rgb(0xc8, 0xc3, 0xb4);
+/// 页级输入框描边色（2026-09-23 三轮定色：Sand 与 StoneGray 之间的暖中灰；
+/// 2026-10-01 随主题描边冷色化 —— 保 L* 78.81 / 对白底对比度 1.76 不变，b* +8.16 → −8.16）。
+const INPUT_STROKE: Color = Color::rgb(0xbb, 0xc4, 0xd2);
 
-/// 卡片外框（旧 `Border.actionCard`：Ivory 面 + cream 边 2px + 圆角 14 + Padding 16）。
+/// 卡片外框（旧 `Border.actionCard`：Ivory 面 + 淡冷边 2px + 圆角 14 + Padding 16）。
 pub fn card(body: View) -> View {
     Border::new()
         .padding(theme::pad_md())
         .background(theme::ivory())
-        .border_brush(theme::border_cream())
+        .border_brush(theme::border_faint())
         .border_thickness(theme::card_border())
         .corner_radius(theme::radius_card())
         .content(body)
@@ -47,7 +52,7 @@ pub fn type_card(body: View) -> View {
         .padding(Thickness::uniform(12.0))
         .margin(Thickness::new(0.0, 0.0, 0.0, 8.0))
         .background(theme::ivory())
-        .border_brush(theme::border_cream())
+        .border_brush(theme::border_faint())
         .border_thickness(theme::card_border())
         .corner_radius(theme::radius_card())
         .content(body)
@@ -162,7 +167,7 @@ pub fn hint_bar(text: &str) -> View {
             TextBlock::new()
                 .text(text.to_string())
                 .font_size(13.0)
-                .foreground(theme::solid(theme::DARK_WARM))
+                .foreground(theme::solid(theme::DARK_SLATE))
                 .text_wrapping(TextWrapping::Wrap),
         )
 }
@@ -186,14 +191,14 @@ where
                 .on_click(on_behaviors)
                 .content(TextBlock::new().text(i18n::t("1083"))),
             {
-                // CTA（旧「＋ 添加规则」）：陶土实底 + 白字 + PointerOver 提亮
+                // CTA（旧「＋ 添加规则」）：强调蓝实底 + 白字 + PointerOver 提亮
                 let cta_overrides = ResourceOverrides::new()
-                    .set("ButtonBackground", theme::TERRACOTTA)
+                    .set("ButtonBackground", theme::ACCENT)
                     .set("ButtonForeground", theme::WHITE)
-                    .set("ButtonBorderBrush", theme::TERRACOTTA)
-                    .set("ButtonBackgroundPointerOver", theme::CORAL)
+                    .set("ButtonBorderBrush", theme::ACCENT)
+                    .set("ButtonBackgroundPointerOver", theme::ACCENT_HOVER)
                     .set("ButtonForegroundPointerOver", theme::WHITE)
-                    .set("ButtonBorderBrushPointerOver", theme::CORAL);
+                    .set("ButtonBorderBrushPointerOver", theme::ACCENT_HOVER);
                 let cta: View = Button::new()
                     .resource_overrides(cta_overrides)
                     .on_click(on_add)
@@ -233,7 +238,7 @@ where
                 .text(title.to_string())
                 .font_size(theme::FONT_CARD_TITLE)
                 .font_weight(FontWeight::SEMI_BOLD)
-                .foreground(theme::terracotta())
+                .foreground(theme::accent_solid())
                 .vertical_alignment(VerticalAlignment::Center),
             Button::new()
                 .grid_column(1)
@@ -336,16 +341,16 @@ fn estimate_width(label: &str) -> f64 {
         .sum()
 }
 
-/// 单个胶囊（Border 承载造型与命中；选中 = 陶土底白字，未选 = 白底暖边）。
+/// 单个胶囊（Border 承载造型与命中；选中 = 强调蓝底白字，未选 = 白底冷边）。
 fn build_toggle_pill(
     toggle: &TypeToggle,
     is_selected: bool,
     on_click: impl IntoPayloadCallback<PointerEventInfo>,
 ) -> View {
     let (background, foreground, border) = if is_selected {
-        (theme::TERRACOTTA, theme::WHITE, theme::TERRACOTTA)
+        (theme::ACCENT, theme::WHITE, theme::ACCENT)
     } else {
-        (theme::WHITE, theme::NEAR_BLACK, theme::RING_WARM)
+        (theme::WHITE, theme::NEAR_BLACK, theme::RING_SOFT)
     };
 
     Border::new()
@@ -394,10 +399,10 @@ where
     C5: IntoUnitCallback,
     C6: IntoUnitCallback,
 {
-    // 行为名胶囊头（旧 `.axaml:69-73`：白底暖边圆角胶囊，菜单序 + 行为显示名）
+    // 行为名胶囊头（旧 `.axaml:69-73`：白底冷边圆角胶囊，菜单序 + 行为显示名）
     let pill: View = Border::new()
         .corner_radius(CornerRadius::uniform(14.0))
-        .border_brush(theme::solid(theme::RING_WARM))
+        .border_brush(theme::solid(theme::RING_SOFT))
         .border_thickness(theme::hairline())
         .background(theme::solid(theme::WHITE))
         .padding(Thickness::new(12.0, 4.0, 12.0, 4.0))
@@ -416,7 +421,7 @@ where
                 .foreground(theme::near_black()),
         );
 
-    // 序号方块（陶土底白字，26×26 圆角 4）
+    // 序号方块（Sand 底 + 强调蓝字，26×26 圆角 4）
     let badge: View = Border::new()
         .width(26.0)
         .height(26.0)
@@ -428,7 +433,7 @@ where
                 .text((index + 1).to_string())
                 .font_size(13.0)
                 .font_weight(FontWeight::SEMI_BOLD)
-                .foreground(theme::terracotta())
+                .foreground(theme::accent_solid())
                 .horizontal_alignment(HorizontalAlignment::Center)
                 .vertical_alignment(VerticalAlignment::Center),
         );
@@ -556,7 +561,7 @@ where
 pub fn row_editor(body: View) -> View {
     Border::new()
         .background(theme::solid(theme::WHITE))
-        .border_brush(theme::solid(theme::RING_WARM))
+        .border_brush(theme::solid(theme::RING_SOFT))
         .border_thickness(theme::hairline())
         .corner_radius(theme::radius_panel())
         .padding(Thickness::uniform(14.0))
@@ -602,7 +607,7 @@ where
             TextBlock::new()
                 .text(hint)
                 .font_size(theme::FONT_CAPTION)
-                .foreground(theme::terracotta())
+                .foreground(theme::accent_solid())
                 .vertical_alignment(VerticalAlignment::Center)
                 .into(),
         ));
@@ -630,7 +635,7 @@ pub fn new_type_link(on_click: impl IntoUnitCallback) -> View {
             TextBlock::new()
                 .text(i18n::t("2553"))
                 .font_size(13.0)
-                .foreground(theme::terracotta()),
+                .foreground(theme::accent_solid()),
         )
 }
 
@@ -640,7 +645,7 @@ pub fn pending_hint(has_dedicated: bool) -> View {
         TextBlock::new()
             .text(i18n::t("2537"))
             .font_size(theme::FONT_CAPTION)
-            .foreground(theme::solid(theme::DARK_WARM)),
+            .foreground(theme::solid(theme::DARK_SLATE)),
     ];
 
     if !has_dedicated {

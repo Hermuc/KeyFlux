@@ -805,6 +805,7 @@ impl App {
                         .ok_or_else(|| windows_core::Error::new(E_FAIL, "missing application"))?;
                     install_xaml_controls_resources(&application)?;
                     install_global_ui_font(&application)?;
+                    install_dialog_layer_overrides(&application)?;
                     let create_pumps = launch_create_pumps.borrow_mut().take().unwrap();
                     let mut pumps = create_pumps(application.clone()).into_iter();
                     let mut primary_pump = pumps.next().ok_or_else(|| {
