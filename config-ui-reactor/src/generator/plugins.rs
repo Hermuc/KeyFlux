@@ -22,6 +22,9 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::generator::model::Config;
+use crate::generator::text::ahk_string;
+
 /// Go `plugins.SpecVersion`：当前插件包格式版本（manifest `specVersion` 不等即拒绝）。
 pub const SPEC_VERSION: i32 = 1;
 
@@ -38,7 +41,12 @@ pub const MAX_SETTING_VALUE_LEN: i64 = 1024;
 pub const SETTINGS_PERMISSION: &str = "settings";
 
 /// Go `plugins.settingTypes`：合法设置项类型词表（协议一部分，两端必须一致）。
-const SETTING_TYPES: [&str; 4] = ["char", "text", "number", "file"];
+///
+/// `bool`（2026-10-01 新增）：**开关类字段插件化的硬前置**。原
+/// `options.quickSwitch` 是 4 个 bool + 4 个 int + 1 个字符串数组，而声明式设置此前
+/// 只有 `char/text/number/file` —— 表达不了"开关"。值域 = `"true"` / `"false"`
+/// （字符串承载，与 `ConfigProvider` 的扁平字符串存储同构 ⇒ **AHK 侧零改动**）。
+const SETTING_TYPES: [&str; 5] = ["char", "text", "number", "file", "bool"];
 
 /// Go `plugins.Entry`：插件入口声明（当前仅 `script` 形态）。
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -131,6 +139,9 @@ pub(crate) fn value_limit(setting: &Setting) -> i64 {
     if setting.kind == "char" {
         return 1;
     }
+    if setting.kind == "bool" {
+        return 5; // "false" —— 最长的合法取值（不接受 yes/1/True 等变体）
+    }
     if setting.kind == "text"
         && setting.max_length > 0
         && (setting.max_length as i64) < MAX_SETTING_VALUE_LEN
@@ -171,6 +182,11 @@ pub(crate) fn validate_setting_value(setting: &Setting, value: &str) -> Result<(
             {
                 return Err(format!("{n} 大于上限 {max}"));
             }
+        }
+        // 空串已在上方提前放行（= 未设置，回落 manifest 默认值）。
+        // 大小写敏感：引擎侧只做 `= "true"` 比较，放宽会让两端判定分叉。
+        "bool" if value != "true" && value != "false" => {
+            return Err(format!("{value:?} 不是布尔值 (仅接受 true/false)"));
         }
         _ => {}
     }
@@ -214,7 +230,7 @@ fn validate_settings(manifest: &Manifest) -> Result<(), String> {
         }
         if !SETTING_TYPES.contains(&setting.kind.as_str()) {
             return Err(format!(
-                "插件「{}」设置项 {:?} 的 type {:?} 不合法 (仅支持 char/text/number/file)",
+                "插件「{}」设置项 {:?} 的 type {:?} 不合法 (仅支持 char/text/number/file/bool)",
                 manifest.id, setting.key, setting.kind
             ));
         }
@@ -262,16 +278,25 @@ fn validate_settings(manifest: &Manifest) -> Result<(), String> {
     Ok(())
 }
 
-/// Go `plugins.ValidateManifest`（加载期与导入 API 共用）。
+/// Go `plugins.ValidateManifest`（导入 API 共用：结构校验 + 内置 ID 保留集）。
+/// 🔴 目录加载路径不走本函数（走 [`validate_manifest_body`]）：随包内置插件
+/// quick_switch 自 2026-10-01 P2 插件化起以标准插件形态分发
+/// （`data/plugins/quick_switch/`），必须经目录扫描正常加载；本函数仅供导入 API
+/// 调用 —— 第三方包不得冒用内置 ID。
 pub fn validate_manifest(manifest: &Manifest) -> Result<(), String> {
+    if BUILTIN_PLUGIN_IDS.contains(&manifest.id.as_str()) {
+        return Err(format!("插件 ID {:?} 与内置插件冲突", manifest.id));
+    }
+    validate_manifest_body(manifest)
+}
+
+/// Go `plugins.validateManifestBody`（目录加载路径；不含内置 ID 检查）。
+fn validate_manifest_body(manifest: &Manifest) -> Result<(), String> {
     if !is_valid_id(&manifest.id) {
         return Err(format!(
             "插件 ID {:?} 不合法 (须匹配 ^[a-z][a-z0-9_]{{0,31}}$)",
             manifest.id
         ));
-    }
-    if BUILTIN_PLUGIN_IDS.contains(&manifest.id.as_str()) {
-        return Err(format!("插件 ID {:?} 与内置插件冲突", manifest.id));
     }
     if manifest.spec_version != SPEC_VERSION {
         return Err(format!(
@@ -303,12 +328,14 @@ pub fn validate_manifest(manifest: &Manifest) -> Result<(), String> {
 
 // --------------------------------------------------------------- 加载（Go plugins.go）
 
-/// Go `parseManifest`：剥 BOM → 解析 → `ValidateManifest`。
+/// Go `parseManifest`：剥 BOM → 解析 → `validateManifestBody`。
+/// 🔴 目录加载路径走**宽松**校验（不含内置 ID 检查）：随包内置插件 quick_switch
+/// 须经目录扫描正常加载；导入 API 另行调 [`validate_manifest`] 补上保留集检查。
 fn parse_manifest(raw: &[u8]) -> Result<Manifest, String> {
     let raw = raw.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(raw);
     let manifest: Manifest =
         serde_json::from_slice(raw).map_err(|error| format!("plugin.json 解析失败: {error}"))?;
-    validate_manifest(&manifest)?;
+    validate_manifest_body(&manifest)?;
     Ok(manifest)
 }
 
@@ -382,6 +409,75 @@ fn ahk_string_lit(s: &str) -> String {
         .replace('`', "``")
         .replace('"', "`\"");
     format!("\"{s}\"")
+}
+
+/// Go `generators.PluginLateInit`：模板函数 `{{ PLUGIN_LATE_INIT }}`（插件晚初始化
+/// 扩展点，位于 `InitKeymap()` 与 `OnExit` 之间）。产出「必须晚于 InitKeymap」的插件
+/// 初始化行，行尾拼接约定（非空时自带前导 `\n`），空块 = 零字节。
+///
+/// 当前唯一消费方 = quick_switch 的 `InitQuickSwitch(...)` 调用行（2026-10-01 P2
+/// 插件化：代码已随插件搬入 `data/plugins/quick_switch/`，提案
+/// `docs/contracts-proposals/quickswitch-pluginization.md`）。存在性/禁用判定与
+/// [`render_plugin_blocks`] 完全同构（同一 catalog + 同一 disabled 集 + 同一入口
+/// 存在性校验），保证「插件不可用 ⇒ 初始化行不产出」（可删除性保证：AHK v2 直调
+/// 未定义函数是加载期致命错误）。配置段迁移到 plugin-settings.json 属 P5，届时
+/// 本函数对 quick_switch 的特判移除。
+pub fn render_late_init(config: &Config, plugins_dir: &Path, disabled: &HashSet<String>) -> String {
+    let catalog = load_catalog(plugins_dir);
+    for manifest in &catalog.plugins {
+        if disabled.contains(&manifest.id) {
+            continue;
+        }
+        if manifest.entry.kind != "script" || manifest.entry.file.is_empty() {
+            continue;
+        }
+        if !safe_plugin_rel_file(&manifest.entry.file) {
+            continue;
+        }
+        let abs = plugins_dir.join(&manifest.id).join(
+            manifest
+                .entry
+                .file
+                .replace('/', std::path::MAIN_SEPARATOR_STR),
+        );
+        if !abs.exists() {
+            continue;
+        }
+        if manifest.id == "quick_switch" {
+            return render_quick_switch_late_init(&config.options.quick_switch);
+        }
+    }
+    String::new()
+}
+
+/// Go `generators.renderQuickSwitchLateInit`：渲染 quick_switch 晚初始化行。
+///
+/// 🔴 字节等价约束：字段顺序 / 分隔符 / bool 文本 / `ahkString` 转义必须与迁移前
+/// 模板硬编码行完全一致（否则 parity 12 份基线全漂）。参数来源 = config.json
+/// `options.quickSwitch`（原模板渲染点），非 plugin-settings（迁移属 P5）。
+fn render_quick_switch_late_init(q: &crate::generator::model::QuickSwitchOption) -> String {
+    let bool_str = |value: bool| if value { "true" } else { "false" };
+    let mut out = String::from("\nInitQuickSwitch({collectEnabled: ");
+    out.push_str(bool_str(q.collect_enabled));
+    out.push_str(", autoShow: ");
+    out.push_str(bool_str(q.auto_show));
+    out.push_str(", autoJumpOpen: ");
+    out.push_str(bool_str(q.auto_jump_open));
+    out.push_str(", autoJumpSave: ");
+    out.push_str(bool_str(q.auto_jump_save));
+    out.push_str(&format!(", pollIntervalMs: {}", q.poll_interval_ms));
+    out.push_str(&format!(", maxHistory: {}", q.max_history));
+    out.push_str(&format!(", overlayRows: {}", q.overlay_rows));
+    out.push_str(&format!(", overlayRowsCompact: {}", q.overlay_rows_compact));
+    out.push_str(", excludedPrefixes: [");
+    for (index, prefix) in q.excluded_prefixes.iter().enumerate() {
+        if index > 0 {
+            out.push_str(", ");
+        }
+        out.push_str(&ahk_string(prefix));
+    }
+    out.push_str("]})");
+    out
 }
 
 /// Go `generators.ahkManifestLiteral`：把 manifest 渲染为 AHK `Map(...)` 原生字面量。
@@ -503,7 +599,8 @@ mod tests {
         PathBuf::from("../plugins/examples")
     }
 
-    /// 目录扫描：读到 everything_search，且字段/权限/设置解析正确。
+    /// 目录扫描：读到 everything_search + quick_switch（2026-10-01 P2 起
+    /// quick_switch 以标准插件形态随包分发），且字段/权限/设置解析正确。
     #[test]
     fn loads_example_plugin() {
         let catalog = load_catalog(&examples_dir());
@@ -512,7 +609,8 @@ mod tests {
             "示例插件应无错误: {:?}",
             catalog.errors
         );
-        assert_eq!(catalog.plugins.len(), 1);
+        assert_eq!(catalog.plugins.len(), 2);
+        // ID 字典序: everything_search 在前
         let plugin = &catalog.plugins[0];
         assert_eq!(plugin.id, "everything_search");
         assert_eq!(plugin.entry.kind, "script");
@@ -520,6 +618,11 @@ mod tests {
         assert_eq!(plugin.entry.func, "EverythingSearchMain");
         assert!(plugin.has_permission("settings"));
         assert_eq!(plugin.settings.len(), 4);
+        // 内置 ID 经目录加载放行（导入路径仍拒绝冒名，见 validate_manifest 拆分）
+        let builtin = &catalog.plugins[1];
+        assert_eq!(builtin.id, "quick_switch");
+        assert_eq!(builtin.entry.func, "QuickSwitchMain");
+        assert!(builtin.has_permission("window"));
     }
 
     /// 缺目录 ⇒ 空目录、无错误（Go: NotExist 不记为错误）。
@@ -530,19 +633,24 @@ mod tests {
         assert!(catalog.errors.is_empty());
     }
 
-    /// 注入块：示例插件产出 1 行 Include + Register/LoadEntry。
+    /// 注入块：示例插件各产出 1 行 Include + Register/LoadEntry。
     #[test]
     fn renders_include_and_bootstrap_for_example() {
         let (includes, bootstrap) = render_plugin_blocks(&examples_dir(), &HashSet::new());
         assert_eq!(
             includes,
-            "\n#Include ../data/plugins/everything_search/main.ahk"
+            "\n#Include ../data/plugins/everything_search/main.ahk\n\
+             #Include ../data/plugins/quick_switch/main.ahk"
         );
         assert!(bootstrap.contains(
             "\nPluginManager.Register(Map(\"id\", \"everything_search\", \"name\", \"Everything 搜索\""
         ), "{bootstrap}");
         assert!(
-            bootstrap.ends_with("\nPluginManager.LoadEntry(\"everything_search\")"),
+            bootstrap.contains("\nPluginManager.LoadEntry(\"everything_search\")"),
+            "{bootstrap}"
+        );
+        assert!(
+            bootstrap.ends_with("\nPluginManager.LoadEntry(\"quick_switch\")"),
             "{bootstrap}"
         );
     }
@@ -556,15 +664,20 @@ mod tests {
         assert!(bootstrap.is_empty());
     }
 
-    /// 停用插件只产注释行、不注入。
+    /// 停用插件只产注释行、不注入（另一插件照常）。
     #[test]
     fn disabled_plugin_is_skipped_with_comment() {
         let disabled: HashSet<String> = ["everything_search".to_string()].into_iter().collect();
         let (includes, bootstrap) = render_plugin_blocks(&examples_dir(), &disabled);
-        assert!(includes.is_empty());
-        assert_eq!(
-            bootstrap,
-            "\n; [插件] everything_search 已在配置中停用, 跳过加载"
+        assert_eq!(includes, "\n#Include ../data/plugins/quick_switch/main.ahk");
+        assert!(bootstrap.contains("\n; [插件] everything_search 已在配置中停用, 跳过加载"));
+        assert!(
+            !bootstrap.contains("\nPluginManager.Register(Map(\"id\", \"everything_search\""),
+            "{bootstrap}"
+        );
+        assert!(
+            bootstrap.contains("\nPluginManager.Register(Map(\"id\", \"quick_switch\""),
+            "{bootstrap}"
         );
     }
 
@@ -574,5 +687,75 @@ mod tests {
         let raw = b"\xEF\xBB\xBF{\"id\":\"x\",\"name\":\"X\",\"specVersion\":1,\"entry\":{\"kind\":\"script\",\"file\":\"a.ahk\",\"func\":\"F\"}}";
         let manifest = parse_manifest(raw).expect("应解析成功");
         assert_eq!(manifest.id, "x");
+    }
+
+    /// `bool` 类型（2026-10-01 协议扩展）：值域严格 = `true`/`false`；空串合法（= 未设置，
+    /// 回落 manifest 默认值）；`yes`/`1`/`True` 一律拒绝（大小写敏感 —— 与 `ConfigProvider`
+    /// 的字符串存储口径一致，引擎侧只做 `= "true"` 比较，放宽大小写会让两边判定分叉）。
+    #[test]
+    fn bool_setting_value_domain_is_strict() {
+        let manifest: Manifest = serde_json::from_str(
+            r#"{"id":"x","name":"X","specVersion":1,
+                "entry":{"kind":"script","file":"a.ahk","func":"F"},
+                "permissions":["settings"],
+                "settings":[{"key":"autoShow","type":"bool","label":"自动弹出","default":"true"}]}"#,
+        )
+        .expect("应能反序列化");
+        assert!(validate_manifest(&manifest).is_ok(), "{manifest:?}");
+
+        let setting = &manifest.settings[0];
+        assert_eq!(value_limit(setting), 5, "上限 = \"false\" 的长度");
+        assert!(validate_setting_value(setting, "").is_ok(), "空串 = 未设置");
+        assert!(validate_setting_value(setting, "true").is_ok());
+        assert!(validate_setting_value(setting, "false").is_ok());
+        for bad in ["yes", "1", "True", "FALSE", "on"] {
+            assert!(
+                validate_setting_value(setting, bad).is_err(),
+                "{bad:?} 应被拒绝"
+            );
+        }
+    }
+
+    /// `bool` 不得携带 `number`/`file` 专属字段（`min`/`max`/`filter`）——
+    /// 否则 manifest 会写出永远不会生效的声明。
+    #[test]
+    fn bool_setting_rejects_number_and_file_only_fields() {
+        let with_extra = |extra: &str| {
+            format!(
+                r#"{{"id":"x","name":"X","specVersion":1,
+                    "entry":{{"kind":"script","file":"a.ahk","func":"F"}},
+                    "permissions":["settings"],
+                    "settings":[{{"key":"k","type":"bool","label":"L"{extra}}}]}}"#
+            )
+        };
+        for (extra, what) in [(r#","min":0"#, "min"), (r#","filter":"*.exe""#, "filter")] {
+            let manifest: Manifest = serde_json::from_str(&with_extra(extra)).unwrap();
+            assert!(
+                validate_manifest(&manifest).is_err(),
+                "bool 不应带 {what}: {manifest:?}"
+            );
+        }
+    }
+
+    /// `bool` 的**默认值**本身也要过校验 —— 坏包必须在加载期隔离，而不是等用户点开设置框。
+    #[test]
+    fn bool_setting_with_bad_default_is_rejected() {
+        let manifest: Manifest = serde_json::from_str(
+            r#"{"id":"x","name":"X","specVersion":1,
+                "entry":{"kind":"script","file":"a.ahk","func":"F"},
+                "permissions":["settings"],
+                "settings":[{"key":"k","type":"bool","label":"L","default":"yes"}]}"#,
+        )
+        .unwrap();
+        let error = validate_manifest(&manifest).expect_err("应拒绝");
+        assert!(error.contains("默认值不合法"), "{error}");
+    }
+
+    /// 词表扩容后，`bool` 必须被 `SETTING_TYPES` 接纳（两端同步的机械闸门：
+    /// 这条挂了说明 Rust 加了 `bool` 而词表没加，或反之）。
+    #[test]
+    fn bool_is_in_setting_types_vocabulary() {
+        assert!(SETTING_TYPES.contains(&"bool"));
+        assert_eq!(SETTING_TYPES.len(), 5);
     }
 }

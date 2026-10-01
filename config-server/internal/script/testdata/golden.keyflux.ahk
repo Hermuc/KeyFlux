@@ -20,13 +20,8 @@
 #Include lib/context/SelectionContext.ahk
 #Include lib/rules/SelectedAction.ahk
 #Include lib/commands/CommandResolver.ahk
-#Include lib/quickswitch/FolderRanker.ahk
-#Include lib/quickswitch/HistoryStore.ahk
-#Include lib/quickswitch/FolderHistory.ahk
-#Include lib/quickswitch/DialogInspector.ahk
-#Include lib/quickswitch/QuickSwitchUI.ahk
-#Include lib/quickswitch/QuickSwitch.ahk
 #Include lib/plugins/Plugins.ahk
+#Include ../data/plugins/quick_switch/main.ahk
 
 ; #WinActivateForce   ; 先关了遇到相关问题再打开试试
 ; InstallKeybdHook    ; 这个可以重装 keyboard hook, 提高自己的 hook 优先级, 以后可能会用到
@@ -41,6 +36,8 @@ SendMode "Event"                                          ; 执行 SendInput 的
 SetKeyDelay 0                                             ; 默认 10 太慢了, https://www.reddit.com/r/AutoHotkey/comments/gd3z4o/possible_unreliable_detection_of_the_keyup_event/
 ProcessSetPriority "High"
 SetWorkingDir("../")
+PluginManager.Register(Map("id", "quick_switch", "name", "快速切换", "nameEn", "Quick Switch", "version", "1.0.0", "specVersion", 1, "description", "黄金快照桩包", "entry", Map("kind", "script", "file", "main.ahk", "func", "QuickSwitchMain"), "permissions", ["window"]))
+PluginManager.LoadEntry("quick_switch")
 ; 引擎级未捕获异常兜底: 替代「错误弹窗 + 线程死亡 + Suspend 残留 (热键全灭)」,
 ; 记录全文到 logs\engine_error.log (见 Functions.ahk 的 EngineOnError 注释)。
 OnError(EngineOnError)

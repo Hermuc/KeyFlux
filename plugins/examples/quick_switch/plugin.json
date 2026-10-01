@@ -1,0 +1,11 @@
+{
+  "id": "quick_switch",
+  "name": "快速切换",
+  "nameEn": "Quick Switch",
+  "version": "1.0.0",
+  "specVersion": 1,
+  "description": "在文件对话框出现时自动收集最近使用的文件夹, 提供一键跳转与候选浮层。",
+  "author": "KeyFlux",
+  "entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"},
+  "permissions": ["window"]
+}

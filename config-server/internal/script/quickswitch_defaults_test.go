@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"settings/internal/script/generators"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,7 +21,7 @@ import (
 // 9 字段全部相等 (缺漏/多出/不等即 fail), 防止改动一处漏改另一处导致默认值漂移。
 // (C# 侧 Models/ConfigReadDefaults.cs QuickSwitchDefaults() 同为真源, 其一致由 C# 单测守护。)
 func TestQuickSwitchDefaultsConsistency(t *testing.T) {
-	const ahkFile = "../../../bin/lib/quickswitch/QuickSwitch.ahk"
+	const ahkFile = "../../../plugins/examples/quick_switch/src/QuickSwitch.ahk" // 2026-10-01 P2 插件化搬迁
 	data, err := os.ReadFile(ahkFile)
 	if err != nil {
 		t.Fatalf("读取 %s 失败: %v", ahkFile, err)
@@ -160,6 +161,25 @@ func TestQuickSwitchUpgradePathFillsDefaults(t *testing.T) {
 		t.Errorf("升级路径: ParseConfig 未补齐默认值\n got = %+v\nwant = %+v",
 			cfg.Options.QuickSwitch, DefaultQuickSwitchOption())
 	}
+
+	// 插件目录桩包 (2026-10-01 P2): InitQuickSwitch 注入行改由晚初始化扩展点产出,
+	// 须有 quick_switch 插件在场才会渲染 (同 generateAHK 管线)。
+	pluginDir := t.TempDir()
+	pdir := filepath.Join(pluginDir, "quick_switch")
+	if err := os.MkdirAll(pdir, 0o755); err != nil {
+		t.Fatalf("建插件目录失败: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
+		"id": "quick_switch", "name": "快速切换", "specVersion": 1,
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"}
+	}`), 0o644); err != nil {
+		t.Fatalf("写桩 manifest 失败: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pdir, "main.ahk"), []byte("QuickSwitchMain(api) {}"), 0o644); err != nil {
+		t.Fatalf("写桩入口失败: %v", err)
+	}
+	generators.SetPluginsDir(pluginDir)
+	defer generators.SetPluginsDir("")
 
 	Preprocess(cfg) // 与 SaveAHK 同序 (同 generateAHK 管线)
 	outPath := filepath.Join(t.TempDir(), "KeyFlux.ahk")

@@ -94,6 +94,12 @@ pub fn build_cards(config: &Config, catalog: &PluginListResponse) -> Vec<PluginC
         catalog
             .plugins
             .iter()
+            // 🔴 去重守卫 (2026-10-01 P2 插件化): quick_switch 自本期起以标准插件
+            // 形态存在于 data/plugins/ (会被目录扫描发现), 但其**专用卡**仍由首卡
+            // 合成 (开关写 options.quickSwitch.collect_enabled, 非 disabled 列表,
+            // 见 apply_enabled 的 is_builtin 分支) —— 不跳过会出现两张同 ID 卡。
+            // 切到目录驱动卡 + 墓碑语义属 P4 (提案 §6)。
+            .filter(|manifest| manifest.id != QUICK_SWITCH_ID)
             .map(|manifest| card_from(config, manifest)),
     );
     cards
@@ -251,6 +257,8 @@ pub const SETTING_CHAR: &str = "char";
 pub const SETTING_NUMBER: &str = "number";
 /// 文件选择（`type: "file"`）。
 pub const SETTING_FILE: &str = "file";
+/// 布尔开关（`type: "bool"`，值域 `"true"`/`"false"`，2026-10-01 新增）。
+pub const SETTING_BOOL: &str = "bool";
 
 /// 未声明 `maxLength` 时的回退（与后端 `Setting.ValueLimit` 口径一致）。
 pub const DEFAULT_MAX_LENGTH: usize = 1024;
@@ -267,10 +275,24 @@ pub fn is_file(setting: &PluginSetting) -> bool {
     setting.setting_type == SETTING_FILE
 }
 
-/// 输入框字符上限（`char` → 1；`maxLength > 0` → 声明值；否则 1024）。
+/// 布尔项（渲染成开关，而非文本框）。
+pub fn is_bool(setting: &PluginSetting) -> bool {
+    setting.setting_type == SETTING_BOOL
+}
+
+/// 布尔项的值解析：**只有字面 `"true"` 为真**（与后端 `ValidateSettingValue` 的空串/字面
+/// 判定同口径）。空串（未设置）按 `false` 呈现，实际生效值由 manifest 默认值在加载期合并。
+pub fn bool_value(value: &str) -> bool {
+    value == "true"
+}
+
+/// 输入框字符上限（`char` → 1；`bool` → 5（`"false"`）；`maxLength > 0` → 声明值；否则 1024）。
 pub fn max_length(setting: &PluginSetting) -> usize {
     if is_char(setting) {
         return 1;
+    }
+    if is_bool(setting) {
+        return 5;
     }
     if setting.max_length > 0 {
         return setting.max_length as usize;

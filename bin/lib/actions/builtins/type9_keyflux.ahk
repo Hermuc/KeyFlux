@@ -169,5 +169,10 @@ ToggleCapslock() {
  *     本薄壳独占 QuickSwitchGoto 这一名字 (生成端 callMap[9] 调用的即本函数)。
  */
 QuickSwitchGoto() {
-  QuickSwitchRun()
+  ; 2026-10-01 QuickSwitch 插件化 P2: 实现已随代码搬入 data/plugins/quick_switch/,
+  ; 本薄壳改经动作注册表间接寻址 —— 🔴 不得直调 QuickSwitchRun(): AHK v2 直调未定义
+  ; 函数是加载期致命错误, 插件被删除/停用时会拖垮整个引擎 (提案 §0.5 P0 实测)。
+  ; 经注册表后, 插件缺席即静默返回 false (可删除性保证); 生成端 callMap[9] 文本
+  ; (`QuickSwitchGoto()`) 保持不变, golden / 语料 / 动作元数据零改动。
+  return PluginManager.InvokeAction("quick_switch", "goto")
 }

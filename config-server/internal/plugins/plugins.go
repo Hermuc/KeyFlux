@@ -57,6 +57,10 @@ const (
 	SettingTypeText   = "text"   // 任意短文本
 	SettingTypeNumber = "number" // 整数 (可带 min/max)
 	SettingTypeFile   = "file"   // 本地文件路径 (界面上给文件选择器)
+	// SettingTypeBool 开关 (值域严格 = "true"/"false"; 2026-10-01 新增)。
+	// 由来: 开关类字段插件化的硬前置 —— 声明式设置此前表达不了"开关"。
+	// 值为字符串承载, 与 ConfigProvider 的扁平字符串存储同构 (引擎侧零改动)。
+	SettingTypeBool = "bool"
 )
 
 // settingTypes 合法类型集。
@@ -65,6 +69,7 @@ var settingTypes = map[string]bool{
 	SettingTypeText:   true,
 	SettingTypeNumber: true,
 	SettingTypeFile:   true,
+	SettingTypeBool:   true,
 }
 
 // SettingsPermission 声明 settings 所必需的能力位 (值必须为单字符)。
@@ -105,6 +110,9 @@ type Setting struct {
 func (s Setting) ValueLimit() int {
 	if s.Type == SettingTypeChar {
 		return 1
+	}
+	if s.Type == SettingTypeBool {
+		return 5 // "false" —— 最长的合法取值
 	}
 	if s.Type == SettingTypeText && s.MaxLength > 0 && s.MaxLength < MaxSettingValueLen {
 		return s.MaxLength
@@ -161,13 +169,21 @@ type Catalog struct {
 	Errors  []string
 }
 
-// ValidateManifest 校验 manifest 结构合法性 (加载期与导入 API 共用)。
+// ValidateManifest 校验 manifest 结构合法性 + 内置 ID 保留集 (导入 API 共用)。
+// 🔴 目录加载路径不走本函数 (走 validateManifestBody): 随包内置插件 quick_switch
+// 自 2026-10-01 P2 插件化起以标准插件形态分发 (data/plugins/quick_switch/), 必须经
+// 目录扫描正常加载; 本函数仅供**导入 API** 调用 —— 第三方包不得冒用内置 ID。
 func ValidateManifest(p *Manifest) error {
-	if !idPattern.MatchString(p.ID) {
-		return fmt.Errorf("插件 ID %q 不合法 (须匹配 ^[a-z][a-z0-9_]{0,31}$)", p.ID)
-	}
 	if BuiltinPluginIDs[p.ID] {
 		return fmt.Errorf("插件 ID %q 与内置插件冲突", p.ID)
+	}
+	return validateManifestBody(p)
+}
+
+// validateManifestBody 校验 manifest 结构合法性 (目录加载路径; 不含内置 ID 检查)。
+func validateManifestBody(p *Manifest) error {
+	if !idPattern.MatchString(p.ID) {
+		return fmt.Errorf("插件 ID %q 不合法 (须匹配 ^[a-z][a-z0-9_]{0,31}$)", p.ID)
 	}
 	if p.SpecVersion != SpecVersion {
 		return fmt.Errorf("specVersion 必须为 %d (当前 %d)", SpecVersion, p.SpecVersion)
@@ -213,7 +229,7 @@ func validateSettings(p *Manifest) error {
 		}
 		seen[s.Key] = true
 		if !settingTypes[s.Type] {
-			return fmt.Errorf("插件「%s」设置项 %q 的 type %q 不合法 (仅支持 char/text/number/file)", p.ID, s.Key, s.Type)
+			return fmt.Errorf("插件「%s」设置项 %q 的 type %q 不合法 (仅支持 char/text/number/file/bool)", p.ID, s.Key, s.Type)
 		}
 		if strings.TrimSpace(s.Label) == "" {
 			return fmt.Errorf("插件「%s」设置项 %q 缺少 label", p.ID, s.Key)
@@ -260,6 +276,12 @@ func ValidateSettingValue(s Setting, value string) error {
 		r := []rune(value)[0]
 		if r < 0x20 || r == 0x7F {
 			return fmt.Errorf("%q 不是可打印字符", value)
+		}
+	case SettingTypeBool:
+		// 空串已在上方提前放行 (= 未设置, 回落 manifest 默认值)。
+		// 大小写敏感: 引擎侧只做 = "true" 比较, 放宽会让两端判定分叉。
+		if value != "true" && value != "false" {
+			return fmt.Errorf("%q 不是布尔值 (仅接受 true/false)", value)
 		}
 	case SettingTypeNumber:
 		n, err := strconv.ParseInt(value, 10, 64)
@@ -319,13 +341,15 @@ func readManifest(dir string) (*Manifest, error) {
 
 // parseManifest 解析并校验 manifest 字节 (导入路径与目录加载共用;
 // 导入时文件尚在临时目录, 目录名比对由调用方按最终落盘位置另行保证)。
+// 校验走 validateManifestBody (不含内置 ID 检查): 目录加载须放行随包内置插件
+// quick_switch; 导入 API (InstallFromZip) 在本函数之后另行调 ValidateManifest 补上。
 func parseManifest(raw []byte) (*Manifest, error) {
 	raw = bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF})
 	var m Manifest
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return nil, fmt.Errorf("plugin.json 解析失败: %w", err)
 	}
-	if err := ValidateManifest(&m); err != nil {
+	if err := validateManifestBody(&m); err != nil {
 		return nil, err
 	}
 	return &m, nil
@@ -379,6 +403,11 @@ func InstallFromZip(r io.Reader, userDir string) (*Manifest, error) {
 	}
 	m, err := parseManifest(raw)
 	if err != nil {
+		return nil, err
+	}
+	// 导入路径补内置 ID 检查 (parseManifest 为目录加载放行随包内置插件, 见其注释):
+	// 第三方 zip 不得冒用 quick_switch 等保留 ID。
+	if err := ValidateManifest(m); err != nil {
 		return nil, err
 	}
 

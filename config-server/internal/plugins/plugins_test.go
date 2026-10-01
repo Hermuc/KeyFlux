@@ -203,3 +203,19 @@ func TestLoadCatalogAndRemove(t *testing.T) {
 		t.Fatal("目录未删除")
 	}
 }
+
+// 目录加载放行内置 ID (随包内置插件 quick_switch 以标准插件形态分发),
+// 但导入 API 仍拒绝冒名 (2026-10-01 P2 插件化: parseManifest 走宽松校验)。
+func TestBuiltinID_CatalogAllowsInstallRejects(t *testing.T) {
+	raw := []byte(`{
+		"id": "quick_switch", "name": "快速切换", "specVersion": 1,
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"}
+	}`)
+	m, err := parseManifest(raw)
+	if err != nil {
+		t.Fatalf("目录加载应放行内置 ID: %v", err)
+	}
+	if err := ValidateManifest(m); err == nil {
+		t.Fatalf("导入 API 应拒绝内置 ID 冒名")
+	}
+}

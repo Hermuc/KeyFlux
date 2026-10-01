@@ -49,8 +49,9 @@ var TemplateFuncMap = template.FuncMap{
 	"GroupDisableKeyFlux": GroupDisableKeyFlux,
 	"selectedActionCode":  selectedActionCode,
 	// 插件注入块 (plugins.go): 零插件时均为空串, 模板行尾拼接约定下产物字节不变
-	"PLUGIN_INCLUDES":  func() string { return PluginIncludes() },
-	"PLUGIN_BOOTSTRAP": func() string { return PluginBootstrap() },
+	"PLUGIN_INCLUDES":   func() string { return PluginIncludes() },
+	"PLUGIN_BOOTSTRAP":  func() string { return PluginBootstrap() },
+	"PLUGIN_LATE_INIT":  func() string { return PluginLateInit() },
 	// 外接脚本注入块 (customscripts.go): 零外接脚本时均为空串, 同上
 	"CUSTOM_SCRIPT_INCLUDES":  func() string { return CustomScriptIncludes() },
 	"CUSTOM_SCRIPT_BOOTSTRAP": func() string { return CustomScriptBootstrap() },

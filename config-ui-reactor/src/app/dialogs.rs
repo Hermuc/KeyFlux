@@ -46,6 +46,11 @@ impl Shell {
                     value,
                     english,
                     context.callback(move |value: String| Message::PsValue(index, value)),
+                    // 开关复用**同一条** `PsValue` 字符串通道（"true"/"false"）——
+                    // `bool` 在协议里就是字符串承载，没必要为一个控件开一条新消息。
+                    context.callback(move |on: bool| {
+                        Message::PsValue(index, if on { "true" } else { "false" }.to_string())
+                    }),
                     context.message(Message::PsPickFile(index)),
                 ),
             ));

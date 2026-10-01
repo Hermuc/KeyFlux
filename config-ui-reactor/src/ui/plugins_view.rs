@@ -454,11 +454,16 @@ pub fn market_entry<C: IntoUnitCallback>(
 }
 
 /// 声明式设置行：标签 + 提示 + 编辑器（`char`/`text`/`number` 用文本框，`file` 加「选择文件」）。
-pub fn setting_row<C: IntoPayloadCallback<String>, F: IntoUnitCallback>(
+pub fn setting_row<
+    C: IntoPayloadCallback<String>,
+    T: IntoPayloadCallback<bool>,
+    F: IntoUnitCallback,
+>(
     setting: &crate::models::PluginSetting,
     value: &str,
     english: bool,
     on_change: C,
+    on_toggle: T,
     on_pick_file: F,
 ) -> View {
     let mut children: Vec<(usize, View)> = Vec::new();
@@ -501,28 +506,37 @@ pub fn setting_row<C: IntoPayloadCallback<String>, F: IntoUnitCallback>(
         ));
     }
 
-    // ⚠️ 0.100.0 的 TextBox 无 `MaxLength`（长度上限由保存前的校验兜底，口径同后端）
-    let editor: View = TextBox::new()
-        .text(value.to_string())
-        .min_width(280.0)
-        .on_text_changed(on_change)
-        .into();
-
-    // `file` 类型：文本框 + 「浏览」按钮（旧 `PluginSettingsDialogWindow.axaml:91` 用 2582；
-    // 2583 是文件对话框标题，此前误用）
-    if crate::services::plugins::is_file(setting) {
-        let pick: View = Button::new()
-            .on_click(on_pick_file)
-            .content(TextBlock::new().text(i18n::t("2582")));
-        children.push((
-            children.len(),
-            StackPanel::new()
-                .orientation(Orientation::Horizontal)
-                .spacing(8.0)
-                .children((editor, pick)),
-        ));
+    // `bool` 类型（2026-10-01 协议扩展）：渲染成开关，**不是**文本框。
+    // 值仍走同一条字符串通道（"true"/"false"）⇒ 无需新增消息、后端无需新分支 ——
+    // 协议里 `bool` 本来就是字符串承载（`ConfigProvider` 只有扁平字符串存储）。
+    if crate::services::plugins::is_bool(setting) {
+        let switch: View =
+            crate::ui::compact_switch(crate::services::plugins::bool_value(value), on_toggle);
+        children.push((children.len(), switch));
     } else {
-        children.push((children.len(), editor));
+        // ⚠️ 0.100.0 的 TextBox 无 `MaxLength`（长度上限由保存前的校验兜底，口径同后端）
+        let editor: View = TextBox::new()
+            .text(value.to_string())
+            .min_width(280.0)
+            .on_text_changed(on_change)
+            .into();
+
+        // `file` 类型：文本框 + 「浏览」按钮（旧 `PluginSettingsDialogWindow.axaml:91` 用 2582；
+        // 2583 是文件对话框标题，此前误用）
+        if crate::services::plugins::is_file(setting) {
+            let pick: View = Button::new()
+                .on_click(on_pick_file)
+                .content(TextBlock::new().text(i18n::t("2582")));
+            children.push((
+                children.len(),
+                StackPanel::new()
+                    .orientation(Orientation::Horizontal)
+                    .spacing(8.0)
+                    .children((editor, pick)),
+            ));
+        } else {
+            children.push((children.len(), editor));
+        }
     }
 
     // `char` 且为空/空格：单字符输入框放不下视觉线索，补一行可读回显（复刻 ShowSpaceToken）

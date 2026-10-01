@@ -29,7 +29,6 @@ use crate::generator::actions::{
 use crate::generator::behaviors::Catalog;
 use crate::generator::model::Config;
 use crate::generator::plugins;
-use crate::generator::text::ahk_string;
 
 /// Go `%t`：bool 打印为 `true` / `false`（模板里 `{{ .Options.X.Y }}` 走这条）。
 fn bool_str(value: bool) -> &'static str {
@@ -74,39 +73,19 @@ pub fn render_keyflux_ahk(
     // L43 末尾换行
     out.push('\n');
 
-    // ---- L44-L61: 引擎初始化（到 `InitKeymap()`） ----
+    // ---- L44-L60: 引擎初始化（到 `InitKeymap()`，ENGINE_INIT 末尾含 `\n`） ----
     out.push_str(ENGINE_INIT);
 
-    // ---- L62: InitQuickSwitch（`{{ range }}` 拼 excludedPrefixes） ----
-    let quick_switch = &config.options.quick_switch;
-    out.push_str("InitQuickSwitch({collectEnabled: ");
-    out.push_str(bool_str(quick_switch.collect_enabled));
-    out.push_str(", autoShow: ");
-    out.push_str(bool_str(quick_switch.auto_show));
-    out.push_str(", autoJumpOpen: ");
-    out.push_str(bool_str(quick_switch.auto_jump_open));
-    out.push_str(", autoJumpSave: ");
-    out.push_str(bool_str(quick_switch.auto_jump_save));
-    out.push_str(&format!(
-        ", pollIntervalMs: {}",
-        quick_switch.poll_interval_ms
-    ));
-    out.push_str(&format!(", maxHistory: {}", quick_switch.max_history));
-    out.push_str(&format!(", overlayRows: {}", quick_switch.overlay_rows));
-    out.push_str(&format!(
-        ", overlayRowsCompact: {}",
-        quick_switch.overlay_rows_compact
-    ));
-    out.push_str(", excludedPrefixes: [");
-    for (index, prefix) in quick_switch.excluded_prefixes.iter().enumerate() {
-        if index > 0 {
-            out.push_str(", ");
-        }
-        out.push_str(&ahk_string(prefix));
+    // ---- L61: `{{- PLUGIN_LATE_INIT }}`（插件晚初始化扩展点，模板用 `{{-` 吃前导
+    //      换行 ⇒ 行尾拼接约定）。非空 = `InitQuickSwitch({...})` 调用行（见
+    //      plugins::render_late_init）；空块 = 零字节，与迁移前形态完全一致。
+    let plugin_late_init = plugins::render_late_init(config, plugins_dir, &disabled);
+    if !plugin_late_init.is_empty() {
+        out.push_str(plugin_late_init.trim_start_matches('\n'));
+        out.push('\n');
     }
-    out.push_str("]})\n");
 
-    // ---- L63-L68: 到 `taskSwitch := ...` ----
+    // ---- L62-L67: 到 `taskSwitch := ...` ----
     out.push_str(INITKEYMAP_HEAD);
 
     // ---- L69: mouseTip（Go: `{{ if .Options.Mouse.ShowTip }}...{{ else }}false{{ end }}`） ----
@@ -381,12 +360,6 @@ const HEAD_INCLUDES: &str = r#"#Requires AutoHotkey v2.0
 #Include lib/context/SelectionContext.ahk
 #Include lib/rules/SelectedAction.ahk
 #Include lib/commands/CommandResolver.ahk
-#Include lib/quickswitch/FolderRanker.ahk
-#Include lib/quickswitch/HistoryStore.ahk
-#Include lib/quickswitch/FolderHistory.ahk
-#Include lib/quickswitch/DialogInspector.ahk
-#Include lib/quickswitch/QuickSwitchUI.ahk
-#Include lib/quickswitch/QuickSwitch.ahk
 #Include lib/plugins/Plugins.ahk"#;
 
 /// L31-L43（到 `SetWorkingDir("../")`，**无**末尾换行）。
