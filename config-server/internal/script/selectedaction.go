@@ -110,10 +110,10 @@ func ValidateSelectedAction(sa *SelectedAction, cat *behaviors.Catalog, cfg *Con
 			if isCustomRef(m.MatchValue) {
 				return fmt.Errorf("未找到引用的匹配类型「%s」，请先在「匹配类型」中创建", strings.TrimPrefix(m.MatchValue, "type:"))
 			}
-		if m.MatchType == "textType" {
-			return fmt.Errorf("未知的文本特征「%s」，可选：%s（或在「匹配类型」中自定义）",
-				m.MatchValue, behaviors.TextFeatureHint())
-		}
+			if m.MatchType == "textType" {
+				return fmt.Errorf("未知的文本特征「%s」，可选：%s（或在「匹配类型」中自定义）",
+					m.MatchValue, behaviors.TextFeatureHint())
+			}
 			return fmt.Errorf("文件扩展名「%s」无效，请填写如 jpg,png（或 * 表示任意文件）", m.MatchValue)
 		}
 		// L1: 文件扩展名归一化后为空拒绝 (空串/纯点/纯逗号), 镜像 textType 词表拒绝风格

@@ -20,7 +20,7 @@ import (
 //   - plain 的排除集正确性: 任一具名特征命中时 plain 必须不出现 —— 这正是
 //     "新增特征忘了同步 plain 排除集"这一历史缺陷的兜底。
 type textTypeVectorDoc struct {
-	Version int    `json:"version"`
+	Version int      `json:"version"`
 	Types   []string `json:"types"`
 	Cases   []struct {
 		Content     string   `json:"content"`
