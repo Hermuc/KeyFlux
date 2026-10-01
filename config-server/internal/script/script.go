@@ -15,6 +15,9 @@ func GenerateScripts(config *Config) {
 	generators.BehaviorCatalog = LoadBehaviorCatalog(ConfigRelPath)
 	// 插件注入目录: 用户插件包在 ../data/plugins (生成端 #Include + 引导, 见 generators/plugins.go)
 	generators.SetPluginsDir("../data/plugins")
+	// 外接脚本数据目录 (config.json 同级 data/): scripts/*.ahk 发现 + custom_functions.ahk
+	// 自愈桩 (见 generators/customscripts.go)
+	generators.SetCustomScriptsDir("../data")
 
 	Preprocess(config)
 

@@ -39,6 +39,8 @@ func GenerateAHK(args ...string) {
 	generators.BehaviorCatalog = script.LoadBehaviorCatalog(configFile)
 	// 插件注入目录 (config.json 同级 plugins/), 见 generators/plugins.go
 	generators.SetPluginsDir(filepath.Join(filepath.Dir(configFile), "plugins"))
+	// 外接脚本数据目录 (config.json 同级 data/), 见 generators/customscripts.go
+	generators.SetCustomScriptsDir(filepath.Dir(configFile))
 	script.Preprocess(config)
 
 	// 命令框字体: 落点跟随**输出文件目录** (部署树的 bin/), 而非 cwd —— CLI 的 cwd 是
