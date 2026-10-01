@@ -43,7 +43,7 @@ where
         ))
 }
 
-/// 运行时边界说明（2425，stone 12）+ 配置引导（2426，terracotta 11）——页尾两行。
+/// 运行时边界说明（2425，stone 12）+ 配置引导（2426，强调蓝 11）——页尾两行。
 pub fn footer_notes() -> View {
     StackPanel::new().spacing(4.0).children((
         TextBlock::new()
@@ -54,7 +54,7 @@ pub fn footer_notes() -> View {
         TextBlock::new()
             .text(i18n::t("2426"))
             .font_size(theme::FONT_BADGE)
-            .foreground(theme::terracotta())
+            .foreground(theme::accent_solid())
             .text_wrapping(TextWrapping::Wrap),
     ))
 }
@@ -103,12 +103,12 @@ where
             .into(),
     ));
     if !version.is_empty() {
-        title_items.push((title_items.len(), badge(&version, theme::CHARCOAL_WARM)));
+        title_items.push((title_items.len(), badge(&version, theme::CHARCOAL)));
     }
     if !card.is_builtin {
         title_items.push((
             title_items.len(),
-            badge(&i18n::t("2421"), theme::OLIVE_GRAY),
+            badge(&i18n::t("2421"), theme::SLATE_GRAY),
         ));
     }
     let title: View = StackPanel::new()
@@ -124,7 +124,7 @@ where
             TextBlock::new()
                 .text(card.description.clone())
                 .font_size(13.0)
-                .foreground(theme::solid(theme::OLIVE_GRAY))
+                .foreground(theme::solid(theme::SLATE_GRAY))
                 .text_wrapping(TextWrapping::Wrap)
                 .into(),
         ));
@@ -161,7 +161,7 @@ where
         .font_size(theme::FONT_MICRO)
         .font_weight(FontWeight::SEMI_BOLD)
         .foreground(if card.enabled {
-            theme::solid(theme::OLIVE_GRAY)
+            theme::solid(theme::SLATE_GRAY)
         } else {
             theme::stone_gray()
         })
@@ -191,12 +191,12 @@ where
 
     let rows: Vec<(usize, View)> = vec![(0, header), (1, info), (2, delete)];
 
-    // 旧 `Border.pluginCard`：Ivory 面 + cream 边 2px + 圆角 14 + Padding 20,16 + 底距 10
+    // 旧 `Border.pluginCard`：Ivory 面 + 淡冷边 2px + 圆角 14 + Padding 20,16 + 底距 10
     Border::new()
         .padding(Thickness::new(20.0, 16.0, 20.0, 16.0))
         .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
         .background(theme::ivory())
-        .border_brush(theme::border_cream())
+        .border_brush(theme::border_faint())
         .border_thickness(theme::card_border())
         .corner_radius(theme::radius_card())
         .content(StackPanel::new().spacing(0.0).keyed_children(rows))
@@ -212,7 +212,7 @@ pub fn loading() -> View {
 }
 
 /// 目录加载告警（逐包错误汇总，多行）+ 重试。
-/// 旧版容器：Ivory 面 + cream 边 1px + 圆角 4（RadiusPanel）+ Padding 14。
+/// 旧版容器：Ivory 面 + 淡冷边 1px + 圆角 4（RadiusPanel）+ Padding 14。
 /// 市场对话框传入 `title`（2433「无法加载插件市场目录」，旧 `PluginMarketWindow.axaml:117`）。
 pub fn load_error(message: &str, title: Option<&str>, on_retry: impl IntoUnitCallback) -> View {
     let mut head: Vec<(usize, View)> = Vec::new();
@@ -240,7 +240,7 @@ pub fn load_error(message: &str, title: Option<&str>, on_retry: impl IntoUnitCal
     StackPanel::new().spacing(10.0).children((
         Border::new()
             .background(theme::ivory())
-            .border_brush(theme::border_cream())
+            .border_brush(theme::border_faint())
             .border_thickness(theme::hairline())
             .corner_radius(theme::radius_panel())
             .padding(Thickness::uniform(14.0))
@@ -265,7 +265,7 @@ pub fn market_empty() -> View {
 pub fn action_error(message: &str) -> View {
     Border::new()
         .background(theme::ivory())
-        .border_brush(theme::border_cream())
+        .border_brush(theme::border_faint())
         .border_thickness(theme::hairline())
         .corner_radius(theme::radius_panel())
         .padding(Thickness::uniform(14.0))
@@ -290,11 +290,11 @@ pub fn empty_state() -> View {
                     .text(i18n::t("2429"))
                     .font_size(13.0)
                     .font_weight(FontWeight::SEMI_BOLD)
-                    .foreground(theme::solid(theme::CHARCOAL_WARM)),
+                    .foreground(theme::solid(theme::CHARCOAL)),
                 TextBlock::new()
                     .text(i18n::t("2430"))
                     .font_size(theme::FONT_CAPTION)
-                    .foreground(theme::solid(theme::OLIVE_GRAY))
+                    .foreground(theme::solid(theme::SLATE_GRAY))
                     .text_wrapping(TextWrapping::Wrap),
             )),
         )
@@ -364,7 +364,7 @@ pub fn qs_section(title: impl Into<String>) -> View {
         .text(title.into())
         .font_size(theme::FONT_BODY)
         .font_weight(FontWeight::SEMI_BOLD)
-        .foreground(theme::solid(theme::CHARCOAL_WARM))
+        .foreground(theme::solid(theme::CHARCOAL))
         .margin(Thickness::new(0.0, 6.0, 0.0, 8.0))
         .into()
 }
@@ -390,7 +390,7 @@ pub fn market_entry<C: IntoUnitCallback>(
             .into(),
     ));
     if !version.is_empty() {
-        title_items.push((title_items.len(), badge(&version, theme::CHARCOAL_WARM)));
+        title_items.push((title_items.len(), badge(&version, theme::CHARCOAL)));
     }
     let title: View = StackPanel::new()
         .orientation(Orientation::Horizontal)
@@ -404,7 +404,7 @@ pub fn market_entry<C: IntoUnitCallback>(
             TextBlock::new()
                 .text(entry.description.clone())
                 .font_size(13.0)
-                .foreground(theme::solid(theme::OLIVE_GRAY))
+                .foreground(theme::solid(theme::SLATE_GRAY))
                 .text_wrapping(TextWrapping::Wrap)
                 .into(),
         ));
@@ -440,12 +440,12 @@ pub fn market_entry<C: IntoUnitCallback>(
         (2, action),
     ];
 
-    // 几何对齐 `Border.pluginCard`（Ivory 面 / cream 边 2px / 圆角 14 / Padding 20,16）
+    // 几何对齐 `Border.pluginCard`（Ivory 面 / 淡冷边 2px / 圆角 14 / Padding 20,16）
     Border::new()
         .padding(Thickness::new(20.0, 16.0, 20.0, 16.0))
         .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
         .background(theme::ivory())
-        .border_brush(theme::border_cream())
+        .border_brush(theme::border_faint())
         .border_thickness(theme::card_border())
         .corner_radius(theme::radius_card())
         .content(StackPanel::new().spacing(0.0).keyed_children(rows))
@@ -494,7 +494,7 @@ pub fn setting_row<C: IntoPayloadCallback<String>, F: IntoUnitCallback>(
             TextBlock::new()
                 .text(range)
                 .font_size(theme::FONT_CAPTION)
-                .foreground(theme::solid(theme::OLIVE_GRAY))
+                .foreground(theme::solid(theme::SLATE_GRAY))
                 .into(),
         ));
     }
@@ -541,13 +541,13 @@ pub fn setting_row<C: IntoPayloadCallback<String>, F: IntoUnitCallback>(
         .keyed_children(children)
 }
 
-/// 一次性操作回显（导入/删除成功提示）：旧版 13 SemiBold terracotta。
+/// 一次性操作回显（导入/删除成功提示）：旧版 13 SemiBold terracotta，现走主题强调色（冷蓝）。
 pub fn status_banner(message: &str) -> View {
     TextBlock::new()
         .text(message.to_string())
         .font_size(13.0)
         .font_weight(FontWeight::SEMI_BOLD)
-        .foreground(theme::terracotta())
+        .foreground(theme::accent_solid())
         .text_wrapping(TextWrapping::Wrap)
         .into()
 }

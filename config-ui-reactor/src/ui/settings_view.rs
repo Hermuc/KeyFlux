@@ -10,7 +10,7 @@ use crate::theme;
 
 /// 分区卡：头部按钮开合，展开时渲染 `body`（不展开时不渲染，控件随建随弃）。
 ///
-/// 几何对齐旧 `Border.settingsCard`：Ivory 面 + cream 边 2px + 圆角 14 + Padding 16；
+/// 几何对齐旧 `Border.settingsCard`：Ivory 面 + 淡冷边 2px + 圆角 14 + Padding 16；
 /// 头部标题 15 SemiBold（旧 `.sectionHeader`）；卡间距 16（旧右列 `Spacing="16"`）。
 pub fn section_card<C: IntoUnitCallback>(
     title: impl Into<String>,
@@ -27,7 +27,7 @@ pub fn section_card<C: IntoUnitCallback>(
                 TextBlock::new()
                     .text(indicator)
                     .font_size(theme::FONT_CARD_TITLE)
-                    .foreground(theme::solid(theme::TERRACOTTA)),
+                    .foreground(theme::solid(theme::ACCENT)),
                 TextBlock::new()
                     .text(title.into())
                     .font_size(theme::FONT_CARD_TITLE)
@@ -45,7 +45,7 @@ pub fn section_card<C: IntoUnitCallback>(
         .padding(theme::pad_md())
         .margin(Thickness::new(0.0, 0.0, 0.0, 16.0))
         .background(theme::ivory())
-        .border_brush(theme::border_cream())
+        .border_brush(theme::border_faint())
         .border_thickness(theme::card_border())
         .corner_radius(theme::radius_card())
         .content(StackPanel::new().spacing(8.0).keyed_children(children))
@@ -59,7 +59,7 @@ pub fn field_row(label: impl Into<String>, control: View) -> View {
             TextBlock::new()
                 .text(label.into())
                 .font_size(theme::FONT_BODY)
-                .foreground(theme::solid(theme::CHARCOAL_WARM))
+                .foreground(theme::solid(theme::CHARCOAL))
                 .vertical_alignment(VerticalAlignment::Center),
             Border::new().grid_column(1).content(control),
         ))
@@ -266,7 +266,7 @@ where
                 function.to_string()
             })
             .font_size(theme::FONT_BODY)
-            .foreground(theme::solid(theme::CHARCOAL_WARM))
+            .foreground(theme::solid(theme::CHARCOAL))
             .text_wrapping(TextWrapping::Wrap),
     );
     let delete: View = Button::new().on_click(on_delete).content(

@@ -108,7 +108,7 @@ pub fn combo<C: IntoPayloadCallback<Option<usize>>>(
 pub fn divider() -> View {
     Border::new()
         .height(1.0)
-        .background(theme::border_cream())
+        .background(theme::border_faint())
         .margin(Thickness::new(0.0, 4.0, 0.0, 12.0))
         .content(TextBlock::new().text(""))
 }
