@@ -26,6 +26,7 @@
 
 pub mod app;
 pub mod generator;
+pub mod glass;
 pub mod models;
 pub mod platform;
 pub mod server;

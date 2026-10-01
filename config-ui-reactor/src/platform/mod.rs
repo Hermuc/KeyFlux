@@ -38,12 +38,19 @@ impl Default for WindowSpec {
 }
 
 impl WindowSpec {
-    /// 按「亚克力开关」派生窗口背景材质：开 = Acrylic（毛玻璃），关 = 保持既有 Mica。
+    /// 按「毛玻璃开关」派生窗口背板材质：开 = [`crate::glass`] 策略背板（当前
+    /// Mica Alt），关 = 保持默认 Mica。策略详情与选型依据见 `crate::glass` 模块文档。
     ///
-    /// reactor 的 `WindowBackdrop` 枚举只允许在本层出现（平台互操作边界），上层只传布尔语义。
-    pub fn with_acrylic(mut self, acrylic: bool) -> Self {
-        if acrylic {
-            self.backdrop = WindowBackdrop::Acrylic;
+    /// `GlassBackdrop` → reactor `WindowBackdrop` 枚举的映射只允许在本层出现
+    /// （平台互操作边界），上层只传布尔语义。
+    pub fn with_glass(mut self, glass_on: bool) -> Self {
+        if glass_on {
+            self.backdrop = match crate::glass::current().backdrop {
+                crate::glass::GlassBackdrop::Solid => WindowBackdrop::None,
+                crate::glass::GlassBackdrop::Mica => WindowBackdrop::Mica,
+                crate::glass::GlassBackdrop::MicaAlt => WindowBackdrop::MicaAlt,
+                crate::glass::GlassBackdrop::Acrylic => WindowBackdrop::Acrylic,
+            };
         }
         self
     }

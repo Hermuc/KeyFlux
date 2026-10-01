@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 
 use windows_reactor::*;
 
+use crate::glass;
 use crate::models::SelectedEntry;
 use crate::models::{
     Action, Config, Keymap, PluginListResponse, PluginSetting, PluginSettingsResponse,
@@ -1765,10 +1766,10 @@ impl Component for Shell {
     }
 
     fn view(&self, _input: &(), context: &mut ViewContext<Self>) -> View {
-        // 亚克力模式同步到主题层（唯一写入点）：开启时自绘表面按 alpha 稀释，材质透出。
-        theme::set_acrylic(self.acrylic);
+        // 毛玻璃策略同步（唯一写入点）：开启时自绘表面按 alpha 稀释，材质透出。
+        glass::set_enabled(self.acrylic);
         // 窗口视觉随状态派生（背板材质的 select 语义收在 `platform::WindowSpec`）。
-        let spec = WindowSpec::default().with_acrylic(self.acrylic);
+        let spec = WindowSpec::default().with_glass(self.acrylic);
         context.window_visuals(spec.visuals());
         context.window_title(&spec.title);
 
@@ -1823,7 +1824,7 @@ impl Component for Shell {
             // 亚克力：覆盖 NavigationView 的三处主题资源（内容区透明 + 窗格轻玻璃）——
             // 框架自带的内容区不透明底会盖住系统背板材质（MS Learn 官方口径：
             // 「不要给 Window / NavigationView / 页面 Grid 设不透明背景」）。
-            .resource_overrides(self.acrylic.then(theme::navigation_glass_resources))
+            .resource_overrides(self.acrylic.then(glass::navigation_glass_resources))
             .on_is_pane_open_changed(context.callback(Message::PaneOverlay))
             .is_settings_visible(false)
             .on_selected_tag_changed(context.callback(|tag: Option<String>| Message::Nav(tag)))
