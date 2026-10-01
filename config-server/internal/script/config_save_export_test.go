@@ -105,7 +105,7 @@ func syntheticKeyOrderConfigJSON(t *testing.T) string {
 				"singlePress": {{TypeID: 9, ValueID: 8}},
 				"z":           {{TypeID: 4, ValueID: 13}},
 				// 非 ASCII: UTF-8 首字节 >= 0x80 ⇒ 恒排在全部 ASCII 键之后
-				"网盘":  {{TypeID: 1, Target: "baidu.exe"}},
+				"网盘":   {{TypeID: 1, Target: "baidu.exe"}},
 				"🔥key": {{TypeID: 1, Target: "fire.exe"}},
 			},
 		}},
