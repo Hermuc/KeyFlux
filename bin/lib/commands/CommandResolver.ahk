@@ -48,7 +48,9 @@ class CommandResolver {
    * 精确命中 → 按 steps 顺序执行 (对齐旧 switch 语义):
    *   无守卫步骤: 执行后继续下一步骤;
    *   带守卫步骤: matchWinTitleCondition 命中 → 执行并立即返回, 未命中 → 跳过。
-   * 未命中 → 委托 Strategy; 阶段 4 无策略, 静默无操作。
+   * 未命中 → 委托 Strategy (若已挂接; 见 FuzzyStrategy.ahk:
+   *   子序列匹配 ∪ 编辑距离 → 唯一候选静默执行 + Tip / 多候选仅 Tip 列出不执行);
+   *   未挂接 (Strategy = "") 时静默无操作, 与纯精确匹配一致。
    * 阶段 6: 提交即广播 abbr_submit (命中与否都报, matched 见契约 §3.1)。
    * @param fuzzy true = 后缀模糊命中 (FuzzySuffixFire 路径), 仅影响事件上报, 执行语义不变。
    */
@@ -59,7 +61,7 @@ class CommandResolver {
     if (!this.Table.Has(key)) {
       try EventBus.Publish("abbr_submit", Map("source", source, "command", command, "matched", false, "fuzzy", fuzzy))
       if (this.Strategy != "") {
-        this.Strategy.Resolve(command, hook)
+        this.Strategy.Resolve(scope, command, hook)
       }
       return
     }
@@ -147,7 +149,8 @@ class CommandResolver {
  * 每键入一个字符: 取当前缓冲 (ih.Input) 的尾部连续片段, 从最长后缀向最短逐个查表,
  * 首个命中即为结果 (最长优先, 保证 dfc→fc 不误取更短的 c): **立即停止输入钩子**, 并把命中
  * 记为「待收尾」交给 EnterCapslockAbbr 延后执行 (见 CommandInputHooks.FinishDelayMs)。
- * 全部未命中则忽略本次输入, 继续等待后续字符累积。
+ * 全部未命中则委托模糊策略 FuzzyStrategy (编辑距离容错 + 候选提示, 若已挂接);
+ * 未挂接则忽略本次输入, 继续等待后续字符累积 (阶段 4 原行为)。
  *
  * 🔴 为什么不在本函数里直接执行 (2026-09-20): 命中这一击的字符 (终止字符) 刚随物理键抵达
  * 命令框窗口, 命令框需要一次绘制周期才把它显示出来; 当场 Resolve 会让命令的窗口抢在前头、
@@ -166,6 +169,13 @@ FuzzySuffixFire(ih, char, scope) {
   Loop len {
     suffix := SubStr(input, A_Index)
     if (CommandResolver.Table.Has(scope ":" suffix)) {
+      ; 精确命中: 容错层立即收起候选提示 (命令即将执行, 提示不得残留)。
+      ; try 包裹: 策略层异常不得破坏精确命中路径 (外层 OnChar 的 try 会吞掉整个命中)。
+      if (CommandResolver.Strategy != "") {
+        try CommandResolver.Strategy.OnExactHit()
+        catch as e
+          CommandInputHooks._log("Strategy.OnExactHit 异常: " e.Message)
+      }
       ; 只记录 + 停钩 (EndReason="Stopped" -> EnterCapslockAbbr 走「待收尾」分支);
       ; 不在回调里执行命令 —— 见函数头注释 (终止字符需要绘制时间)
       ;
@@ -184,5 +194,13 @@ FuzzySuffixFire(ih, char, scope) {
       ih.Stop()
       return
     }
+  }
+  ; 全部精确后缀未命中 → 委托模糊策略 (编辑距离容错 + 候选提示, 见 FuzzyStrategy.ahk)。
+  ; 衔接关系: 精确层恒有最高优先级, 容错层只在精确层零命中时被咨询 —— dfc→fc、全串
+  ; MatchList 命中两条既有通道不受影响。未挂接策略 ("" = "") 时到此为止, 静默无操作。
+  if (CommandResolver.Strategy != "") {
+    try CommandResolver.Strategy.OnInputChanged(ih, scope, input, char)
+    catch as e
+      CommandInputHooks._log("Strategy.OnInputChanged 异常: " e.Message)
   }
 }
