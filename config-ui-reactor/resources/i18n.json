@@ -1115,38 +1115,6 @@
     "zh": "删除该方案",
     "en": "Delete this keymap"
   },
-  "2408": {
-    "zh": "快速切换",
-    "en": "Quick Switch"
-  },
-  "2409": {
-    "zh": "完全禁用采集",
-    "en": "Disable all folder collection"
-  },
-  "2410": {
-    "zh": "自动显示候选浮层",
-    "en": "Auto-show suggestion overlay"
-  },
-  "2411": {
-    "zh": "自动跳转: 打开对话框",
-    "en": "Auto-jump: open dialog"
-  },
-  "2412": {
-    "zh": "自动跳转: 保存对话框",
-    "en": "Auto-jump: save dialog"
-  },
-  "2413": {
-    "zh": "历史保留条数上限",
-    "en": "Max saved history entries"
-  },
-  "2414": {
-    "zh": "排除目录 (路径前缀)",
-    "en": "Excluded folders (path prefixes)"
-  },
-  "2415": {
-    "zh": "添加排除目录",
-    "en": "Add excluded folder"
-  },
   "2416": {
     "zh": "清空历史",
     "en": "Clear history"
@@ -1598,9 +1566,5 @@
   "2594": {
     "zh": "亚克力效果设置无法保存",
     "en": "Failed to save acrylic setting"
-  },
-  "2596": {
-    "zh": "✎ 编辑后缀",
-    "en": "✎ Edit extensions"
   }
 }

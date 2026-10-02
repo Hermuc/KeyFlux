@@ -17,8 +17,6 @@ pub const CATALOG_URLS: [&str; 2] = [
     "https://raw.githubusercontent.com/Hermuc/KeyFlux/main/plugins/marketplace.json",
     "https://cdn.jsdelivr.net/gh/Hermuc/KeyFlux@main/plugins/marketplace.json",
 ];
-/// 兼容旧引用的主源。
-pub const CATALOG_URL: &str = CATALOG_URLS[0];
 
 /// 外部网络超时（对齐旧版 15s）。
 const EXTERNAL_TIMEOUT: Duration = Duration::from_secs(15);
