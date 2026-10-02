@@ -6,8 +6,15 @@
   "specVersion": 1,
   "description": "在文件对话框出现时自动收集最近使用的文件夹, 提供一键跳转与候选浮层。",
   "author": "KeyFlux",
-  "entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"},
+  "entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain", "late": "InitQuickSwitch"},
   "permissions": ["window", "settings"],
+  "provides": {
+    "actions": [
+      {"id": "goto", "label": "快速切换", "labelEn": "Quick Switch", "kind": "plugin"},
+      {"id": "clear_history", "label": "清空切换历史", "labelEn": "Clear switch history", "kind": "plugin"}
+    ]
+  },
+  "bundled": true,
   "settings": [
     {
       "key": "collectEnabled",

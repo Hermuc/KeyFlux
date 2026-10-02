@@ -1030,12 +1030,24 @@ v4.1 焦点降级语义 + 延后收尾状态 + 终止字符强制投递语义) +
   **一等动作**(出现在主界面动作下拉)。每项: `id`(^[A-Za-z][A-Za-z0-9_]{0,31}$, 插件内唯一;
   全局动作 ID = `<pluginId>.<actionId>`, 与 ActionRegistry 键空间一致) / `label`(必填) /
   `labelEn` / `kind`(词表当前仅 `"plugin"`)。上限 32/插件; 声明空 `actions` 即拒绝。
-  ⚠️ P7a 仅**声明 + 校验**, 无消费方 ⇒ 未声明 provides 的插件 wire 逐字节不变
-  (`*Provides` omitempty); 消费切换 = P7b(动作下拉动态化 + 配置 actionId 字符串化双字段过渡,
-  见提案 `docs/contracts-proposals/plugin-action-decoupling.md` §6 裁定)。
+  **P7b (同日) 消费切换**: 面板动作编辑器类型 9 分区**由目录 `provides.actions[]` 动态聚合**
+  (核心零硬编码名单); 生成端 `callMap[9]` 改产出全局薄壳
+  `PluginAction("<pluginId>", "<actionId>")`(bin/lib/plugins/PluginManager.ahk)经动作注册表
+  间接寻址 —— 核心层对具体插件/动作名零知识(机械验收: grep 零命中, 残余仅注释/测试/兼容层)。
+- `bundled`(2026-10-02 P7b, 可选 bool): **随包分发标记** —— 「内置/用户」判定的唯一真源
+  (替代 P4 硬编码保留 ID 名单, 名单已删)。随包插件 manifest 携带; **导入 API
+  (`ValidateManifest`) 见 `bundled:true` 即拒绝**(随包渠道专属, 第三方包不得冒用);
+  同名目录冲突由 `InstallFromZip` 已存在检查兜底。面板 `is_builtin` = manifest.bundled。
+- **动作绑定 (P7b 双字段过渡)**: typeID 9 的 `actionValueID` 语义收窄为**子类型标记**
+  (值恒 9 = 「插件动作」, 不再是可选菜单项; 静态目录已移除该项), 具体动作由新字段
+  `actionId`(json `actionId,omitempty`, 值 `<pluginId>.<actionId>`)承载 —— **新保存双写**
+  (`actionValueID: 9` + `actionId`), 渲染时 `actionId` 优先; 旧式 `actionValueID:9` 无
+  `actionId` 的绑定渲染为空(2026-09-23 起出厂配置已无此绑定, 无迁移需求)。数字字段
+  退役另立 compat 期批次。
 - L1 插件入口约定: `entry.func`(如 `QuickSwitchMain(api)`)由 PluginManager 在引导点调用,
   `api` 为按 `permissions` 裁剪的 APIView; 「必须晚于 InitKeymap」的初始化走
-  `{{ PLUGIN_LATE_INIT }}` 晚初始化扩展点(空块零字节; P7a 起函数名可经 `entry.late` 声明)。
+  `{{ PLUGIN_LATE_INIT }}` 晚初始化扩展点(空块零字节; **P7b 起仅由 `entry.late` 声明驱动**,
+  生成器不再有任何插件特判)。
 
 ## 5. Go 生成端契约
 

@@ -15,12 +15,6 @@ use crate::models::{
     Config, PluginListResponse, PluginManifest, PluginSetting, PluginSettingsResponse,
 };
 
-/// 内置插件 ID（与 Go `internal/plugins.BuiltinPluginIDs` 对应）。
-pub const BUILTIN_PLUGIN_IDS: [&str; 1] = ["quick_switch"];
-
-/// 内置 QuickSwitch 的固定 ID。
-pub const QUICK_SWITCH_ID: &str = "quick_switch";
-
 /// 统一插件卡（内置 + 用户同一模型）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PluginCard {
@@ -65,11 +59,6 @@ impl PluginCard {
     // 2026-10-01 的对齐修复一并删除（零调用点）。
 }
 
-/// 判断是否内置插件。
-pub fn is_builtin(id: &str) -> bool {
-    BUILTIN_PLUGIN_IDS.contains(&id)
-}
-
 /// 由目录响应 + 当前配置构建统一卡片列表。
 ///
 /// 🔴 目录驱动 (2026-10-02 反转, 用户裁定「删掉旧的合成卡」)：quick_switch 不再
@@ -95,8 +84,11 @@ pub fn build_cards(config: &Config, catalog: &PluginListResponse) -> Vec<PluginC
 }
 
 /// 单个用户插件卡（复刻 `PluginCardVm` 的派生字段）。
+///
+/// P7b 起「内置」判定 = manifest `bundled` 标记（随包分发渠道专属），不再用
+/// 硬编码 ID 名单。
 pub fn card_from(config: &Config, manifest: &PluginManifest) -> PluginCard {
-    let builtin = is_builtin(&manifest.id);
+    let builtin = manifest.bundled;
     PluginCard {
         id: manifest.id.clone(),
         name: manifest.name.clone(),
@@ -150,16 +142,16 @@ pub fn apply_enabled(config: &mut Config, card_id: &str, _is_builtin: bool, enab
 
 /// 删除插件后的注册表收尾（复刻 `DeletePlugin` 的收尾），返回是否发生变更。
 ///
-/// 2026-10-02 P4 墓碑：**随包内置**插件的删除要把 ID 记入
-/// `config.options.plugins.removed`（否则 sync-plugins / 重装会把它带回）；
+/// 2026-10-02 P4 墓碑：**随包分发**插件（`bundled` 标记, P7b 判定真源）的删除要
+/// 把 ID 记入 `config.options.plugins.removed`（否则 sync-plugins / 重装会把它带回）；
 /// 用户插件只清 disabled 孤儿项（删了就是删了，重装 = 重新导入）。
-pub fn remove_from_registry(config: &mut Config, card_id: &str) -> bool {
+pub fn remove_from_registry(config: &mut Config, card_id: &str, bundled: bool) -> bool {
     let registry = &mut config.options.plugins.disabled;
     let before = registry.len();
     registry.retain(|id| id != card_id);
     let mut changed = before != registry.len();
 
-    if is_builtin(card_id) {
+    if bundled {
         let tombstones = &mut config.options.plugins.removed;
         if !tombstones.iter().any(|id| id == card_id) {
             tombstones.push(card_id.to_string());
@@ -388,6 +380,16 @@ mod tests {
     use crate::models::PluginsOption;
 
     fn manifest(id: &str, name: &str, version: Option<&str>, settings: usize) -> PluginManifest {
+        bundled_manifest(id, name, version, settings, false)
+    }
+
+    fn bundled_manifest(
+        id: &str,
+        name: &str,
+        version: Option<&str>,
+        settings: usize,
+        bundled: bool,
+    ) -> PluginManifest {
         PluginManifest {
             id: id.to_string(),
             name: name.to_string(),
@@ -406,6 +408,7 @@ mod tests {
                     settings
                 ])
             },
+            bundled,
             ..Default::default()
         }
     }
@@ -414,14 +417,20 @@ mod tests {
     fn builtin_quick_switch_is_directory_driven() {
         let config = Config::default();
         let catalog = PluginListResponse {
-            plugins: vec![manifest(QUICK_SWITCH_ID, "快速切换", Some("1.0.0"), 1)],
+            plugins: vec![bundled_manifest(
+                "quick_switch",
+                "快速切换",
+                Some("1.0.0"),
+                1,
+                true,
+            )],
             errors: None,
         };
         let cards = build_cards(&config, &catalog);
 
         assert_eq!(cards.len(), 1, "目录驱动: 内置卡也来自目录扫描, 无合成前置");
         let card = &cards[0];
-        assert_eq!(card.id, QUICK_SWITCH_ID);
+        assert_eq!(card.id, "quick_switch");
         assert!(card.is_builtin);
         assert!(card.can_delete, "内置卡可删除 (P4 放行 + 墓碑)");
         assert!(
@@ -462,8 +471,11 @@ mod tests {
     fn builtin_id_in_catalog_is_deletable_with_tombstone() {
         // 2026-10-02 P4: builtin 放行删除 (删目录 + 墓碑, 删了不复活)。
         let config = Config::default();
-        let card = card_from(&config, &manifest(QUICK_SWITCH_ID, "QS", None, 1));
-        assert!(card.is_builtin, "目录里出现内置 ID 也按内置判定");
+        let card = card_from(
+            &config,
+            &bundled_manifest("quick_switch", "QS", None, 1, true),
+        );
+        assert!(card.is_builtin, "bundled 标记 ⇒ 内置判定 (P7b 动态真源)");
         assert!(card.can_delete, "内置卡可删除 (P4 放行)");
         assert!(card.can_configure, "有 settings 声明 ⇒ 可配置");
     }
@@ -487,17 +499,17 @@ mod tests {
         // P6 (2026-10-02): 开关统一 disabled 表 —— builtin 与用户卡同一路径。
         let mut config = Config::default();
 
-        assert!(apply_enabled(&mut config, QUICK_SWITCH_ID, true, false));
+        assert!(apply_enabled(&mut config, "quick_switch", true, false));
         assert_eq!(
             config.options.plugins.disabled,
-            vec![QUICK_SWITCH_ID.to_string()],
+            vec!["quick_switch".to_string()],
             "停用内置 = 入 disabled 表 (不注入 ⇒ 无定时器/无浮层/无动作)"
         );
         assert!(
-            !apply_enabled(&mut config, QUICK_SWITCH_ID, true, false),
+            !apply_enabled(&mut config, "quick_switch", true, false),
             "重复停用无变化"
         );
-        assert!(apply_enabled(&mut config, QUICK_SWITCH_ID, true, true));
+        assert!(apply_enabled(&mut config, "quick_switch", true, true));
         assert!(config.options.plugins.disabled.is_empty(), "启用 = 出表");
     }
 
@@ -524,9 +536,12 @@ mod tests {
     fn removing_from_registry_reports_change() {
         let mut config = Config::default();
         config.options.plugins.disabled = vec!["a".to_string(), "b".to_string()];
-        assert!(remove_from_registry(&mut config, "a"));
+        assert!(remove_from_registry(&mut config, "a", false));
         assert_eq!(config.options.plugins.disabled, vec!["b".to_string()]);
-        assert!(!remove_from_registry(&mut config, "zzz"), "不存在 ⇒ 无变化");
+        assert!(
+            !remove_from_registry(&mut config, "zzz", false),
+            "不存在 ⇒ 无变化"
+        );
     }
 
     /// 墓碑 (2026-10-02 P4)：删除随包内置插件 ⇒ ID 记入
@@ -534,14 +549,14 @@ mod tests {
     #[test]
     fn removing_builtin_writes_tombstone() {
         let mut config = Config::default();
-        config.options.plugins.disabled = vec![QUICK_SWITCH_ID.to_string()];
-        assert!(remove_from_registry(&mut config, QUICK_SWITCH_ID));
+        config.options.plugins.disabled = vec!["quick_switch".to_string()];
+        assert!(remove_from_registry(&mut config, "quick_switch", true));
         assert!(
             config
                 .options
                 .plugins
                 .removed
-                .contains(&QUICK_SWITCH_ID.to_string()),
+                .contains(&"quick_switch".to_string()),
             "内置删除 ⇒ 墓碑"
         );
         assert!(
@@ -549,16 +564,16 @@ mod tests {
                 .options
                 .plugins
                 .disabled
-                .contains(&QUICK_SWITCH_ID.to_string()),
+                .contains(&"quick_switch".to_string()),
             "disabled 孤儿项照常清理"
         );
         // 幂等：目录已在墓碑中（重开面板再删一次不会再触发保存）
-        assert!(!remove_from_registry(&mut config, QUICK_SWITCH_ID));
+        assert!(!remove_from_registry(&mut config, "quick_switch", true));
 
         // 用户插件：不进墓碑（未登记 disabled 时删除 = 无注册表变更，返回 false）
         let mut config2 = Config::default();
         config2.options.plugins.disabled = vec!["a".to_string()];
-        assert!(remove_from_registry(&mut config2, "a"));
+        assert!(remove_from_registry(&mut config2, "a", false));
         assert!(
             config2.options.plugins.removed.is_empty(),
             "用户插件不进墓碑"
@@ -570,7 +585,7 @@ mod tests {
         // 目录驱动 (2026-10-02): builtin 卡也来自 card_from (无独立合成构造器)。
         let builtin_only = vec![card_from(
             &Config::default(),
-            &manifest(QUICK_SWITCH_ID, "快速切换", Some("1.0.0"), 0),
+            &bundled_manifest("quick_switch", "快速切换", Some("1.0.0"), 0, true),
         )];
         assert!(show_empty_state(false, None, &builtin_only));
         assert!(
@@ -585,7 +600,10 @@ mod tests {
         let with_user = {
             let config = Config::default();
             vec![
-                card_from(&config, &manifest(QUICK_SWITCH_ID, "快速切换", None, 0)),
+                card_from(
+                    &config,
+                    &bundled_manifest("quick_switch", "快速切换", None, 0, true),
+                ),
                 card_from(&config, &manifest("a", "A", None, 0)),
             ]
         };

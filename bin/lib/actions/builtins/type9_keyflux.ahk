@@ -160,19 +160,6 @@ ToggleCapslock() {
   send("{blind}{CapsLock}")
 }
 
-/**
- * 快速切换 (QuickSwitch): 跳转到推荐的首个候选文件夹。
- * 无默认热键 (2026-09-23 起 ^g 绑定已从配置移除, 触发靠轮询自动路径); 本入口经
- * 生成端 callMap[9] 保留, 供将来托盘/其它非热键通道复用。
- * 薄壳: 仅转调编排层 QuickSwitchRun(); 不含任何窗口/枚举/磁盘逻辑。
- * 注: AHK 全局函数命名空间唯一, 故编排入口在 QuickSwitch.ahk 中名为 QuickSwitchRun,
- *     本薄壳独占 QuickSwitchGoto 这一名字 (生成端 callMap[9] 调用的即本函数)。
- */
-QuickSwitchGoto() {
-  ; 2026-10-01 QuickSwitch 插件化 P2: 实现已随代码搬入 data/plugins/quick_switch/,
-  ; 本薄壳改经动作注册表间接寻址 —— 🔴 不得直调 QuickSwitchRun(): AHK v2 直调未定义
-  ; 函数是加载期致命错误, 插件被删除/停用时会拖垮整个引擎 (提案 §0.5 P0 实测)。
-  ; 经注册表后, 插件缺席即静默返回 false (可删除性保证); 生成端 callMap[9] 文本
-  ; (`QuickSwitchGoto()`) 保持不变, golden / 语料 / 动作元数据零改动。
-  return PluginManager.InvokeAction("quick_switch", "goto")
-}
+; 2026-10-02 P7b: QuickSwitchGoto() 薄壳已删 —— 生成端 callMap[9] (valueID=9 子类型)
+; 直接产出 PluginAction("<pluginId>", "<actionId>") (全局函数, PluginManager.ahk),
+; 核心层对具体插件/动作名零知识 (机械验收: grep 零命中)。

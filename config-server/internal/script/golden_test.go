@@ -104,7 +104,7 @@ func TestSyntheticConfigCoversMatrix(t *testing.T) {
 		{`TypeID8 builtinFunctions8 (AHKCode 直出)`, `MsgBox("hello")`},
 		{`TypeID9 ValueID6 capslock 缩写启用`, `EnterCapslockAbbr()`},
 		{`TypeID9 ValueID5 semicolon 缩写启用`, `EnterSemicolonAbbr(semiHook, semiHookAbbrWindow)`},
-		{`TypeID9 ValueID9 QuickSwitch 薄壳 (callMap[9])`, `km.Map("*z", _ => QuickSwitchGoto())`},
+		{`TypeID9 插件动作 (P7b actionId 渲染)`, `km.Map("*z", _ => PluginAction("quick_switch", "goto"))`},
 		// TypeID5 重映射特殊路径 -> 模板尾部 .KeyMapping
 		{`.KeyMapping 渲染重映射 (a::b, WindowGroupID0)`, `a::b`},
 		{`.KeyMapping 渲染重映射 (k::l, WindowGroupID5)`, `k::l`},
@@ -151,7 +151,8 @@ func generateAHK(t *testing.T) string {
 
 	// 插件目录 (2026-10-01 P2 插件化): quick_switch 已以标准插件形态经
 	// data/plugins/ 分发, 黄金基线覆盖「插件注入 + 晚初始化扩展点」双路径。
-	// 桩包与仓库 plugins/examples/quick_switch 同构 (entry.func = QuickSwitchMain)。
+	// 桩包与仓库 plugins/examples/quick_switch 同构 (entry.func = QuickSwitchMain,
+	// entry.late = InitQuickSwitch —— P7b 起晚初始化全声明驱动)。
 	base := t.TempDir()
 	pdir := filepath.Join(base, "quick_switch")
 	if err := os.MkdirAll(pdir, 0o755); err != nil {
@@ -160,7 +161,7 @@ func generateAHK(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
 		"id": "quick_switch", "name": "快速切换", "nameEn": "Quick Switch",
 		"version": "1.0.0", "specVersion": 1, "description": "黄金快照桩包",
-		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"},
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain", "late": "InitQuickSwitch"},
 		"permissions": ["window"]
 	}`), 0o644); err != nil {
 		t.Fatalf("写桩 manifest 失败: %v", err)
@@ -295,7 +296,8 @@ func syntheticConfig() *Config {
 				},
 			},
 			// ID5: 被渲染的模式, 覆盖 TypeID 1/2/3/4/5/6/7/8/9, 并承载缩写启用触发
-			// (TypeID9 ValueID6/5) 与 QuickSwitch 薄壳 (TypeID9 ValueID9)。单行 disableAt。
+			// (TypeID9 ValueID6/5) 与插件动作 (P7b: TypeID9 + actionId, valueID 9 =
+			// 子类型标记双写)。单行 disableAt。
 			// 每 hotkey 一 Action (约束1)。
 			{
 				ID: 5, Name: "CapsLock", Enable: true,
@@ -316,7 +318,7 @@ func syntheticConfig() *Config {
 					"*w": {{TypeID: 9, ValueID: 5, WindowGroupID: 0}},
 					"*e": {{TypeID: 9, ValueID: 1, WindowGroupID: 0}},
 					"*r": {{TypeID: 9, ValueID: 8, WindowGroupID: 0}},
-					"*z": {{TypeID: 9, ValueID: 9, WindowGroupID: 0}},
+					"*z": {{TypeID: 9, ValueID: 9, ActionID: "quick_switch.goto", WindowGroupID: 0}},
 				},
 			},
 			// ID6: 第二个被渲染模式 (中文名 -> 走 UTF-8), 带窗口组守卫 (ct1/ct2/ct5)、

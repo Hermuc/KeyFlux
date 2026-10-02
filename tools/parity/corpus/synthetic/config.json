@@ -247,7 +247,8 @@
           {
             "windowGroupID": 0,
             "actionTypeID": 9,
-            "actionValueID": 9
+            "actionValueID": 9,
+            "actionId": "quick_switch.goto"
           }
         ]
       }

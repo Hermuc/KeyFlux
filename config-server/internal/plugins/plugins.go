@@ -36,12 +36,6 @@ const SpecVersion = 1
 
 var idPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 
-// BuiltinPluginIDs 内置插件保留 ID 集 (引擎随软件分发的插件, 配置段独立管理,
-// 不进入用户插件目录)。用户包 ID 不得占用。
-var BuiltinPluginIDs = map[string]bool{
-	"quick_switch": true,
-}
-
 // Entry 插件入口声明。阶段 1 仅接受 script 形态 (file + func);
 // 运行时加载为阶段 2, 校验通过即视为合法声明。
 type Entry struct {
@@ -148,6 +142,9 @@ type Manifest struct {
 	// Provides 插件能力提供声明 (可选; P7a 协议扩容, 消费方 = P7b 动作下拉动态化)。
 	// 指针形态: 缺省 = nil = wire 不出场 (存量插件零漂移)。
 	Provides *Provides `json:"provides,omitempty"`
+	// Bundled 随包分发标记 (P7b): 仅随软件分发的插件 manifest 携带, 用户导入包
+	// 声明即拒绝 (见 ValidateManifest)。「内置/用户」判定的唯一真源。
+	Bundled bool `json:"bundled,omitempty"`
 }
 
 // ProvidedActionKindPlugin 动作 kind 词表: 由插件脚本处理的动作 (经
@@ -209,13 +206,15 @@ type Catalog struct {
 	Errors  []string
 }
 
-// ValidateManifest 校验 manifest 结构合法性 + 内置 ID 保留集 (导入 API 共用)。
-// 🔴 目录加载路径不走本函数 (走 validateManifestBody): 随包内置插件 quick_switch
-// 自 2026-10-01 P2 插件化起以标准插件形态分发 (data/plugins/quick_switch/), 必须经
-// 目录扫描正常加载; 本函数仅供**导入 API** 调用 —— 第三方包不得冒用内置 ID。
+// ValidateManifest 校验 manifest 结构合法性 + 分发标记拦截 (仅供**导入 API** 调用)。
+// 🔴 目录加载路径不走本函数 (走 validateManifestBody): 随包插件以标准插件形态分发
+// (data/plugins/<id>/), 必须经目录扫描正常加载。
+// P7b 起「内置」不再用硬编码 ID 名单 —— 冒名拦截改为**分发标记**动态判定:
+// `bundled: true` 是随包分发渠道专属标记, 导入包声明即拒绝; 同名目录冲突由
+// InstallFromZip 的已存在检查兜底 (含同名用户包)。
 func ValidateManifest(p *Manifest) error {
-	if BuiltinPluginIDs[p.ID] {
-		return fmt.Errorf("插件 ID %q 与内置插件冲突", p.ID)
+	if p.Bundled {
+		return fmt.Errorf("插件包不得声明 bundled 标记 (随包分发专属)")
 	}
 	return validateManifestBody(p)
 }
@@ -487,7 +486,8 @@ func InstallFromZip(r io.Reader, userDir string) (*Manifest, error) {
 		return nil, err
 	}
 	// 导入路径补内置 ID 检查 (parseManifest 为目录加载放行随包内置插件, 见其注释):
-	// 第三方 zip 不得冒用 quick_switch 等保留 ID。
+	// 导入路径补分发标记拦截 (parseManifest 为目录加载放行随包插件, 见其注释):
+	// 第三方 zip 不得声明 bundled, 也不得与既有目录同名。
 	if err := ValidateManifest(m); err != nil {
 		return nil, err
 	}

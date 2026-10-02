@@ -139,6 +139,10 @@ pub enum Message {
         value_id: i32,
         label_key: &'static str,
     },
+    /// 选中插件动作（P7b：type 9 动态组；`action_id = "<pluginId>.<actionId>"`）。
+    SelectPluginAction {
+        action_id: String,
+    },
     /// 窗口侦探（`POST /server/command/2`）。
     WindowSpy,
     /// 非保存类命令的结果提示（与 `SaveFinished` 同处理）。

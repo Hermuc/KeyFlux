@@ -161,6 +161,9 @@ pub struct ActionDto {
     pub remap_to_key: String,
     #[serde(rename = "actionValueID", skip_serializing_if = "is_zero")]
     pub value_id: i32,
+    /// 插件动作 `<pluginId>.<actionId>`（P7b 双字段过渡；仅 typeID 9 有意义）。
+    #[serde(rename = "actionId", skip_serializing_if = "String::is_empty")]
+    pub action_id: String,
     #[serde(rename = "winTitle", skip_serializing_if = "String::is_empty")]
     pub win_title: String,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -484,6 +487,7 @@ fn action_to_dto(a: &m::Action) -> ActionDto {
         keys_to_send: a.keys_to_send.clone(),
         remap_to_key: a.remap_to_key.clone(),
         value_id: a.value_id,
+        action_id: a.action_id.clone(),
         win_title: a.win_title.clone(),
         target: a.target.clone(),
         args: a.args.clone(),
@@ -707,6 +711,7 @@ fn dto_to_action(a: &ActionDto) -> m::Action {
         keys_to_send: a.keys_to_send.clone(),
         remap_to_key: a.remap_to_key.clone(),
         value_id: a.value_id,
+        action_id: a.action_id.clone(),
         win_title: a.win_title.clone(),
         target: a.target.clone(),
         args: a.args.clone(),

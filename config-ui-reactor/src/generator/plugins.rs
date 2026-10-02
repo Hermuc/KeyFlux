@@ -25,9 +25,6 @@ use serde::Deserialize;
 /// Go `plugins.SpecVersion`：当前插件包格式版本（manifest `specVersion` 不等即拒绝）。
 pub const SPEC_VERSION: i32 = 1;
 
-/// Go `plugins.BuiltinPluginIDs`：内置插件保留 ID 集（用户包不得占用）。
-pub const BUILTIN_PLUGIN_IDS: [&str; 1] = ["quick_switch"];
-
 /// Go `plugins.MaxSettingsPerPlugin`。
 pub const MAX_SETTINGS_PER_PLUGIN: usize = 32;
 
@@ -126,6 +123,8 @@ pub struct Manifest {
     pub settings: Vec<Setting>,
     /// 能力提供块（可选；缺省 = 无 = wire 不出场，存量插件零漂移）。
     pub provides: Option<Provides>,
+    /// 随包分发标记（P7b）：仅随软件分发的插件 manifest 携带；导入包声明即拒绝。
+    pub bundled: bool,
 }
 
 impl Manifest {
@@ -330,14 +329,15 @@ fn validate_settings(manifest: &Manifest) -> Result<(), String> {
     Ok(())
 }
 
-/// Go `plugins.ValidateManifest`（导入 API 共用：结构校验 + 内置 ID 保留集）。
-/// 🔴 目录加载路径不走本函数（走 [`validate_manifest_body`]）：随包内置插件
-/// quick_switch 自 2026-10-01 P2 插件化起以标准插件形态分发
-/// （`data/plugins/quick_switch/`），必须经目录扫描正常加载；本函数仅供导入 API
-/// 调用 —— 第三方包不得冒用内置 ID。
+/// Go `plugins.ValidateManifest`（仅供导入 API 调用：结构校验 + 分发标记拦截）。
+/// 🔴 目录加载路径不走本函数（走 [`validate_manifest_body`]）：随包插件以标准插件
+/// 形态分发（`data/plugins/<id>/`），必须经目录扫描正常加载。
+/// P7b 起「内置」不再用硬编码 ID 名单 —— 冒名拦截改为**分发标记**动态判定：
+/// `bundled: true` 是随包分发渠道专属标记，导入包声明即拒绝；同名目录冲突由
+/// 安装流程的已存在检查兜底。
 pub fn validate_manifest(manifest: &Manifest) -> Result<(), String> {
-    if BUILTIN_PLUGIN_IDS.contains(&manifest.id.as_str()) {
-        return Err(format!("插件 ID {:?} 与内置插件冲突", manifest.id));
+    if manifest.bundled {
+        return Err("插件包不得声明 bundled 标记 (随包分发专属)".to_string());
     }
     validate_manifest_body(manifest)
 }
@@ -539,6 +539,9 @@ pub fn render_late_init(
     removed: &HashSet<String>,
 ) -> String {
     let catalog = load_catalog(plugins_dir);
+    // P7b (2026-10-02): 全声明驱动 —— manifest `entry.late` 声明函数名，渲染为
+    // 无参调用；生成端对任何具体插件零知识。多插件逐行累积（与 Go 同构）。
+    let mut out = String::new();
     for manifest in &catalog.plugins {
         if removed.contains(&manifest.id) || disabled.contains(&manifest.id) {
             continue;
@@ -558,14 +561,13 @@ pub fn render_late_init(
         if !abs.exists() {
             continue;
         }
-        if manifest.id == "quick_switch" {
-            // P5 (2026-10-02): 无参调用 —— 配置已迁 plugin-settings.json, 插件经
-            // ConfigProvider 自取; 生成器不再读 options.quickSwitch。
-            // （P7 将以 manifest 声明泛化此特判。）
-            return "\nInitQuickSwitch()".to_string();
+        if !manifest.entry.late.is_empty() {
+            out.push('\n');
+            out.push_str(&manifest.entry.late);
+            out.push_str("()");
         }
     }
-    String::new()
+    out
 }
 
 /// Go `generators.ahkManifestLiteral`：把 manifest 渲染为 AHK `Map(...)` 原生字面量。
@@ -734,9 +736,19 @@ mod tests {
             .expect("excludedPrefixes 声明存在");
         assert_eq!(excluded.kind, "text");
         assert!(excluded.multiline, "排除前缀 = 多行文本 (换行分隔)");
-        // P7a (2026-10-02)：示例插件尚未声明 provides / late（零漂移前提）。
-        assert!(builtin.provides.is_none());
-        assert!(builtin.entry.late.is_empty());
+        // P7b (2026-10-02)：quick_switch 声明 entry.late + provides.actions（消费切换完成）。
+        assert_eq!(builtin.entry.late, "InitQuickSwitch");
+        assert!(builtin.bundled, "随包分发标记");
+        let provides = builtin.provides.as_ref().expect("provides 已声明");
+        assert_eq!(provides.actions.len(), 2);
+        assert_eq!(provides.actions[0].id, "goto");
+        assert_eq!(provides.actions[1].id, "clear_history");
+        assert!(
+            provides
+                .actions
+                .iter()
+                .all(|action| action.kind == "plugin")
+        );
     }
 
     /// P7a 校验矩阵：provides.actions[] + entry.late（与 Go TestValidateProvidesAndLateInit 同源）。

@@ -26,7 +26,7 @@ func TestValidateManifest(t *testing.T) {
 		want   string
 	}{
 		{func(m *Manifest) { m.ID = "Bad-ID" }, "不合法"},
-		{func(m *Manifest) { m.ID = "quick_switch" }, "内置插件"},
+		{func(m *Manifest) { m.Bundled = true }, "bundled"},
 		{func(m *Manifest) { m.SpecVersion = 2 }, "specVersion"},
 		{func(m *Manifest) { m.Name = " " }, "缺少名称"},
 		{func(m *Manifest) { m.Entry = Entry{Kind: "builtin"} }, "entry.kind"},
@@ -255,9 +255,9 @@ func TestLoadCatalogAndRemove(t *testing.T) {
 		t.Fatalf("坏包应记入错误: %+v", c.Errors)
 	}
 
-	// 删除: 内置 ID / 非法 ID / 不存在
+	// 删除: 不存在的 ID / 非法 ID / 合法删除
 	if err := Remove(user, "quick_switch"); err == nil {
-		t.Fatal("内置 ID 应拒绝删除")
+		t.Fatal("不存在的插件应拒绝删除")
 	}
 	if err := Remove(user, "../evil"); err == nil {
 		t.Fatal("非法 ID 应拒绝删除")
@@ -273,19 +273,24 @@ func TestLoadCatalogAndRemove(t *testing.T) {
 	}
 }
 
-// 目录加载放行内置 ID (随包内置插件 quick_switch 以标准插件形态分发),
-// 但导入 API 仍拒绝冒名 (2026-10-01 P2 插件化: parseManifest 走宽松校验)。
-func TestBuiltinID_CatalogAllowsInstallRejects(t *testing.T) {
+// 目录加载放行随包插件 (以标准插件形态分发), 导入 API 拒绝 bundled 标记声明
+// (2026-10-02 P7b: 「内置」不再用硬编码 ID 名单, 改分发标记动态判定)。
+func TestBundledMarker_CatalogAllowsImportRejects(t *testing.T) {
 	raw := []byte(`{
-		"id": "quick_switch", "name": "快速切换", "specVersion": 1,
+		"id": "quick_switch", "name": "快速切换", "specVersion": 1, "bundled": true,
 		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"}
 	}`)
 	m, err := parseManifest(raw)
 	if err != nil {
-		t.Fatalf("目录加载应放行内置 ID: %v", err)
+		t.Fatalf("目录加载应放行随包插件: %v", err)
 	}
 	if err := ValidateManifest(m); err == nil {
-		t.Fatalf("导入 API 应拒绝内置 ID 冒名")
+		t.Fatalf("导入 API 应拒绝 bundled 标记声明")
+	}
+	plain := *m
+	plain.Bundled = false
+	if err := ValidateManifest(&plain); err != nil {
+		t.Fatalf("无标记的同结构 manifest 应通过: %v", err)
 	}
 }
 

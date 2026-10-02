@@ -1,12 +1,11 @@
 # 提案: 插件动作完全解耦 (P7) —— `provides.actions[]` 与动作 ID 字符串化
 
-> 状态: **P7a 已落地 (2026-10-02)**; §6 三问已裁定 (见 §6 裁定记录), P7b 待独立批次。
+> 状态: **P7a + P7b 均已落地 (2026-10-02)**; §6 三问已裁定 (见 §6 裁定记录)。
 > (QuickSwitch 插件化提案 §6 P7 期的独立载体; 依 D4 裁定「P7 另起提案,
 > 不与前 6 期混批」。前置: P0-P6 已全部落地, 见 `quickswitch-pluginization.md` §11)。
 > 关联契约: `docs/CONTRACTS.md` §3.4 ActionRegistry、§3.7 PluginManager、§4 插件清单格式
 > （2026-10-02 订正版 + P7a 增补）、§5 生成端契约; §0 总原则 2（快路径红线）。
-> 分支: P7a 已随 main 落地（零漂移双轨验证）; **P7b 仍走独立分支 + 独立评审**
-> （动作下拉动态化 + 配置字符串化 + 基线重录, 不与其他工作混批）。
+> 分支: P7a/P7b 均已随 main 落地（P7a 零漂移双轨; P7b 基线重录 + 定向 diff 审计）。
 
 ---
 
@@ -125,3 +124,38 @@ P7 = 拆 K1/K2（协议）+ K3（机制泛化）。K4 随 K1 自动消解。
   （Go exe 以 buildServer 口径含 P7a 代码重建后复核）。
 - 契约: `CONTRACTS.md` §4 增补 `entry.late` / `provides` 两目 + 变更记录一行
   （合并补记 P5+P6 契约面）。
+
+## 8. P7b 执行记录（2026-10-02, 同日落地）
+
+**范围兑现（§3 四步全落地）**:
+
+1. **manifest 声明**: quick_switch 声明 `entry.late: InitQuickSwitch` +
+   `provides.actions: [goto, clear_history]`（`clear_history` = 回归 P6 移除的
+   「清空切换历史」入口; 插件侧 `QuickSwitchClearHistory()` 注册, 引擎日志实证
+   `action registered: quick_switch:clear_history`）; everything_search 声明
+   `bundled: true`。
+2. **生成器删 K2 特判**: `render_late_init`（Go/Rust 两端）改纯 `entry.late` 声明驱动,
+   `id == "quick_switch"` 特判删除; 生成产物逐字节不变（工厂插件对 factory 语料,
+   `InitQuickSwitch()` 行经声明产出同一字节）。
+3. **callMap[9] → PluginAction**: 生成端（两端同构）改产出
+   `PluginAction("<pluginId>", "<actionId>")`; AHK 侧删 `QuickSwitchGoto()` 薄壳
+   （type9_keyflux.ahk）, 新增全局薄壳 `PluginAction()`（PluginManager.ahk, 转发
+   `InvokeAction`）; **K3 删名单**: Go `BuiltinPluginIDs` 与 Rust `BUILTIN_PLUGIN_IDS`
+   全删, 冒名拦截改为 manifest `bundled` 标记动态判定（导入 API 见 bundled:true 即拒;
+   市场已安装判定经后端目录动态流入）。
+4. **面板动作下拉动态化**: 类型 9 静态目录移除值 9 项（收窄为子类型标记）,
+   `plugin_action_groups()` 从目录 `provides.actions[]` 动态聚合追加分区;
+   `Message::SelectPluginAction` → `select_plugin_action()` **双字段过渡**
+   （写 `actionValueID: 9` + `actionId`, 渲染 actionId 优先; 换类型/选静态项即清
+   actionId）; 旧式 valueID9 无 actionId 渲染为空（出厂配置无此绑定, 零迁移）。
+
+**验证**: Go 全仓绿（golden 重录 1 行 = 预期）; Rust gates 全绿（fmt/clippy/306+ tests;
+夹具 action_render.json 由 Go 重生成, value9 新旧形态两例）; parity 4/4 重录 +
+**定向 diff 审计 = synthetic 基线恰 1 行**（`QuickSwitchGoto()` → `PluginAction(...)`,
+factory 基线零变化）; api-parity 双腿 23/23（**零重录** —— actionId omitempty,
+api-parity 沙箱配置无插件动作绑定）; 机械验收 grep = 核心层零功能性命中
+（残余仅注释/测试/兼容层: P5 迁移函数与 deprecated options.quickSwitch 段, 待兼容期后
+另批移除）。
+**部署实证**: 生产树后端/面板 md5 双侧一致（C58E0C95...）; 产物重生成
+（`bin/KeyFlux.ahk` mtime 11:43, L62 `InitQuickSwitch()`; 生产配置无插件动作绑定 ⇒
+无 PluginAction 行属预期）; 引擎日志 goto + clear_history 双注册; engine_error 零新条目。

@@ -177,3 +177,59 @@ where
 
     StackPanel::new().spacing(4.0).keyed_children(row_views)
 }
+
+/// 插件动作组布局（P7b）：与 [`radio_rows`] 同款视觉（**每行最多 2 组**，组内纵向、
+/// 组间横向等距）。选中态以 `action_id` 字符串比对（内置单选与插件动作的互斥由
+/// [`select_radio`]/[`select_plugin_action`] 的字段清理保证）。
+pub fn plugin_action_rows<F, C>(
+    groups: &[Vec<crate::services::action_editor::PluginActionItem>],
+    group_name_base: &str,
+    selected_action_id: &str,
+    mut make_callback: F,
+) -> View
+where
+    F: FnMut(crate::services::action_editor::PluginActionItem) -> C,
+    C: IntoPayloadCallback<bool>,
+{
+    let row_views: Vec<(usize, View)> = groups
+        .chunks(2)
+        .enumerate()
+        .map(|(row_index, row_groups)| {
+            let columns: Vec<(usize, View)> = row_groups
+                .iter()
+                .enumerate()
+                .map(|(column_index, group)| {
+                    let items: Vec<(usize, View)> = group
+                        .iter()
+                        .enumerate()
+                        .map(|(item_index, item)| {
+                            let callback = make_callback(item.clone());
+                            let radio: View = RadioButton::new()
+                                .group_name(format!(
+                                    "{group_name_base}-p-{row_index}-{column_index}"
+                                ))
+                                .is_checked(item.full_id == selected_action_id)
+                                .on_checked(callback)
+                                .content(item.label.clone());
+                            (item_index, radio)
+                        })
+                        .collect();
+                    (
+                        column_index,
+                        StackPanel::new().spacing(4.0).keyed_children(items),
+                    )
+                })
+                .collect();
+            (
+                row_index,
+                StackPanel::new()
+                    .orientation(Orientation::Horizontal)
+                    .spacing(28.0)
+                    .margin(Thickness::new(0.0, 0.0, 0.0, 10.0))
+                    .keyed_children(columns),
+            )
+        })
+        .collect();
+
+    StackPanel::new().spacing(4.0).keyed_children(row_views)
+}

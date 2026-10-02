@@ -171,7 +171,7 @@ func TestQuickSwitchUpgradePathFillsDefaults(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
 		"id": "quick_switch", "name": "快速切换", "specVersion": 1,
-		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"}
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain", "late": "InitQuickSwitch"}
 	}`), 0o644); err != nil {
 		t.Fatalf("写桩 manifest 失败: %v", err)
 	}

@@ -7,7 +7,7 @@
 //!
 //! UI 侧只负责「把这里的产物摆成控件」（见 `ui::action_editor`）。
 
-use crate::models::{Action, Config};
+use crate::models::{Action, Config, PluginListResponse};
 use crate::services::i18n;
 
 /// 动作类型下拉项（`label` 为文案键，展示时经 i18n 翻译）。
@@ -127,6 +127,7 @@ pub fn apply_type_change(action: &mut Action, new_type_id: i32) -> Option<TypeCh
     action.run_in_background = false;
     action.detect_hidden_window = false;
     action.ahk_code.clear();
+    action.action_id.clear();
     action.window_group_id = keep_group;
     action.type_id = new_type_id;
     action.is_empty = new_type_id == 0;
@@ -254,8 +255,22 @@ pub fn select_radio(action: &mut Action, item: &RadioItem) -> (i32, i32) {
     let old_value = action.value_id;
     action.value_id = item.value_id;
     action.comment = item.label_key.to_string();
+    // P7b: 内置单选与插件动作互斥 —— 选中内置项即清插件动作绑定
+    action.action_id.clear();
     action.is_empty = false;
     (old_value, item.value_id)
+}
+
+/// P7b：选中插件动作（`full_id = "<pluginId>.<actionId>"`）。
+/// 双字段过渡：`value_id` 写 9（「插件动作」子类型标记，旧版本可识别），渲染以
+/// `action_id` 优先。返回旧 value_id 供缩写联动。
+pub fn select_plugin_action(action: &mut Action, full_id: &str) -> i32 {
+    let old_value = action.value_id;
+    action.action_id = full_id.to_string();
+    action.value_id = 9;
+    action.comment = full_id.to_string();
+    action.is_empty = false;
+    old_value
 }
 
 // ---------------------------------------------------------------- 单选目录
@@ -370,8 +385,10 @@ static TEXT_GROUPS: [&[RadioItem]; 4] = [
     ],
 ];
 
-/// 类型 9「KeyFlux」三行。
-static KEYFLUX_GROUPS: [&[RadioItem]; 3] = [
+/// 类型 9「KeyFlux」内置快路径两行（红线不动）。
+/// P7b：原第三组 valueID 9（旧式插件动作薄壳）已删除 —— 插件动作改由
+/// [`plugin_action_groups`] 从目录 `provides.actions[]` 动态聚合。
+static KEYFLUX_GROUPS: [&[RadioItem]; 2] = [
     &[
         ri(1, "71", true),
         ri(2, "72", false),
@@ -384,7 +401,6 @@ static KEYFLUX_GROUPS: [&[RadioItem]; 3] = [
         ri(7, "77", false),
         ri(8, "78", true),
     ],
-    &[ri(9, "2408", false)],
 ];
 
 /// 取某类型的单选分组目录（复刻 `RadioCatalog.GroupsFor`）。
@@ -419,6 +435,42 @@ pub fn radio_rows(type_id: i32, is_abbr: bool) -> Vec<Vec<Vec<RadioItem>>> {
 /// 该类型是否有单选编辑器（复刻 `RebuildEditor` 的分发：2/3/4/7/9）。
 pub fn has_radio_editor(type_id: i32) -> bool {
     matches!(type_id, 2 | 3 | 4 | 7 | 9)
+}
+
+// ---------------------------------------------------------------- 插件动作（P7b）
+
+/// 插件动作选项（type 9 动态组；`full_id = "<pluginId>.<actionId>"`）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PluginActionItem {
+    pub full_id: String,
+    pub label: String,
+}
+
+/// 从插件目录聚合 type 9 的动态组：**每个声明了 `provides.actions` 的插件一组**
+///（内置快路径 1-8 保持编译期直连，不经此处 —— 快路径红线）。
+/// 目录未加载 / 无插件声明 ⇒ 空Vec（编辑器不渲染插件动作区）。
+pub fn plugin_action_groups(catalog: Option<&PluginListResponse>) -> Vec<Vec<PluginActionItem>> {
+    let Some(catalog) = catalog else {
+        return Vec::new();
+    };
+    catalog
+        .plugins
+        .iter()
+        .filter_map(|manifest| {
+            let actions = manifest.provides.as_ref()?.actions.as_slice();
+            if actions.is_empty() {
+                return None;
+            }
+            let items = actions
+                .iter()
+                .map(|action| PluginActionItem {
+                    full_id: format!("{}.{}", manifest.id, action.id),
+                    label: action.label.clone(),
+                })
+                .collect::<Vec<_>>();
+            Some(items)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -576,14 +628,15 @@ mod tests {
         assert_eq!(rows[1].len(), 2);
         assert_eq!(rows[0][0][0].value_id, 1);
 
+        // P7b: 值 9 静态项移除 (子类型标记, 不可直选) —— 类型 9 仅剩 2 组 ⇒ 1 行;
+        // 插件动作由 plugin_action_groups 动态拼接 (UI 层职责, 不在本目录)。
         let rows = radio_rows(9, false);
-        assert_eq!(rows.len(), 2, "3 组 ⇒ 2 行（末行 1 组）");
-        assert_eq!(rows[1].len(), 1);
+        assert_eq!(rows.len(), 1, "2 组 ⇒ 1 行 (P7b 值 9 静态项移除)");
+        assert_eq!(rows[0].len(), 2);
     }
 
     #[test]
     fn radio_rows_filter_hidden_options_and_drop_empty_groups() {
-        // 类型 9 组 3 只有一项（"2408"）且不隐藏
         let rows = radio_rows(9, true);
         let flat: Vec<i32> = rows
             .iter()
@@ -593,7 +646,10 @@ mod tests {
             .collect();
         assert!(!flat.contains(&1), "值 1 标了 hideInAbbr");
         assert!(flat.contains(&2), "值 2 未隐藏");
-        assert!(flat.contains(&9), "组 3 保留（未隐藏）");
+        assert!(
+            !flat.contains(&9),
+            "P7b: 值 9 = 插件动作子类型标记, 不在静态目录"
+        );
     }
 
     #[test]

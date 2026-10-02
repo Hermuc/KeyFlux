@@ -3,12 +3,12 @@
 //! 复刻 `config-ui-avalonia/ViewModels/PluginMarketViewModel.cs`：
 //! * 目录走**外部网络**（发布侧 `plugins/marketplace.json`），与本地后端无关；
 //! * 安装 = 客户端下载 zip → `POST /api/plugins/import`（与本地导入同链路，**后端不出网**）；
-//! * 已安装判定 = 本地用户插件目录 ID 集 ∪ 内置 ID 集。
+//! * 已安装判定 = 后端插件目录 ID 集（含随包 bundled 插件；P7b 起内置判定 =
+//!   manifest.bundled 标记动态真源, 不再依赖硬编码名单）。
 
 use std::time::Duration;
 
 use crate::models::{MarketCatalog, MarketPluginEntry};
-use crate::services::plugins::is_builtin;
 
 /// 市场目录地址（发布侧：仓库 `plugins/marketplace.json`）。
 pub const CATALOG_URL: &str =
@@ -72,13 +72,14 @@ fn entry_to_market(entry: &MarketPluginEntry, installed: &[String]) -> MarketEnt
         description: entry.description.clone().unwrap_or_default(),
         author: entry.author.clone().unwrap_or_default(),
         url: entry.url.clone(),
-        is_installed: is_builtin(&entry.id) || installed.iter().any(|id| id == &entry.id),
+        is_installed: installed.iter().any(|id| id == &entry.id),
     }
 }
 
-/// 可否安装（内置条目与已安装条目不可安装）。
+/// 可否安装（已安装条目不可安装；随包 bundled 插件经后端目录进 installed 集合，
+/// 冒名 zip 由后端 InstallFromZip 的同名/分发标记检查兜底拒绝）。
 pub fn can_install(entry: &MarketEntry) -> bool {
-    !entry.is_installed && !is_builtin(&entry.id)
+    !entry.is_installed
 }
 
 fn external_agent() -> ureq::Agent {
@@ -153,13 +154,18 @@ mod tests {
                 entry("b", "B", None),
             ],
         };
-        let installed = vec!["b".to_string()];
+        // P7b: 内置判定 = manifest.bundled 动态真源 —— 后端目录含随包插件,
+        // 其 ID 经 installed 集合流入 (不再有硬编码名单特判)。
+        let installed = vec!["quick_switch".to_string(), "b".to_string()];
         let entries = build_entries(&catalog, &installed);
 
         assert_eq!(entries.len(), 3);
         assert!(!entries[0].is_installed, "未装");
         assert!(can_install(&entries[0]));
-        assert!(entries[1].is_installed, "内置条目恒为已安装");
+        assert!(
+            entries[1].is_installed,
+            "随包 bundled 条目经后端目录判为已安装"
+        );
         assert!(!can_install(&entries[1]));
         assert!(entries[2].is_installed, "已在本地目录中");
         assert!(!can_install(&entries[2]));
