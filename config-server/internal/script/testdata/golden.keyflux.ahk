@@ -56,7 +56,7 @@ ImeInputHost.Enable()
 ; 见 docs/design-ime-guard.md。
 CommandInputHooks.Register(CommandImeGuard)
 InitKeymap()
-InitQuickSwitch({collectEnabled: true, autoShow: true, autoJumpOpen: true, autoJumpSave: false, pollIntervalMs: 800, maxHistory: 200, overlayRows: 8, overlayRowsCompact: 4, excludedPrefixes: ["D:\Archive", "C:\Temp"]})
+InitQuickSwitch()
 OnExit(KeyFluxExit)
 #include ../data/custom_functions.ahk
 

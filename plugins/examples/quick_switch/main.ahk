@@ -18,11 +18,12 @@
 ;      QuickSwitchGoto() (bin/lib/actions/builtins/type9_keyflux.ahk, 生成端
 ;      callMap[9]) 经 PluginManager.InvokeAction("quick_switch", "goto") 间接寻址 ——
 ;      核心对本插件零静态引用, 本插件被删除/停用时该调用点静默返回 false。
-;   ② 配置通道: InitQuickSwitch({...9 字段...}) 由生成端「晚初始化扩展点」
-;      ({{ PLUGIN_LATE_INIT }}) 注入调用, 参数取自 config.json 的
-;      options.quickSwitch (生成期渲染) —— 保持原调用时机 (InitKeymap 之后)
-;      与取值来源不变; 本插件被删除/停用时生成端不再注入该行。
-;      (声明式设置 + plugin-settings.json 迁移属 P5, 见提案 §6。)
+;   ② 配置通道 (2026-10-02 P5): 晚初始化扩展点 ({{ PLUGIN_LATE_INIT }}) 注入无参
+;      InitQuickSwitch() 调用 (保持原调用时机, InitKeymap 之后), 配置由插件运行时
+;      经 ConfigProvider (data/plugin-settings.json, 契约 §3.8) 自取, 键缺失回落
+;      manifest.settings[].default 同源的内置默认值; 本插件被删除/停用时生成端
+;      不再注入该行。options.quickSwitch 专用段已 deprecated (仅保留读取兼容,
+;      迁移由后端启动时一次性写入 plugin-settings.json)。
 ;
 ; 依赖引擎侧接口: DialogInspector 所用的窗口枚举、InputTipWindow (core),
 ;   CommandInputHooks 不涉及 (本插件不经命令框触发, 触发为对话框轮询)。

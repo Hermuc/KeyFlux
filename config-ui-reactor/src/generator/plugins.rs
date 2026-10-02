@@ -22,9 +22,6 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::generator::model::Config;
-use crate::generator::text::ahk_string;
-
 /// Go `plugins.SpecVersion`：当前插件包格式版本（manifest `specVersion` 不等即拒绝）。
 pub const SPEC_VERSION: i32 = 1;
 
@@ -76,6 +73,10 @@ pub struct Setting {
     pub max: Option<f64>,
     #[serde(rename = "maxLength")]
     pub max_length: i32,
+    /// 仅 type=text：多行编辑器 + 换行分隔值（2026-10-02 P5，首个消费方
+    /// = quick_switch.excludedPrefixes；提案 §5 D2）。
+    #[serde(rename = "multiline")]
+    pub multiline: bool,
 }
 
 /// Go `plugins.Manifest`（`plugin.json`）。
@@ -260,6 +261,12 @@ fn validate_settings(manifest: &Manifest) -> Result<(), String> {
                 manifest.id, setting.key
             ));
         }
+        if setting.kind != "text" && setting.multiline {
+            return Err(format!(
+                "插件「{}」设置项 {:?} 不是 text 类型, 不应带 multiline",
+                manifest.id, setting.key
+            ));
+        }
         for v in [setting.min, setting.max].into_iter().flatten() {
             if v != (v as i64 as f64) {
                 return Err(format!(
@@ -415,15 +422,14 @@ fn ahk_string_lit(s: &str) -> String {
 /// 扩展点，位于 `InitKeymap()` 与 `OnExit` 之间）。产出「必须晚于 InitKeymap」的插件
 /// 初始化行，行尾拼接约定（非空时自带前导 `\n`），空块 = 零字节。
 ///
-/// 当前唯一消费方 = quick_switch 的 `InitQuickSwitch(...)` 调用行（2026-10-01 P2
-/// 插件化：代码已随插件搬入 `data/plugins/quick_switch/`，提案
+/// 当前唯一消费方 = quick_switch 的 `InitQuickSwitch()` 无参调用行（2026-10-02 P5
+/// 起：代码随插件搬入 `data/plugins/quick_switch/`，配置经 ConfigProvider 运行时
+/// 自取 `plugin-settings.json`，生成器与 `options.quickSwitch` 已解耦；提案
 /// `docs/contracts-proposals/quickswitch-pluginization.md`）。存在性/禁用判定与
 /// [`render_plugin_blocks`] 完全同构（同一 catalog + 同一 disabled/removed 集 + 同一入口
 /// 存在性校验），保证「插件不可用 ⇒ 初始化行不产出」（可删除性保证：AHK v2 直调
-/// 未定义函数是加载期致命错误）。配置段迁移到 plugin-settings.json 属 P5，届时
-/// 本函数对 quick_switch 的特判移除。
+/// 未定义函数是加载期致命错误）。特判泛化（manifest 声明晚初始化函数）属 P7。
 pub fn render_late_init(
-    config: &Config,
     plugins_dir: &Path,
     disabled: &HashSet<String>,
     removed: &HashSet<String>,
@@ -449,40 +455,13 @@ pub fn render_late_init(
             continue;
         }
         if manifest.id == "quick_switch" {
-            return render_quick_switch_late_init(&config.options.quick_switch);
+            // P5 (2026-10-02): 无参调用 —— 配置已迁 plugin-settings.json, 插件经
+            // ConfigProvider 自取; 生成器不再读 options.quickSwitch。
+            // （P7 将以 manifest 声明泛化此特判。）
+            return "\nInitQuickSwitch()".to_string();
         }
     }
     String::new()
-}
-
-/// Go `generators.renderQuickSwitchLateInit`：渲染 quick_switch 晚初始化行。
-///
-/// 🔴 字节等价约束：字段顺序 / 分隔符 / bool 文本 / `ahkString` 转义必须与迁移前
-/// 模板硬编码行完全一致（否则 parity 12 份基线全漂）。参数来源 = config.json
-/// `options.quickSwitch`（原模板渲染点），非 plugin-settings（迁移属 P5）。
-fn render_quick_switch_late_init(q: &crate::generator::model::QuickSwitchOption) -> String {
-    let bool_str = |value: bool| if value { "true" } else { "false" };
-    let mut out = String::from("\nInitQuickSwitch({collectEnabled: ");
-    out.push_str(bool_str(q.collect_enabled));
-    out.push_str(", autoShow: ");
-    out.push_str(bool_str(q.auto_show));
-    out.push_str(", autoJumpOpen: ");
-    out.push_str(bool_str(q.auto_jump_open));
-    out.push_str(", autoJumpSave: ");
-    out.push_str(bool_str(q.auto_jump_save));
-    out.push_str(&format!(", pollIntervalMs: {}", q.poll_interval_ms));
-    out.push_str(&format!(", maxHistory: {}", q.max_history));
-    out.push_str(&format!(", overlayRows: {}", q.overlay_rows));
-    out.push_str(&format!(", overlayRowsCompact: {}", q.overlay_rows_compact));
-    out.push_str(", excludedPrefixes: [");
-    for (index, prefix) in q.excluded_prefixes.iter().enumerate() {
-        if index > 0 {
-            out.push_str(", ");
-        }
-        out.push_str(&ahk_string(prefix));
-    }
-    out.push_str("]})");
-    out
 }
 
 /// Go `generators.ahkManifestLiteral`：把 manifest 渲染为 AHK `Map(...)` 原生字面量。
@@ -641,6 +620,16 @@ mod tests {
         assert_eq!(builtin.id, "quick_switch");
         assert_eq!(builtin.entry.func, "QuickSwitchMain");
         assert!(builtin.has_permission("window"));
+        // P5 (2026-10-02)：9 项声明式设置 + settings 能力位。
+        assert!(builtin.has_permission("settings"));
+        assert_eq!(builtin.settings.len(), 9);
+        let excluded = builtin
+            .settings
+            .iter()
+            .find(|setting| setting.key == "excludedPrefixes")
+            .expect("excludedPrefixes 声明存在");
+        assert_eq!(excluded.kind, "text");
+        assert!(excluded.multiline, "排除前缀 = 多行文本 (换行分隔)");
     }
 
     /// 缺目录 ⇒ 空目录、无错误（Go: NotExist 不记为错误）。

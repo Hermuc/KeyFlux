@@ -66,7 +66,7 @@ func ParseConfig(file string) (*Config, error) {
 	// 边界: 只做「整段为零才补齐」, 绝不逐字段补齐 —— 用户合法地把 autoJumpSave 设为 false
 	// (其余字段为默认) 必须原样保留, 故以「全零签名」而非「单字段空值」判定 (同 C# 侧口径)。
 	// 默认值真源见 DefaultQuickSwitchOption (三端一致, 有单测守护)。
-	if isQuickSwitchZero(config.Options.QuickSwitch) {
+	if IsQuickSwitchZero(config.Options.QuickSwitch) {
 		config.Options.QuickSwitch = DefaultQuickSwitchOption()
 	}
 	// 存量迁移: 旧 actionSchemes → selectedAction 单键分发 (读时一次性, 硬切不回写;
@@ -125,10 +125,10 @@ func DefaultQuickSwitchOption() QuickSwitchOption {
 	}
 }
 
-// isQuickSwitchZero 判定 quickSwitch 是否为「旧配置缺失该段」的全零签名。
+// IsQuickSwitchZero 判定 quickSwitch 是否为「旧配置缺失该段」的全零签名。
 // 因 QuickSwitchOption 含切片字段 (不可用 == 比较结构体), 故逐字段判定;
 // 口径与 C# ConfigReadDefaults.IsQuickSwitchUnset 完全一致, 保证引擎与 UI 判定同步。
-func isQuickSwitchZero(q QuickSwitchOption) bool {
+func IsQuickSwitchZero(q QuickSwitchOption) bool {
 	return !q.CollectEnabled && !q.AutoShow && !q.AutoJumpOpen && !q.AutoJumpSave &&
 		q.PollIntervalMs == 0 && q.MaxHistory == 0 &&
 		q.OverlayRows == 0 && q.OverlayRowsCompact == 0 &&

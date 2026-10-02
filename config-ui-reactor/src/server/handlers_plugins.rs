@@ -73,6 +73,9 @@ pub(crate) struct WireSetting {
     pub max: Option<f64>,
     #[serde(rename = "maxLength", skip_serializing_if = "is_zero_i32")]
     pub max_length: i32,
+    /// Go `Setting.Multiline`（omitempty ⇒ false 省略；仅 type=text）。
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub multiline: bool,
 }
 
 fn is_zero_i32(value: &i32) -> bool {
@@ -131,6 +134,7 @@ impl WireSetting {
             min: self.min,
             max: self.max,
             max_length: self.max_length,
+            multiline: self.multiline,
         }
     }
 }
@@ -182,6 +186,7 @@ impl WireManifest {
                     min: setting.min,
                     max: setting.max,
                     max_length: setting.max_length,
+                    multiline: setting.multiline,
                 })
                 .collect(),
         }
@@ -658,9 +663,127 @@ pub(crate) fn save_plugin_settings(ctx: &ServerContext, id: &str, body: &[u8]) -
     HttpReply::json(200, marshal_go_json(&dto))
 }
 
+// ---------------------------------------------------------------- 一次性迁移（P5）
+
+/// Go `server.MigrateQuickSwitchSettings`：把 config.json 的 `options.quickSwitch`
+/// （2026-10-02 P5 起 **deprecated**，仅保留读取兼容）一次性迁移到
+/// `plugin-settings.json` 的 `quick_switch` 段。规则：
+/// * 旧段全零签名（= 旧配置缺段，口径同 Go `script.IsQuickSwitchZero`）⇒ 不迁移，
+///   插件回落 manifest 默认值；
+/// * 否则 9 个键的现值全部入表，但只写存储中尚不存在的键（幂等 + 用户已存值不被覆盖）；
+/// * 只写不改：旧段原样保留，回滚旧版本仍读得懂（约束 #5 配置兼容）。
+///
+/// 失败一律静默返回（迁移不阻塞服务启动，插件有默认值兜底）。
+pub(crate) fn migrate_quick_switch_settings(ctx: &ServerContext) {
+    #[derive(Deserialize)]
+    struct RawConfig {
+        #[serde(default)]
+        options: RawOptions,
+    }
+    #[derive(Deserialize, Default)]
+    struct RawOptions {
+        #[serde(rename = "quickSwitch", default)]
+        quick_switch: crate::models::config::QuickSwitchOption,
+    }
+    let Ok(data) = std::fs::read_to_string(&ctx.paths.config_file) else {
+        return;
+    };
+    let Ok(raw) = serde_json::from_str::<RawConfig>(&data) else {
+        return;
+    };
+    let q = raw.options.quick_switch;
+    let all_zero = !q.collect_enabled
+        && !q.auto_show
+        && !q.auto_jump_open
+        && !q.auto_jump_save
+        && q.poll_interval_ms == 0
+        && q.max_history == 0
+        && q.overlay_rows == 0
+        && q.overlay_rows_compact == 0
+        && q.excluded_prefixes.is_empty();
+    if all_zero {
+        return;
+    }
+    let values: BTreeMap<String, String> = [
+        ("collectEnabled", q.collect_enabled.to_string()),
+        ("autoShow", q.auto_show.to_string()),
+        ("autoJumpOpen", q.auto_jump_open.to_string()),
+        ("autoJumpSave", q.auto_jump_save.to_string()),
+        ("pollIntervalMs", q.poll_interval_ms.to_string()),
+        ("maxHistory", q.max_history.to_string()),
+        ("overlayRows", q.overlay_rows.to_string()),
+        ("overlayRowsCompact", q.overlay_rows_compact.to_string()),
+        ("excludedPrefixes", q.excluded_prefixes.join("\n")),
+    ]
+    .into_iter()
+    .map(|(key, value)| (key.to_string(), value))
+    .collect();
+    let existing = ctx.plugin_settings.load_for("quick_switch");
+    let fresh: BTreeMap<String, String> = values
+        .into_iter()
+        .filter(|(key, _)| !existing.contains_key(key))
+        .collect();
+    if fresh.is_empty() {
+        return;
+    }
+    let _ = ctx.plugin_settings.save("quick_switch", &fresh);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// P5 迁移：非全零 ⇒ 全量入表；已有键不覆盖；幂等。
+    #[test]
+    fn migrate_quick_switch_settings_rules() {
+        let root = std::env::temp_dir().join(format!("kf-migrate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let data = root.join("data");
+        let bin = root.join("bin");
+        std::fs::create_dir_all(&data).expect("建 data");
+        std::fs::create_dir_all(&bin).expect("建 bin");
+        std::fs::write(
+            data.join("config.json"),
+            r#"{"keymaps":[],"options":{"quickSwitch":{"collectEnabled":true,"pollIntervalMs":800}}}"#,
+        )
+        .expect("写 config");
+        // ServerPaths: config_file = cwd/../data/config.json ⇒ cwd = <root>/bin
+        let ctx = ServerContext::with_hooks(
+            ServerPaths::new(&bin, &bin),
+            crate::server::handlers_config::Hooks::default(),
+        );
+        migrate_quick_switch_settings(&ctx);
+        let values = ctx.plugin_settings.load_for("quick_switch");
+        assert_eq!(
+            values.get("collectEnabled").map(String::as_str),
+            Some("true"),
+            "非全零段应迁移"
+        );
+        assert_eq!(
+            values.get("pollIntervalMs").map(String::as_str),
+            Some("800")
+        );
+
+        // 幂等 + 不覆盖：改小配置里的值再迁移，已存键必须保持
+        std::fs::write(
+            &ctx.paths.config_file,
+            r#"{"keymaps":[],"options":{"quickSwitch":{"collectEnabled":false,"pollIntervalMs":9}}}"#,
+        )
+        .expect("改写 config");
+        migrate_quick_switch_settings(&ctx);
+        let values = ctx.plugin_settings.load_for("quick_switch");
+        assert_eq!(
+            values.get("collectEnabled").map(String::as_str),
+            Some("true"),
+            "已有键不被迁移覆盖"
+        );
+        assert_eq!(
+            values.get("pollIntervalMs").map(String::as_str),
+            Some("800"),
+            "已有键不被迁移覆盖"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// 回归 (2026-10-02): 目录列表路径必须放行内置 ID —— 随包内置插件
     /// quick_switch 以标准插件形态存在于 data/plugins/, 面板列表此前误走

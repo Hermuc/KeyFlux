@@ -976,26 +976,56 @@ v4.1 焦点降级语义 + 延后收尾状态 + 终止字符强制投递语义) +
 
 ## 4. 插件清单格式(冻结)
 
-`data/plugins/<id>/plugin.json`:
+> 🔴 **2026-10-02 订正**: 本节原样例与实现严重不符(旧文含 `runtime`/`provides` 字段、
+> `entry` 为字符串、`settings` 为对象表、示例 id 用连字符) —— 均系**设计期草稿**, 从未实现。
+> 以下为**实现真源**(`config-server/internal/plugins/plugins.go` 的 `Manifest` + 校验,
+> 与 `config-ui-reactor/src/generator/plugins.rs` 同构; 双端单测守护)。实现先于本订正,
+> 本节自 quick_switch 插件化 (P2-P5) 起即按此运作。
+
+`data/plugins/<id>/plugin.json`(真源 `plugins/examples/`, 部署到 `data/plugins/`):
 
 ```json
 {
-  "id": "everything-search",
-  "name": "Everything 本地搜索",
+  "id": "quick_switch",
+  "name": "快速切换",
+  "nameEn": "Quick Switch",
   "version": "1.0.0",
-  "runtime": "ahk",
-  "entry": "main.ahk",
-  "provides": { "actions": ["everythingSearch"], "abbrCommands": ["fs"] },
-  "permissions": ["selection", "run", "settings"],
-  "settings": {
-    "everythingPath": { "type": "path", "label": "Everything.exe 路径" }
-  }
+  "specVersion": 1,
+  "description": "……",
+  "author": "KeyFlux",
+  "entry": { "kind": "script", "file": "main.ahk", "func": "QuickSwitchMain" },
+  "permissions": ["window", "settings"],
+  "settings": [
+    { "key": "excludedPrefixes", "type": "text", "label": "排除目录前缀",
+      "labelEn": "Excluded prefixes", "default": "",
+      "hint": "……", "hintEn": "……", "multiline": true }
+  ]
 }
 ```
 
-- `runtime`:`"ahk"` = L1 进程内(当前支持);`"process"` = L2(预留,清单可声明,加载器报"暂不支持")
-- `permissions` 词表(冻结):`selection` / `run` / `clipboard` / `window` / `settings` / `events`
-- L1 插件入口约定:`main.ahk` 必须导出 `Register(api)` 函数,由 PluginManager 调用
+- 🔴 **id 词表(冻结)**: `^[a-z][a-z0-9_]{0,31}$` —— **下划线**分隔(如 `quick_switch`),
+  不是连字符。随包内置 ID 集 = `BUILTIN_PLUGIN_IDS`(现仅 `quick_switch`; 导入 API 拒绝冒名,
+  目录加载放行内置 ID —— 校验拆分见 2026-10-01 变更行)。
+- `specVersion` 必须为 `1`(不等即拒绝); `name` 必填; `nameEn`/`version`/`description`/
+  `author`/`permissions`/`settings` 可省略。
+- `entry` 是**对象**: `kind` 当前仅支持 `"script"`(`{file, func}` 必填) —— 加载器对其他
+  kind 产 `[插件错误]` 注释并跳过。
+- `permissions` 词表(冻结): `selection` / `window` / `run` / `settings` / `events`
+  (`clipboard` 经 APIBridge 归并到 selection 命名空间)。**声明 `settings` 必须同时申请
+  `settings` 权限**(校验器拒绝自相矛盾声明)。APIBridge 命名空间映射见
+  `bin/lib/plugins/APIBridge.ahk`(`settings -> config.*`)。
+- `settings` 是**数组**(每项一个 `Setting`), 不是对象表; 类型词表(冻结):
+  `char` / `text` / `number` / `file` / `bool`(2026-10-01 P1; 值域严格 `"true"`/`"false"`)。
+  每项: `key`(^[A-Za-z][A-Za-z0-9_]{0,31}$, 插件内唯一) / `type` / `label`(必填) /
+  `labelEn` / `default` / `filter`(仅 file) / `hint` / `hintEn` / `min`+`max`(仅 number,
+  整数闭区间) / `maxLength`(仅 text, 0=1024) / `multiline`(2026-10-02 P5, 仅 text:
+  多行编辑器 + 换行分隔值)。
+- **存储**: 设置值独立存 `data/plugin-settings.json`(扁平字符串 KV, 键 `<pluginId>:<key>`;
+  唯一写入者 = 后端 GET/PUT `/api/plugins/:id/settings`; 引擎侧 `ConfigProvider.ahk`
+  只读同一文件, 契约 §3.8)。空串 = 未设置(回落 `default`)。
+- L1 插件入口约定: `entry.func`(如 `QuickSwitchMain(api)`)由 PluginManager 在引导点调用,
+  `api` 为按 `permissions` 裁剪的 APIView; 「必须晚于 InitKeymap」的初始化走
+  `{{ PLUGIN_LATE_INIT }}` 晚初始化扩展点(空块零字节)。
 
 ## 5. Go 生成端契约
 

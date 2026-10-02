@@ -104,6 +104,9 @@ type Setting struct {
 	Max *float64 `json:"max,omitempty"`
 	// MaxLength 仅 type=text 使用: 值长度上限 (0 = 用 MaxSettingValueLen)。
 	MaxLength int `json:"maxLength,omitempty"`
+	// Multiline 仅 type=text 使用: 多行编辑器 + 换行分隔值 (2026-10-02 P5 新增,
+	// 首个消费方 = quick_switch.excludedPrefixes 排除前缀表; 提案 §5 D2)。
+	Multiline bool `json:"multiline,omitempty"`
 }
 
 // ValueLimit 该设置项允许的最大值长度 (字符数)。
@@ -242,6 +245,9 @@ func validateSettings(p *Manifest) error {
 		}
 		if s.Type != SettingTypeFile && s.Filter != "" {
 			return fmt.Errorf("插件「%s」设置项 %q 不是 file 类型, 不应带 filter", p.ID, s.Key)
+		}
+		if s.Type != SettingTypeText && s.Multiline {
+			return fmt.Errorf("插件「%s」设置项 %q 不是 text 类型, 不应带 multiline", p.ID, s.Key)
 		}
 		// number 是整数语义, 小数边界会让界面与后端校验口径分叉
 		for _, v := range []*float64{s.Min, s.Max} {

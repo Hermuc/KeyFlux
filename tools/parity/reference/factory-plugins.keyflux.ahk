@@ -39,7 +39,7 @@ ProcessSetPriority "High"
 SetWorkingDir("../")
 PluginManager.Register(Map("id", "everything_search", "name", "Everything 搜索", "nameEn", "Everything Search", "version", "1.0.1", "specVersion", 1, "description", "在命令框里按下前置键 (默认空格), 用 Everything 搜索当前选中的文字; 搜索结果在命令框正下方以下拉列表展示, 可用 ↑↓ 选择、回车打开。Everything 未运行时自动拉起。", "author", "KeyFlux", "entry", Map("kind", "script", "file", "main.ahk", "func", "EverythingSearchMain"), "permissions", ["selection", "run", "settings"]))
 PluginManager.LoadEntry("everything_search")
-PluginManager.Register(Map("id", "quick_switch", "name", "快速切换", "nameEn", "Quick Switch", "version", "1.0.0", "specVersion", 1, "description", "在文件对话框出现时自动收集最近使用的文件夹, 提供一键跳转与候选浮层。", "author", "KeyFlux", "entry", Map("kind", "script", "file", "main.ahk", "func", "QuickSwitchMain"), "permissions", ["window"]))
+PluginManager.Register(Map("id", "quick_switch", "name", "快速切换", "nameEn", "Quick Switch", "version", "1.0.0", "specVersion", 1, "description", "在文件对话框出现时自动收集最近使用的文件夹, 提供一键跳转与候选浮层。", "author", "KeyFlux", "entry", Map("kind", "script", "file", "main.ahk", "func", "QuickSwitchMain"), "permissions", ["window", "settings"]))
 PluginManager.LoadEntry("quick_switch")
 ; 引擎级未捕获异常兜底: 替代「错误弹窗 + 线程死亡 + Suspend 残留 (热键全灭)」,
 ; 记录全文到 logs\engine_error.log (见 Functions.ahk 的 EngineOnError 注释)。
@@ -59,7 +59,7 @@ ImeInputHost.Enable()
 ; 见 docs/design-ime-guard.md。
 CommandInputHooks.Register(CommandImeGuard)
 InitKeymap()
-InitQuickSwitch({collectEnabled: true, autoShow: true, autoJumpOpen: true, autoJumpSave: false, pollIntervalMs: 800, maxHistory: 200, overlayRows: 8, overlayRowsCompact: 4, excludedPrefixes: []})
+InitQuickSwitch()
 OnExit(KeyFluxExit)
 #include ../data/custom_functions.ahk
 

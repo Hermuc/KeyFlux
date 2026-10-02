@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"settings/internal/plugins"
-	"settings/internal/script/model"
 	"strings"
 	"sync"
 )
@@ -53,11 +52,10 @@ func PluginBootstrap() string {
 // (2026-10-01 QuickSwitch 插件化 P2 引入; 模板中位于 InitKeymap() 与 OnExit 之间)。
 // 产出「必须晚于 InitKeymap()」的插件初始化行, 每行以 \n 前导, 空块 = 零字节
 // (行尾拼接约定, 与 PLUGIN_INCLUDES/BOOTSTRAP 同款)。
-// 当前唯一消费方 = quick_switch 的 InitQuickSwitch(...) 调用行: 代码已随插件搬入
-// data/plugins/quick_switch/ (提案 docs/contracts-proposals/quickswitch-pluginization.md),
-// 调用时机与参数来源 (config.json options.quickSwitch 的生成期渲染) 保持与硬编码时期
-// 逐字节一致; 插件被禁用/入口缺失 => 不产出 (可删除性保证)。配置段迁移到
-// plugin-settings.json + 声明式设置属 P5, 届时本函数对 quick_switch 的特判移除。
+// 当前唯一消费方 = quick_switch 的 InitQuickSwitch() 无参调用行 (2026-10-02 P5 起):
+// 代码随插件搬入 data/plugins/quick_switch/, 配置经 ConfigProvider 运行时自取
+// (plugin-settings.json), 生成器与 options.quickSwitch 已解耦; 插件被禁用/入口缺失
+// => 不产出 (可删除性保证)。特判泛化 (manifest 声明晚初始化函数) 属 P7。
 func PluginLateInit() string {
 	_, _, late := pluginBlocks()
 	return late
@@ -141,8 +139,11 @@ func renderPluginBlocks(dir string) (includes, bootstrap, lateInit string) {
 		inc.WriteString(fmt.Sprintf("\n#Include ../data/plugins/%s/%s", m.ID, m.Entry.File))
 		boot.WriteString(fmt.Sprintf("\nPluginManager.Register(%s)", ahkManifestLiteral(m)))
 		boot.WriteString(fmt.Sprintf("\nPluginManager.LoadEntry(%s)", ahkStringLit(m.ID)))
-		if m.ID == "quick_switch" && Cfg != nil {
-			late.WriteString(renderQuickSwitchLateInit(Cfg.Options.QuickSwitch))
+		if m.ID == "quick_switch" {
+			// P5 (2026-10-02): 晚初始化改无参调用 —— 配置已迁 plugin-settings.json,
+			// 插件经 ConfigProvider 自取 (QuickSwitch.ahk), 生成器不再读 options.quickSwitch
+			// (核心对插件配置零知识的 P5 一步; P7 将以 manifest 声明泛化此特判)。
+			late.WriteString("\nInitQuickSwitch()")
 		}
 	}
 	for _, e := range cat.Errors {
@@ -151,36 +152,9 @@ func renderPluginBlocks(dir string) (includes, bootstrap, lateInit string) {
 	return inc.String(), boot.String(), late.String()
 }
 
-// renderQuickSwitchLateInit 渲染 quick_switch 的晚初始化行 (InitQuickSwitch 调用)。
-// 🔴 字节等价约束: 字段顺序 / 分隔符 / bool 文本 (%t) / ahkString 转义 必须与迁移前
-// 模板硬编码行完全一致 (否则 parity 12 份基线全漂)。迁移前形态见 git 历史
-// keyflux.tmpl (InitQuickSwitch({...}), 2026-10-01 P2 前最后一版)。
-// 参数来源 = config.json options.quickSwitch (Go 模板引擎原渲染点), 非 plugin-settings
-// (迁移属 P5)。
-func renderQuickSwitchLateInit(q model.QuickSwitchOption) string {
-	var b strings.Builder
-	b.WriteString("\nInitQuickSwitch({collectEnabled: ")
-	b.WriteString(fmt.Sprintf("%t", q.CollectEnabled))
-	b.WriteString(", autoShow: ")
-	b.WriteString(fmt.Sprintf("%t", q.AutoShow))
-	b.WriteString(", autoJumpOpen: ")
-	b.WriteString(fmt.Sprintf("%t", q.AutoJumpOpen))
-	b.WriteString(", autoJumpSave: ")
-	b.WriteString(fmt.Sprintf("%t", q.AutoJumpSave))
-	b.WriteString(fmt.Sprintf(", pollIntervalMs: %d", q.PollIntervalMs))
-	b.WriteString(fmt.Sprintf(", maxHistory: %d", q.MaxHistory))
-	b.WriteString(fmt.Sprintf(", overlayRows: %d", q.OverlayRows))
-	b.WriteString(fmt.Sprintf(", overlayRowsCompact: %d", q.OverlayRowsCompact))
-	b.WriteString(", excludedPrefixes: [")
-	for i, p := range q.ExcludedPrefixes {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString(model.AhkString(p))
-	}
-	b.WriteString("]})")
-	return b.String()
-}
+// renderQuickSwitchLateInit 已于 2026-10-02 P5 移除: 晚初始化行改渲染无参
+// `InitQuickSwitch()`, 参数改由插件运行时经 ConfigProvider 自取
+// (plugin-settings.json), 生成器与 options.quickSwitch 解耦。
 
 // ahkManifestLiteral 把 manifest 渲染为 AHK Map 字面量
 // (AHK v2 无内置 JSON 解析, 生成端代为解析后以原生字面量下发)。
