@@ -142,8 +142,12 @@ pub fn hint_row(text: impl Into<String>) -> View {
 
 // ------------------------------------------- 「快捷键方案」三列契约（表头 ⇄ 数据行共用）
 
-/// 第 2 列（触发键）宽。
-const SCHEME_COL_HOTKEY: f64 = 130.0;
+/// 第 1 列（名称）宽 —— 名称框 180 + 右侧 8 呼吸。
+///
+/// 🔴 2026-10-02：曾用 STAR——名称框改定宽 180 后（见 [`scheme_row`]），STAR 格（≈234）
+/// 剩下 ≈54 DIP 空档，把触发键列整体推远（用户："两列的间距太大了"）。改定宽后余量
+/// 让给第 2 列。
+const SCHEME_COL_NAME: f64 = 188.0;
 /// 第 3 列（开关）宽 —— 取值见 [`scheme_columns`] 的推导：贴近数据行原本 `Auto` 的实测宽度，
 /// 这样「把列宽钉死」不会挪动开关自身的位置。
 ///
@@ -177,16 +181,20 @@ const SCHEME_INSET_DELETE: f64 = 4.0;
 /// [`SCHEME_COL_SWITCH`] 注释），2026-10-02 放宽到 104 ⇒ 开关位置左移 ≤8 DIP
 /// （表头与数据行同步移动，对齐不变），`OFF` 槽位 ≥28 DIP。
 ///
-/// 第 1 列仍是 STAR：它没有"需要与另一个 Grid 对齐的同名列头"之外的约束，且固定 124px 会把
-/// 「CapsLock + Space」截断（旧注释的结论仍然成立）。
+/// 第 1 列定宽 188：名称框随列定宽（见 [`SCHEME_COL_NAME`]）。
+///
+/// 第 2 列是 STAR：左卡列固定 560 ⇒ 此列实测 ≈176 DIP，触发键框（min_width 110）
+/// 随之拉宽吃掉余量——开关/删除列的绝对位置因此与"第 1 列 STAR 时代"完全一致。
+/// 名称列不能也用 STAR：名称框已定宽 180，STAR 会把两列间撑出 ≈54 DIP 空档
+/// （用户报障 2026-10-02）。
 ///
 /// ⚠️ 更彻底的做法是把表头与数据行合进**同一个** Grid（表头行 + N 个数据行），那样用 `Auto`
 /// 也能对齐；但那是页面结构的重构（`views.rs::settings_page` 的组装方式也要改），收益不抵风险，
 /// 故本轮只固化列契约。**改动本页布局时，表头与数据行必须继续共用本函数与 [`scheme_inset`]。**
 fn scheme_columns() -> [GridLength; 4] {
     [
+        GridLength::Pixel(SCHEME_COL_NAME),
         GridLength::STAR,
-        GridLength::Pixel(SCHEME_COL_HOTKEY),
         GridLength::Pixel(SCHEME_COL_SWITCH),
         GridLength::Pixel(SCHEME_COL_DELETE),
     ]
@@ -259,10 +267,14 @@ where
     E: IntoPayloadCallback<bool>,
     D: IntoUnitCallback,
 {
-    // 名称框收窄（用户定版 2026-10-02）：STAR 列仍对齐表头，框自身限宽左对齐
+    // 名称框**等宽**（用户定版 2026-10-02）：固定 180 DIP 左对齐。迭代史：① max_width 240
+    // + 左对齐 = 随内容自适应，12 行宽窄参差（用户截图）；② 填满 STAR 列（≈234）= 等宽但
+    // 过宽（用户："可以窄一点"）；③ 定 180 而名称列仍 STAR ⇒ 两列间撑出 ≈54 空档（用户：
+    // "间距太大了"）——列随之改定宽 188（见 [`SCHEME_COL_NAME`]），余量让给触发键列。
+    // 180 容下最宽名称「鼠标侧键( Back )」（实测需 ≈135），更长的名称框内滚动。
     let name_box: View = TextBox::new()
         .text(name.to_string())
-        .max_width(240.0)
+        .width(180.0)
         .min_height(32.0)
         .horizontal_alignment(HorizontalAlignment::Left)
         .on_text_changed(on_name)
