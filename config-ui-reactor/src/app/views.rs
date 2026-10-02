@@ -274,13 +274,47 @@ impl Shell {
         // 文本特征卡不渲染）。展开 = 「✎ 编辑后缀」链 + 后缀 TextBox + 保存/取消，
         // 保存走既有 MtSave 校验链（normalize_exts + 后端校验）。
         let exts_editor: View = if match_type == MATCH_FILE_EXT {
-            selected_action_view::exts_editor(
-                self.exts_edit_open,
-                self.exts_edit.as_ref().map(|(_, text)| text.clone()),
-                context.callback(|value: String| Message::SaExtsEditValue(value)),
-                context.message(Message::SaExtsEditSave),
-                context.message(Message::SaExtsEditToggle),
-            )
+            // 常驻可编辑后缀框（用户定版 2026-10-02）：展示当前选中分组的后缀串，
+            // 直接编辑；改动 800ms 尾随保存（generation 防抖复刻行为编辑语义）。
+            // 文本特征卡不渲染（仅 fileExt）。mt_status（校验错误）内联回显。
+            let current_mt_index = config
+                .match_types
+                .iter()
+                .position(|mt| mt.id == sel_id)
+                .or_else(|| {
+                    config
+                        .match_types
+                        .iter()
+                        .position(|mt| mt.kind == MATCH_FILE_EXT)
+                });
+            let dirty = match (&self.exts_edit, current_mt_index) {
+                (Some((dirty_index, text)), Some(index)) if *dirty_index == index => {
+                    Some(text.clone())
+                }
+                _ => None,
+            };
+            let display_text = dirty.unwrap_or_else(|| {
+                current_mt_index
+                    .and_then(|index| config.match_types.get(index))
+                    .map(|mt| mt.exts.join(","))
+                    .unwrap_or_default()
+            });
+            // 校验错误回显（MtSave validate 失败经 mt_status）
+            let exts_status: View = match &self.mt_status {
+                Some((text, is_error)) if *is_error => selected_action_view::hint_bar(text),
+                _ => View::empty(),
+            };
+            View::fragment((
+                selected_action_view::exts_editor(
+                    current_mt_index.unwrap_or(usize::MAX),
+                    display_text,
+                    self.exts_edit.clone(),
+                    context.callback(move |(index, value): (usize, String)| {
+                        Message::SaExtsEditValue(index, value)
+                    }),
+                ),
+                exts_status,
+            ))
         } else {
             View::empty()
         };
