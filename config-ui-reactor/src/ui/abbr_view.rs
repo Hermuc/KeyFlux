@@ -14,9 +14,18 @@ use windows_reactor::*;
 use crate::services::abbr::{self, AbbrChip};
 use crate::theme;
 
+/// chip 单元**单侧**间隙 = 键盘网格间距的一半（相邻 chip 间隙 = 两侧相加
+/// = [`keymap_view::CELL_SPACING`]，与模式页键盘格间距**同一真源**，2026-10-02
+/// 用户定版：命令页格子间距对齐键盘网格）。
+///
+/// `VariableSizedWrapGrid` 无 spacing 属性 ⇒ 间隙由单元内边距构成：单元步距
+/// = 内容宽高 + 两侧间隙，按钮自身收进 [`CHIP_GAP_PER_SIDE`]，尺寸不变。
+const CHIP_GAP_PER_SIDE: f64 = super::keymap_view::CELL_SPACING / 2.0;
+
 /// 缩写 chips 换行网格（每项一个按钮，字色固定 NearBlack，无绑定态）。
 ///
-/// `item_width` 由调用方用 [`abbr::chip_item_width`] 依标签集算出（统一格宽布局的必然要求）。
+/// `item_width` 由调用方用 [`abbr::chip_item_width`] 依标签集算出（统一格宽布局的必然要求）；
+/// 本函数把它加上两侧间隙作为**单元步距**，按钮在单元内收进间隙（见 [`CHIP_GAP_PER_SIDE`]）。
 pub fn chip_grid<F, C>(chips: &[AbbrChip], item_width: f64, mut make_callback: F) -> View
 where
     F: FnMut(AbbrChip) -> C,
@@ -35,8 +44,8 @@ where
 
     VariableSizedWrapGrid::new()
         .orientation(Orientation::Horizontal)
-        .item_width(item_width)
-        .item_height(abbr::CHIP_HEIGHT)
+        .item_width(item_width + CHIP_GAP_PER_SIDE * 2.0)
+        .item_height(abbr::CHIP_HEIGHT + CHIP_GAP_PER_SIDE * 2.0)
         .keyed_children(items)
 }
 
@@ -51,6 +60,12 @@ fn chip_button<C: IntoUnitCallback>(chip: &AbbrChip, on_click: C) -> View {
     Button::new()
         .height(abbr::CHIP_HEIGHT)
         .min_width(abbr::CHIP_MIN_WIDTH)
+        .margin(Thickness::new(
+            CHIP_GAP_PER_SIDE,
+            CHIP_GAP_PER_SIDE,
+            CHIP_GAP_PER_SIDE,
+            CHIP_GAP_PER_SIDE,
+        ))
         .is_enabled(chip.enabled)
         .resource_overrides(
             ResourceOverrides::new()
