@@ -338,21 +338,8 @@ pub enum Message {
     PluginImport,
     /// 导入完成（Ok = 已导入插件的显示名）。
     PluginImported(Result<String, String>),
-    /// 打开插件配置（内置 QuickSwitch，或声明了 settings 的用户插件）。
+    /// 打开插件配置（声明了 settings 的插件；P6 起 QuickSwitch 亦走此路）。
     PluginConfigure(String),
-    // ------------------------------------------------------------- QuickSwitch 对话框
-    /// 编辑草稿字段（开关/数值）。
-    QsEdit(QsField),
-    /// 追加一行「排除目录」。
-    QsAddPrefix,
-    /// 删除第 N 行「排除目录」。
-    QsRemovePrefix(usize),
-    /// 编辑第 N 行「排除目录」文本。
-    QsPrefix(usize, String),
-    /// 清空历史（一次性动作，非持久字段）。
-    QsClearHistory,
-    /// 对话框关闭（Primary = 保存；其余 = 放弃草稿）。
-    QsClosed(ContentDialogResult),
     // ------------------------------------------------------------- 插件市场
     /// 重新拉取市场目录。
     MarketReload,
@@ -472,19 +459,6 @@ pub struct SaAddDraft {
     pub(super) checked: Vec<String>,
     /// 弹窗内错误（重复条件 1115 等）。
     pub(super) error: Option<String>,
-}
-
-/// QuickSwitch 配置对话框的可编辑字段（消息载荷）。
-#[derive(Clone)]
-pub enum QsField {
-    CollectEnabled(bool),
-    AutoShow(bool),
-    AutoJumpOpen(bool),
-    AutoJumpSave(bool),
-    MaxHistory(i32),
-    OverlayRows(i32),
-    OverlayRowsCompact(i32),
-    PollIntervalMs(i32),
 }
 
 /// 可编辑的动作字段（消息载荷；`Clone` 以满足 `Component::Message` 约束）。
