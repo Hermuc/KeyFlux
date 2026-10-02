@@ -270,6 +270,21 @@ impl Shell {
             })
         });
 
+        // 文件后缀卡专属：内联编辑当前分组后缀串（预设分组、特殊场景修改；
+        // 文本特征卡不渲染）。展开 = 「✎ 编辑后缀」链 + 后缀 TextBox + 保存/取消，
+        // 保存走既有 MtSave 校验链（normalize_exts + 后端校验）。
+        let exts_editor: View = if match_type == MATCH_FILE_EXT {
+            selected_action_view::exts_editor(
+                self.exts_edit_open,
+                self.exts_edit.as_ref().map(|(_, text)| text.clone()),
+                context.callback(|value: String| Message::SaExtsEditValue(value)),
+                context.message(Message::SaExtsEditSave),
+                context.message(Message::SaExtsEditToggle),
+            )
+        } else {
+            View::empty()
+        };
+
         // 详情面板
         let detail: View = if let Some(mapping) = mapping {
             let covering = sa::covering(&self.catalog, match_type, &mapping.match_value);
@@ -410,8 +425,13 @@ impl Shell {
                     "fileExt"
                 },
             }));
-        let mut card_children: Vec<(usize, View)> =
-            vec![(0, header), (1, toggles_area), (2, new_type), (3, detail)];
+        let mut card_children: Vec<(usize, View)> = vec![
+            (0, header),
+            (1, toggles_area),
+            (2, exts_editor),
+            (3, new_type),
+            (4, detail),
+        ];
         // 页内状态条（▶ 执行失败等）：仅渲染在**当前点亮**的卡上
         if is_selected_type && let Some((text, is_error)) = &self.sa_status {
             card_children.push((
