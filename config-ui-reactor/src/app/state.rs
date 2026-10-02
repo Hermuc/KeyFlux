@@ -47,10 +47,11 @@ impl Shell {
     }
 
     /// 配置落盘的**唯一入口**（保存策略，2026-10-02 用户定版）：
-    /// 一切编辑只改内存 `config`，只有页脚「保存配置」按钮 / Ctrl+S（同走
-    /// `Message::Save`）才经此方法 `PUT /config` 落盘并重启引擎。
-    /// ⚠️ 新增交互**禁止**在编辑处理器里调用本方法做自动保存——需要持久化的变更
-    /// 一律留给用户显式保存（1 秒节流防连点，复刻 `SaveCommand` 的 useThrottleFn）。
+    /// 一切编辑只改内存（config / 行为目录 / 草稿）并入队
+    /// [`save_pipeline::PendingChange`]，只有页脚「保存配置」按钮 / Ctrl+S（同走
+    /// `Message::Save`）才经 [`save_pipeline::flush_and_save`] 按序提交全部暂存变更。
+    /// ⚠️ 新增交互**禁止**在编辑处理器里调用本方法做自动保存
+    /// （1 秒节流防连点，复刻 `SaveCommand` 的 useThrottleFn）。
     pub(super) fn save_now(&mut self, context: &ComponentContext<Self>) {
         let (Some(config), Some(port)) = (self.config.clone(), self.port) else {
             return;
@@ -79,7 +80,16 @@ impl Shell {
 
         self.notice = None;
         self.notice_error = false;
-        let _ = context.spawn_background(move |_token| Message::SaveFinished(save(port, &config)));
+        let queue = self.pending.take();
+        let data_root = self.data_root.clone();
+        let _ = context.spawn_background(move |_token| {
+            Message::SaveFinished(save_pipeline::flush_and_save(
+                port,
+                data_root.as_deref(),
+                queue,
+                &config,
+            ))
+        });
     }
 
     /// 匹配类型草稿整体替换（选中/新建切换时清状态）。

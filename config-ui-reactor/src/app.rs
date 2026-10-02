@@ -26,13 +26,13 @@ use crate::models::{
 };
 use crate::platform::{self, WindowSpec};
 use crate::services::abbr;
-use crate::services::api::{ApiResponse, MessageBody, SettingsApi};
+use crate::services::api::{ApiResponse, SettingsApi};
 use crate::services::backend::{BackendSession, BackendSessionOptions, resolve_settings_exe};
 use crate::services::market::{self, MarketEntry};
 use crate::services::selected_action::{self as sa, MATCH_FILE_EXT, MATCH_TEXT_TYPE};
 use crate::services::{
-    action_editor, behaviors_edit, i18n, keymap, markdown, match_types_edit, plugins, settings,
-    store,
+    action_editor, behaviors_edit, i18n, keymap, markdown, match_types_edit, plugins,
+    save_pipeline, settings, store,
 };
 use crate::theme;
 use crate::ui::{
@@ -86,8 +86,6 @@ pub struct Shell {
     market_loading: bool,
     /// 市场目录拉取失败原因。
     market_error: Option<String>,
-    /// 正在安装的市场条目 id。
-    market_installing: Option<String>,
     /// 安装成功回显。
     market_status: Option<String>,
     /// 插件设置对话框：当前插件 id。
@@ -102,8 +100,6 @@ pub struct Shell {
     ps_error: Option<String>,
     /// 插件设置对话框是否打开（校验失败重开时用）。
     ps_open: bool,
-    /// 插件设置对话框保存进行中（防在结果返回前重复提交）。
-    ps_saving: bool,
     /// 「删除映射」确认框是否打开（1109 文案）。
     sa_delete_confirm: bool,
     /// 选中动作页页内状态条（▶ 执行失败等；`(文本, 是否错误)`）。
@@ -139,14 +135,14 @@ pub struct Shell {
     bh_draft: Option<behaviors_edit::BehaviorDraft>,
     /// 行为对话框内状态条。
     bh_status: Option<(String, bool)>,
-    /// 行为保存/删除进行中（防重复提交）。
-    bh_saving: bool,
     /// 「编辑使用指南」对话框是否打开。
     guide_edit_open: bool,
     /// 指南编辑框内容。
     guide_edit_text: String,
     /// 自定义热键动作编辑对话框：当前编辑的行（`Some(row)` = 打开，keymap id=1）。
     hotkey_editor_row: Option<usize>,
+    /// 暂存变更队列（保存策略：一切修改先入队，页脚「保存配置」统一提交）。
+    pending: save_pipeline::PendingQueue,
     /// 选项页当前展开的分区（`None` = 全部收起；一次只展开一张，复刻旧版手风琴）。
     settings_open: Option<&'static str>,
     /// 选项页「触发延时」分区当前选中的方案（`nav` 中 id>4 方案的下标）。
@@ -206,7 +202,6 @@ impl Component for Shell {
             market_entries: Vec::new(),
             market_loading: false,
             market_error: None,
-            market_installing: None,
             market_status: None,
             ps_id: None,
             ps_title: String::new(),
@@ -214,7 +209,6 @@ impl Component for Shell {
             ps_loading: false,
             ps_error: None,
             ps_open: false,
-            ps_saving: false,
             sa_delete_confirm: false,
             sa_status: None,
             sa_add: None,
@@ -232,7 +226,6 @@ impl Component for Shell {
             bh_pick: None,
             bh_draft: None,
             bh_status: None,
-            bh_saving: false,
             guide_edit_open: false,
             guide_edit_text: String::new(),
             hotkey_editor_row: None,
@@ -241,6 +234,7 @@ impl Component for Shell {
             settings_notice: None,
             data_root: None,
             catalog: sa::Catalog::default(),
+            pending: save_pipeline::PendingQueue::default(),
             sa_text_sel: None,
             sa_file_sel: None,
             sa_text_pick: None,
@@ -278,16 +272,12 @@ impl Component for Shell {
                 self.pane_overlay_open = open;
             }
             Message::AcrylicToggle(value) => {
+                // 视觉即时生效（玻璃策略随渲染派生）；持久化入队 —— 只有
+                // 「保存配置」成功后才写 `data/ui-prefs.json`（保存策略统一咽喉）。
                 self.acrylic = value;
-                // 持久化失败不阻断交互：状态已生效，仅以页内提示告知无法记住选择。
-                if let Some(root) = self.data_root.as_deref()
-                    && let Err(error) = crate::services::ui_prefs::save(
-                        root,
-                        crate::services::ui_prefs::UiPrefs { acrylic: value },
-                    )
-                {
-                    self.settings_notice = Some(format!("{}: {error}", i18n::t("2594")));
-                }
+                self.pending.push(save_pipeline::PendingChange::UiPrefs(
+                    crate::services::ui_prefs::UiPrefs { acrylic: value },
+                ));
             }
             Message::SelectKey(hotkey) => {
                 if hotkey.is_empty() {
@@ -461,11 +451,16 @@ impl Component for Shell {
                     self.notice = Some(text);
                     // 保存成功 ⇒ 导航即时重建（方案启停等变化反映到侧栏，复刻 BuildNav）
                     self.rebuild_nav();
+                    // 暂存变更已提交 ⇒ 从后端重拉目录，两份快照与服务端最终态对齐
+                    self.reload_catalog(context);
+                    self.refresh_plugins(context);
                     self.schedule_notice_clear(context);
                 }
-                Err(reason) => {
+                Err(failure) => {
                     self.notice_error = true;
-                    self.notice = Some(reason);
+                    self.notice = Some(failure.reason);
+                    // 未执行的余项原序退回队列（已执行项不回滚，重试由再次保存承担）
+                    self.pending.restore(failure.remaining);
                 }
             },
             Message::Notice(result) => match result {
@@ -948,6 +943,9 @@ impl Component for Shell {
                         .first()
                         .map(|pack| self.catalog.base_action_of(&pack.id))
                         .unwrap_or_else(|| "run".to_string());
+                    // 保存策略：行为包先入内存目录（下拉即刻可见）并入队，
+                    // 「保存配置」时统一提交（此处不再直连后端）
+                    let staged_id = draft.id.clone();
                     let applies = if match_type == sa::MATCH_TEXT_TYPE {
                         crate::models::BehaviorAppliesTo {
                             kind: sa::MATCH_TEXT_TYPE.to_string(),
@@ -981,18 +979,18 @@ impl Component for Shell {
                         source: Some("user".to_string()),
                         ..Default::default()
                     };
-                    if let Some(port) = self.port {
-                        let _ = context.spawn_background(move |_token| {
-                            let api = crate::services::transport::new_settings_api(port);
-                            let response = api.create_behavior(&pack);
-                            match response.success {
-                                true => Message::BhReloaded(Ok(())),
-                                false => Message::BhReloaded(Err(response
-                                    .error_message
-                                    .unwrap_or_else(|| format!("HTTP {}", response.status)))),
-                            }
-                        });
+                    if let Some(slot) = self
+                        .catalog
+                        .user
+                        .iter_mut()
+                        .find(|pack| pack.id == staged_id)
+                    {
+                        *slot = pack.clone();
+                    } else {
+                        self.catalog.user.push(pack.clone());
                     }
+                    self.pending
+                        .push(save_pipeline::PendingChange::BehaviorCreate(pack));
                 }
                 // 重新载入草稿为「编辑既有」态（新建后 id 已落库）
                 let index = self
@@ -1021,26 +1019,19 @@ impl Component for Shell {
                     return;
                 };
                 self.config = config_holder;
-                // 级联删同名专属行为包（bound_type_id 命中）。行为包属**行为库独立存储**
-                // （同 BhDelete 语义，立即生效）；匹配类型本身只改内存 config，
-                // 落盘统一走页脚「保存配置」。
-                if let Some(port) = self.port {
-                    let type_ref = format!("type:{type_id}");
-                    let bound = self
-                        .catalog
-                        .user
-                        .iter()
-                        .find(|pack| pack.bound_type_id.as_deref() == Some(type_ref.as_str()))
-                        .map(|pack| pack.id.clone());
-                    if let Some(behavior_id) = bound {
-                        let _ = context.spawn_background(move |_token| {
-                            let api = crate::services::transport::new_settings_api(port);
-                            // 吞错理由: 级联删除属清理性质, 失败留孤儿行为包无害;
-                            // 后台任务无 UI 通道, 经 Message 回传需跨线程转发, 保守不加。
-                            let _ = api.delete_behavior(&behavior_id);
-                            Message::Noop
-                        });
-                    }
+                // 级联删同名专属行为包（bound_type_id 命中）：内存目录即时移除 +
+                // 入队，由「保存配置」统一提交（保存策略：无即时副作用）。
+                let type_ref = format!("type:{type_id}");
+                let bound = self
+                    .catalog
+                    .user
+                    .iter()
+                    .find(|pack| pack.bound_type_id.as_deref() == Some(type_ref.as_str()))
+                    .map(|pack| pack.id.clone());
+                if let Some(behavior_id) = bound {
+                    self.catalog.user.retain(|pack| pack.id != behavior_id);
+                    self.pending
+                        .push(save_pipeline::PendingChange::BehaviorDelete(behavior_id));
                 }
                 self.mt_draft = None;
             }
@@ -1181,64 +1172,34 @@ impl Component for Shell {
                     self.bh_status = Some((reason, true));
                     return;
                 }
-                let Some(port) = self.port else {
-                    return;
-                };
+                // 保存策略：「保存」= 应用到**内存目录**（下拉即刻反映）并入队；
+                // 行为库落盘 + 引擎重启由「保存配置」统一提交。
                 let pack = draft.to_pack();
                 let id = pack.id.clone();
-                self.bh_saving = true;
-                let _ = context.spawn_background(move |_token| {
-                    let api = crate::services::transport::new_settings_api(port);
-                    let response = if is_new {
-                        api.create_behavior(&pack)
-                    } else {
-                        api.update_behavior(&id, &pack)
-                    };
-                    Message::BhSaved(if response.success {
-                        Ok(())
-                    } else {
-                        Err(response
-                            .error_message
-                            .unwrap_or_else(|| format!("HTTP {}", response.status)))
-                    })
-                });
-            }
-            Message::BhSaved(result) => {
-                self.bh_saving = false;
-                match result {
-                    Ok(()) => {
-                        self.bh_status = None;
-                        self.reload_catalog(context);
-                    }
-                    Err(reason) => self.bh_status = Some((reason, true)),
+                if let Some(slot) = self.catalog.user.iter_mut().find(|pack| pack.id == id) {
+                    *slot = pack.clone();
+                } else {
+                    self.catalog.user.push(pack.clone());
                 }
+                let change = if is_new {
+                    save_pipeline::PendingChange::BehaviorCreate(pack)
+                } else {
+                    save_pipeline::PendingChange::BehaviorUpdate { id, pack }
+                };
+                self.pending.push(change);
+                self.bh_status = Some((i18n::t("2595"), false));
             }
             Message::BhDelete => {
                 let Some(draft) = self.bh_draft.clone() else {
                     return;
                 };
-                let Some(port) = self.port else {
-                    return;
-                };
+                // 保存策略：内存目录即时移除 + 入队，由「保存配置」统一提交
+                // （本会话内建又删会在队列里相互抵消，见 PendingQueue::push）。
                 let id = draft.id.clone();
-                self.bh_saving = true;
-                let _ = context.spawn_background(move |_token| {
-                    let api = crate::services::transport::new_settings_api(port);
-                    let response = api.delete_behavior(&id);
-                    Message::BhSaved(if response.success {
-                        Ok(())
-                    } else {
-                        Err(response
-                            .error_message
-                            .unwrap_or_else(|| format!("HTTP {}", response.status)))
-                    })
-                });
-            }
-            Message::BhReloaded(result) => {
-                if let Err(reason) = result {
-                    self.bh_status = Some((reason, true));
-                }
-                self.reload_catalog(context);
+                self.catalog.user.retain(|pack| pack.id != id);
+                self.pending
+                    .push(save_pipeline::PendingChange::BehaviorDelete(id));
+                self.bh_status = Some((i18n::t("2595"), false));
             }
             // ---------------------------------------------------------- 指南编辑
             Message::GuideEditOpen => {
@@ -1318,59 +1279,39 @@ impl Component for Shell {
                     .map(|config| plugins::apply_enabled(config, &id, is_builtin, enabled));
             }
             Message::PluginDelete(id) => {
-                if let Some(port) = self.port {
-                    let _ = context.spawn_background(move |_token| {
-                        let api = crate::services::transport::new_settings_api(port);
-                        let response = api.delete_plugin(&id);
-                        Message::PluginDeleted {
-                            id,
-                            result: if response.success {
-                                Ok(())
-                            } else {
-                                Err(response
-                                    .error_message
-                                    .unwrap_or_else(|| format!("HTTP {}", response.status)))
-                            },
-                        }
-                    });
-                }
+                // bundled 判定以删除前目录快照里的 manifest 标记为准（墓碑只该打在
+                // 随包分发的插件上；此刻目录仍在，快照未失效）。
+                let bundled = self
+                    .plugin_catalog
+                    .as_ref()
+                    .and_then(|catalog| {
+                        catalog
+                            .plugins
+                            .iter()
+                            .find(|manifest| manifest.id == id)
+                            .map(|manifest| manifest.bundled)
+                    })
+                    .unwrap_or(false);
+                // 保存策略：注册表清理只改内存 config，目录删除入队，
+                // 由「保存配置」统一提交（提交后 refresh_plugins 重拉目录）。
+                let _ = self
+                    .config
+                    .as_mut()
+                    .map(|config| plugins::remove_from_registry(config, &id, bundled));
+                self.pending
+                    .push(save_pipeline::PendingChange::PluginDelete(id));
+                self.plugins_action_error = None;
+                self.notice = Some(i18n::t("2595"));
+                self.notice_error = false;
+                self.schedule_notice_clear(context);
             }
-            Message::PluginDeleted { id, result } => match result {
-                Ok(()) => {
-                    // 注册表孤儿项清理（旧版行为包先例：config 变更统一走保存链路）。
-                    // P7b: bundled 判定以删除前目录里的 manifest 标记为准（墓碑只
-                    // 该打在随包分发的插件上）。
-                    let bundled = self
-                        .plugin_catalog
-                        .as_ref()
-                        .and_then(|catalog| {
-                            catalog
-                                .plugins
-                                .iter()
-                                .find(|manifest| manifest.id == id)
-                                .map(|manifest| manifest.bundled)
-                        })
-                        .unwrap_or(false);
-                    // 注册表清理只改内存 config，落盘统一走页脚「保存配置」
-                    let _ = self
-                        .config
-                        .as_mut()
-                        .map(|config| plugins::remove_from_registry(config, &id, bundled));
-                    self.reload_plugins(context);
-                }
-                Err(reason) => {
-                    self.plugins_action_error = Some(format!("{}: {reason}", i18n::t("2436")));
-                }
-            },
             Message::PluginImport => {
-                let Some(port) = self.port else {
-                    return;
-                };
-                // 文件选择是**同步模态**对话（必须在 UI 线程弹出）；选定后再把字节交给后台 POST。
+                // 文件选择是**同步模态**对话（必须在 UI 线程弹出）；字节此刻读出并校验
+                // 可读（与旧链路同一失败口径），上传入队 —— 由「保存配置」统一提交。
                 // 过滤器显示名走 i18n 2437（旧版 `KeyFlux 插件包`），不再硬编码中文。
                 let picked = platform::file_dialog::pick_open_file(
                     &i18n::t("2427"),
-                    &format!("{}\0*.zip\0\0", i18n::t("2437")),
+                    &format!("{} *.zip  ", i18n::t("2437")),
                 );
                 let Some(path) = picked else {
                     return;
@@ -1386,30 +1327,12 @@ impl Component for Shell {
                     .file_name()
                     .map(|name| name.to_string_lossy().into_owned())
                     .unwrap_or_else(|| "plugin.zip".to_string());
-
-                let _ = context.spawn_background(move |_token| {
-                    let api = crate::services::transport::new_settings_api(port);
-                    let response = api.import_plugin(&bytes, &file_name);
-                    Message::PluginImported(match response.value {
-                        Some(manifest) => Ok(manifest.name),
-                        None => Err(response
-                            .error_message
-                            .unwrap_or_else(|| format!("HTTP {}", response.status))),
-                    })
-                });
+                self.pending
+                    .push(save_pipeline::PendingChange::PluginImport { bytes, file_name });
+                self.plugins_error = None;
+                self.plugins_action_error = None;
+                self.plugin_status = Some(i18n::t("2595"));
             }
-            Message::PluginImported(result) => match result {
-                Ok(name) => {
-                    self.plugins_error = None;
-                    self.plugins_action_error = None;
-                    self.plugin_status = Some(i18n::t_fmt("2431", &[&name]));
-                    // 刷新**保留**刚设的成功回显（此前 reload 先清 status ⇒ 横幅永远看不到）
-                    self.refresh_plugins(context);
-                }
-                Err(reason) => {
-                    self.plugins_action_error = Some(format!("{}: {reason}", i18n::t("2432")));
-                }
-            },
             // ---------------------------------------------------------- 插件市场
             Message::PluginsMarket => {
                 self.market_open = true;
@@ -1433,48 +1356,18 @@ impl Component for Shell {
                 }
             }
             Message::MarketInstall { id, url } => {
-                let Some(port) = self.port else {
-                    return;
-                };
-                self.market_installing = Some(id.clone());
-                self.market_error = None;
-                let _ = context.spawn_background(move |_token| {
-                    // 客户端下载 zip → 复用本地导入链路（后端不出网）
-                    let outcome = market::download_zip(&url).and_then(|bytes| {
-                        let api = crate::services::transport::new_settings_api(port);
-                        let response = api.import_plugin(&bytes, &format!("{id}.zip"));
-                        match response.value {
-                            Some(manifest) => Ok(manifest.name),
-                            None => Err(response
-                                .error_message
-                                .unwrap_or_else(|| format!("HTTP {}", response.status))),
-                        }
+                // 保存策略：安装（下载 zip + 导入）入队，由「保存配置」统一提交；
+                // is_installed 保持 false（此刻确实未装，保存成功后刷新列表即到位）。
+                self.pending
+                    .push(save_pipeline::PendingChange::MarketInstall {
+                        id: id.clone(),
+                        url,
                     });
-                    Message::MarketInstalled {
-                        id,
-                        result: outcome,
-                    }
-                });
-            }
-            Message::MarketInstalled { id, result } => {
-                self.market_installing = None;
-                match result {
-                    Ok(name) => {
-                        self.market_status = Some(i18n::t_fmt("2431", &[&name]));
-                        if let Some(entry) = self.market_entries.iter_mut().find(|e| e.id == id) {
-                            entry.is_installed = true;
-                        }
-                        // 插件页同步刷新（新装的插件应出现在列表里）
-                        self.refresh_plugins(context);
-                    }
-                    Err(reason) => {
-                        self.market_error = Some(format!("{}: {reason}", i18n::t("2432")));
-                    }
-                }
+                self.market_error = None;
+                self.market_status = Some(i18n::t("2595"));
             }
             Message::MarketClosed => {
                 self.market_open = false;
-                self.market_installing = None;
                 // 关闭市场后无条件刷新插件页（复刻 `OnMarketClosed` 的 ReloadAsync）
                 self.refresh_plugins(context);
             }
@@ -1528,10 +1421,7 @@ impl Component for Shell {
                     self.ps_error = None;
                     return;
                 }
-                if self.ps_saving {
-                    return; // 保存进行中，防重复提交
-                }
-                // 本地即时校验（后端仍是权威；失败 → 弹窗保持打开供修正）
+                // 本地即时校验（保存管线提交时后端仍是权威；失败 → 弹窗保持打开供修正）
                 let english = matches!(i18n::language(), i18n::Lang::En);
                 for (setting, value) in &self.ps_rows {
                     if let Some(reason) = plugins::validate_setting(setting, value) {
@@ -1541,9 +1431,6 @@ impl Component for Shell {
                         return;
                     }
                 }
-                let Some(port) = self.port else {
-                    return;
-                };
                 let Some(id) = self.ps_id.clone() else {
                     return;
                 };
@@ -1552,35 +1439,15 @@ impl Component for Shell {
                     .iter()
                     .map(|(setting, value)| (setting.key.clone(), value.clone()))
                     .collect();
-                // 复刻旧版「保存期间窗口保持打开，后端拒绝也不关」：弹窗保持，
-                // `PsSaved(Ok)` 才关闭（Err 时 ps_error 已在弹窗内显示）
-                self.ps_saving = true;
+                // 保存策略：「保存」= 入队（整表写回），由「保存配置」统一提交
+                // （提交时后端按声明校验，失败原因经页脚提示条回显）。
+                self.pending
+                    .push(save_pipeline::PendingChange::PluginSettings { id, values });
+                self.ps_open = false;
                 self.ps_error = None;
-                let _ = context.spawn_background(move |_token| {
-                    let api = crate::services::transport::new_settings_api(port);
-                    let response = api.save_plugin_settings(&id, &values);
-                    Message::PsSaved(if response.success {
-                        Ok(())
-                    } else {
-                        Err(response
-                            .error_message
-                            .unwrap_or_else(|| format!("HTTP {}", response.status)))
-                    })
-                });
-            }
-            Message::PsSaved(result) => {
-                self.ps_saving = false;
-                match result {
-                    Ok(()) => {
-                        self.ps_open = false;
-                        self.ps_error = None;
-                    }
-                    Err(reason) => {
-                        // 后端拒绝 → 弹窗保持打开供修正（值未丢）
-                        self.ps_error = Some(format!("{}: {reason}", i18n::t("2585")));
-                        self.ps_open = true;
-                    }
-                }
+                self.notice = Some(i18n::t("2595"));
+                self.notice_error = false;
+                self.schedule_notice_clear(context);
             }
             Message::PluginConfigure(id) => {
                 // 声明式设置（P6 起 QuickSwitch 亦走此路 —— 专用对话框已删）：
@@ -1633,28 +1500,19 @@ impl Component for Shell {
                 };
             }
             Message::StartupToggle(enabled) => {
+                // 回显态写内存 config；真实生效 = 计划任务（服务端命令 3/4），
+                // 入队待「保存配置」统一发送（保存策略：无即时副作用）。
                 if let Some(config) = self.config.as_mut() {
                     settings::set_startup(config, enabled);
                 }
-                if let Some(port) = self.port {
-                    let command_id = settings::startup_command_id(enabled);
-                    let _ = context.spawn_background(move |_token| {
-                        let api = crate::services::transport::new_settings_api(port);
-                        let response = api.send_server_command(command_id);
-                        Message::StartupDone(if response.success {
-                            Ok(())
-                        } else {
-                            Err(response
-                                .error_message
-                                .unwrap_or_else(|| format!("HTTP {}", response.status)))
-                        })
-                    });
-                }
+                self.pending
+                    .push(save_pipeline::PendingChange::StartupCommand(
+                        settings::startup_command_id(enabled),
+                    ));
+                self.notice = Some(i18n::t("2595"));
+                self.notice_error = false;
+                self.schedule_notice_clear(context);
             }
-            Message::StartupDone(result) => match result {
-                Ok(()) => self.settings_notice = None,
-                Err(reason) => self.settings_notice = Some(reason),
-            },
             Message::Opt(edit) => self.apply_opt(edit),
             Message::DelayScheme(index) => self.delay_scheme = index,
             Message::FontBrowse => {

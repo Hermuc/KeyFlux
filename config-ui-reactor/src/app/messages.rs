@@ -161,7 +161,7 @@ pub enum Message {
     Failed(String),
     Retry,
     Save,
-    SaveFinished(Result<String, String>),
+    SaveFinished(Result<String, save_pipeline::SaveFailure>),
     // ------------------------------------------------------------- 选中动作页
     /// 主热键输入（AHK 格式，手输）。
     SaHotkey(String),
@@ -309,10 +309,6 @@ pub enum Message {
     BhSave,
     /// 删除（仅用户包）。
     BhDelete,
-    /// 行为目录刷新完成（保存/删除后重拉）。
-    BhReloaded(Result<(), String>),
-    /// 保存结果。
-    BhSaved(Result<(), String>),
     /// 行为目录快照到达（Ready 后台拉取 `GET /api/behaviors`）。
     BehaviorsLoaded(Result<Box<sa::Catalog>, String>),
     // ------------------------------------------------------------- 插件页
@@ -328,17 +324,10 @@ pub enum Message {
     },
     /// 删除用户插件。
     PluginDelete(String),
-    /// 删除完成（Ok = 后端已删除目录，需清注册表 + 重载）。
-    PluginDeleted {
-        id: String,
-        result: Result<(), String>,
-    },
     /// 打开「插件市场」。
     PluginsMarket,
     /// 导入本地插件包（弹文件选择 → `POST /api/plugins/import`）。
     PluginImport,
-    /// 导入完成（Ok = 已导入插件的显示名）。
-    PluginImported(Result<String, String>),
     /// 打开插件配置（声明了 settings 的插件；P6 起 QuickSwitch 亦走此路）。
     PluginConfigure(String),
     // ------------------------------------------------------------- 插件市场
@@ -350,11 +339,6 @@ pub enum Message {
     MarketInstall {
         id: String,
         url: String,
-    },
-    /// 安装结果（Ok = 已导入插件名）。
-    MarketInstalled {
-        id: String,
-        result: Result<String, String>,
     },
     /// 关闭市场对话框。
     MarketClosed,
@@ -370,15 +354,11 @@ pub enum Message {
     },
     /// 对话框关闭（Primary = 校验并保存；校验失败则原样重开）。
     PsClosed(ContentDialogResult),
-    /// 保存结果（Err = 后端拒绝，原样重开）。
-    PsSaved(Result<(), String>),
     // ------------------------------------------------------------- 选项页
     /// 开合一个分区（一次只展开一张，复刻旧版手风琴）。
     SettingsSection(&'static str),
-    /// 开机自启开关（即时 `POST /server/command/3|4`，不走保存链路）。
+    /// 开机自启开关（回显写内存 config；计划任务命令入队，保存管线统一发送）。
     StartupToggle(bool),
-    /// 开机自启命令完成（Err = 失败原因，进选项页提示条）。
-    StartupDone(Result<(), String>),
     /// 「触发延时」分区当前选中的方案（渲染态）。
     DelayScheme(usize),
     /// 「命令框字体」浏览按钮（Win32 文件对话框，UI 线程同步弹出）。
