@@ -270,51 +270,45 @@ impl Shell {
             })
         });
 
-        // 文件后缀卡专属：常驻可编辑后缀框（直接展示/编辑当前分组后缀串，
-        // 无切换按钮；文本特征卡不渲染）。改动经 800ms 尾随保存走既有
-        // MtSave 校验链（normalize_exts + 后端校验）。
+        // 文件后缀卡专属：常驻可编辑后缀框（直接展示/编辑当前选中**分组**的后缀串；
+        // 数据源 = `config.file_groups`（chips 即由此渲染，预设分组出厂自带后缀）；
+        // 文本特征卡不渲染。改动经 800ms 尾随保存直接写 file_groups + save_now。
+        // 仅「group:」chip 可编辑（自定义类型 type: / 孤儿 orphan: 无 exts 数据源）。
         let exts_editor: View = if match_type == MATCH_FILE_EXT {
-            // 常驻可编辑后缀框（用户定版 2026-10-02）：展示当前选中分组的后缀串，
-            // 直接编辑；改动 800ms 尾随保存（generation 防抖复刻行为编辑语义）。
-            // 文本特征卡不渲染（仅 fileExt）。mt_status（校验错误）内联回显。
-            let current_mt_index = config
-                .match_types
-                .iter()
-                .position(|mt| mt.id == sel_id)
-                .or_else(|| {
-                    config
-                        .match_types
-                        .iter()
-                        .position(|mt| mt.kind == MATCH_FILE_EXT)
-                });
-            let dirty = match (&self.exts_edit, current_mt_index) {
+            let group_index = sel_id
+                .strip_prefix("group:")
+                .and_then(|name| config.file_groups.iter().position(|fg| fg.name == name));
+            let dirty = match (&self.exts_edit, group_index) {
                 (Some((dirty_index, text)), Some(index)) if *dirty_index == index => {
                     Some(text.clone())
                 }
                 _ => None,
             };
             let display_text = dirty.unwrap_or_else(|| {
-                current_mt_index
-                    .and_then(|index| config.match_types.get(index))
-                    .map(|mt| mt.exts.join(","))
+                group_index
+                    .and_then(|index| config.file_groups.get(index))
+                    .map(|fg| fg.exts.join(","))
                     .unwrap_or_default()
             });
-            // 校验错误回显（MtSave validate 失败经 mt_status）
+            // 校验错误回显（normalize_exts 后端校验失败经 mt_status）
             let exts_status: View = match &self.mt_status {
                 Some((text, is_error)) if *is_error => selected_action_view::hint_bar(text),
                 _ => View::empty(),
             };
-            View::fragment((
-                selected_action_view::exts_editor(
-                    current_mt_index.unwrap_or(usize::MAX),
-                    display_text,
-                    self.exts_edit.clone(),
-                    context.callback(move |(index, value): (usize, String)| {
-                        Message::SaExtsEditValue(index, value)
-                    }),
-                ),
-                exts_status,
-            ))
+            match (group_index, exts_status) {
+                (Some(index), status) => View::fragment((
+                    selected_action_view::exts_editor(
+                        index,
+                        display_text,
+                        self.exts_edit.clone(),
+                        context.callback(move |(fg_index, value): (usize, String)| {
+                            Message::SaExtsEditValue(fg_index, value)
+                        }),
+                    ),
+                    status,
+                )),
+                (None, status) => status,
+            }
         } else {
             View::empty()
         };
