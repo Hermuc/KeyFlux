@@ -22,7 +22,6 @@ use crate::glass;
 use crate::models::SelectedEntry;
 use crate::models::{
     Action, Config, Keymap, PluginListResponse, PluginSetting, PluginSettingsResponse,
-    QuickSwitchOption,
 };
 use crate::platform::{self, WindowSpec};
 use crate::services::abbr;
@@ -78,10 +77,6 @@ pub struct Shell {
     plugins_action_error: Option<String>,
     /// 插件页一次性操作回显（导入/删除成功提示）。
     plugin_status: Option<String>,
-    /// QuickSwitch 配置对话框的编辑草稿（`None` = 对话框关闭）。
-    qs_draft: Option<QuickSwitchOption>,
-    /// QuickSwitch 对话框内错误（清空历史失败等；渲染在弹窗**内部**，不再写页面横幅被遮蔽）。
-    qs_error: Option<String>,
     /// 插件市场对话框是否打开。
     market_open: bool,
     /// 市场条目（目录序）。
@@ -206,8 +201,6 @@ impl Component for Shell {
             plugins_error: None,
             plugins_action_error: None,
             plugin_status: None,
-            qs_draft: None,
-            qs_error: None,
             market_open: false,
             market_entries: Vec::new(),
             market_loading: false,
@@ -468,10 +461,6 @@ impl Component for Shell {
                     self.notice = Some(text);
                     // 保存成功 ⇒ 导航即时重建（方案启停等变化反映到侧栏，复刻 BuildNav）
                     self.rebuild_nav();
-                    // QuickSwitch 草稿在保存确认后关闭弹窗（保存失败则保持打开供修正，
-                    // 复刻旧 `QuickSwitchDialogWindow` 的「失败窗口不关」语义）
-                    self.qs_draft = None;
-                    self.qs_error = None;
                     self.sa_enable_prev = None;
                     self.schedule_notice_clear(context);
                 }
@@ -1592,12 +1581,9 @@ impl Component for Shell {
                 }
             }
             Message::PluginConfigure(id) => {
-                if id == plugins::QUICK_SWITCH_ID {
-                    // 打开即深拷贝出草稿（副本编辑，取消不影响真源）
-                    self.qs_draft = self.config.as_ref().map(plugins::draft_from);
-                    self.plugin_status = None;
-                } else {
-                    // 声明式设置：打开即拉取「声明 + 默认值合并后的完整值表」
+                // 声明式设置（P6 起 QuickSwitch 亦走此路 —— 专用对话框已删）：
+                // 打开即拉取「声明 + 默认值合并后的完整值表」
+                {
                     let Some(config) = self.config.as_ref() else {
                         return;
                     };
@@ -1633,79 +1619,6 @@ impl Component for Shell {
                             }
                         });
                     }
-                }
-            }
-            // ---------------------------------------------------------- QuickSwitch 对话框
-            Message::QsEdit(field) => {
-                if let Some(draft) = self.qs_draft.as_mut() {
-                    match field {
-                        QsField::CollectEnabled(value) => draft.collect_enabled = value,
-                        QsField::AutoShow(value) => draft.auto_show = value,
-                        QsField::AutoJumpOpen(value) => draft.auto_jump_open = value,
-                        QsField::AutoJumpSave(value) => draft.auto_jump_save = value,
-                        QsField::MaxHistory(value) => draft.max_history = value,
-                        QsField::OverlayRows(value) => draft.overlay_rows = value,
-                        QsField::OverlayRowsCompact(value) => draft.overlay_rows_compact = value,
-                        QsField::PollIntervalMs(value) => draft.poll_interval_ms = value,
-                    }
-                }
-            }
-            Message::QsAddPrefix => {
-                if let Some(draft) = self.qs_draft.as_mut() {
-                    draft.excluded_prefixes.push(String::new());
-                }
-            }
-            Message::QsRemovePrefix(index) => {
-                if let Some(draft) = self.qs_draft.as_mut()
-                    && index < draft.excluded_prefixes.len()
-                {
-                    draft.excluded_prefixes.remove(index);
-                }
-            }
-            Message::QsPrefix(index, value) => {
-                if let Some(draft) = self.qs_draft.as_mut()
-                    && let Some(slot) = draft.excluded_prefixes.get_mut(index)
-                {
-                    *slot = value;
-                }
-            }
-            Message::QsClearHistory => {
-                // 一次性动作：截断 <部署根>/data/quickswitch/history.tsv（文件保留）。
-                // 错误写进**弹窗内部**（此前写页面横幅，被打开中的 ContentDialog 遮蔽）
-                let outcome = match &self.data_root {
-                    Some(root) => plugins::clear_history(root),
-                    None => Err("未确定部署根目录".to_string()),
-                };
-                if let Err(reason) = outcome {
-                    self.qs_error = Some(format!("{}: {reason}", i18n::t("2417")));
-                }
-            }
-            Message::QsClosed(result) => {
-                if result != ContentDialogResult::Primary {
-                    self.qs_draft = None;
-                    self.qs_error = None;
-                    return;
-                }
-                if self.qs_draft.is_none() {
-                    return;
-                }
-                // 复刻旧版语义：保存期间**草稿保留、弹窗保持打开**，`SaveFinished(Ok)`
-                // 才关闭（见其 Ok 分支清除 `qs_draft`）；无变更时直接丢弃草稿关闭。
-                let changed = self
-                    .qs_draft
-                    .as_ref()
-                    .and_then(|draft| {
-                        self.config
-                            .as_mut()
-                            .map(|config| plugins::commit_draft(config, draft))
-                    })
-                    .unwrap_or(false);
-                if changed {
-                    self.qs_error = None;
-                    self.save_now(context);
-                } else {
-                    self.qs_draft = None;
-                    self.qs_error = None;
                 }
             }
             // ---------------------------------------------------------- 选项页
@@ -1839,7 +1752,6 @@ impl Component for Shell {
             .children((
                 title_bar,
                 nav,
-                self.quick_switch_dialog(context),
                 self.market_dialog(context),
                 self.plugin_settings_dialog(context),
                 self.sa_delete_dialog(context),

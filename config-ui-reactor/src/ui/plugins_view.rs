@@ -515,11 +515,19 @@ pub fn setting_row<
         children.push((children.len(), switch));
     } else {
         // ⚠️ 0.100.0 的 TextBox 无 `MaxLength`（长度上限由保存前的校验兜底，口径同后端）
-        let editor: View = TextBox::new()
+        let mut editor = TextBox::new()
             .text(value.to_string())
             .min_width(280.0)
-            .on_text_changed(on_change)
-            .into();
+            .on_text_changed(on_change);
+        // `text` 且声明 `multiline`（2026-10-02 P5）：接受回车 + 换行分隔值
+        // （首个消费方 = quick_switch.excludedPrefixes），复用 action_editor 的形态。
+        if crate::services::plugins::is_multiline(setting) {
+            editor = editor
+                .accepts_return(true)
+                .text_wrapping(TextWrapping::Wrap)
+                .min_height(96.0);
+        }
+        let editor: View = editor.into();
 
         // `file` 类型：文本框 + 「浏览」按钮（旧 `PluginSettingsDialogWindow.axaml:91` 用 2582；
         // 2583 是文件对话框标题，此前误用）

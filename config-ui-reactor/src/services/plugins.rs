@@ -3,15 +3,16 @@
 //! 逐项复刻 `config-ui-avalonia/ViewModels/PluginsPageViewModel.cs` 的可判定部分：
 //! 统一卡片列表（目录驱动，含随包内置插件）+ 启停开关分流 + 状态/显示派生 + 空态判定。
 //!
-//! 开关语义（与旧版一致）：
-//! * **内置卡**（`quick_switch`）直通 `options.quickSwitch.collectEnabled`；
-//! * **用户卡**直通注册表 `options.plugins.disabled`（在表内 = 已停用）。
+//! 开关语义（2026-10-02 P6 收口，统一）：
+//! * **所有卡**（含随包内置 quick_switch）直通注册表 `options.plugins.disabled`
+//!   （在表内 = 已停用）。D5 语义修正：关 = 不注入 = 无定时器/无浮层/无动作；
+//! * QuickSwitch 的细粒度行为（收集/自动弹出/自动跳转等）走声明式设置
+//!   （`GET/PUT /api/plugins/:id/settings`，存 plugin-settings.json，P5）。
 //!
 //! 两者都走「保存链路」（`PUT /config` 会重生成脚本并重启引擎）。
 
 use crate::models::{
     Config, PluginListResponse, PluginManifest, PluginSetting, PluginSettingsResponse,
-    QuickSwitchOption,
 };
 
 /// 内置插件 ID（与 Go `internal/plugins.BuiltinPluginIDs` 对应）。
@@ -73,9 +74,8 @@ pub fn is_builtin(id: &str) -> bool {
 ///
 /// 🔴 目录驱动 (2026-10-02 反转, 用户裁定「删掉旧的合成卡」)：quick_switch 不再
 /// 前置合成 —— 随包内置插件以标准插件形态存在于 data/plugins/，由目录扫描发现并
-/// 经 [`card_from`] 渲染（带版本号/作者/manifest 描述）。开关语义不变：
-/// builtin 卡的 enabled 读 `options.quickSwitch.collect_enabled`（见 card_from），
-/// 写回走 [`apply_enabled`] 的 is_builtin 分支。
+/// 经 [`card_from`] 渲染（带版本号/作者/manifest 描述）。开关语义 P6 起统一：
+/// enabled = 未登记 disabled 表。
 /// 墓碑 (2026-10-02 P4)：`options.plugins.removed` 中的 ID 不出卡（目录可能被
 /// sync-plugins 带回，墓碑保证「删了不复活」）。
 pub fn build_cards(config: &Config, catalog: &PluginListResponse) -> Vec<PluginCard> {
@@ -108,41 +108,29 @@ pub fn card_from(config: &Config, manifest: &PluginManifest) -> PluginCard {
         // 2026-10-02 P4: builtin 也放行删除 —— 随包内置插件删目录 + 墓碑
         // (remove_from_registry 写入), 删了不复活; 引擎侧 P2 已解耦, 安全。
         can_delete: true,
-        can_configure: builtin
-            || manifest
-                .settings
-                .as_ref()
-                .map(|settings| !settings.is_empty())
-                .unwrap_or(false),
-        // 开关状态源按卡类型分流 (2026-10-02 目录驱动反转): builtin (quick_switch)
-        // 读 options.quickSwitch.collect_enabled —— 与 apply_enabled 的 is_builtin
-        // 写回分支、生成期 {{ PLUGIN_LATE_INIT }} 的渲染条件同源; 用户插件读
-        // disabled 表 (= 登记即停用)。
-        enabled: if builtin {
-            config.options.quick_switch.collect_enabled
-        } else {
-            !config
-                .options
-                .plugins
-                .disabled
-                .iter()
-                .any(|id| id == &manifest.id)
-        },
+        // P6 收口 (2026-10-02)：可配置 = 声明了 settings（quick_switch 的 9 项
+        // 声明式设置走通用编辑器，专用对话框已删）。
+        can_configure: manifest
+            .settings
+            .as_ref()
+            .map(|settings| !settings.is_empty())
+            .unwrap_or(false),
+        // P6 收口 (2026-10-02)：开关统一 disabled 表（D5 语义修正 —— 关 =
+        // 不注入 = 无定时器/无浮层/无动作；细粒度行为走声明式设置）。
+        enabled: !config
+            .options
+            .plugins
+            .disabled
+            .iter()
+            .any(|id| id == &manifest.id),
     }
 }
 
 /// 写回开关（复刻 `OnCardEnabledChanged` 的配置写入部分，返回**是否真的发生变更**）。
 ///
-/// 调用方在返回 `true` 时应走保存链路（`force: true`）。
-pub fn apply_enabled(config: &mut Config, card_id: &str, is_builtin: bool, enabled: bool) -> bool {
-    if is_builtin {
-        if config.options.quick_switch.collect_enabled == enabled {
-            return false;
-        }
-        config.options.quick_switch.collect_enabled = enabled;
-        return true;
-    }
-
+/// P6 起 builtin 与用户卡同一条 disabled 表路径（`is_builtin` 参数已无语义，保留
+/// 仅为调用方兼容）。返回 `true` 时调用方应走保存链路（`force: true`）。
+pub fn apply_enabled(config: &mut Config, card_id: &str, _is_builtin: bool, enabled: bool) -> bool {
     let registry = &mut config.options.plugins.disabled;
     let registered = registry.iter().any(|id| id == card_id);
     if enabled {
@@ -199,32 +187,12 @@ pub fn join_errors(errors: Option<&Vec<String>>) -> Option<String> {
     }
 }
 
-// ---------------------------------------------------------------- QuickSwitch 配置对话框
+// ---------------------------------------------------------------- QuickSwitch 专用对话框（已删）
 
-/// `history.tsv` 相对于部署根的路径（复刻 `QuickSwitchDialogViewModel.ClearHistory`）。
-pub const HISTORY_RELATIVE_PATH: &str = "data/quickswitch/history.tsv";
-
-/// 从真源深拷贝出编辑草稿（复刻 `QuickSwitchDialogViewModel` 构造：副本编辑，取消不影响真源）。
-pub fn draft_from(config: &Config) -> QuickSwitchOption {
-    config.options.quick_switch.clone()
-}
-
-/// 把草稿写回真源（复刻 `SaveAsync`）：`maxHistory` 下限钳到 1，逐字段写回；返回是否发生变更。
-///
-/// 返回 `true` 时调用方应走保存链路（`force: true`）。
-pub fn commit_draft(config: &mut Config, draft: &QuickSwitchOption) -> bool {
-    let mut draft = draft.clone();
-    draft.max_history = draft.max_history.max(1);
-
-    if config.options.quick_switch == draft {
-        return false;
-    }
-    config.options.quick_switch = draft;
-    true
-}
-
-/// 历史条数下限（复刻 `Math.Max(1, MaxHistory)`）。
-pub const MIN_HISTORY: i32 = 1;
+// 2026-10-02 P6 收口：QuickSwitch 专用配置对话框（draft_from/commit_draft/
+// MIN_HISTORY/清空历史）随「配置迁 plugin-settings.json」一并移除 —— quick_switch
+// 的 9 项设置走通用声明式编辑器（plugins_view::setting_row）。已知代价：清空历史
+// 入口暂缺（可作插件动作/工具项后续回归）；history.tsv 手工可清。
 
 /// 把插件声明的 `filter`（如 `"everything.exe"`）转成 Win32 `GetOpenFileNameW` 的
 /// 双 NUL 过滤器串（复刻旧 `PluginSettingsDialogWindow.axaml.cs:102-107` 的 `ExtOf`）：
@@ -247,23 +215,12 @@ pub fn file_dialog_filter(declared: &str) -> String {
     }
 }
 
-/// 清空 QuickSwitch 历史：把 `<部署根>/data/quickswitch/history.tsv` 截断为空文件（文件保留）。
-///
-/// 引擎在每次对话框实例切换时经 `HistLoad` 重读该文件，故截断后历史立即呈空态。
-/// `deployment_root` = 部署根（`backend_dir` 的父级）。
-pub fn clear_history(deployment_root: &std::path::Path) -> Result<std::path::PathBuf, String> {
-    let path = deployment_root.join(HISTORY_RELATIVE_PATH);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    }
-    std::fs::write(&path, b"").map_err(|error| error.to_string())?;
-    Ok(path)
-}
-
 // ---------------------------------------------------------------- 插件声明式设置
 
 /// 单字符输入（`type: "char"`）。
 pub const SETTING_CHAR: &str = "char";
+/// 短文本输入（`type: "text"`）。
+pub const SETTING_TEXT: &str = "text";
 /// 数字输入（`type: "number"`）。
 pub const SETTING_NUMBER: &str = "number";
 /// 文件选择（`type: "file"`）。
@@ -289,6 +246,11 @@ pub fn is_file(setting: &PluginSetting) -> bool {
 /// 布尔项（渲染成开关，而非文本框）。
 pub fn is_bool(setting: &PluginSetting) -> bool {
     setting.setting_type == SETTING_BOOL
+}
+
+/// 多行文本项（2026-10-02 P5：换行分隔值，如排除前缀表）。
+pub fn is_multiline(setting: &PluginSetting) -> bool {
+    setting.setting_type == SETTING_TEXT && setting.multiline
 }
 
 /// 布尔项的值解析：**只有字面 `"true"` 为真**（与后端 `ValidateSettingValue` 的空串/字面
@@ -450,10 +412,9 @@ mod tests {
 
     #[test]
     fn builtin_quick_switch_is_directory_driven() {
-        let mut config = Config::default();
-        config.options.quick_switch.collect_enabled = true;
+        let config = Config::default();
         let catalog = PluginListResponse {
-            plugins: vec![manifest(QUICK_SWITCH_ID, "快速切换", Some("1.0.0"), 0)],
+            plugins: vec![manifest(QUICK_SWITCH_ID, "快速切换", Some("1.0.0"), 1)],
             errors: None,
         };
         let cards = build_cards(&config, &catalog);
@@ -463,15 +424,17 @@ mod tests {
         assert_eq!(card.id, QUICK_SWITCH_ID);
         assert!(card.is_builtin);
         assert!(card.can_delete, "内置卡可删除 (P4 放行 + 墓碑)");
-        assert!(card.can_configure, "内置卡可配置");
-        assert!(card.enabled, "开关状态源 = collectEnabled");
+        assert!(
+            card.can_configure,
+            "有 settings 声明 ⇒ 可配置 (P6 通用编辑器)"
+        );
+        assert!(card.enabled, "未登记 disabled ⇒ 启用 (P6 统一语义)");
         assert_eq!(card.version_text(), "v1.0.0", "版本号来自 manifest");
     }
 
     #[test]
     fn user_plugins_follow_and_default_enabled() {
         let mut config = Config::default();
-        config.options.quick_switch.collect_enabled = false;
         config.options.plugins = PluginsOption {
             disabled: vec!["b".to_string()],
             removed: vec![],
@@ -499,10 +462,10 @@ mod tests {
     fn builtin_id_in_catalog_is_deletable_with_tombstone() {
         // 2026-10-02 P4: builtin 放行删除 (删目录 + 墓碑, 删了不复活)。
         let config = Config::default();
-        let card = card_from(&config, &manifest(QUICK_SWITCH_ID, "QS", None, 0));
+        let card = card_from(&config, &manifest(QUICK_SWITCH_ID, "QS", None, 1));
         assert!(card.is_builtin, "目录里出现内置 ID 也按内置判定");
         assert!(card.can_delete, "内置卡可删除 (P4 放行)");
-        assert!(card.can_configure);
+        assert!(card.can_configure, "有 settings 声明 ⇒ 可配置");
     }
 
     #[test]
@@ -520,16 +483,22 @@ mod tests {
     }
 
     #[test]
-    fn enabling_builtin_writes_collect_enabled_only_on_change() {
+    fn enabling_builtin_writes_disabled_registry_only_on_change() {
+        // P6 (2026-10-02): 开关统一 disabled 表 —— builtin 与用户卡同一路径。
         let mut config = Config::default();
-        config.options.quick_switch.collect_enabled = false;
 
-        assert!(apply_enabled(&mut config, QUICK_SWITCH_ID, true, true));
-        assert!(config.options.quick_switch.collect_enabled);
-        assert!(
-            !apply_enabled(&mut config, QUICK_SWITCH_ID, true, true),
-            "无变化 ⇒ 不必保存"
+        assert!(apply_enabled(&mut config, QUICK_SWITCH_ID, true, false));
+        assert_eq!(
+            config.options.plugins.disabled,
+            vec![QUICK_SWITCH_ID.to_string()],
+            "停用内置 = 入 disabled 表 (不注入 ⇒ 无定时器/无浮层/无动作)"
         );
+        assert!(
+            !apply_enabled(&mut config, QUICK_SWITCH_ID, true, false),
+            "重复停用无变化"
+        );
+        assert!(apply_enabled(&mut config, QUICK_SWITCH_ID, true, true));
+        assert!(config.options.plugins.disabled.is_empty(), "启用 = 出表");
     }
 
     #[test]
@@ -625,43 +594,6 @@ mod tests {
         assert!(show_load_error(false, Some("boom")));
         assert!(!show_load_error(true, Some("boom")), "加载中不显示错误");
         assert!(!show_load_error(false, None));
-    }
-
-    #[test]
-    fn draft_is_deep_copy_and_commit_clamps_history() {
-        let mut config = Config::default();
-        config.options.quick_switch.max_history = 5;
-        config.options.quick_switch.excluded_prefixes = vec!["C:\\tmp".to_string()];
-
-        let mut draft = draft_from(&config);
-        draft.max_history = 0; // 期望被钳到 1
-        draft.excluded_prefixes.push("D:\\x".to_string());
-        draft.auto_show = true;
-
-        // 副本编辑不影响真源
-        assert_eq!(config.options.quick_switch.max_history, 5);
-        assert_eq!(config.options.quick_switch.excluded_prefixes.len(), 1);
-
-        assert!(commit_draft(&mut config, &draft), "有变更 ⇒ 需保存");
-        assert_eq!(config.options.quick_switch.max_history, 1, "下限钳到 1");
-        assert_eq!(config.options.quick_switch.excluded_prefixes.len(), 2);
-        assert!(config.options.quick_switch.auto_show);
-
-        assert!(!commit_draft(&mut config, &draft), "再次提交无变更");
-    }
-
-    #[test]
-    fn clear_history_truncates_file_and_keeps_it() {
-        let root = std::env::temp_dir().join("keyflux-qs-history-test");
-        let path = root.join(HISTORY_RELATIVE_PATH);
-        std::fs::create_dir_all(path.parent().expect("有父目录")).expect("建目录");
-        std::fs::write(&path, "C:\\a\nC:\\b\n").expect("写入历史");
-
-        let written = clear_history(&root).expect("清空应成功");
-        assert_eq!(written, path);
-        assert!(path.exists(), "文件本身保留");
-        assert_eq!(std::fs::read(&path).expect("读取").len(), 0, "内容被截断");
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
