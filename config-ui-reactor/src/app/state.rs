@@ -364,6 +364,21 @@ impl Shell {
                 });
                 self.rebuild_nav();
             }
+            OptEdit::SchemeDelete(index) => {
+                // 删除自定义方案（id>4 渲染序下标）：导航构成变化 ⇒ 重建导航。
+                // 方案对应触发键的绑定随 keymap 整体移除（保存链路持久化）。
+                let removed = config
+                    .keymaps
+                    .iter()
+                    .filter(|km| km.id > 4)
+                    .nth(index)
+                    .map(|km| km.id);
+                if let Some(id) = removed {
+                    config.keymaps.retain(|km| km.id != id);
+                    let next = config.clone();
+                    self.nav = build_nav(&next);
+                }
+            }
             OptEdit::SchemeDelay(index, value) => {
                 if let (Some(keymap), Ok(delay)) = (
                     config.keymaps.iter_mut().filter(|km| km.id > 4).nth(index),

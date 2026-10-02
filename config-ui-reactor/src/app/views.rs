@@ -533,6 +533,7 @@ impl Shell {
                     context.callback(move |value: bool| {
                         Message::Opt(OptEdit::SchemeEnable(index, value))
                     }),
+                    context.message(Message::Opt(OptEdit::SchemeDelete(index))),
                 ),
             ));
         }
