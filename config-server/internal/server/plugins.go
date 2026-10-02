@@ -1,12 +1,18 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
+	"os"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"settings/internal/plugins"
+	"settings/internal/script"
+	"settings/internal/script/model"
 )
 
 // 插件 REST API (插件页): 用户插件位于 ../data/plugins, 设置值位于
@@ -193,4 +199,51 @@ func SavePluginSettingsHandler(c *gin.Context) {
 		Settings: m.Settings,
 		Values:   mergedValues(m, pluginSettings.LoadFor(m.ID)),
 	})
+}
+
+// MigrateQuickSwitchSettings 把 config.json 的 options.quickSwitch (2026-10-02 P5 起
+// deprecated, 仅保留读取兼容) 一次性迁移到 plugin-settings.json 的 quick_switch 段。
+// 规则:
+//   - 旧段全零签名 (= 旧配置缺段, 口径同 script.IsQuickSwitchZero) => 不迁移,
+//     插件回落 manifest 默认值;
+//   - 否则 9 个键的现值全部入表, 但只写存储中尚不存在的键 (幂等 + 用户已存值不被覆盖);
+//   - 只写不改: 旧段原样保留, 回滚旧版本仍读得懂 (约束 #5 配置兼容)。
+//
+// 任何失败都静默返回: 迁移不阻塞服务启动, 插件有默认值兜底。
+func MigrateQuickSwitchSettings(configPath string) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return
+	}
+	var raw struct {
+		Options struct {
+			QuickSwitch model.QuickSwitchOption `json:"quickSwitch"`
+		} `json:"options"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return
+	}
+	q := raw.Options.QuickSwitch
+	if script.IsQuickSwitchZero(q) {
+		return
+	}
+	values := map[string]string{
+		"collectEnabled":     strconv.FormatBool(q.CollectEnabled),
+		"autoShow":           strconv.FormatBool(q.AutoShow),
+		"autoJumpOpen":       strconv.FormatBool(q.AutoJumpOpen),
+		"autoJumpSave":       strconv.FormatBool(q.AutoJumpSave),
+		"pollIntervalMs":     strconv.Itoa(q.PollIntervalMs),
+		"maxHistory":         strconv.Itoa(q.MaxHistory),
+		"overlayRows":        strconv.Itoa(q.OverlayRows),
+		"overlayRowsCompact": strconv.Itoa(q.OverlayRowsCompact),
+		"excludedPrefixes":   strings.Join(q.ExcludedPrefixes, "\n"),
+	}
+	existing := pluginSettings.LoadFor("quick_switch")
+	for k := range existing {
+		delete(values, k)
+	}
+	if len(values) == 0 {
+		return
+	}
+	_ = pluginSettings.Save("quick_switch", values)
 }

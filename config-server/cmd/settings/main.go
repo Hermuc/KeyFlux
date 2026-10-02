@@ -44,7 +44,8 @@ func main() {
 	// (实测), 曾把"连接后端"整体拖到 2.1s —— 两者都与 HTTP 服务无依赖, 并行化后
 	// 进程启动 ~70ms 即通告端口。
 	go proc.ExecCmd("./KeyFlux.exe", "/script", "./bin/MiscTools.ahk", "GenerateShortcuts")
-	go server.PreloadStartup() // 异步预热开机自启缓存: 与 GUI 冷启动并行, 首次 GET /config 免等 schtasks
+	go server.PreloadStartup()                              // 异步预热开机自启缓存: 与 GUI 冷启动并行, 首次 GET /config 免等 schtasks
+	server.MigrateQuickSwitchSettings(script.ConfigRelPath) // P5 一次性迁移: options.quickSwitch (deprecated) → plugin-settings.json (幂等, 失败静默)
 	server.Run(hasError, rainDone, debug, headless)
 }
 

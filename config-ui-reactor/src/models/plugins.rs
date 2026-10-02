@@ -134,6 +134,9 @@ pub struct PluginSetting {
     /// 数字项上限。
     #[serde(default)]
     pub max: Option<i64>,
+    /// 仅 text：多行编辑器 + 换行分隔值（2026-10-02 P5）。
+    #[serde(default)]
+    pub multiline: bool,
 }
 
 fn default_setting_type() -> String {

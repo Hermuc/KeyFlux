@@ -133,8 +133,7 @@ func TestSyntheticConfigCoversMatrix(t *testing.T) {
 		{`pathVariable 普通值 (AhkString)`, `editor := "D:\tools\edit.exe"`},
 		{`pathVariable ahk-expression 前缀原样输出`, `desktop := A_Desktop`},
 		// QuickSwitch 配置段注入 (模板 -> InitQuickSwitch)
-		{`QuickSwitch 配置注入 (模板渲染 InitQuickSwitch)`, `InitQuickSwitch({collectEnabled: true`},
-		{`QuickSwitch excludedPrefixes 数组渲染`, `excludedPrefixes: ["D:\Archive", "C:\Temp"]`},
+		{`QuickSwitch 晚初始化 (P5 无参, 插件运行时自取设置)`, `InitQuickSwitch()`},
 	}
 
 	for _, m := range matrix {

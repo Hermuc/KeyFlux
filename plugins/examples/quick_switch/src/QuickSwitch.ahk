@@ -40,13 +40,62 @@ QuickSwitchEnsure() {
     InitQuickSwitch()
 }
 
-; 初始化/重初始化。cfg 缺省字段用默认值补齐。
+; P5 (2026-10-02) 配置自取: 从 plugin-settings.json (ConfigProvider, 契约 §3.8)
+; 读取本插件设置; 键缺失/为空一律回落默认值 (与 manifest.settings[].default 同源)。
+; 值均为字符串 (ConfigProvider 只有扁平字符串存储): bool = "true"/"false" 字面,
+; number = 十进制整数字符串, excludedPrefixes = 换行分隔。
+QuickSwitchLoadSettings() {
+  c := QuickSwitchDefaultConfig()
+  v := ConfigProvider.Get("quick_switch", "collectEnabled")
+  if (v != "")
+    c.collectEnabled := (v = "true")
+  v := ConfigProvider.Get("quick_switch", "autoShow")
+  if (v != "")
+    c.autoShow := (v = "true")
+  v := ConfigProvider.Get("quick_switch", "autoJumpOpen")
+  if (v != "")
+    c.autoJumpOpen := (v = "true")
+  v := ConfigProvider.Get("quick_switch", "autoJumpSave")
+  if (v != "")
+    c.autoJumpSave := (v = "true")
+  v := ConfigProvider.Get("quick_switch", "pollIntervalMs")
+  if (v != "")
+    try c.pollIntervalMs := Integer(v)
+  v := ConfigProvider.Get("quick_switch", "maxHistory")
+  if (v != "")
+    try c.maxHistory := Integer(v)
+  v := ConfigProvider.Get("quick_switch", "overlayRows")
+  if (v != "")
+    try c.overlayRows := Integer(v)
+  v := ConfigProvider.Get("quick_switch", "overlayRowsCompact")
+  if (v != "")
+    try c.overlayRowsCompact := Integer(v)
+  v := ConfigProvider.Get("quick_switch", "excludedPrefixes")
+  if (v != "") {
+    arr := []
+    for line in StrSplit(v, "`n", "`r") {
+      line := Trim(line)
+      if (line != "")
+        arr.Push(line)
+    }
+    c.excludedPrefixes := arr
+  }
+  return c
+}
+
+; 初始化/重初始化。cfg 缺省时经 ConfigProvider 自取设置 (P5); 缺省字段用默认值补齐。
 InitQuickSwitch(cfg := 0) {
   global QSCFG, QSSTATE
   c := QuickSwitchDefaultConfig()
   if (IsObject(cfg)) {
     ; 注意: AHK v2.0.19 普通 Object 不能直接 `for k, v in cfg` (报 "Value not enumerable"),
     ; 也不能用 `c[k] :=` 下标赋值 (普通 Object 无 __Item); 必须经 OwnProps() + 动态属性语法。
+    for k in cfg.OwnProps() {
+      c.%k% := cfg.%k%
+    }
+  } else {
+    ; 未显式传参 (晚初始化行 / Include 期自动初始化 / 手动入口) => 自取设置
+    cfg := QuickSwitchLoadSettings()
     for k in cfg.OwnProps() {
       c.%k% := cfg.%k%
     }
@@ -404,5 +453,5 @@ _QSIsExcluded(p, prefixes) {
   return false
 }
 
-; 自动初始化 (随 #Include 载入即生效; 使用默认配置, 后续可被 InitQuickSwitch(cfg) 覆盖)。
+; 自动初始化 (随 #Include 载入即生效; P5 起经 ConfigProvider 自取设置, 缺失回落默认)。
 InitQuickSwitch()

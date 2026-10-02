@@ -350,6 +350,9 @@ pub struct PluginsOption {
 }
 
 /// 对应 Go `struct QuickSwitchOption`。
+///
+/// 🔴 2026-10-02 P5 起 **deprecated**（同 Go 侧注释）：配置已迁
+/// `plugin-settings.json`，本段仅保留序列化与读取兼容（回滚安全）。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuickSwitchOption {

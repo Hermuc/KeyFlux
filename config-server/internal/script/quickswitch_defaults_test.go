@@ -192,11 +192,12 @@ func TestQuickSwitchUpgradePathFillsDefaults(t *testing.T) {
 	}
 	out := normalizeAHK(string(outRaw))
 
-	wantLine := `InitQuickSwitch({collectEnabled: true, autoShow: true, autoJumpOpen: true, autoJumpSave: false, pollIntervalMs: 800, maxHistory: 200, overlayRows: 8, overlayRowsCompact: 4, excludedPrefixes: []})`
-	if !strings.Contains(out, wantLine) {
-		t.Errorf("升级路径: 生成脚本未包含真默认值注入行\n期望包含: %s", wantLine)
+	// P5 (2026-10-02): 生成产物只含无参 InitQuickSwitch() —— 配置改由插件运行时
+	// 经 ConfigProvider 自取 (缺失键回落 manifest 默认), 生成器不再注入参数行。
+	if !strings.Contains(out, "\nInitQuickSwitch()") {
+		t.Errorf("升级路径: 生成脚本未包含无参 InitQuickSwitch() 晚初始化行")
 	}
-	if strings.Contains(out, "pollIntervalMs: 0") {
-		t.Errorf("升级路径: 生成脚本出现零值注入 (pollIntervalMs: 0), 说明默认值未补齐")
+	if strings.Contains(out, "InitQuickSwitch({") {
+		t.Errorf("升级路径: 生成脚本仍含参数注入行 (P5 已移除), 说明生成器未与 options.quickSwitch 解耦")
 	}
 }

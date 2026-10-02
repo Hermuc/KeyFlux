@@ -199,6 +199,9 @@ pub struct CommandInputSkin {
     pub window_shadow_size: String,
 }
 
+/// 🔴 2026-10-02 P5 起 **deprecated**：配置已迁 `plugin-settings.json`（quick_switch
+/// 段，插件经 ConfigProvider 自取）；本段仅保留序列化与读取兼容（回滚安全），生成器
+/// 不再消费。全量移除（GET /config 停出该段 ⇒ api-parity 重录）待一个兼容期后另做。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct QuickSwitchOption {

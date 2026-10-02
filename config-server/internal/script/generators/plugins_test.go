@@ -170,8 +170,9 @@ func TestRenderPluginBlocks_NonScriptEntry(t *testing.T) {
 	}
 }
 
-// quick_switch 晚初始化行: 插件存在时产出 InitQuickSwitch(...) 调用,
-// 字节形态必须与迁移前模板硬编码行完全一致 (字段顺序/分隔符/bool 文本/转义)。
+// quick_switch 晚初始化行: P5 (2026-10-02) 起为无参 InitQuickSwitch() ——
+// 配置由插件运行时经 ConfigProvider 自取 (plugin-settings.json), 生成器不再
+// 读 options.quickSwitch (核心对插件配置零知识的一步; 特判泛化属 P7)。
 func TestPluginLateInit_QuickSwitch(t *testing.T) {
 	dir := t.TempDir()
 	pdir := filepath.Join(dir, "quick_switch")
@@ -184,22 +185,11 @@ func TestPluginLateInit_QuickSwitch(t *testing.T) {
 	}`), 0o644)
 	os.WriteFile(filepath.Join(pdir, "main.ahk"), []byte("QuickSwitchMain(api) {}"), 0o644)
 
-	// 注入配置: Cfg 为 generators 包的全局 (SaveAHK 在模板执行前注入)
-	oldCfg := Cfg
-	Cfg = &model.Config{}
-	Cfg.Options.QuickSwitch = model.QuickSwitchOption{
-		CollectEnabled: true, AutoShow: true, AutoJumpOpen: true, AutoJumpSave: false,
-		PollIntervalMs: 800, MaxHistory: 20, OverlayRows: 8, OverlayRowsCompact: 4,
-		ExcludedPrefixes: []string{"C:\\Temp", "D:\\「引号」"},
-	}
-	defer func() { Cfg = oldCfg }()
-
 	SetPluginsDir(dir)
 	_, boot, late := pluginBlocks()
 
-	want := "\nInitQuickSwitch({collectEnabled: true, autoShow: true, autoJumpOpen: true, autoJumpSave: false, pollIntervalMs: 800, maxHistory: 20, overlayRows: 8, overlayRowsCompact: 4, excludedPrefixes: [\"C:\\Temp\", \"D:\\「引号」\"]})"
-	if late != want {
-		t.Fatalf("晚初始化行字节不符:\n got=%q\nwant=%q", late, want)
+	if late != "\nInitQuickSwitch()" {
+		t.Fatalf("晚初始化行字节不符 (P5 应为无参调用):\n got=%q\nwant=%q", late, "\nInitQuickSwitch()")
 	}
 	// 引导行照常产出 (真插件身份)
 	if !strings.Contains(boot, "\nPluginManager.LoadEntry(\"quick_switch\")") {
