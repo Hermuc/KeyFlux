@@ -1003,13 +1003,9 @@
     "zh": "自定义",
     "en": "Custom"
   },
-  "1094": {
-    "zh": "立即生效 (重启 KeyFlux)",
-    "en": "Apply Now (restarts KeyFlux)"
-  },
   "1095": {
-    "zh": "行为的增删改在此管理; 变更需重启 KeyFlux 后生效 (点「立即生效」或保存设置)",
-    "en": "Manage behaviors here; changes take effect after KeyFlux restarts (click Apply Now or save settings)"
+    "zh": "行为的增删改在此管理; 变更需重启 KeyFlux 后生效 (保存设置时自动重启)",
+    "en": "Manage behaviors here; changes take effect after KeyFlux restarts (saving settings restarts it)"
   },
   "1096": {
     "zh": "删除",
@@ -1026,10 +1022,6 @@
   "1099": {
     "zh": "添加前提",
     "en": "Add Precondition"
-  },
-  "1101_applied": {
-    "zh": "重启指令已发送; 若引擎未恢复, 请从托盘「重载」KeyFlux",
-    "en": "Restart requested; if the engine does not recover, reload KeyFlux from the tray"
   },
   "1102_deleted": {
     "zh": "已删除: {0}",

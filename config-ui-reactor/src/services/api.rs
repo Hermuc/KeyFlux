@@ -178,8 +178,6 @@ pub trait SettingsApi: Send + Sync {
     ) -> ApiResponse<crate::models::BehaviorPack>;
     /// `DELETE /api/behaviors/{id}`：删除用户行为包。
     fn delete_behavior(&self, id: &str) -> ApiResponse<MessageBody>;
-    /// `POST /api/behaviors/apply`：让行为变更立即生效（重启引擎；`restartFailed` 见 MessageBody）。
-    fn apply_behaviors(&self) -> ApiResponse<MessageBody>;
 }
 
 /// 基于 `ureq` 的阻塞式实现（在 `spawn_background` 中调用）。
@@ -486,10 +484,6 @@ impl SettingsApi for HttpSettingsApi {
 
     fn delete_behavior(&self, id: &str) -> ApiResponse<MessageBody> {
         self.delete(&format!("api/behaviors/{id}"))
-    }
-
-    fn apply_behaviors(&self) -> ApiResponse<MessageBody> {
-        self.post_empty("api/behaviors/apply")
     }
 }
 

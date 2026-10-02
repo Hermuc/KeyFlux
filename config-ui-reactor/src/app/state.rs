@@ -2,6 +2,8 @@
 //!
 //! 自原 `app.rs` 的 `impl Shell` 拆分；纯代码搬移，行为不变。
 
+use std::time::Duration;
+
 use super::*;
 
 impl Shell {
@@ -44,11 +46,21 @@ impl Shell {
         }
     }
 
-    /// 立即保存（启用开关 / 删除映射等即时语义；不受页脚保存的 1 秒节流限制）。
+    /// 配置落盘的**唯一入口**（保存策略，2026-10-02 用户定版）：
+    /// 一切编辑只改内存 `config`，只有页脚「保存配置」按钮 / Ctrl+S（同走
+    /// `Message::Save`）才经此方法 `PUT /config` 落盘并重启引擎。
+    /// ⚠️ 新增交互**禁止**在编辑处理器里调用本方法做自动保存——需要持久化的变更
+    /// 一律留给用户显式保存（1 秒节流防连点，复刻 `SaveCommand` 的 useThrottleFn）。
     pub(super) fn save_now(&mut self, context: &ComponentContext<Self>) {
         let (Some(config), Some(port)) = (self.config.clone(), self.port) else {
             return;
         };
+        if let Some(last) = self.last_save
+            && last.elapsed() < Duration::from_secs(1)
+        {
+            return;
+        }
+        self.last_save = Some(Instant::now());
 
         // 选项页皮肤字段校验（颜色 #RRGGBB / 数值 >= 0；错误文案用标签而非 JSON 键）
         for field in settings::SKIN_FIELDS {
@@ -68,25 +80,6 @@ impl Shell {
         self.notice = None;
         self.notice_error = false;
         let _ = context.spawn_background(move |_token| Message::SaveFinished(save(port, &config)));
-    }
-
-    /// 行为编辑尾随保存（800ms 防抖）：代际计数保证只有最新一次编辑会真正落盘，
-    /// 复刻旧版「所有修改经 SaveAsync 咽喉」的自动保存语义。
-    pub(super) fn request_sa_throttled_save(&mut self, context: &ComponentContext<Self>) {
-        let generation = self
-            .sa_save_gen
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-            + 1;
-        let generation_slot = std::sync::Arc::clone(&self.sa_save_gen);
-        let _ = context.spawn_background(move |_token| {
-            std::thread::sleep(Duration::from_millis(800));
-            // 已有更新的编辑 ⇒ 这一代失效（由最新一代的定时器落盘）
-            if generation_slot.load(std::sync::atomic::Ordering::SeqCst) == generation {
-                Message::SaSaveThrottled
-            } else {
-                Message::Noop
-            }
-        });
     }
 
     /// 匹配类型草稿整体替换（选中/新建切换时清状态）。
