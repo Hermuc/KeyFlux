@@ -579,25 +579,6 @@ pub fn new_type_link(on_click: impl IntoUnitCallback) -> View {
         )
 }
 
-/// 卡内「✎ 编辑分组」文字链（编辑当前选中的匹配类型分组；复用 2553 造型）。
-pub fn edit_type_link(on_click: impl IntoUnitCallback) -> View {
-    Button::new()
-        .resource_overrides(
-            ResourceOverrides::new()
-                .set("ButtonBackground", Color::transparent())
-                .set("ButtonBorderBrush", Color::transparent())
-                .set("ButtonBackgroundPointerOver", Color::transparent())
-                .set("ButtonBorderBrushPointerOver", Color::transparent()),
-        )
-        .on_click(on_click)
-        .content(
-            TextBlock::new()
-                .text(i18n::t("2595"))
-                .font_size(13.0)
-                .foreground(theme::accent_solid()),
-        )
-}
-
 /// 未配置类型的「待配置」提示（2537 + 专属行为缺位提示 2517）。
 pub fn pending_hint(has_dedicated: bool) -> View {
     let mut children = vec![

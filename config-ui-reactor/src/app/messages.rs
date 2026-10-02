@@ -225,9 +225,6 @@ pub enum Message {
     /// 清除选中动作热键（输入行尾 ✕，复刻旧 HotkeyCapture 的清除钮）。
     SaHotkeyClear,
     /// 卡内「＋ 新建匹配类型」（2553）：直接打开匹配类型对话框并预置对应 kind 的草稿。
-    SaEditType {
-        kind: &'static str,
-    },
     SaNewType {
         kind: &'static str,
     },
