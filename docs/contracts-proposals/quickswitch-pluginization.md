@@ -503,6 +503,38 @@ P4（安全删除）必须先于 P6（开启删除按钮）—— **先让删除
 settings 声明 + plugin-settings.json 迁移 + `options.quickSwitch` 段退役（P5）；
 `CONTRACTS §4` 订正随 P5 manifest 真实扩容一并做。
 
+### ✅ P2 收尾两修 + P4 执行记录（2026-10-02，已完成并部署生产）
+
+三项连续热修（详见 `CONTRACTS.md` 2026-10-02 变更行）：
+
+1. **bb7807d（校验拆分收尾）**：面板服务端 `parse_manifest_wire`（目录列表 + zip 安装
+   共用）误用严格版 `validate_manifest` ⇒ 插件页报「与内置插件冲突」。改走
+   `validate_manifest_body`（放行内置 ID），zip 导入路径显式补严格版；
+   回归测试 `parse_manifest_wire_allows_builtin_id`。
+   **教训：校验拆分必须盘点所有调用面，漏一个就是生产事故。**
+2. **12efe80（卡片反转，用户裁定）**：删合成前置卡，`build_cards` 改**全目录驱动**，
+   quick_switch 卡由 `card_from` 渲染（v1.0.0 + manifest 描述，自带删除按钮与版本号）；
+   开关状态源分流：builtin 读 `options.quickSwitch.collect_enabled`，用户插件读 disabled 表。
+3. **f0bc762（P4 墓碑 + 删除放行，C7/C8 解）**：config 模型加
+   `options.plugins.removed`（墓碑，与 disabled 分开）。🔴 序列化口径 =
+   **skip 空序列化**（Go `omitempty` / Rust `skip_serializing_if`，DTO 层同构）⇒
+   空时字段消失，GET /config 与 12 份 parity 基线**逐字节零漂移**（实证：双 parity
+   4/4，无需重录）。`Remove` 放行内置 ID（目录移除；墓碑由面板经 PUT /config 持久化）；
+   生成器跳过墓碑（注释行两端同文）；`remove_from_registry` 幂等写墓碑
+   （用户插件删除不进墓碑）；`sync-plugins` 改调 `tools/sync-plugins.ps1`
+   （robocopy 后按墓碑删目录 —— **用户删除胜过随包分发**）。
+
+**验证**：Go 全仓全绿 + Rust **306 passed** + 双 parity 4/4 + `make check`（生产树）
+ORACLE PASS；部署 = drop-in-rust + `bin/ui` robocopy 双腿 + sync-out + 计划任务重启。
+
+**恢复路径现状**：墓碑手工清除（config 移除 `removed` 条目 + 重跑 sync-plugins/重装）；
+UI 恢复入口待随包源进部署树后另议。**残余注意**：P6 的「删除依赖 P5」论断基于专用
+配置对话框，当前 QuickSwitch 无 settings（开关走选项页），故删除已安全；但删插件后
+`options.quickSwitch` 段成为无害孤段（§6 既有结论）。
+
+**剩余待办**：P5（settings 声明 + plugin-settings.json 迁移 + `options.quickSwitch`
+段退役 + CONTRACTS §4 订正）与 P6（配置入口接住后收口）次轮；P7 另起提案。
+
 ---
 
 ## 附: 一句话本质
