@@ -1,10 +1,12 @@
 # 提案: 插件动作完全解耦 (P7) —— `provides.actions[]` 与动作 ID 字符串化
 
-> 状态: **待评审**（QuickSwitch 插件化提案 §6 P7 期的独立载体; 依 D4 裁定「P7 另起提案,
-> 不与前 6 期混批」。前置: P0-P6 已全部落地, 见 `quickswitch-pluginization.md` §11）。
+> 状态: **P7a 已落地 (2026-10-02)**; §6 三问已裁定 (见 §6 裁定记录), P7b 待独立批次。
+> (QuickSwitch 插件化提案 §6 P7 期的独立载体; 依 D4 裁定「P7 另起提案,
+> 不与前 6 期混批」。前置: P0-P6 已全部落地, 见 `quickswitch-pluginization.md` §11)。
 > 关联契约: `docs/CONTRACTS.md` §3.4 ActionRegistry、§3.7 PluginManager、§4 插件清单格式
-> （2026-10-02 订正版）、§5 生成端契约; §0 总原则 2（快路径红线）。
-> 分支: **独立分支 + 独立评审**（协议变更 + 基线全量重录, 不与其他工作混批）。
+> （2026-10-02 订正版 + P7a 增补）、§5 生成端契约; §0 总原则 2（快路径红线）。
+> 分支: P7a 已随 main 落地（零漂移双轨验证）; **P7b 仍走独立分支 + 独立评审**
+> （动作下拉动态化 + 配置字符串化 + 基线重录, 不与其他工作混批）。
 
 ---
 
@@ -38,19 +40,22 @@ P7 = 拆 K1/K2（协议）+ K3（机制泛化）。K4 随 K1 自动消解。
 {
   "provides": {
     "actions": [
-      { "id": "goto", "label": "快速切换", "labelEn": "Quick Switch",
-        "kind": "plugin", "lateInit": "InitQuickSwitch" }
+      { "id": "goto", "label": "快速切换", "labelEn": "Quick Switch", "kind": "plugin" }
     ]
-  }
+  },
+  "entry": { "kind": "script", "file": "main.ahk", "func": "QuickSwitchMain",
+             "late": "InitQuickSwitch" }
 }
 ```
 
 - `actions[].id`: 插件内唯一; 全局动作 ID = `"<pluginId>.<actionId>"`（与
   `ActionRegistry.RegisterAction` 现有键空间一致, 零迁移）。
-- `actions[].lateInit`（可选）: 声明该插件的晚初始化函数名 ⇒ 生成端 `PLUGIN_LATE_INIT`
-  渲染 `"<lateInit>()"`（无参, 配置自取 —— P5 已定式）。**未声明 = 不产出, 空块零字节**
+- `entry.late`（可选; §6 裁定 3 修正案 —— 晚初始化挂 entry 而非 actions[]）:
+  声明该插件的晚初始化函数名 ⇒ 生成端 `PLUGIN_LATE_INIT`
+  渲染 `"<late>()"`（无参, 配置自取 —— P5 已定式）。**未声明 = 不产出, 空块零字节**
   ⇒ P7a 落地时 quick_switch 若不同步改 manifest, 产物逐字节不变（双轨闸门同 P2）。
-- 校验: id 词表同 settings key; 全局键唯一性由目录扫描聚合后判重（重名 = 后包告警隔离）。
+- 校验: id 词表同 settings key; kind 词表当前仅 `"plugin"`; 全局动作 ID 唯一性由目录扫描
+  聚合后判重（重名 = 后包告警隔离; P7b 消费方落地）。
 - 影响面: 两端 manifest 模型 + 校验 + wire 投影（omitempty, 未声明不出场）⇒
   **GET /api/plugins 输出对存量插件零漂移; GET /config 不变** ⇒ parity / api-parity 基线
   **不动**（quick_switch 在 P7a 内不同步改 manifest 的前提下）。
@@ -62,7 +67,7 @@ P7 = 拆 K1/K2（协议）+ K3（机制泛化）。K4 随 K1 自动消解。
 | ① 动作下拉动态化 | type9 的 valueID 子项列表 = 内置 1-8 快路径（**红线不动**）+ 目录聚合 `provides.actions[]`; 生成端 `valueID 9` → `PluginAction("<pluginId>", "<actionId>")` | keyflux 产物变（type9 键位行）⇒ parity 重录 |
 | ② 配置字符串化 | keymap 配置存 `actionId: "quick_switch.goto"`（新增字段）, 生成端解析; 数字 `typeID/valueID` 继续输出（旧配置读兼容） | config 模型加字段 ⇒ GET /config 变 ⇒ api-parity 重录 |
 | ③ 删 `BUILTIN_PLUGIN_IDS` | 「内置」改为随包分发标记（manifest 或分发渠道属性）; 冒名拦截改「真源目录名单」动态生成 | 面板/后端逻辑, 无产物影响 |
-| ④ K2 移除 | 晚初始化特判删除, 全走 `lateInit` 声明 | 产物不变（P7a 已对齐） |
+| ④ K2 移除 | 晚初始化特判删除, 全走 `entry.late` 声明 | 产物不变（P7a 已对齐） |
 
 **机械验收**: `grep -rn "quickswitch\|quick_switch" bin/lib/ config-server/internal/ config-ui-reactor/src/`
 中「核心层」（排除插件自身/测试/文档）**零命中** —— 核心零知识的可 grep 证明。
@@ -84,10 +89,39 @@ P7 = 拆 K1/K2（协议）+ K3（机制泛化）。K4 随 K1 自动消解。
 3. 全量重录后 `make parity` / `make api-parity` / `make check` 全绿。
 4. 第 3 节「机械验收」grep 零命中。
 
-## 6. 待用户裁定项
+## 6. 裁定记录（2026-10-02, 依「模块化 + 可移植性」标准裁定）
 
-1. **动作 ID 存储形态**: 双字段过渡（本提案）vs 只存字符串（更激进, 回滚丢配置）。
-2. **内置快路径 1-8 是否同样走 provides**: 本提案建议**不**（红线约束 #6, 编译期原生
-   注册动作保持直连）。
-3. **`lateInit` 放 manifest 顶层还是 provides.actions[] 内**: 本提案放 actions[] 内
-   （与动作同生命周期）, 备选顶层 `init.late`。
+1. **动作 ID 存储形态: 双字段过渡**（本提案原案）。
+   理由: 可移植性/回滚安全最大化 —— 旧 `typeID/valueID` 持续写入 ⇒ revert 零配置损失;
+   旧版本继续读数字字段 ⇒ 前向+后向双兼容。只存字符串虽更干净, 但回滚即丢配置,
+   违背约束 #5（配置兼容）。数字字段退役另立 compat 期清理批次（届时另行提案, 不混入 P7b）。
+2. **内置快路径 1-8 不走 provides**（本提案原案）。
+   理由: 快路径红线（约束 #6）—— 编译期原生注册保持直连, 无查表间接层;
+   动作下拉动态化只聚合 `provides.actions[]`, 内置 1-8 恒为前缀段。
+   内置动作不因动态化变得更可移植（它们本就是核心）, 动态化只增漂移风险。
+3. **lateInit 位置: `entry.late`**（**修正案**, 非原案的 actions[] 内, 亦非备选的顶层
+   `init.late`）。理由: 晚初始化是**插件生命周期**关切而非某个 action 的属性 ——
+   多动作插件在 actions[] 内放 lateInit 有归属歧义; `entry` 已是脚本入口族
+   （`kind`/`file`/`func`）, `late` 与 `func` 同族同文件, 单一编辑点;
+   不新增顶层对象, 协议面最小。已按此实现（Go `Entry.Late` / Rust `Entry.late`）。
+
+## 7. P7a 执行记录（2026-10-02）
+
+- **范围**: 两端 manifest 模型 + 校验 + wire 投影, **零消费**（生成器不动,
+  quick_switch manifest 不同步改 —— 零漂移前提）。
+- Go (`internal/plugins`): `Entry.Late` / `ProvidedAction` / `Provides` /
+  `Manifest.Provides`(指针, omitempty); 校验 `entry.late` 词表
+  `^[A-Za-z_][A-Za-z0-9_]{0,63}$` + `validateProvides`（空 actions 拒绝 / id 词表同
+  设置 key / 插件内唯一 / label 必填 / kind 仅 "plugin" / 上限
+  `MaxActionsPerPlugin=32`）; 测试 `TestValidateProvidesAndLateInit`（含 wire 形态:
+  无声明 ⇒ 序列化不含新键）。
+- Rust (`config-ui-reactor`): generator `Entry.late` / `ProvidedAction` / `Provides` /
+  `Manifest.provides` + 同构校验（`is_valid_late_init` 手写匹配, 不引入正则）;
+  wire `WireEntry.late` / `WireAction` / `WireProvides` / `WireManifest.provides`
+  （skip 条件与 Go omitempty 同形, 字段序 = Go 声明序）; 面板 DTO
+  `models/plugins.rs` 补 `late`/`provides`（serde default, 未消费）;
+  测试 `validates_provides_and_late_init`。cargo-gates（fmt/clippy/test）全绿, 306 tests。
+- **零漂移证明（验收标准 1 ✅）**: parity 4/4 + api-parity 双腿 23/23 **全部基线零重录**
+  （Go exe 以 buildServer 口径含 P7a 代码重建后复核）。
+- 契约: `CONTRACTS.md` §4 增补 `entry.late` / `provides` 两目 + 变更记录一行
+  （合并补记 P5+P6 契约面）。

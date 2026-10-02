@@ -42,6 +42,75 @@ func TestValidateManifest(t *testing.T) {
 	}
 }
 
+// TestValidateProvidesAndLateInit P7a 协议扩容: provides.actions[] + entry.late
+// 的校验矩阵与 wire 形态 (omitempty 零漂移)。
+func TestValidateProvidesAndLateInit(t *testing.T) {
+	// entry.late: 合法值放行; 非法标识符拒绝。
+	m := validManifest()
+	m.Entry.Late = "InitHelloWorld"
+	if err := ValidateManifest(m); err != nil {
+		t.Fatalf("合法 entry.late 被拒绝: %v", err)
+	}
+	for _, bad := range []string{"1Init", "Init X", "Init-X", strings.Repeat("A", 65)} {
+		m.Entry.Late = bad
+		if err := validateManifestBody(m); err == nil || !strings.Contains(err.Error(), "entry.late") {
+			t.Fatalf("entry.late %q: 期望拒绝, 实际: %v", bad, err)
+		}
+	}
+
+	// provides: 合法声明放行 (含 labelEn / 多动作)。
+	m = validManifest()
+	m.Provides = &Provides{Actions: []ProvidedAction{
+		{ID: "goto", Label: "跳转", LabelEn: "Go", Kind: "plugin"},
+		{ID: "back", Label: "返回", Kind: "plugin"},
+	}}
+	if err := ValidateManifest(m); err != nil {
+		t.Fatalf("合法 provides 被拒绝: %v", err)
+	}
+
+	cases := []struct {
+		mutate func(*Provides)
+		want   string
+	}{
+		{func(p *Provides) { p.Actions = nil }, "没有任何 action"},
+		{func(p *Provides) { p.Actions[0].ID = "Bad-Id" }, "不合法"},
+		{func(p *Provides) { p.Actions[1].ID = p.Actions[0].ID }, "重复"},
+		{func(p *Provides) { p.Actions[0].Label = " " }, "缺少 label"},
+		{func(p *Provides) { p.Actions[0].Kind = "builtin" }, "kind"},
+	}
+	for i, tc := range cases {
+		m = validManifest()
+		m.Provides = &Provides{Actions: []ProvidedAction{
+			{ID: "goto", Label: "跳转", Kind: "plugin"},
+			{ID: "back", Label: "返回", Kind: "plugin"},
+		}}
+		tc.mutate(m.Provides)
+		err := ValidateManifest(m)
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Fatalf("case %d: 期望错误含 %q, 实际: %v", i, tc.want, err)
+		}
+	}
+
+	// wire 形态: 无 provides / 无 late 的 manifest 序列化不含新键 (零漂移)。
+	raw := manifestJSON(t, validManifest())
+	if strings.Contains(raw, "provides") || strings.Contains(raw, "late") {
+		t.Fatalf("存量 manifest wire 漂移: %s", raw)
+	}
+	// 有声明时键出场, 顺序 = 声明序 (provides 在 settings 之后)。
+	m = validManifest()
+	m.Entry.Late = "InitHello"
+	m.Provides = &Provides{Actions: []ProvidedAction{{ID: "goto", Label: "跳转", Kind: "plugin"}}}
+	raw = manifestJSON(t, m)
+	want := `"entry":{"kind":"script","file":"main.ahk","func":"PluginMain","late":"InitHello"}`
+	if !strings.Contains(raw, want) {
+		t.Fatalf("entry.late wire 形态不符: %s", raw)
+	}
+	want = `"provides":{"actions":[{"id":"goto","label":"跳转","kind":"plugin"}]}`
+	if !strings.Contains(raw, want) || !strings.HasSuffix(raw, want+"}") {
+		t.Fatalf("provides wire 形态/位置不符: %s", raw)
+	}
+}
+
 // buildZip 构造内存 zip: entries 为 name -> content, 目录项用空 content。
 func buildZip(t *testing.T, entries map[string]string) []byte {
 	t.Helper()

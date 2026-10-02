@@ -52,6 +52,9 @@ pub struct Entry {
     pub kind: String,
     pub file: String,
     pub func: String,
+    /// 晚初始化函数名（可选；P7a）。生成端渲染进 `PLUGIN_LATE_INIT` 扩展点为
+    /// **无参**调用（配置由插件运行时自取，P5 定式）；空 = 无晚初始化，空块零字节。
+    pub late: String,
 }
 
 /// Go `plugins.Setting`：声明式设置项（仅生成端用到的字段；`min`/`max` 为可空）。
@@ -79,6 +82,32 @@ pub struct Setting {
     pub multiline: bool,
 }
 
+/// Go `plugins.ProvidedActionKindPlugin`：动作 kind 词表（当前仅 "plugin"）。
+pub const PROVIDED_ACTION_KIND_PLUGIN: &str = "plugin";
+
+/// Go `plugins.MaxActionsPerPlugin`：单插件动作声明上限（防 manifest 失控）。
+pub const MAX_ACTIONS_PER_PLUGIN: usize = 32;
+
+/// Go `plugins.ProvidedAction`：插件对外提供的一等动作
+/// （`manifest.provides.actions[]`；全局动作 ID = `<pluginId>.<actionId>`）。
+/// P7a 仅声明 + 校验（零消费 ⇒ 产物零漂移）；消费切换 = P7b。
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct ProvidedAction {
+    pub id: String,
+    pub label: String,
+    #[serde(rename = "labelEn")]
+    pub label_en: String,
+    pub kind: String,
+}
+
+/// Go `plugins.Provides`：manifest 的能力提供块。
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct Provides {
+    pub actions: Vec<ProvidedAction>,
+}
+
 /// Go `plugins.Manifest`（`plugin.json`）。
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
@@ -95,6 +124,8 @@ pub struct Manifest {
     pub entry: Entry,
     pub permissions: Vec<String>,
     pub settings: Vec<Setting>,
+    /// 能力提供块（可选；缺省 = 无 = wire 不出场，存量插件零漂移）。
+    pub provides: Option<Provides>,
 }
 
 impl Manifest {
@@ -128,6 +159,20 @@ fn is_valid_id(id: &str) -> bool {
 fn is_valid_setting_key(key: &str) -> bool {
     let bytes = key.as_bytes();
     if bytes.is_empty() || bytes.len() > 32 || !bytes[0].is_ascii_alphabetic() {
+        return false;
+    }
+    bytes[1..]
+        .iter()
+        .all(|b| b.is_ascii_alphanumeric() || *b == b'_')
+}
+
+/// Go `lateInitPattern` `^[A-Za-z_][A-Za-z0-9_]{0,63}$`（手写匹配，同上）。
+fn is_valid_late_init(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    if bytes.is_empty() || bytes.len() > 64 {
+        return false;
+    }
+    if !(bytes[0] == b'_' || bytes[0].is_ascii_alphabetic()) {
         return false;
     }
     bytes[1..]
@@ -322,6 +367,12 @@ pub(crate) fn validate_manifest_body(manifest: &Manifest) -> Result<(), String> 
                     manifest.id
                 ));
             }
+            if !manifest.entry.late.is_empty() && !is_valid_late_init(&manifest.entry.late) {
+                return Err(format!(
+                    "插件「{}」的 entry.late {:?} 不合法 (须匹配 ^[A-Za-z_][A-Za-z0-9_]{{0,63}}$)",
+                    manifest.id, manifest.entry.late
+                ));
+            }
         }
         _ => {
             return Err(format!(
@@ -330,7 +381,60 @@ pub(crate) fn validate_manifest_body(manifest: &Manifest) -> Result<(), String> 
             ));
         }
     }
-    validate_settings(manifest)
+    validate_settings(manifest)?;
+    validate_provides(manifest)
+}
+
+/// Go `plugins.validateProvides`（P7a）：加载期拦坏声明，坏包在目录加载时即隔离。
+fn validate_provides(manifest: &Manifest) -> Result<(), String> {
+    let Some(provides) = &manifest.provides else {
+        return Ok(());
+    };
+    let actions = &provides.actions;
+    if actions.is_empty() {
+        return Err(format!(
+            "插件「{}」声明了 provides 但没有任何 action",
+            manifest.id
+        ));
+    }
+    if actions.len() > MAX_ACTIONS_PER_PLUGIN {
+        return Err(format!(
+            "插件「{}」声明的动作过多 ({} > {})",
+            manifest.id,
+            actions.len(),
+            MAX_ACTIONS_PER_PLUGIN
+        ));
+    }
+    let mut seen = std::collections::HashSet::with_capacity(actions.len());
+    for (index, action) in actions.iter().enumerate() {
+        if !is_valid_setting_key(&action.id) {
+            return Err(format!(
+                "插件「{}」第 {} 个动作的 id {:?} 不合法 (须匹配 ^[A-Za-z][A-Za-z0-9_]{{0,31}}$)",
+                manifest.id,
+                index + 1,
+                action.id
+            ));
+        }
+        if !seen.insert(action.id.as_str()) {
+            return Err(format!(
+                "插件「{}」动作 id {:?} 重复",
+                manifest.id, action.id
+            ));
+        }
+        if action.label.trim().is_empty() {
+            return Err(format!(
+                "插件「{}」动作 {:?} 缺少 label",
+                manifest.id, action.id
+            ));
+        }
+        if action.kind != PROVIDED_ACTION_KIND_PLUGIN {
+            return Err(format!(
+                "插件「{}」动作 {:?} 的 kind {:?} 不合法 (当前仅支持 {:?})",
+                manifest.id, action.id, action.kind, PROVIDED_ACTION_KIND_PLUGIN
+            ));
+        }
+    }
+    Ok(())
 }
 
 // --------------------------------------------------------------- 加载（Go plugins.go）
@@ -630,6 +734,107 @@ mod tests {
             .expect("excludedPrefixes 声明存在");
         assert_eq!(excluded.kind, "text");
         assert!(excluded.multiline, "排除前缀 = 多行文本 (换行分隔)");
+        // P7a (2026-10-02)：示例插件尚未声明 provides / late（零漂移前提）。
+        assert!(builtin.provides.is_none());
+        assert!(builtin.entry.late.is_empty());
+    }
+
+    /// P7a 校验矩阵：provides.actions[] + entry.late（与 Go TestValidateProvidesAndLateInit 同源）。
+    #[test]
+    fn validates_provides_and_late_init() {
+        let base = || Manifest {
+            id: "hello_world".to_string(),
+            name: "Hello".to_string(),
+            spec_version: SPEC_VERSION,
+            entry: Entry {
+                kind: "script".to_string(),
+                file: "main.ahk".to_string(),
+                func: "PluginMain".to_string(),
+                late: String::new(),
+            },
+            ..Default::default()
+        };
+
+        // entry.late：合法放行；非法标识符拒绝。
+        let mut m = base();
+        m.entry.late = "InitHelloWorld".to_string();
+        assert!(validate_manifest_body(&m).is_ok());
+        for bad in ["1Init", "Init X", "Init-X", "A".repeat(65).as_str()] {
+            m.entry.late = bad.to_string();
+            let error = validate_manifest_body(&m).unwrap_err();
+            assert!(error.contains("entry.late"), "late {bad:?}: {error}");
+        }
+
+        // provides：合法声明放行。
+        let mut m = base();
+        m.provides = Some(Provides {
+            actions: vec![
+                ProvidedAction {
+                    id: "goto".to_string(),
+                    label: "跳转".to_string(),
+                    label_en: "Go".to_string(),
+                    kind: "plugin".to_string(),
+                },
+                ProvidedAction {
+                    id: "back".to_string(),
+                    label: "返回".to_string(),
+                    label_en: String::new(),
+                    kind: "plugin".to_string(),
+                },
+            ],
+        });
+        assert!(validate_manifest_body(&m).is_ok());
+
+        let mut m2 = base();
+        m2.provides = Some(Provides { actions: vec![] });
+        let error = validate_manifest_body(&m2).unwrap_err();
+        assert!(error.contains("没有任何 action"), "{error}");
+
+        let two_actions = || Provides {
+            actions: vec![
+                ProvidedAction {
+                    id: "goto".to_string(),
+                    label: "跳转".to_string(),
+                    label_en: String::new(),
+                    kind: "plugin".to_string(),
+                },
+                ProvidedAction {
+                    id: "back".to_string(),
+                    label: "返回".to_string(),
+                    label_en: String::new(),
+                    kind: "plugin".to_string(),
+                },
+            ],
+        };
+        let expect_reject = |m: &Manifest, want: &str| {
+            let error = validate_manifest_body(m).unwrap_err();
+            assert!(error.contains(want), "期望含 {want:?}, 实际: {error}");
+        };
+
+        // id 词表
+        let mut m = base();
+        m.provides = Some(two_actions());
+        m.provides.as_mut().unwrap().actions[0].id = "Bad-Id".to_string();
+        expect_reject(&m, "不合法");
+
+        // 插件内重复
+        let mut m = base();
+        m.provides = Some(two_actions());
+        let id = m.provides.as_ref().unwrap().actions[0].id.clone();
+        m.provides.as_mut().unwrap().actions[1].id = id;
+        expect_reject(&m, "重复");
+
+        // 缺 label
+        let mut m = base();
+        m.provides = Some(two_actions());
+        m.provides.as_mut().unwrap().actions[0].label = " ".to_string();
+        expect_reject(&m, "缺少 label");
+
+        // kind 词表
+        let mut m = base();
+        m.provides = Some(two_actions());
+        m.provides.as_mut().unwrap().actions[0].kind = "builtin".to_string();
+        expect_reject(&m, "kind");
     }
 
     /// 缺目录 ⇒ 空目录、无错误（Go: NotExist 不记为错误）。

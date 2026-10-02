@@ -48,6 +48,12 @@ type Entry struct {
 	Kind string `json:"kind"`           // "script"
 	File string `json:"file,omitempty"` // script: 入口脚本文件名 (包内相对路径)
 	Func string `json:"func,omitempty"` // script: 入口函数名
+	// Late 仅 script 形态使用: 晚初始化函数名 (可选)。生成端渲染进模板
+	// PLUGIN_LATE_INIT 扩展点为**无参**调用 (配置由插件运行时自取, P5 定式),
+	// 时机 = 原硬编码晚初始化位置 (引擎热键注册之后、会话就绪之前)。
+	// 空串 = 插件无晚初始化, 渲染空块 (零字节)。(2026-10-02 P7a 新增;
+	// 首个消费方将 = quick_switch, P7b 切换。)
+	Late string `json:"late,omitempty"`
 }
 
 // 设置项类型词表。词表是协议的一部分: 设置界面按 type 决定编辑器控件,
@@ -82,6 +88,10 @@ const MaxSettingsPerPlugin = 32
 const MaxSettingValueLen = 1024
 
 var settingKeyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,31}$`)
+
+// lateInitPattern 晚初始化函数名词表: AHK v2 合法标识符 (防第三方注入任意
+// 非标识符文本进生成产物; 无参调用, 不接受带参形态)。
+var lateInitPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)
 
 // Setting 插件设置项声明 (manifest.settings[])。
 //
@@ -135,6 +145,33 @@ type Manifest struct {
 	Entry       Entry     `json:"entry"`
 	Permissions []string  `json:"permissions,omitempty"`
 	Settings    []Setting `json:"settings,omitempty"`
+	// Provides 插件能力提供声明 (可选; P7a 协议扩容, 消费方 = P7b 动作下拉动态化)。
+	// 指针形态: 缺省 = nil = wire 不出场 (存量插件零漂移)。
+	Provides *Provides `json:"provides,omitempty"`
+}
+
+// ProvidedActionKindPlugin 动作 kind 词表: 由插件脚本处理的动作 (经
+// ActionRegistry.RegisterAction 注册, 全局 ID = "<pluginId>.<actionId>")。
+const ProvidedActionKindPlugin = "plugin"
+
+// MaxActionsPerPlugin 单个插件可声明的动作上限 (防 manifest 失控, 同 MaxSettingsPerPlugin)。
+const MaxActionsPerPlugin = 32
+
+// ProvidedAction 插件对外提供的一等动作 (manifest.provides.actions[])。
+//
+// "一等" = 出现在主界面动作下拉 (type9「快速切换」所在列表) 中, 由引擎按
+// PluginAction("<pluginId>", "<actionId>") 派发回插件 —— 而非插件各自处理。
+// P7a 仅声明 + 校验 (零消费 ⇒ 产物零漂移); P7b 消费切换。
+type ProvidedAction struct {
+	ID      string `json:"id"`                // 插件内唯一; 词表同设置项 key
+	Label   string `json:"label"`             // 下拉显示名 (中文)
+	LabelEn string `json:"labelEn,omitempty"` // 英文界面显示名
+	Kind    string `json:"kind"`              // 当前仅 "plugin"
+}
+
+// Provides manifest 的能力提供块。
+type Provides struct {
+	Actions []ProvidedAction `json:"actions,omitempty"`
 }
 
 // HasPermission 该 manifest 是否声明了指定能力位。
@@ -199,10 +236,48 @@ func validateManifestBody(p *Manifest) error {
 		if strings.TrimSpace(p.Entry.File) == "" || strings.TrimSpace(p.Entry.Func) == "" {
 			return fmt.Errorf("插件「%s」的 script entry 缺少 file 或 func", p.ID)
 		}
+		if p.Entry.Late != "" && !lateInitPattern.MatchString(p.Entry.Late) {
+			return fmt.Errorf("插件「%s」的 entry.late %q 不合法 (须匹配 ^[A-Za-z_][A-Za-z0-9_]{0,63}$)", p.ID, p.Entry.Late)
+		}
 	default:
 		return fmt.Errorf("插件「%s」的 entry.kind %q 不合法 (当前仅支持 script)", p.ID, p.Entry.Kind)
 	}
-	return validateSettings(p)
+	if err := validateSettings(p); err != nil {
+		return err
+	}
+	return validateProvides(p)
+}
+
+// validateProvides 校验能力提供块 (P7a)。与 validateSettings 同理: 加载期就把
+// 坏声明拦掉, 坏包在目录加载时即隔离, 不等 P7b 消费方才炸。
+func validateProvides(p *Manifest) error {
+	if p.Provides == nil {
+		return nil
+	}
+	acts := p.Provides.Actions
+	if len(acts) == 0 {
+		return fmt.Errorf("插件「%s」声明了 provides 但没有任何 action", p.ID)
+	}
+	if len(acts) > MaxActionsPerPlugin {
+		return fmt.Errorf("插件「%s」声明的动作过多 (%d > %d)", p.ID, len(acts), MaxActionsPerPlugin)
+	}
+	seen := make(map[string]bool, len(acts))
+	for i, a := range acts {
+		if !settingKeyPattern.MatchString(a.ID) {
+			return fmt.Errorf("插件「%s」第 %d 个动作的 id %q 不合法 (须匹配 ^[A-Za-z][A-Za-z0-9_]{0,31}$)", p.ID, i+1, a.ID)
+		}
+		if seen[a.ID] {
+			return fmt.Errorf("插件「%s」动作 id %q 重复", p.ID, a.ID)
+		}
+		seen[a.ID] = true
+		if strings.TrimSpace(a.Label) == "" {
+			return fmt.Errorf("插件「%s」动作 %q 缺少 label", p.ID, a.ID)
+		}
+		if a.Kind != ProvidedActionKindPlugin {
+			return fmt.Errorf("插件「%s」动作 %q 的 kind %q 不合法 (当前仅支持 %q)", p.ID, a.ID, a.Kind, ProvidedActionKindPlugin)
+		}
+	}
+	return nil
 }
 
 // validateSettings 校验声明式设置块。
