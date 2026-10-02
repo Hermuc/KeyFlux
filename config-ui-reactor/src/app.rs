@@ -941,15 +941,16 @@ impl Component for Shell {
                 // 复用匹配类型编辑链：from_existing 草稿改 exts → MtSave(false)
                 // （validate + normalize_exts + save_now 全走既有路径；校验失败经
                 // mt_status 回显在卡片内联编辑器下方）。
-                let draft = self
-                    .config
-                    .as_ref()
-                    .and_then(|config| config.match_types.get(index))
-                    .map(|mt| match_types_edit::MatchTypeDraft::from_existing(index, mt));
-                if let Some(mut draft) = draft {
-                    draft.exts = text;
-                    self.mt_draft = Some(draft);
-                    let _ = context.sender().send(Message::MtSave(false));
+                // 直接写 file_groups[index].exts（chips 数据源）+ 归一 + save_now
+                let mut config_holder = self.config.clone();
+                let applied = config_holder.as_mut().and_then(|config| {
+                    config.file_groups.get_mut(index).map(|fg| {
+                        fg.exts = sa::normalize_exts(&text);
+                    })
+                });
+                if applied.is_some() {
+                    self.config = config_holder;
+                    self.save_now(context);
                 }
             }
             Message::MtSave(with_behavior) => {
