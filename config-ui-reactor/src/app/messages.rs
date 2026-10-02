@@ -266,9 +266,8 @@ pub enum Message {
     /// 保存：`true` = 同时创建专属行为并强绑定（2529）。
     MtSave(bool),
     /// 文件后缀卡内联编辑当前分组后缀串（仅 fileExt 卡渲染；预设分组、特殊场景修改）。
-    SaExtsEditToggle,
-    SaExtsEditValue(String),
-    SaExtsEditSave,
+    SaExtsEditValue(usize, String),
+    SaExtsEditCommit(u64),
     /// 删除类型（级联删 `type:` 引用映射 + 同名专属行为包）。
     MtDelete,
     /// 「试一下」示例内容（`POST /api/selected-action/test`）。

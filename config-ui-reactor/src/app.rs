@@ -122,9 +122,10 @@ pub struct Shell {
     pane_overlay_open: bool,
     /// 「管理匹配类型」对话框是否打开。
     mt_dialog: bool,
-    /// 文件后缀卡内联后缀编辑器：展开态 + (分组下标, 后缀串草稿)。
-    exts_edit_open: bool,
+    /// 文件后缀卡内联后缀编辑器：(分组下标, 未落盘文本)——None = 干净态。
     exts_edit: Option<(usize, String)>,
+    /// 尾随保存代际（防抖复刻 sa_save_gen 模式）。
+    exts_save_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// 匹配类型编辑草稿（`None` = 未进入编辑/已清）。
     mt_draft: Option<match_types_edit::MatchTypeDraft>,
     /// 匹配类型对话框内状态条。
@@ -226,8 +227,8 @@ impl Component for Shell {
             acrylic: false,
             pane_overlay_open: true,
             mt_dialog: false,
-            exts_edit_open: false,
             exts_edit: None,
+            exts_save_gen: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             mt_draft: None,
             mt_status: None,
             mt_test: String::new(),
@@ -910,38 +911,35 @@ impl Component for Shell {
                 });
             }
             Message::MtExts(value) => self.mt_edit_draft(|draft| draft.exts = value),
-            Message::SaExtsEditToggle => {
-                self.exts_edit_open = !self.exts_edit_open;
-                if self.exts_edit_open {
-                    // 展开时捕获当前选中分组的后缀串（config.match_types 原文）
-                    let selected_id = self
-                        .sa_selected_id(MATCH_FILE_EXT)
-                        .or_else(|| self.sa_selected_id(MATCH_TEXT_TYPE));
-                    self.exts_edit = self.config.as_ref().and_then(|config| {
-                        selected_id.as_deref().and_then(|id| {
-                            config
-                                .match_types
-                                .iter()
-                                .position(|mt| mt.id == id && mt.kind == MATCH_FILE_EXT)
-                                .map(|index| (index, config.match_types[index].exts.join(",")))
-                        })
-                    });
-                    if self.exts_edit.is_none() {
-                        self.exts_edit_open = false;
+            Message::SaExtsEditValue(index, value) => {
+                self.exts_edit = Some((index, value));
+                // 800ms 尾随保存（generation 防抖，复刻行为编辑语义）
+                let generation = self
+                    .exts_save_gen
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                    + 1;
+                let gen_slot = std::sync::Arc::clone(&self.exts_save_gen);
+                let _ = context.spawn_background(move |_token| {
+                    std::thread::sleep(std::time::Duration::from_millis(800));
+                    if gen_slot.load(std::sync::atomic::Ordering::SeqCst) == generation {
+                        Message::SaExtsEditCommit(generation)
+                    } else {
+                        Message::Noop
                     }
-                }
+                });
             }
-            Message::SaExtsEditValue(value) => {
-                if let Some((_, text)) = self.exts_edit.as_mut() {
-                    *text = value;
+            Message::SaExtsEditCommit(generation) => {
+                // 代际校验：有更新编辑 ⇒ 本代失效
+                if self.exts_save_gen.load(std::sync::atomic::Ordering::SeqCst) != generation {
+                    return;
                 }
-            }
-            Message::SaExtsEditSave => {
                 let Some((index, text)) = self.exts_edit.clone() else {
                     return;
                 };
+                self.exts_edit = None;
                 // 复用匹配类型编辑链：from_existing 草稿改 exts → MtSave(false)
-                // （validate + normalize_exts + 后端校验全走既有路径）。
+                // （validate + normalize_exts + save_now 全走既有路径；校验失败经
+                // mt_status 回显在卡片内联编辑器下方）。
                 let draft = self
                     .config
                     .as_ref()
@@ -950,8 +948,6 @@ impl Component for Shell {
                 if let Some(mut draft) = draft {
                     draft.exts = text;
                     self.mt_draft = Some(draft);
-                    self.exts_edit_open = false;
-                    self.exts_edit = None;
                     let _ = context.sender().send(Message::MtSave(false));
                 }
             }
