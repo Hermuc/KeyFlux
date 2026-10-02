@@ -341,7 +341,7 @@ impl Shell {
                 rows.push((
                     rows.len(),
                     Grid::new()
-                        .columns([GridLength::Pixel(140.0), GridLength::STAR, GridLength::Auto])
+                        .columns([GridLength::Pixel(120.0), GridLength::STAR, GridLength::Auto])
                         .children((
                             {
                                 let combo: View = ComboBox::new()
@@ -358,11 +358,14 @@ impl Shell {
                             Border::new()
                                 .grid_column(1)
                                 .margin(Thickness::new(8.0, 0.0, 8.0, 0.0))
-                                .content(TextBox::new().text(value.clone()).on_text_changed(
-                                    context.callback(move |value: String| {
-                                        Message::MtRuleValue(rule, value)
-                                    }),
-                                )),
+                                .content(
+                                    TextBox::new()
+                                        .text(value.clone())
+                                        .min_width(200.0)
+                                        .on_text_changed(context.callback(move |value: String| {
+                                            Message::MtRuleValue(rule, value)
+                                        })),
+                                ),
                             Border::new().grid_column(2).content(crate::ui::icon_button(
                                 "✕",
                                 15.0,
@@ -435,9 +438,13 @@ impl Shell {
                 }),
             )
             .content(
+                // 125% DPI 下 ContentDialog 内容区仅 ~496 DIP：min_width 520 会把
+                // 右侧（规则行 ✕ / 测试匹配钮）推出弹窗被裁 —— 收窄到 480 并开
+                // 横向滚动兜底（2026-10-02 用户截图实锤）。
                 ScrollViewer::new()
                     .max_height(460.0)
-                    .min_width(520.0)
+                    .min_width(480.0)
+                    .horizontal_scroll_bar_visibility(ScrollBarVisibility::Auto)
                     .content(StackPanel::new().spacing(8.0).keyed_children(rows)),
             )
     }
