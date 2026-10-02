@@ -291,7 +291,7 @@ pub fn validate_manifest(manifest: &Manifest) -> Result<(), String> {
 }
 
 /// Go `plugins.validateManifestBody`（目录加载路径；不含内置 ID 检查）。
-fn validate_manifest_body(manifest: &Manifest) -> Result<(), String> {
+pub(crate) fn validate_manifest_body(manifest: &Manifest) -> Result<(), String> {
     if !is_valid_id(&manifest.id) {
         return Err(format!(
             "插件 ID {:?} 不合法 (须匹配 ^[a-z][a-z0-9_]{{0,31}}$)",
