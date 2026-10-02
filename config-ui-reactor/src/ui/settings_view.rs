@@ -152,8 +152,9 @@ const SCHEME_COL_HOTKEY: f64 = 130.0;
 /// 教训：**固定宽容器的契约测试必须拿"最宽的那条字符串"去量**（见
 /// [`scheme_switch_column_fits_switch_and_indicator`]）。
 const SCHEME_COL_SWITCH: f64 = 104.0;
-/// 第 4 列（删除钮）宽 —— 红色 ✕ 图形钮（icon_button）自然宽 ≈30 DIP。
-const SCHEME_COL_DELETE: f64 = 36.0;
+/// 第 4 列（删除钮）宽 —— 红 ✕ 图形钮（icon_button）含 WinUI 默认 padding
+/// 自然宽 ≈40 DIP；36 曾把 ✕ 裁掉右缘（用户截图 2026-10-02）。
+const SCHEME_COL_DELETE: f64 = 44.0;
 /// 第 2 列内容左缩进（表头与数据行经 [`scheme_inset`] 共用，不可能只改一边）。
 const SCHEME_INSET_HOTKEY: f64 = 8.0;
 /// 第 3 列内容左缩进（表头与数据行经 [`scheme_inset`] 共用，不可能只改一边）。
@@ -241,10 +242,12 @@ pub fn scheme_header() -> View {
 /// 「快捷键方案」行：名称(501) / 触发键(502) / 开关(504) 三列内联编辑。
 /// 行距 8px（此前 2px 过挤，12 行连成一片）；开关列左留 [`scheme_inset`]`(2)`。
 /// 列定义与缩进与 [`scheme_header`] 同源（见 [`scheme_columns`] 的"为什么必须固定"）。
+#[allow(clippy::too_many_arguments)] // 造型函数: 名称/触发键/开关/删除四组件+三回调, 拆结构体反而晦涩
 pub fn scheme_row<N, H, E, D>(
     name: &str,
     hotkey: &str,
     enabled: bool,
+    can_delete: bool,
     on_name: N,
     on_hotkey: H,
     on_enable: E,
@@ -301,7 +304,9 @@ where
                     "✕",
                     15.0,
                     theme::ERROR_CRIMSON,
-                    true,
+                    // 已启用方案不可删除（用户定版 2026-10-02）：禁用态由 WinUI
+                    // 自动灰化内容。
+                    can_delete && !enabled,
                     on_delete,
                 )),
         ))

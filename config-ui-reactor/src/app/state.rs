@@ -367,12 +367,24 @@ impl Shell {
             OptEdit::SchemeDelete(index) => {
                 // 删除自定义方案（id>4 渲染序下标）：导航构成变化 ⇒ 重建导航。
                 // 方案对应触发键的绑定随 keymap 整体移除（保存链路持久化）。
-                let removed = config
+                // 已启用方案不可删（用户定版；按钮已灰化，此处兜底防绕过）。
+                let deletable = config
                     .keymaps
                     .iter()
                     .filter(|km| km.id > 4)
                     .nth(index)
-                    .map(|km| km.id);
+                    .map(|km| !km.enable)
+                    .unwrap_or(false);
+                let removed = deletable
+                    .then(|| {
+                        config
+                            .keymaps
+                            .iter()
+                            .filter(|km| km.id > 4)
+                            .nth(index)
+                            .map(|km| km.id)
+                    })
+                    .flatten();
                 if let Some(id) = removed {
                     config.keymaps.retain(|km| km.id != id);
                     let next = config.clone();

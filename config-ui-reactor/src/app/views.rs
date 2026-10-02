@@ -524,6 +524,7 @@ impl Shell {
                     &keymap.name,
                     &keymap.hotkey,
                     keymap.enable,
+                    !keymap.enable,
                     context.callback(move |value: String| {
                         Message::Opt(OptEdit::SchemeName(index, value))
                     }),
@@ -533,6 +534,7 @@ impl Shell {
                     context.callback(move |value: bool| {
                         Message::Opt(OptEdit::SchemeEnable(index, value))
                     }),
+                    // 已启用方案不可删除（用户定版）：先关再删
                     context.message(Message::Opt(OptEdit::SchemeDelete(index))),
                 ),
             ));
