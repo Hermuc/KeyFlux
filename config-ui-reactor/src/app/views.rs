@@ -1129,7 +1129,7 @@ impl Shell {
                 "该键在当前窗口分组下尚无动作，请选择动作类型"
             } else {
                 // 措辞需同时适配「模式页键盘网格」与「缩写页 chips」两种宿主
-                "请先从左侧选中一个键或缩写条目"
+                "请先从上方选中一个键或缩写条目"
             }),
             Some(action) => match action.type_id {
                 0 => action_editor_view::hint("未配置"),
@@ -1470,7 +1470,7 @@ impl Shell {
         // ScrollViewer 拿不到边界 ⇒ 不滚动、列表底部溢出窗口被裁（2026-09-29 实测）。
         Border::new()
             .grid_column(1)
-            .width(340.0)
+            .width(300.0)
             .margin(Thickness::new(20.0, 20.0, 4.0, 28.0))
             .content(
                 Grid::new()
@@ -1547,7 +1547,10 @@ impl Shell {
                         keymap::parent_info(keymap, config).as_deref(),
                     )),
                     Border::new().grid_row(1).content(
+                        // 横向兜底：低逻辑宽（DPI 缩放/备注栏展开）下底行自然宽可能
+                        // 超出可用宽，SinglePress 等行尾键会被裁 —— 允许横向滚动保底。
                         ScrollViewer::new()
+                            .horizontal_scroll_bar_visibility(ScrollBarVisibility::Auto)
                             .max_height(keymap_view::GRID_MAX_HEIGHT)
                             .content(grid),
                     ),

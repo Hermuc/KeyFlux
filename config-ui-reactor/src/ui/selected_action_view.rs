@@ -105,11 +105,7 @@ where
                 .horizontal_alignment(HorizontalAlignment::Center)
                 .vertical_alignment(VerticalAlignment::Center),
         );
-    let clear: View = Button::new().on_click(on_clear).content(
-        TextBlock::new()
-            .text("✕")
-            .foreground(theme::solid(theme::ERROR_CRIMSON)),
-    );
+    let clear: View = crate::ui::icon_button("✕", 15.0, theme::ERROR_CRIMSON, true, on_clear);
     let input_row: View = Grid::new()
         .columns([GridLength::Auto, GridLength::STAR, GridLength::Auto])
         .children((
@@ -212,12 +208,8 @@ where
     P: IntoUnitCallback,
     D: IntoUnitCallback,
 {
-    // 旧截图：▶/✕ **右对齐到卡边**（无边框图形按钮；▶ 用 U+25B8 避开 emoji 回退）
-    let ghost = ResourceOverrides::new()
-        .set("ButtonBackground", Color::transparent())
-        .set("ButtonBorderBrush", Color::transparent())
-        .set("ButtonBackgroundPointerOver", Color::transparent())
-        .set("ButtonBorderBrushPointerOver", Color::transparent());
+    // 旧截图：▶/✕ **右对齐到卡边**（无边框图形按钮；▶ 用 U+25B8 避开 emoji 回退）。
+    // ▸(U+25B8) 字形墨迹只有 ✕(U+2715) 的一半左右，字号 22 才与 ✕@15 视觉等大。
     Grid::new()
         .columns([GridLength::STAR, GridLength::Auto, GridLength::Auto])
         .children((
@@ -227,32 +219,23 @@ where
                 .font_weight(FontWeight::SEMI_BOLD)
                 .foreground(theme::accent_solid())
                 .vertical_alignment(VerticalAlignment::Center),
-            Button::new()
-                .grid_column(1)
-                .is_enabled(can_play)
-                .resource_overrides(ghost.clone())
-                .on_click(on_play)
-                .content(
-                    TextBlock::new()
-                        .text("▸")
-                        .font_size(16.0)
-                        .foreground(theme::near_black()),
-                ),
+            Border::new().grid_column(1).content(crate::ui::icon_button(
+                "▸",
+                22.0,
+                theme::NEAR_BLACK,
+                can_play,
+                on_play,
+            )),
             Border::new()
                 .grid_column(2)
                 .margin(Thickness::new(8.0, 0.0, 4.0, 0.0))
-                .content(
-                    Button::new()
-                        .is_enabled(can_delete)
-                        .resource_overrides(ghost)
-                        .on_click(on_delete)
-                        .content(
-                            TextBlock::new()
-                                .text("✕")
-                                .font_size(15.0)
-                                .foreground(theme::solid(theme::ERROR_CRIMSON)),
-                        ),
-                ),
+                .content(crate::ui::icon_button(
+                    "✕",
+                    15.0,
+                    theme::ERROR_CRIMSON,
+                    can_delete,
+                    on_delete,
+                )),
         ))
 }
 
@@ -435,42 +418,11 @@ where
         .on_selection_changed(on_switch)
         .into();
 
-    // ↑ ↓ ✕ = ghost 紧凑排（旧截图：无边框细符号）
-    let ghost = ResourceOverrides::new()
-        .set("ButtonBackground", Color::transparent())
-        .set("ButtonBorderBrush", Color::transparent())
-        .set("ButtonBackgroundPointerOver", Color::transparent())
-        .set("ButtonBorderBrushPointerOver", Color::transparent());
-    let up: View = Button::new()
-        .is_enabled(can_up)
-        .resource_overrides(ghost.clone())
-        .on_click(on_up)
-        .content(
-            TextBlock::new()
-                .text("↑")
-                .font_size(15.0)
-                .foreground(theme::stone_gray()),
-        );
-    let down: View = Button::new()
-        .is_enabled(can_down)
-        .resource_overrides(ghost.clone())
-        .on_click(on_down)
-        .content(
-            TextBlock::new()
-                .text("↓")
-                .font_size(15.0)
-                .foreground(theme::stone_gray()),
-        );
+    // ↑ ↓ ✕ = 无边框图形钮（icon_button 全态透明覆盖）
+    let up: View = crate::ui::icon_button("↑", 15.0, theme::STONE_GRAY, can_up, on_up);
+    let down: View = crate::ui::icon_button("↓", 15.0, theme::STONE_GRAY, can_down, on_down);
     // 旧版删除 = 淡红 ✕（tooltip 1108 因 reactor 无 Tooltip API 暂缺）
-    let remove: View = Button::new()
-        .resource_overrides(ghost)
-        .on_click(on_remove)
-        .content(
-            TextBlock::new()
-                .text("✕")
-                .font_size(15.0)
-                .foreground(theme::solid(theme::ERROR_CRIMSON)),
-        );
+    let remove: View = crate::ui::icon_button("✕", 15.0, theme::ERROR_CRIMSON, true, on_remove);
 
     let selector: View = Grid::new()
         .columns([

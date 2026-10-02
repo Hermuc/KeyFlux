@@ -136,7 +136,15 @@ lint:
 check-texttypes:
 	python tools/texttype_conformance.py
 
-# check-hooks: CommandInputHooks 的 provider 分发契约回归探针 (AHK 运行时断言, 自带 0/1 退出码)。
+# # deploy-panel: guarded manual deploy of the settings panel (probe-marker gate +
+# cargo-gates single source + staging + prod hash gate + relaunch). Replaces the
+# error-prone hand-rolled chain; -SkipGates skips fmt/clippy/test but never the marker gate.
+deploy-panel:
+	MSYS_NO_PATHCONV=1 pwsh -NoProfile -ExecutionPolicy Bypass -File tools/deploy_panel.ps1
+
+.PHONY: deploy-panel
+
+check-hooks: CommandInputHooks 的 provider 分发契约回归探针 (AHK 运行时断言, 自带 0/1 退出码)。
 # 2026-09-19: _Call 曾以「取方法引用再 .Call()」的方式派发, 而 AHK v2 的 `obj.Method` **不绑定 this**
 #   (this 只是普通首参, 取值前无值) ⇒ 首个实参被顶成 this、末位实参缺失 ⇒ 每次回调抛
 #   `Missing a required parameter.`, 被分发的 try/catch 吞掉并视为「未消费」。

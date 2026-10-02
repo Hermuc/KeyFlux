@@ -331,11 +331,7 @@ where
             .foreground(theme::solid(theme::CHARCOAL))
             .text_wrapping(TextWrapping::Wrap),
     );
-    let delete: View = Button::new().on_click(on_delete).content(
-        TextBlock::new()
-            .text("✕")
-            .foreground(theme::solid(theme::ERROR_CRIMSON)),
-    );
+    let delete: View = crate::ui::icon_button("✕", 15.0, theme::ERROR_CRIMSON, true, on_delete);
 
     Grid::new()
         .columns([GridLength::Pixel(100.0), GridLength::STAR, GridLength::Auto])
