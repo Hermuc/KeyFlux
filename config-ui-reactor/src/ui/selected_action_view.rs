@@ -560,7 +560,6 @@ where
         .keyed_children(children)
 }
 
-/// 卡内「＋ 新建匹配类型」文字链（2553；旧 `TypeCardVm.CreateType` 入口）。
 /// 文件后缀卡：当前分组的**常驻可编辑后缀框**（仅 fileExt 卡调用）。
 ///
 /// 交互（用户定版 2026-10-02）：无切换按钮——框内直接展示/编辑当前选中分组的
@@ -584,6 +583,7 @@ pub fn exts_editor(
         .into()
 }
 
+/// 卡内「＋ 新建匹配类型」文字链（2553；旧 `TypeCardVm.CreateType` 入口）。
 pub fn new_type_link(on_click: impl IntoUnitCallback) -> View {
     Button::new()
         .resource_overrides(

@@ -6,7 +6,8 @@
 //! Phase 1.5 实测结论（见 `09-Phase1.5-专项结论.md`）：
 //! * 每个独立窗口都必须**各自**声明标题与视觉（主题/材质/尺寸），**不继承**父窗口；
 //! * 自绘标题栏用 `TitleBar` 控件（`TitleBarSlot::{Content,RightHeader}`）；
-//! * 弹窗用 `ComponentContext::open_window` 独立窗口（`ContentDialog` 会崩溃）。
+//! * 弹窗现统一走 `ContentDialog`（2026-10 生产验证正常；旧「崩溃」结论不再成立，
+//! * `open_window` 通道保留未用）。
 
 use windows_reactor::{WindowBackdrop, WindowTheme, WindowVisuals};
 

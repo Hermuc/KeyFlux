@@ -24,11 +24,11 @@ pub struct PluginCard {
     pub version: Option<String>,
     pub description: String,
     pub author: String,
-    /// 内置插件（quick_switch；不可删除，开关直通 `collectEnabled`）。
+    /// 随包内置标记（P7b 起 = manifest `bundled` 动态真源；P4 起可删除，P6 起开关走 disabled 表）。
     pub is_builtin: bool,
-    /// 是否可删除（仅用户插件）。
+    /// 是否可删除（P4 起内置卡也可删）。
     pub can_delete: bool,
-    /// 是否可打开配置对话框（内置卡恒可；用户卡需声明了 settings）。
+    /// 是否可打开配置对话框（声明了 settings 即可配；内置与用户卡同口径，P6 起）。
     pub can_configure: bool,
     pub enabled: bool,
 }
