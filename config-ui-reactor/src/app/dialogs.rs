@@ -225,7 +225,7 @@ impl Shell {
         let mut rows: Vec<(usize, View)> = Vec::new();
         if let Some((text, is_error)) = &self.mt_status {
             rows.push((rows.len(), plugins_view::action_error(text)));
-            let _ = is_error;
+            let _ = is_error; // 对话框内统一红字渲染（views 侧才按 is_error 分流）
         }
 
         // 类型列表（既有自定义类型）+ 新建（405）
@@ -460,7 +460,7 @@ impl Shell {
         let mut rows: Vec<(usize, View)> = Vec::new();
         if let Some((text, is_error)) = &self.bh_status {
             rows.push((rows.len(), plugins_view::action_error(text)));
-            let _ = is_error;
+            let _ = is_error; // 对话框内统一红字渲染（views 侧才按 is_error 分流）
         }
 
         // 目录下拉 + 新建 + 立即生效

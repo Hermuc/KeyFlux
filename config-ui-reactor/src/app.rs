@@ -1081,6 +1081,8 @@ impl Component for Shell {
                     if let Some(behavior_id) = bound {
                         let _ = context.spawn_background(move |_token| {
                             let api = crate::services::transport::new_settings_api(port);
+                            // 吞错理由: 级联删除属清理性质, 失败留孤儿行为包无害;
+                            // 后台任务无 UI 通道, 经 Message 回传需跨线程转发, 保守不加。
                             let _ = api.delete_behavior(&behavior_id);
                             let _ = api.apply_behaviors();
                             Message::Noop
