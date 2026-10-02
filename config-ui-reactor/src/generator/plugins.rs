@@ -418,14 +418,19 @@ fn ahk_string_lit(s: &str) -> String {
 /// 当前唯一消费方 = quick_switch 的 `InitQuickSwitch(...)` 调用行（2026-10-01 P2
 /// 插件化：代码已随插件搬入 `data/plugins/quick_switch/`，提案
 /// `docs/contracts-proposals/quickswitch-pluginization.md`）。存在性/禁用判定与
-/// [`render_plugin_blocks`] 完全同构（同一 catalog + 同一 disabled 集 + 同一入口
+/// [`render_plugin_blocks`] 完全同构（同一 catalog + 同一 disabled/removed 集 + 同一入口
 /// 存在性校验），保证「插件不可用 ⇒ 初始化行不产出」（可删除性保证：AHK v2 直调
 /// 未定义函数是加载期致命错误）。配置段迁移到 plugin-settings.json 属 P5，届时
 /// 本函数对 quick_switch 的特判移除。
-pub fn render_late_init(config: &Config, plugins_dir: &Path, disabled: &HashSet<String>) -> String {
+pub fn render_late_init(
+    config: &Config,
+    plugins_dir: &Path,
+    disabled: &HashSet<String>,
+    removed: &HashSet<String>,
+) -> String {
     let catalog = load_catalog(plugins_dir);
     for manifest in &catalog.plugins {
-        if disabled.contains(&manifest.id) {
+        if removed.contains(&manifest.id) || disabled.contains(&manifest.id) {
             continue;
         }
         if manifest.entry.kind != "script" || manifest.entry.file.is_empty() {
@@ -529,11 +534,24 @@ fn ahk_manifest_literal(manifest: &Manifest) -> String {
 ///
 /// 单插件失败只产注释行，不影响其他插件（错误隔离）；入口文件在生成期做存在性与路径
 /// 安全校验（AHK 的 `#Include` 指向缺失文件会让整个脚本加载失败）。
-pub fn render_plugin_blocks(plugins_dir: &Path, disabled: &HashSet<String>) -> (String, String) {
+/// `removed` = 墓碑集（`config.options.plugins.removed`，2026-10-02 P4）：用户主动
+/// 删除的随包内置插件 —— 目录被同步带回时不复活（文案与 Go 同构，parity 产物一致）。
+pub fn render_plugin_blocks(
+    plugins_dir: &Path,
+    disabled: &HashSet<String>,
+    removed: &HashSet<String>,
+) -> (String, String) {
     let mut includes = String::new();
     let mut bootstrap = String::new();
     let catalog = load_catalog(plugins_dir);
     for manifest in &catalog.plugins {
+        if removed.contains(&manifest.id) {
+            bootstrap.push_str(&format!(
+                "\n; [插件] {} 已被用户移除 (墓碑), 跳过加载",
+                manifest.id
+            ));
+            continue;
+        }
         if disabled.contains(&manifest.id) {
             // 启停持久化（config.options.plugins.disabled）：停用插件不注入不注册。
             bootstrap.push_str(&format!(
@@ -636,7 +654,8 @@ mod tests {
     /// 注入块：示例插件各产出 1 行 Include + Register/LoadEntry。
     #[test]
     fn renders_include_and_bootstrap_for_example() {
-        let (includes, bootstrap) = render_plugin_blocks(&examples_dir(), &HashSet::new());
+        let (includes, bootstrap) =
+            render_plugin_blocks(&examples_dir(), &HashSet::new(), &HashSet::new());
         assert_eq!(
             includes,
             "\n#Include ../data/plugins/everything_search/main.ahk\n\
@@ -658,8 +677,11 @@ mod tests {
     /// 空目录 / 不存在的目录 ⇒ 两块皆空串（模板行尾拼接下产物字节不变）。
     #[test]
     fn empty_when_no_plugins() {
-        let (includes, bootstrap) =
-            render_plugin_blocks(std::path::Path::new("../data/nope"), &HashSet::new());
+        let (includes, bootstrap) = render_plugin_blocks(
+            std::path::Path::new("../data/nope"),
+            &HashSet::new(),
+            &HashSet::new(),
+        );
         assert!(includes.is_empty());
         assert!(bootstrap.is_empty());
     }
@@ -668,7 +690,8 @@ mod tests {
     #[test]
     fn disabled_plugin_is_skipped_with_comment() {
         let disabled: HashSet<String> = ["everything_search".to_string()].into_iter().collect();
-        let (includes, bootstrap) = render_plugin_blocks(&examples_dir(), &disabled);
+        let (includes, bootstrap) =
+            render_plugin_blocks(&examples_dir(), &disabled, &HashSet::new());
         assert_eq!(includes, "\n#Include ../data/plugins/quick_switch/main.ahk");
         assert!(bootstrap.contains("\n; [插件] everything_search 已在配置中停用, 跳过加载"));
         assert!(
@@ -677,6 +700,28 @@ mod tests {
         );
         assert!(
             bootstrap.contains("\nPluginManager.Register(Map(\"id\", \"quick_switch\""),
+            "{bootstrap}"
+        );
+    }
+
+    /// 墓碑（2026-10-02 P4）：removed 中的随包内置插件不注入、只产注释行 ——
+    /// 目录被 sync-plugins 带回时不复活（文案与 Go 同构）。
+    #[test]
+    fn removed_plugin_tombstone_skips_injection() {
+        let removed: HashSet<String> = ["quick_switch".to_string()].into_iter().collect();
+        let (includes, bootstrap) =
+            render_plugin_blocks(&examples_dir(), &HashSet::new(), &removed);
+        assert_eq!(
+            includes,
+            "\n#Include ../data/plugins/everything_search/main.ahk"
+        );
+        assert!(bootstrap.contains("\n; [插件] quick_switch 已被用户移除 (墓碑), 跳过加载"));
+        assert!(
+            !bootstrap.contains("\nPluginManager.Register(Map(\"id\", \"quick_switch\""),
+            "{bootstrap}"
+        );
+        assert!(
+            bootstrap.contains("\nPluginManager.LoadEntry(\"everything_search\")"),
             "{bootstrap}"
         );
     }

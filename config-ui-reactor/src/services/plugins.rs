@@ -76,10 +76,20 @@ pub fn is_builtin(id: &str) -> bool {
 /// 经 [`card_from`] 渲染（带版本号/作者/manifest 描述）。开关语义不变：
 /// builtin 卡的 enabled 读 `options.quickSwitch.collect_enabled`（见 card_from），
 /// 写回走 [`apply_enabled`] 的 is_builtin 分支。
+/// 墓碑 (2026-10-02 P4)：`options.plugins.removed` 中的 ID 不出卡（目录可能被
+/// sync-plugins 带回，墓碑保证「删了不复活」）。
 pub fn build_cards(config: &Config, catalog: &PluginListResponse) -> Vec<PluginCard> {
     catalog
         .plugins
         .iter()
+        .filter(|manifest| {
+            !config
+                .options
+                .plugins
+                .removed
+                .iter()
+                .any(|id| id == &manifest.id)
+        })
         .map(|manifest| card_from(config, manifest))
         .collect()
 }
@@ -95,7 +105,9 @@ pub fn card_from(config: &Config, manifest: &PluginManifest) -> PluginCard {
         description: manifest.description.clone().unwrap_or_default(),
         author: manifest.author.clone().unwrap_or_default(),
         is_builtin: builtin,
-        can_delete: !builtin,
+        // 2026-10-02 P4: builtin 也放行删除 —— 随包内置插件删目录 + 墓碑
+        // (remove_from_registry 写入), 删了不复活; 引擎侧 P2 已解耦, 安全。
+        can_delete: true,
         can_configure: builtin
             || manifest
                 .settings
@@ -148,12 +160,25 @@ pub fn apply_enabled(config: &mut Config, card_id: &str, is_builtin: bool, enabl
     true
 }
 
-/// 删除插件后清理注册表孤儿项（复刻 `DeletePlugin` 的收尾），返回是否发生变更。
+/// 删除插件后的注册表收尾（复刻 `DeletePlugin` 的收尾），返回是否发生变更。
+///
+/// 2026-10-02 P4 墓碑：**随包内置**插件的删除要把 ID 记入
+/// `config.options.plugins.removed`（否则 sync-plugins / 重装会把它带回）；
+/// 用户插件只清 disabled 孤儿项（删了就是删了，重装 = 重新导入）。
 pub fn remove_from_registry(config: &mut Config, card_id: &str) -> bool {
     let registry = &mut config.options.plugins.disabled;
     let before = registry.len();
     registry.retain(|id| id != card_id);
-    before != registry.len()
+    let mut changed = before != registry.len();
+
+    if is_builtin(card_id) {
+        let tombstones = &mut config.options.plugins.removed;
+        if !tombstones.iter().any(|id| id == card_id) {
+            tombstones.push(card_id.to_string());
+            changed = true;
+        }
+    }
+    changed
 }
 
 /// 页面空态判定（复刻 `ShowEmptyState`：加载完成、无告警、且无用户插件）。
@@ -437,7 +462,7 @@ mod tests {
         let card = &cards[0];
         assert_eq!(card.id, QUICK_SWITCH_ID);
         assert!(card.is_builtin);
-        assert!(!card.can_delete, "内置卡不可删除 (墓碑属 P4)");
+        assert!(card.can_delete, "内置卡可删除 (P4 放行 + 墓碑)");
         assert!(card.can_configure, "内置卡可配置");
         assert!(card.enabled, "开关状态源 = collectEnabled");
         assert_eq!(card.version_text(), "v1.0.0", "版本号来自 manifest");
@@ -449,6 +474,7 @@ mod tests {
         config.options.quick_switch.collect_enabled = false;
         config.options.plugins = PluginsOption {
             disabled: vec!["b".to_string()],
+            removed: vec![],
         };
         let catalog = PluginListResponse {
             plugins: vec![
@@ -470,11 +496,12 @@ mod tests {
     }
 
     #[test]
-    fn builtin_id_in_catalog_is_not_deletable() {
+    fn builtin_id_in_catalog_is_deletable_with_tombstone() {
+        // 2026-10-02 P4: builtin 放行删除 (删目录 + 墓碑, 删了不复活)。
         let config = Config::default();
         let card = card_from(&config, &manifest(QUICK_SWITCH_ID, "QS", None, 0));
         assert!(card.is_builtin, "目录里出现内置 ID 也按内置判定");
-        assert!(!card.can_delete);
+        assert!(card.can_delete, "内置卡可删除 (P4 放行)");
         assert!(card.can_configure);
     }
 
@@ -531,6 +558,42 @@ mod tests {
         assert!(remove_from_registry(&mut config, "a"));
         assert_eq!(config.options.plugins.disabled, vec!["b".to_string()]);
         assert!(!remove_from_registry(&mut config, "zzz"), "不存在 ⇒ 无变化");
+    }
+
+    /// 墓碑 (2026-10-02 P4)：删除随包内置插件 ⇒ ID 记入
+    /// `options.plugins.removed`（重复删除幂等）；用户插件删除不进墓碑。
+    #[test]
+    fn removing_builtin_writes_tombstone() {
+        let mut config = Config::default();
+        config.options.plugins.disabled = vec![QUICK_SWITCH_ID.to_string()];
+        assert!(remove_from_registry(&mut config, QUICK_SWITCH_ID));
+        assert!(
+            config
+                .options
+                .plugins
+                .removed
+                .contains(&QUICK_SWITCH_ID.to_string()),
+            "内置删除 ⇒ 墓碑"
+        );
+        assert!(
+            !config
+                .options
+                .plugins
+                .disabled
+                .contains(&QUICK_SWITCH_ID.to_string()),
+            "disabled 孤儿项照常清理"
+        );
+        // 幂等：目录已在墓碑中（重开面板再删一次不会再触发保存）
+        assert!(!remove_from_registry(&mut config, QUICK_SWITCH_ID));
+
+        // 用户插件：不进墓碑（未登记 disabled 时删除 = 无注册表变更，返回 false）
+        let mut config2 = Config::default();
+        config2.options.plugins.disabled = vec!["a".to_string()];
+        assert!(remove_from_registry(&mut config2, "a"));
+        assert!(
+            config2.options.plugins.removed.is_empty(),
+            "用户插件不进墓碑"
+        );
     }
 
     #[test]

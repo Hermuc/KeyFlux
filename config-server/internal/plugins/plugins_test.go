@@ -219,3 +219,17 @@ func TestBuiltinID_CatalogAllowsInstallRejects(t *testing.T) {
 		t.Fatalf("导入 API 应拒绝内置 ID 冒名")
 	}
 }
+
+// 2026-10-02 P4: Remove 放行内置 ID (随包内置插件可删除; 墓碑由面板 config
+// 状态源负责, 本函数只删目录)。
+func TestRemove_AllowsBuiltinID(t *testing.T) {
+	dir := t.TempDir()
+	pdir := filepath.Join(dir, "quick_switch")
+	os.MkdirAll(pdir, 0o755)
+	if err := Remove(dir, "quick_switch"); err != nil {
+		t.Fatalf("内置 ID 删除应放行: %v", err)
+	}
+	if _, err := os.Stat(pdir); !os.IsNotExist(err) {
+		t.Fatalf("目录应已删除")
+	}
+}

@@ -187,8 +187,13 @@ type CommandFontOption struct {
 
 // PluginsOption 插件注册表 (第三方插件启用状态)。「disabled」= 已停用插件 ID 集,
 // 缺省 (不在列表中) = 启用: 新导入插件默认启用无需写注册表; 引擎运行时就绪后按此表过滤加载。
+// 「removed」= 用户主动删除的**随包内置**插件 ID 墓碑 (2026-10-02 P4): 随包插件删了会被
+// sync-plugins / 重装带回, 墓碑让生成器跳过注入、UI 不出卡、同步通道不放行。
+// 🔴 omitempty: 空 (常态) 时字段从 config.json 消失 —— 与 Rust skip_serializing_if
+// 同构, 保证 GET /config 产物对旧基线逐字节等价 (裸字段会产生 "removed":null vs [] 分歧)。
 type PluginsOption struct {
 	Disabled []string `json:"disabled"`
+	Removed  []string `json:"removed,omitempty"`
 }
 
 // QuickSwitchOption 「快速切换 QuickSwitch」阶段 1 配置段 (config.json 的 options.quickSwitch)。

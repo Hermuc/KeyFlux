@@ -497,11 +497,11 @@ func extractZipFile(f *zip.File, dest string) error {
 	return err
 }
 
-// Remove 删除用户插件目录 (id 已由正则保证无路径穿越字符; 内置 ID 双重拒绝)。
+// Remove 删除用户插件目录 (id 已由正则保证无路径穿越字符)。
+// 2026-10-02 P4 放行内置 ID：随包内置插件 (quick_switch) 可删除 —— 目录移除 +
+// 面板把 ID 记入 config.options.plugins.removed 墓碑 (墓碑属 config 状态源, 由
+// 面板经 PUT /config 持久化; 本函数只删目录), 生成器与同步通道按墓碑跳过。
 func Remove(userDir, id string) error {
-	if BuiltinPluginIDs[id] {
-		return fmt.Errorf("插件 ID %q 与内置插件冲突", id)
-	}
 	if !idPattern.MatchString(id) {
 		return fmt.Errorf("插件 ID %q 不合法", id)
 	}

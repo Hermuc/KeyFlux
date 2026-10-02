@@ -530,11 +530,10 @@ pub(crate) fn delete_plugin(ctx: &ServerContext, id: &str) -> HttpReply {
     }
 }
 
-/// Go `plugins.Remove`：内置 ID / 非法 ID / 不存在均拒绝。
+/// Go `plugins.Remove`：非法 ID / 不存在均拒绝。
+/// 2026-10-02 P4 放行内置 ID：随包内置插件可删除（目录移除 + 面板写墓碑
+/// `config.options.plugins.removed`，与本函数同构 —— 墓碑属 config 状态源）。
 fn remove_plugin(user_dir: &Path, id: &str) -> Result<(), String> {
-    if gplugins::BUILTIN_PLUGIN_IDS.contains(&id) {
-        return Err(format!("插件 ID {id:?} 与内置插件冲突"));
-    }
     if !super::settings_store::is_valid_plugin_id(id) {
         return Err(format!("插件 ID {id:?} 不合法"));
     }
