@@ -642,9 +642,10 @@ impl Shell {
                 }
             }))
             .content(
+                // 125% DPI 下内容区 ~496 DIP（同 441 行注释）：520 会把「新增一个」推出裁掉
                 ScrollViewer::new()
                     .max_height(460.0)
-                    .min_width(520.0)
+                    .min_width(480.0)
                     .content(StackPanel::new().spacing(8.0).keyed_children(rows)),
             )
     }
@@ -669,7 +670,7 @@ impl Shell {
                 .text(self.guide_edit_text.clone())
                 .accepts_return(true)
                 .min_height(320.0)
-                .min_width(560.0)
+                .min_width(480.0)
                 .on_text_changed(context.callback(|value: String| Message::GuideEditValue(value))),
             Button::new()
                 .on_click(context.message(Message::GuideEditReset))
@@ -708,7 +709,8 @@ impl Shell {
             .content(
                 ScrollViewer::new()
                     .max_height(480.0)
-                    .min_width(560.0)
+                    // 内容区 ~496 DIP：560 会把右侧推出裁掉（同 441 行注释）
+                    .min_width(480.0)
                     .content(self.action_editor_panel(context)),
             )
     }
@@ -768,7 +770,8 @@ impl Shell {
             .content(
                 ScrollViewer::new()
                     .max_height(460.0)
-                    .min_width(520.0)
+                    // 内容区 ~496 DIP：520 会把右侧裁掉（同 441 行注释）
+                    .min_width(480.0)
                     .content(StackPanel::new().spacing(0.0).keyed_children(rows)),
             )
     }
