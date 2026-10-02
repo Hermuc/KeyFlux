@@ -1768,7 +1768,7 @@ impl Component for Shell {
         // （用户实测截图）；Standard 与行内分隔线对齐，且与常规桌面应用观感一致。
         let title_bar: View = TitleBar::new()
             .grid_row(0)
-            .title("KeyFlux 设置面板")
+            .title("设置面板")
             .preferred_height(WindowTitleBarHeight::Standard)
             .into();
 
