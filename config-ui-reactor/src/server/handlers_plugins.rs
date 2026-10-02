@@ -41,6 +41,9 @@ pub(crate) struct WireEntry {
     pub file: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub func: String,
+    /// Go `Entry.Late`（P7a；omitempty ⇒ 空串省略）。
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub late: String,
 }
 
 /// Go `plugins.Setting` 的 wire 投影。字段序 = Go 声明序。
@@ -97,6 +100,25 @@ fn serialize_go_f64_opt<S: serde::Serializer>(
     }
 }
 
+/// Go `plugins.ProvidedAction` 的 wire 投影。字段序 = Go 声明序。
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub(crate) struct WireAction {
+    pub id: String,
+    pub label: String,
+    #[serde(rename = "labelEn", skip_serializing_if = "String::is_empty")]
+    pub label_en: String,
+    pub kind: String,
+}
+
+/// Go `plugins.Provides` 的 wire 投影（`actions` omitempty）。
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub(crate) struct WireProvides {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<WireAction>,
+}
+
 /// Go `plugins.Manifest` 的 wire 投影。`settings` omitempty（len==0 不出场）。
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
@@ -118,6 +140,9 @@ pub(crate) struct WireManifest {
     pub permissions: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub settings: Option<Vec<WireSetting>>,
+    /// Go `Manifest.Provides`（P7a；`*Provides` omitempty ⇒ nil 不出场）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provides: Option<WireProvides>,
 }
 
 impl WireSetting {
@@ -169,6 +194,7 @@ impl WireManifest {
                 kind: self.entry.kind.clone(),
                 file: self.entry.file.clone(),
                 func: self.entry.func.clone(),
+                late: self.entry.late.clone(),
             },
             permissions: self.permissions.clone().unwrap_or_default(),
             settings: self
@@ -189,6 +215,18 @@ impl WireManifest {
                     multiline: setting.multiline,
                 })
                 .collect(),
+            provides: self.provides.as_ref().map(|provides| gplugins::Provides {
+                actions: provides
+                    .actions
+                    .iter()
+                    .map(|action| gplugins::ProvidedAction {
+                        id: action.id.clone(),
+                        label: action.label.clone(),
+                        label_en: action.label_en.clone(),
+                        kind: action.kind.clone(),
+                    })
+                    .collect(),
+            }),
         }
     }
 }

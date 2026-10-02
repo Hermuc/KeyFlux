@@ -33,6 +33,9 @@ pub struct PluginManifest {
     /// 声明式设置项：**非空**即表示该插件可配置。
     #[serde(default)]
     pub settings: Option<Vec<PluginSetting>>,
+    /// 能力提供块（P7a 协议扩容；缺省 = 无。消费方 = P7b 动作下拉动态化）。
+    #[serde(default)]
+    pub provides: Option<PluginProvides>,
 }
 
 /// 插件入口声明。
@@ -45,6 +48,9 @@ pub struct PluginEntry {
     pub file: Option<String>,
     #[serde(default)]
     pub func: Option<String>,
+    /// 晚初始化函数名（P7a；可选，生成端渲染为无参调用）。
+    #[serde(default)]
+    pub late: Option<String>,
 }
 
 impl Default for PluginEntry {
@@ -53,12 +59,35 @@ impl Default for PluginEntry {
             kind: default_kind(),
             file: None,
             func: None,
+            late: None,
         }
     }
 }
 
 fn default_kind() -> String {
     "script".to_string()
+}
+
+/// 插件对外提供的一等动作（P7a；全局动作 ID = `<pluginId>.<actionId>`）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginProvidedAction {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub label_en: Option<String>,
+    #[serde(default)]
+    pub kind: String,
+}
+
+/// manifest 的能力提供块。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginProvides {
+    #[serde(default)]
+    pub actions: Vec<PluginProvidedAction>,
 }
 
 /// `GET /api/plugins` 响应：用户插件列表（ID 字典序）+ 逐包加载告警。
