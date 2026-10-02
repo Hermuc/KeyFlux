@@ -1,8 +1,8 @@
 //! 双语文案表（沿用旧版 `Resources/i18n.json` 的**格式与语义**）。
 //!
 //! 契约（逐字对齐 `config-ui-avalonia/Services/I18n.cs`）：
-//! * 表结构：`{ "<key>": { "zh": "...", "en": "..." } }`，键为字符串（数字键 + 6 个非数字键
-//!   `301err` / `301hint` / `1101_applied` / `1102_deleted` / `1103_only` / `1104_any`）；
+//! * 表结构：`{ "<key>": { "zh": "...", "en": "..." } }`，键为字符串（数字键 + 5 个非数字键
+//!   `301err` / `301hint` / `1102_deleted` / `1103_only` / `1104_any`）；
 //! * `t(key)`：空 key → `""`；剥掉 `label:` 前缀；按当前语言取值，为空则回退另一语言，
 //!   仍为空则**原样返回 key**；
 //! * `t_fmt(key, args)`：占位符 `{0}` `{1}`…；**占位符不匹配不抛异常**，回退未填充模板；
@@ -133,19 +133,12 @@ mod tests {
         // 2026-10-02 实测：392 = 数字键 + 6 个非数字键（较 401 删 QuickSwitch 专用对话框
         // 文案 2408-2415（P6 退役零引用）+ 2596（30d46a4 定版后失去消费方）；
         // 选项页「亚克力毛玻璃效果」标签 + 其偏好保存失败提示）。
-        assert_eq!(key_count(), 392, "i18n 键数变化时必须同步本断言");
+        assert_eq!(key_count(), 390, "i18n 键数变化时必须同步本断言");
     }
 
     #[test]
     fn non_numeric_keys_exist() {
-        for k in [
-            "301err",
-            "301hint",
-            "1101_applied",
-            "1102_deleted",
-            "1103_only",
-            "1104_any",
-        ] {
+        for k in ["301err", "301hint", "1102_deleted", "1103_only", "1104_any"] {
             assert!(table().contains_key(k), "缺少非数字键 {k}");
         }
     }

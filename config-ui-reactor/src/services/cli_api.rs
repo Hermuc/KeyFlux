@@ -287,14 +287,6 @@ impl SettingsApi for CliSettingsApi {
     fn delete_behavior(&self, id: &str) -> ApiResponse<MessageBody> {
         self.call("DELETE", &format!("/api/behaviors/{id}"), None)
     }
-
-    fn apply_behaviors(&self) -> ApiResponse<MessageBody> {
-        self.call(
-            "POST",
-            "/api/behaviors/apply",
-            Some((b"{}", "application/json")),
-        )
-    }
 }
 
 /// 生产桥执行器：写 body 到临时文件 → 启 `settings.exe Call ...` → 读 out 文件与 stdout 契约行。

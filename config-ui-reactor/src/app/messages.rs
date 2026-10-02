@@ -236,8 +236,6 @@ pub enum Message {
     SaAddConfirm,
     /// 「添加映射」取消。
     SaAddCancel,
-    /// 行为编辑后的尾随保存（800ms 防抖到期且仍是最新一代 ⇒ 真正落盘）。
-    SaSaveThrottled,
     // ---------------------------------------------------------- 匹配类型管理
     /// 打开「管理匹配类型」对话框（2519）。
     MatchTypesOpen,
@@ -311,14 +309,10 @@ pub enum Message {
     BhSave,
     /// 删除（仅用户包）。
     BhDelete,
-    /// 立即生效（`POST /api/behaviors/apply`，重启引擎）。
-    BhApplyNow,
     /// 行为目录刷新完成（保存/删除后重拉）。
     BhReloaded(Result<(), String>),
     /// 保存结果。
     BhSaved(Result<(), String>),
-    /// 应用结果（Err = 失败原因；Ok 忽略 `restartFailed` 差异——引擎重启失败由 1079 引导）。
-    BhApplied(Result<(), String>),
     /// 行为目录快照到达（Ready 后台拉取 `GET /api/behaviors`）。
     BehaviorsLoaded(Result<Box<sa::Catalog>, String>),
     // ------------------------------------------------------------- 插件页

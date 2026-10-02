@@ -15,7 +15,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use windows_reactor::*;
 
@@ -104,16 +104,12 @@ pub struct Shell {
     ps_open: bool,
     /// 插件设置对话框保存进行中（防在结果返回前重复提交）。
     ps_saving: bool,
-    /// 选中动作页启用开关的**保存前值**（保存失败时回滚显示态，复刻 `SaveEnableAsync`）。
-    sa_enable_prev: Option<bool>,
     /// 「删除映射」确认框是否打开（1109 文案）。
     sa_delete_confirm: bool,
     /// 选中动作页页内状态条（▶ 执行失败等；`(文本, 是否错误)`）。
     sa_status: Option<(String, bool)>,
     /// 「添加映射」弹窗草稿（`None` = 关闭）。
     sa_add: Option<SaAddDraft>,
-    /// 行为编辑尾随保存的代际计数（防抖窗口内新编辑使旧定时器失效）。
-    sa_save_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// 键位/缩写页右侧备注汇总是否折叠（默认展开；折叠以优先保证键盘网格完整显示）。
     comments_collapsed: bool,
     /// 选项页「亚克力毛玻璃效果」状态（持久化于面板私有偏好文件 `data/ui-prefs.json`）。
@@ -125,7 +121,7 @@ pub struct Shell {
     mt_dialog: bool,
     /// 文件后缀卡内联后缀编辑器：(分组下标, 未落盘文本)——None = 干净态。
     exts_edit: Option<(usize, String)>,
-    /// 尾随保存代际（防抖复刻 sa_save_gen 模式）。
+    /// 尾随归一代际（800ms 防抖只做**内存**归一，落盘统一走页脚保存）。
     exts_save_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// 匹配类型编辑草稿（`None` = 未进入编辑/已清）。
     mt_draft: Option<match_types_edit::MatchTypeDraft>,
@@ -219,11 +215,9 @@ impl Component for Shell {
             ps_error: None,
             ps_open: false,
             ps_saving: false,
-            sa_enable_prev: None,
             sa_delete_confirm: false,
             sa_status: None,
             sa_add: None,
-            sa_save_gen: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             comments_collapsed: false,
             acrylic: false,
             pane_overlay_open: true,
@@ -452,22 +446,7 @@ impl Component for Shell {
                 let slot = Arc::clone(&self.session);
                 let _ = context.spawn_background(move |_token| load_backend(slot));
             }
-            Message::Save => {
-                let (Some(config), Some(port)) = (self.config.clone(), self.port) else {
-                    return;
-                };
-                // 1 秒节流（复刻 `SaveCommand` 的 useThrottleFn(1000)）；开关等即时保存走
-                // `save_now` 不受限流
-                if let Some(last) = self.last_save
-                    && last.elapsed() < Duration::from_secs(1)
-                {
-                    return;
-                }
-                self.last_save = Some(Instant::now());
-                self.notice = None;
-                let _ = context
-                    .spawn_background(move |_token| Message::SaveFinished(save(port, &config)));
-            }
+            Message::Save => self.save_now(context),
             Message::ClearNotice => {
                 if !self.notice_error {
                     self.notice = None;
@@ -482,18 +461,11 @@ impl Component for Shell {
                     self.notice = Some(text);
                     // 保存成功 ⇒ 导航即时重建（方案启停等变化反映到侧栏，复刻 BuildNav）
                     self.rebuild_nav();
-                    self.sa_enable_prev = None;
                     self.schedule_notice_clear(context);
                 }
                 Err(reason) => {
                     self.notice_error = true;
                     self.notice = Some(reason);
-                    // 启用开关保存失败 ⇒ 回滚显示态（复刻 `SaveEnableAsync`）
-                    if let Some(previous) = self.sa_enable_prev.take()
-                        && let Some(config) = self.config.as_mut()
-                    {
-                        config.selected_action.enable = previous;
-                    }
                 }
             },
             Message::Notice(result) => match result {
@@ -536,16 +508,11 @@ impl Component for Shell {
                 }
             }
             Message::SaEnable(enabled) => {
-                // 记录保存前值：失败时回滚显示态（复刻 `SaveEnableAsync`）
-                self.sa_enable_prev = self
-                    .config
-                    .as_ref()
-                    .map(|config| config.selected_action.enable);
+                // 只改内存态（保存策略：唯一落盘入口 = 页脚「保存配置」；旧版
+                // `SaveEnableAsync` 的"开关即保存 + 失败回滚"已随自动保存一起退役）
                 if let Some(config) = self.config.as_mut() {
                     config.selected_action.enable = enabled;
                 }
-                // 启用开关 = 立即保存（对齐旧版 SaveEnableAsync 语义）
-                self.save_now(context);
             }
             Message::SaSelectToggle { match_type, id } => match match_type {
                 MATCH_TEXT_TYPE => self.sa_text_sel = Some(id),
@@ -559,7 +526,7 @@ impl Component for Shell {
                 if id.is_empty() {
                     return;
                 }
-                // 仅已配置（存在 mapping）的类型可删；打开确认框（1109，确认才落盘）
+                // 仅已配置（存在 mapping）的类型可删；打开确认框（1109，确认才应用，保存配置才落盘）
                 let has_mapping = self.config.as_ref().is_some_and(|config| {
                     [MATCH_TEXT_TYPE, MATCH_FILE_EXT].iter().any(|match_type| {
                         sa::find_mapping_for_type(config, match_type, &id).is_some()
@@ -570,7 +537,6 @@ impl Component for Shell {
             Message::SaDeleteCancelled => self.sa_delete_confirm = false,
             Message::SaDeleteConfirmed => {
                 self.sa_delete_confirm = false;
-                let mut removed = false;
                 for match_type in [MATCH_TEXT_TYPE, MATCH_FILE_EXT] {
                     let id = self.sa_selected_id(match_type).unwrap_or_default();
                     if id.is_empty() {
@@ -581,14 +547,10 @@ impl Component for Shell {
                             sa::find_mapping_index_for_type(config, match_type, &id)
                     {
                         config.selected_action.mappings.remove(position);
-                        removed = true;
                         self.reset_sa_selection(match_type);
                     }
                 }
-                if removed {
-                    // 删除即保存（复刻旧版「确认后立即保存」）
-                    self.save_now(context);
-                }
+                // 只删内存映射（确认才应用；落盘统一走页脚「保存配置」）
             }
             Message::SaPlaySample => {
                 let Some(port) = self.port else {
@@ -620,7 +582,6 @@ impl Component for Shell {
             },
             Message::SaAddBehavior { match_type } => {
                 self.add_behavior(match_type);
-                self.request_sa_throttled_save(context);
             }
             Message::SaRemoveEntry { match_type, index } => {
                 let id = self.sa_selected_id(match_type).unwrap_or_default();
@@ -631,7 +592,6 @@ impl Component for Shell {
                     // 至少保留一个行为（旧版 1108 语义；空 entries 会被后端 400 拒绝）
                     mapping.entries.remove(index);
                 }
-                self.save_now(context);
             }
             Message::SaEntrySwitch {
                 match_type,
@@ -674,7 +634,6 @@ impl Component for Shell {
                 {
                     mapping.entries[index] = replacement;
                 }
-                self.request_sa_throttled_save(context);
             }
             Message::SaEntryMove {
                 match_type,
@@ -690,7 +649,6 @@ impl Component for Shell {
                         mapping.entries.swap(index, target as usize);
                     }
                 }
-                self.request_sa_throttled_save(context);
             }
             Message::SaEntryValue {
                 match_type,
@@ -704,7 +662,6 @@ impl Component for Shell {
                 {
                     entry.action_value = value;
                 }
-                self.request_sa_throttled_save(context);
             }
             Message::SaEntryWorkingDir {
                 match_type,
@@ -718,9 +675,7 @@ impl Component for Shell {
                 {
                     entry.working_dir = value;
                 }
-                self.request_sa_throttled_save(context);
             }
-            Message::SaSaveThrottled => self.save_now(context),
             Message::SaPlayDone(result) => {
                 self.sa_status = match result {
                     // 成功：引擎侧可见执行，不打扰（旧版 StatusText 仅承载失败）
@@ -831,7 +786,6 @@ impl Component for Shell {
                         entries,
                     });
                 self.sa_add = None;
-                self.save_now(context);
             }
             // ---------------------------------------------------------- 匹配类型管理
             Message::MatchTypesOpen => {
@@ -914,7 +868,8 @@ impl Component for Shell {
             Message::MtExts(value) => self.mt_edit_draft(|draft| draft.exts = value),
             Message::SaExtsEditValue(index, value) => {
                 self.exts_edit = Some((index, value));
-                // 800ms 尾随保存（generation 防抖，复刻行为编辑语义）
+                // 800ms 尾随**归一**（generation 防抖，复刻行为编辑语义）——只把后缀串
+                // 归一写回内存 config（chips 数据源），落盘统一走页脚「保存配置」。
                 let generation = self
                     .exts_save_gen
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
@@ -938,10 +893,8 @@ impl Component for Shell {
                     return;
                 };
                 self.exts_edit = None;
-                // 复用匹配类型编辑链：from_existing 草稿改 exts → MtSave(false)
-                // （validate + normalize_exts + save_now 全走既有路径；校验失败经
-                // mt_status 回显在卡片内联编辑器下方）。
-                // 直接写 file_groups[index].exts（chips 数据源）+ 归一 + save_now
+                // 直接写 file_groups[index].exts（chips 数据源）+ 归一（内存态；
+                // 落盘统一走页脚「保存配置」）
                 let mut config_holder = self.config.clone();
                 let applied = config_holder.as_mut().and_then(|config| {
                     config.file_groups.get_mut(index).map(|fg| {
@@ -950,7 +903,6 @@ impl Component for Shell {
                 });
                 if applied.is_some() {
                     self.config = config_holder;
-                    self.save_now(context);
                 }
             }
             Message::MtSave(with_behavior) => {
@@ -988,7 +940,6 @@ impl Component for Shell {
                 match_types_edit::apply(config, &draft);
                 self.config = config_holder;
                 self.mt_status = None;
-                self.save_now(context);
 
                 if with_behavior {
                     // 「保存并创建专属行为」：建一个强绑定本类型的行为包
@@ -1070,7 +1021,9 @@ impl Component for Shell {
                     return;
                 };
                 self.config = config_holder;
-                // 级联删同名专属行为包（bound_type_id 命中）
+                // 级联删同名专属行为包（bound_type_id 命中）。行为包属**行为库独立存储**
+                // （同 BhDelete 语义，立即生效）；匹配类型本身只改内存 config，
+                // 落盘统一走页脚「保存配置」。
                 if let Some(port) = self.port {
                     let type_ref = format!("type:{type_id}");
                     let bound = self
@@ -1085,13 +1038,11 @@ impl Component for Shell {
                             // 吞错理由: 级联删除属清理性质, 失败留孤儿行为包无害;
                             // 后台任务无 UI 通道, 经 Message 回传需跨线程转发, 保守不加。
                             let _ = api.delete_behavior(&behavior_id);
-                            let _ = api.apply_behaviors();
                             Message::Noop
                         });
                     }
                 }
                 self.mt_draft = None;
-                self.save_now(context);
             }
             Message::MtTest(content) => {
                 self.mt_test = content;
@@ -1283,27 +1234,6 @@ impl Component for Shell {
                     })
                 });
             }
-            Message::BhApplyNow => {
-                let Some(port) = self.port else {
-                    return;
-                };
-                let _ = context.spawn_background(move |_token| {
-                    let api = crate::services::transport::new_settings_api(port);
-                    let response = api.apply_behaviors();
-                    Message::BhApplied(if response.success {
-                        Ok(())
-                    } else {
-                        Err(response
-                            .error_message
-                            .unwrap_or_else(|| format!("HTTP {}", response.status)))
-                    })
-                });
-            }
-            Message::BhApplied(result) => match result {
-                // 1101_applied 已含「若未恢复请托盘重载」引导
-                Ok(()) => self.bh_status = Some((i18n::t("1101_applied"), false)),
-                Err(reason) => self.bh_status = Some((reason, true)),
-            },
             Message::BhReloaded(result) => {
                 if let Err(reason) = result {
                     self.bh_status = Some((reason, true));
@@ -1318,23 +1248,24 @@ impl Component for Shell {
             Message::GuideEditValue(value) => self.guide_edit_text = value,
             Message::GuideEditReset => {
                 // 复刻旧 `OverviewEditWindow`：清空 = 恢复默认文档（引擎回落站内 config_doc.md）
+                // 只改内存态（清空文本 + config 置空），落盘统一走页脚「保存配置」
                 self.guide_edit_text.clear();
                 if let Some(config) = self.config.as_mut() {
                     config.overview_doc_md = String::new();
                 }
                 self.doc_md.clear();
                 self.guide_edit_open = false;
-                self.save_now(context);
             }
             Message::GuideEditClose => self.guide_edit_open = false,
             Message::GuideEditSave => {
                 let text = std::mem::take(&mut self.guide_edit_text);
                 self.doc_md = text.clone();
                 self.guide_edit_open = false;
+                // 「保存」= 应用到内存 config（对话框草稿 → 工作副本）；落盘统一走
+                // 页脚「保存配置」（保存策略：唯一落盘入口）
                 if let Some(config) = self.config.as_mut() {
                     config.overview_doc_md = text;
                 }
-                self.save_now(context);
             }
             // ---------------------------------------------------------- 自定义热键动作编辑
             Message::CustomHotkeyEdit(row) => {
@@ -1379,15 +1310,12 @@ impl Component for Shell {
                 is_builtin,
                 enabled,
             } => {
-                let changed = self
+                // 只改内存态（保存策略：唯一落盘入口 = 页脚「保存配置」；旧版
+                // "开关即保存 + 重启引擎" 已随自动保存一起退役，启用在保存后生效）
+                let _ = self
                     .config
                     .as_mut()
-                    .map(|config| plugins::apply_enabled(config, &id, is_builtin, enabled))
-                    .unwrap_or(false);
-                if changed {
-                    // 开关即保存（旧版 `SaveAsync(force: true)`：PUT /config 会重生成脚本并重启引擎）
-                    self.save_now(context);
-                }
+                    .map(|config| plugins::apply_enabled(config, &id, is_builtin, enabled));
             }
             Message::PluginDelete(id) => {
                 if let Some(port) = self.port {
@@ -1423,14 +1351,11 @@ impl Component for Shell {
                                 .map(|manifest| manifest.bundled)
                         })
                         .unwrap_or(false);
-                    let cleaned = self
+                    // 注册表清理只改内存 config，落盘统一走页脚「保存配置」
+                    let _ = self
                         .config
                         .as_mut()
-                        .map(|config| plugins::remove_from_registry(config, &id, bundled))
-                        .unwrap_or(false);
-                    if cleaned {
-                        self.save_now(context);
-                    }
+                        .map(|config| plugins::remove_from_registry(config, &id, bundled));
                     self.reload_plugins(context);
                 }
                 Err(reason) => {

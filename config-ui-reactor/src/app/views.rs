@@ -272,7 +272,8 @@ impl Shell {
 
         // 文件后缀卡专属：常驻可编辑后缀框（直接展示/编辑当前选中**分组**的后缀串；
         // 数据源 = `config.file_groups`（chips 即由此渲染，预设分组出厂自带后缀）；
-        // 文本特征卡不渲染。改动经 800ms 尾随保存直接写 file_groups + save_now。
+        // 文本特征卡不渲染。改动经 800ms 尾随防抖归一写回内存 file_groups（chips 数据源），
+        // 落盘统一走页脚「保存配置」（无自动保存，2026-10-02 定版）。
         // 仅「group:」chip 可编辑（自定义类型 type: / 孤儿 orphan: 无 exts 数据源）。
         let exts_editor: View = if match_type == MATCH_FILE_EXT {
             let group_index = sel_id

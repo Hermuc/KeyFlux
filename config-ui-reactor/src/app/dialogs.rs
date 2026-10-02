@@ -451,7 +451,10 @@ impl Shell {
 
     /// 「管理行为」对话框（复刻 `BehaviorLibraryWindow` 的主从编辑）：
     /// 目录下拉（内置 ★ 标注）+ 新建 + 表单（ID/名称/描述/前提行/基础动作/模板/工作目录）
-    /// + 删除 + 立即生效（1094）。内置包只读（1103_only）。
+    /// + 删除。内置包只读（1103_only）。
+    ///
+    /// 🔴 「立即生效」按钮已移除（2026-10-02 用户定版）：行为变更经页脚
+    /// 「保存配置」重启引擎后生效，不再提供绕过保存链路的即时应用入口。
     pub(super) fn sa_behaviors_dialog(&self, context: &mut ViewContext<Self>) -> View {
         if !self.bh_dialog {
             return View::empty();
@@ -463,7 +466,7 @@ impl Shell {
             let _ = is_error; // 对话框内统一红字渲染（views 侧才按 is_error 分流）
         }
 
-        // 目录下拉 + 新建 + 立即生效
+        // 目录下拉 + 新建
         let labels: Vec<String> = self
             .catalog
             .packs()
@@ -479,7 +482,7 @@ impl Shell {
         rows.push((
             rows.len(),
             Grid::new()
-                .columns([GridLength::STAR, GridLength::Auto, GridLength::Auto])
+                .columns([GridLength::STAR, GridLength::Auto])
                 .children((
                     {
                         let combo: View = ComboBox::new()
@@ -498,11 +501,6 @@ impl Shell {
                         .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
                         .on_click(context.message(Message::BhNew))
                         .content(TextBlock::new().text(i18n::t("405"))),
-                    Button::new()
-                        .grid_column(2)
-                        .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
-                        .on_click(context.message(Message::BhApplyNow))
-                        .content(TextBlock::new().text(i18n::t("1094"))),
                 )),
         ));
 
