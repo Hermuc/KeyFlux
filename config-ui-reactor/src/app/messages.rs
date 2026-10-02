@@ -422,6 +422,7 @@ pub enum OptEdit {
     SchemeHotkey(usize, String),
     SchemeEnable(usize, bool),
     SchemeAdd,
+    SchemeDelete(usize),
     SchemeDelay(usize, String),
     HideMatrix(bool),
     Language(usize),

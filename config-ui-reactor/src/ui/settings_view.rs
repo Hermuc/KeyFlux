@@ -152,10 +152,14 @@ const SCHEME_COL_HOTKEY: f64 = 130.0;
 /// 教训：**固定宽容器的契约测试必须拿"最宽的那条字符串"去量**（见
 /// [`scheme_switch_column_fits_switch_and_indicator`]）。
 const SCHEME_COL_SWITCH: f64 = 104.0;
+/// 第 4 列（删除钮）宽 —— 红色 ✕ 图形钮（icon_button）自然宽 ≈30 DIP。
+const SCHEME_COL_DELETE: f64 = 36.0;
 /// 第 2 列内容左缩进（表头与数据行经 [`scheme_inset`] 共用，不可能只改一边）。
 const SCHEME_INSET_HOTKEY: f64 = 8.0;
 /// 第 3 列内容左缩进（表头与数据行经 [`scheme_inset`] 共用，不可能只改一边）。
 const SCHEME_INSET_SWITCH: f64 = 16.0;
+/// 第 4 列内容左缩进（表头与数据行共用）。
+const SCHEME_INSET_DELETE: f64 = 4.0;
 
 /// 「快捷键方案」三列宽度（**表头与数据行共用同一份**）。
 ///
@@ -178,11 +182,12 @@ const SCHEME_INSET_SWITCH: f64 = 16.0;
 /// ⚠️ 更彻底的做法是把表头与数据行合进**同一个** Grid（表头行 + N 个数据行），那样用 `Auto`
 /// 也能对齐；但那是页面结构的重构（`views.rs::settings_page` 的组装方式也要改），收益不抵风险，
 /// 故本轮只固化列契约。**改动本页布局时，表头与数据行必须继续共用本函数与 [`scheme_inset`]。**
-fn scheme_columns() -> [GridLength; 3] {
+fn scheme_columns() -> [GridLength; 4] {
     [
         GridLength::STAR,
         GridLength::Pixel(SCHEME_COL_HOTKEY),
         GridLength::Pixel(SCHEME_COL_SWITCH),
+        GridLength::Pixel(SCHEME_COL_DELETE),
     ]
 }
 
@@ -195,6 +200,7 @@ fn scheme_inset(column: usize) -> Thickness {
     match column {
         1 => Thickness::new(SCHEME_INSET_HOTKEY, 0.0, 0.0, 0.0),
         2 => Thickness::new(SCHEME_INSET_SWITCH, 0.0, 0.0, 0.0),
+        3 => Thickness::new(SCHEME_INSET_DELETE, 0.0, 0.0, 0.0),
         _ => Thickness::new(0.0, 0.0, 0.0, 0.0),
     }
 }
@@ -218,6 +224,8 @@ pub fn scheme_header() -> View {
                     .font_size(theme::FONT_CAPTION)
                     .foreground(theme::stone_gray()),
             ),
+        // 第 4 列（删除钮）无列头文字，仅占位保持列契约对齐
+        Border::new().grid_column(3),
         Border::new()
             .grid_column(2)
             .margin(scheme_inset(2))
@@ -233,22 +241,27 @@ pub fn scheme_header() -> View {
 /// 「快捷键方案」行：名称(501) / 触发键(502) / 开关(504) 三列内联编辑。
 /// 行距 8px（此前 2px 过挤，12 行连成一片）；开关列左留 [`scheme_inset`]`(2)`。
 /// 列定义与缩进与 [`scheme_header`] 同源（见 [`scheme_columns`] 的"为什么必须固定"）。
-pub fn scheme_row<N, H, E>(
+pub fn scheme_row<N, H, E, D>(
     name: &str,
     hotkey: &str,
     enabled: bool,
     on_name: N,
     on_hotkey: H,
     on_enable: E,
+    on_delete: D,
 ) -> View
 where
     N: IntoPayloadCallback<String>,
     H: IntoPayloadCallback<String>,
     E: IntoPayloadCallback<bool>,
+    D: IntoUnitCallback,
 {
+    // 名称框收窄（用户定版 2026-10-02）：STAR 列仍对齐表头，框自身限宽左对齐
     let name_box: View = TextBox::new()
         .text(name.to_string())
+        .max_width(240.0)
         .min_height(32.0)
+        .horizontal_alignment(HorizontalAlignment::Left)
         .on_text_changed(on_name)
         .into();
     let hotkey_box: View = TextBox::new()
@@ -280,6 +293,17 @@ where
                 .margin(scheme_inset(2))
                 .vertical_alignment(VerticalAlignment::Center)
                 .content(switch),
+            Border::new()
+                .grid_column(3)
+                .margin(scheme_inset(3))
+                .vertical_alignment(VerticalAlignment::Center)
+                .content(crate::ui::icon_button(
+                    "✕",
+                    15.0,
+                    theme::ERROR_CRIMSON,
+                    true,
+                    on_delete,
+                )),
         ))
 }
 
