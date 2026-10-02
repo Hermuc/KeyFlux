@@ -745,13 +745,13 @@ impl Shell {
         }
 
         for entry in &self.market_entries {
-            let installing = self.market_installing.as_deref() == Some(entry.id.as_str());
+            // 保存策略：安装入队（无即时网络动作）⇒ 不再有"安装中"转圈态
             rows.push((
                 rows.len(),
                 plugins_view::market_entry(
                     entry,
                     english,
-                    installing,
+                    false,
                     context.message(Message::MarketInstall {
                         id: entry.id.clone(),
                         url: entry.url.clone(),

@@ -1,6 +1,7 @@
 //! `app` 的后台连接/保存**自由函数**（自原 `app.rs` 拆分）。
 //!
-//! 非 UI 线程侧：连接后端（直连或子进程）、拉配置、保存。
+//! 非 UI 线程侧：连接后端（直连或子进程）、拉配置。保存统一走
+//! `services::save_pipeline`（保存策略唯一实现处）。
 
 use super::*;
 
@@ -124,25 +125,4 @@ pub fn connect(options: &BackendSessionOptions) -> Result<BackendSession, String
 
     BackendSession::spawn(&exe, options.working_directory.as_deref(), options)
         .map_err(|error| error.to_string())
-}
-
-/// 清洗后 PUT 配置（`ConfigSaver` 语义），返回保存提示文案。
-pub fn save(port: u16, config: &Config) -> Result<String, String> {
-    let payload = store::clean_for_save(config);
-    let api = crate::services::transport::new_settings_api(port);
-    let response: ApiResponse<MessageBody> = api.save_config(&payload);
-
-    if !response.success {
-        return Err(response
-            .error_message
-            .unwrap_or_else(|| format!("保存失败 (HTTP {})", response.status)));
-    }
-
-    // `restartFailed`：保存已落盘但引擎重启失败 ⇒ 引导用户经托盘「重载」手动生效
-    // （复刻旧版 1078 标题 + 1079 正文的模态文案，此处合并为提示条文本）
-    if response.value.as_ref().and_then(|body| body.restart_failed) == Some(true) {
-        return Ok(format!("{}：{}", i18n::t("1078"), i18n::t("1079")));
-    }
-
-    Ok(i18n::t("928"))
 }

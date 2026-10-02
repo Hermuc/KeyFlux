@@ -29,6 +29,7 @@ pub mod markdown;
 pub mod market;
 pub mod match_types_edit;
 pub mod plugins;
+pub mod save_pipeline;
 pub mod selected_action;
 pub mod settings;
 pub mod store;

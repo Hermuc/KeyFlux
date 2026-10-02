@@ -1159,10 +1159,6 @@
     "zh": "从插件市场安装，或导入本地插件包（.zip，内含 plugin.json）。",
     "en": "Install from the plugin marketplace, or import a local plugin package (.zip containing plugin.json)."
   },
-  "2431": {
-    "zh": "已导入「{0}」",
-    "en": "\"{0}\" imported"
-  },
   "2432": {
     "zh": "导入失败",
     "en": "Import failed"
@@ -1178,10 +1174,6 @@
   "2435": {
     "zh": "已安装",
     "en": "Installed"
-  },
-  "2436": {
-    "zh": "删除插件失败",
-    "en": "Failed to remove the plugin"
   },
   "2437": {
     "zh": "KeyFlux 插件包",
@@ -1558,5 +1550,9 @@
   "2594": {
     "zh": "亚克力效果设置无法保存",
     "en": "Failed to save acrylic setting"
+  },
+  "2595": {
+    "zh": "修改已暂存,点击左下角「保存配置」提交",
+    "en": "Changes staged; click Save (bottom-left) to commit"
   }
 }
