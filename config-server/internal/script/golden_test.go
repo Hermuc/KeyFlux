@@ -364,13 +364,6 @@ func syntheticConfig() *Config {
 				{Name: "", Value: "ignored-blank-name"},
 				{Name: "   ", Value: "ignored-space-name"},
 			},
-			// 快速切换配置段 (设计 §3.1): 模板注入 InitQuickSwitch(...) 覆盖默认初始化;
-			// excludedPrefixes 覆盖 ahkString 数组渲染与反斜杠路径。
-			QuickSwitch: QuickSwitchOption{
-				CollectEnabled: true, AutoShow: true, AutoJumpOpen: true, AutoJumpSave: false,
-				PollIntervalMs: 800, MaxHistory: 200, OverlayRows: 8, OverlayRowsCompact: 4,
-				ExcludedPrefixes: []string{`D:\Archive`, `C:\Temp`},
-			},
 		},
 		// 选中动作 (方案 D 单键分发): textType/fileExt 两类匹配; entry 覆盖空 actionValue
 		// (内置 ID 直通) 与显式 actionValue (展开后透传) 两种形态; 目录缺失时显示名回退 ID。

@@ -3,10 +3,12 @@
 //! ⚠️ 加载**必须**走 [`parse_config`]（内部经 `model::config_from_json` 容忍 `null`），
 //! 不要直接 `serde_json::from_str::<Config>`。
 //!
-//! 默认值口径（Go 的两条"整段为零才补齐"规则，不可改成逐字段补齐）：
+//! 默认值口径（Go 的"整段为零才补齐"规则，不可改成逐字段补齐）：
 //! * `commandInputSkin` **整段为零** ⇒ 填 [`default_command_input_skin`]（18 字段）；
-//! * `quickSwitch` **全零签名** ⇒ 填 [`default_quick_switch_option`]；
 //! * `mouse.tipSymbol` 为空 ⇒ `"🐶"`。
+//!
+//! （`quickSwitch` 段的默认回填已随 2026-10-02 兼容段移除批次删除：deprecated 段
+//! 不再读取也不再输出。）
 //!
 //! 未移植：`MigrateSelectedAction` 的**旧 `actionSchemes` 迁移分支**（需要时才做；
 //! 当前遇到非空 `actionSchemes` 且无 `selectedAction` 会**显式报错**，绝不静默降级）。
@@ -14,9 +16,7 @@
 use std::io;
 use std::path::Path;
 
-use crate::generator::model::{
-    Action, CommandInputSkin, Config, Keymap, QuickSwitchOption, config_from_json,
-};
+use crate::generator::model::{Action, CommandInputSkin, Config, Keymap, config_from_json};
 
 /// Go `script.ConfigRelPath`：运行时配置文件落点（相对进程 cwd，即部署树的 `bin/`）。
 pub const CONFIG_REL_PATH: &str = "../data/config.json";
@@ -46,35 +46,6 @@ pub fn default_command_input_skin() -> CommandInputSkin {
         window_shadow_opacity: "0.5".into(),
         window_shadow_size: "3.0".into(),
     }
-}
-
-/// Go `script.DefaultQuickSwitchOption`（三端一致，由 Go/AHK/C# 三侧单测守护）。
-pub fn default_quick_switch_option() -> QuickSwitchOption {
-    QuickSwitchOption {
-        collect_enabled: true,
-        auto_show: true,
-        auto_jump_open: true,
-        auto_jump_save: false,
-        poll_interval_ms: 800,
-        max_history: 200,
-        overlay_rows: 8,
-        overlay_rows_compact: 4,
-        excluded_prefixes: Vec::new(),
-    }
-}
-
-/// Go `isQuickSwitchZero`：逐字段判定「旧配置缺失该段」的全零签名
-/// （含切片故不能用 `==`）—— 绝不逐字段补齐，否则会把用户合法的 `false` 覆盖掉。
-fn is_quick_switch_zero(option: &QuickSwitchOption) -> bool {
-    !option.collect_enabled
-        && !option.auto_show
-        && !option.auto_jump_open
-        && !option.auto_jump_save
-        && option.poll_interval_ms == 0
-        && option.max_history == 0
-        && option.overlay_rows == 0
-        && option.overlay_rows_compact == 0
-        && option.excluded_prefixes.is_empty()
 }
 
 /// Go `Preprocess`：向 `ID == 1` 的模式注入隐藏全局热键 `!f17`（免疫 suspend）。
@@ -117,9 +88,6 @@ pub fn parse_config(path: &Path, keyflux_version: &str) -> io::Result<Config> {
     }
     if config.options.command_input_skin == CommandInputSkin::default() {
         config.options.command_input_skin = default_command_input_skin();
-    }
-    if is_quick_switch_zero(&config.options.quick_switch) {
-        config.options.quick_switch = default_quick_switch_option();
     }
 
     // 存量迁移（Go `MigrateSelectedAction`）：新契约已存在 ⇒ 旧段废弃不再输出。
@@ -236,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn fills_skin_and_quickswitch_defaults_only_when_whole_section_zero() {
+    fn fills_skin_defaults_only_when_whole_section_zero() {
         let path = write_temp("defaults", r#"{"keymaps":[]}"#);
         let config = parse_config(&path, "1.0.0").unwrap();
         let _ = std::fs::remove_file(&path);
@@ -245,42 +213,24 @@ mod tests {
             config.options.command_input_skin,
             default_command_input_skin()
         );
-        assert!(config.options.quick_switch.collect_enabled);
-        assert_eq!(config.options.quick_switch.poll_interval_ms, 800);
         assert_eq!(config.options.mouse.tip_symbol, "🐶");
         assert_eq!(config.options.keyflux_version, "1.0.0");
     }
 
     #[test]
-    fn quick_switch_filled_only_on_all_zero_signature() {
-        // (a) 全零签名（旧配置缺失该段）⇒ 补齐默认
-        let all_zero = write_temp(
-            "qs-zero",
-            r#"{"keymaps":[],"options":{"quickSwitch":{"collectEnabled":false,"autoShow":false,"autoJumpOpen":false,"autoJumpSave":false,"pollIntervalMs":0,"maxHistory":0,"overlayRows":0,"overlayRowsCompact":0,"excludedPrefixes":[]}}}"#,
+    fn deprecated_quick_switch_section_is_ignored() {
+        // 2026-10-02 兼容段移除：deprecated 段不再读取（未知键容忍）也不回填默认值。
+        let path = write_temp(
+            "qs-legacy",
+            r#"{"keymaps":[],"options":{"quickSwitch":{"collectEnabled":true,"pollIntervalMs":800}}}"#,
         );
-        let filled = parse_config(&all_zero, "").unwrap();
-        let _ = std::fs::remove_file(&all_zero);
+        let config = parse_config(&path, "").unwrap();
+        let _ = std::fs::remove_file(&path);
+        let json = serde_json::to_string(&config.options).unwrap();
         assert!(
-            filled.options.quick_switch.collect_enabled,
-            "全零签名应补齐默认"
+            !json.contains("quickSwitch"),
+            "deprecated 段不得出现在模型输出: {json}"
         );
-        assert_eq!(filled.options.quick_switch.poll_interval_ms, 800);
-
-        // (b) 部分设置（此处只有 collectEnabled=true，其余仍为零）⇒ **原样保留**，
-        //     Go 侧口径是「整段为零才补齐」，故不能把剩余字段填成默认值。
-        let partial = write_temp(
-            "qs-partial",
-            r#"{"keymaps":[],"options":{"quickSwitch":{"collectEnabled":true,"autoShow":false,"autoJumpOpen":false,"autoJumpSave":false,"pollIntervalMs":0,"maxHistory":0,"overlayRows":0,"overlayRowsCompact":0,"excludedPrefixes":[]}}}"#,
-        );
-        let kept = parse_config(&partial, "").unwrap();
-        let _ = std::fs::remove_file(&partial);
-        assert!(kept.options.quick_switch.collect_enabled);
-        assert_eq!(
-            kept.options.quick_switch.poll_interval_ms, 0,
-            "部分设置不得被补齐"
-        );
-        assert_eq!(kept.options.quick_switch.max_history, 0);
-        assert!(kept.options.quick_switch.excluded_prefixes.is_empty());
     }
 
     #[test]

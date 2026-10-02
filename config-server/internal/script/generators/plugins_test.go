@@ -201,7 +201,6 @@ func TestPluginLateInit_DeclaredByManifest(t *testing.T) {
 func TestPluginLateInit_DeclaredAbsent(t *testing.T) {
 	oldCfg := Cfg
 	Cfg = &model.Config{}
-	Cfg.Options.QuickSwitch = model.QuickSwitchOption{CollectEnabled: true}
 	defer func() { Cfg = oldCfg }()
 
 	// 入口缺失

@@ -316,9 +316,6 @@ pub struct Options {
     #[serde(default)]
     pub keyboard_layout: String,
 
-    #[serde(default)]
-    pub quick_switch: QuickSwitchOption,
-
     /// Go 侧为指针 + omitempty ⇒ 容忍缺失与显式 `null`。
     #[serde(default, deserialize_with = "de_null_default")]
     pub plugins: PluginsOption,
@@ -352,41 +349,6 @@ pub struct PluginsOption {
     /// GET /config 产物对旧基线逐字节等价（裸字段会产生 null vs [] 分歧）。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub removed: Vec<String>,
-}
-
-/// 对应 Go `struct QuickSwitchOption`。
-///
-/// 🔴 2026-10-02 P5 起 **deprecated**（同 Go 侧注释）：配置已迁
-/// `plugin-settings.json`，本段仅保留序列化与读取兼容（回滚安全）。
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QuickSwitchOption {
-    #[serde(default)]
-    pub collect_enabled: bool,
-
-    #[serde(default)]
-    pub auto_show: bool,
-
-    #[serde(default)]
-    pub auto_jump_open: bool,
-
-    #[serde(default)]
-    pub auto_jump_save: bool,
-
-    #[serde(default)]
-    pub poll_interval_ms: i32,
-
-    #[serde(default)]
-    pub max_history: i32,
-
-    #[serde(default)]
-    pub overlay_rows: i32,
-
-    #[serde(default)]
-    pub overlay_rows_compact: i32,
-
-    #[serde(default)]
-    pub excluded_prefixes: Vec<String>,
 }
 
 /// 对应 Go `struct WindowGroup`。

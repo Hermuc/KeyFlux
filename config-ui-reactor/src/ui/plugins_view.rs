@@ -4,7 +4,8 @@
 //! * 页头：「插件市场」（2428）+「导入插件」（2427）；
 //! * 分区：「第三方插件」（2421）+ 说明（2425）；
 //! * 卡片：显示名 + 版本徽标 + 启停开关 + 状态文字（2423/2424）+ 描述 + 作者；
-//!   **信息区可点即配置**（复刻旧版「点击卡片即可调整」，提示 2426），用户卡带「删除」（912）；
+//!   **信息区可点即配置**（复刻旧版「点击卡片即可调整」，提示 2426），用户卡带「删除」（912，
+//!   2026-10-02 定版：删除钮在头部开关块内、ON 状态字右边）；
 //! * 三态：加载中（2439）/ 逐包告警 / 空态（2429 + 2430）。
 //!
 //! Fluent 化取舍：旧版固定尺寸列表 + 内部滚动，新版改**自适应高度卡片 + 外层滚动**。
@@ -165,10 +166,31 @@ where
     //    对齐"）。修法不是就地补一句对齐，而是**回到唯一实现**：拷贝少一份，"某一页漏了某个
     //    属性"的漂移入口就少一个。
     // 开关块右侧 12px 留白挂到列 1 的 `Border.margin` 上（原挂在状态字自己的 margin 上，等效）。
+    //
+    // 删除钮（2026-10-02 用户定版）：从卡片底部的独立行移入头部开关块，**位于 ON 状态字
+    // 再右边**——开关 / 状态字 / 删除横向一行；不可删除（内置）时不渲染，不留空槽。
+    // 卸载入口：旧版 `IsVisible=CanDelete`（内置卡**不渲染**此钮），tooltip 912。
+    let delete: View = if card.can_delete {
+        Button::new()
+            .vertical_alignment(VerticalAlignment::Center)
+            .on_click(on_delete)
+            .content(
+                TextBlock::new()
+                    .text("✕")
+                    .foreground(theme::solid(theme::ERROR_CRIMSON)),
+            )
+    } else {
+        View::empty()
+    };
+    let mut toggle_items: Vec<(usize, View)> =
+        vec![(0, switch), (1, crate::ui::on_off_indicator(card.enabled))];
+    if card.can_delete {
+        toggle_items.push((2, delete));
+    }
     let toggle_block: View = StackPanel::new()
         .orientation(Orientation::Horizontal)
         .spacing(10.0)
-        .children((switch, crate::ui::on_off_indicator(card.enabled)));
+        .keyed_children(toggle_items);
 
     let header: View = Grid::new()
         .columns([GridLength::STAR, GridLength::Auto])
@@ -180,18 +202,7 @@ where
                 .content(toggle_block),
         ));
 
-    // 卸载入口：旧版 `IsVisible=CanDelete`（内置卡**不渲染**此钮），tooltip 912
-    let delete: View = if card.can_delete {
-        Button::new().on_click(on_delete).content(
-            TextBlock::new()
-                .text("✕")
-                .foreground(theme::solid(theme::ERROR_CRIMSON)),
-        )
-    } else {
-        View::empty()
-    };
-
-    let rows: Vec<(usize, View)> = vec![(0, header), (1, info), (2, delete)];
+    let rows: Vec<(usize, View)> = vec![(0, header), (1, info)];
 
     // 旧 `Border.pluginCard`：Ivory 面 + 淡冷边 2px + 圆角 14 + Padding 20,16 + 底距 10
     Border::new()

@@ -9,9 +9,9 @@
 //!   例外：Go 对**结构体**的 omitempty 不生效（`ConfigDTO.Options` 恒输出），Rust
 //!   直接用非 Option 字段即可。
 //! * **空集合恒 `[]`**：`ConfigToDTO` 保证 keymaps/fileGroups/matchTypes/mappings
-//!   永不缺键（dto.go:208-235）。`options.windowGroups` / `pathVariables` /
-//!   `quickSwitch.excludedPrefixes` 在 Go 侧 nil 时输出 `null`，Rust 模型
-//!   （`Vec`）无法区分 nil 与空，恒输出 `[]`（真实配置无 null 形态，见下）。
+//!   永不缺键（dto.go:208-235）。`options.windowGroups` / `pathVariables` 在 Go 侧
+//!   nil 时输出 `null`，Rust 模型（`Vec`）无法区分 nil 与空，恒输出 `[]`
+//!   （真实配置无 null 形态，见下）。
 //! * **`hotkeys` map**：Go nil map 输出 `null`、空 map 输出 `{}`；Rust 模型
 //!   （`BTreeMap`）同样无法区分，恒输出 `{}`（真实 config.json 16 个 keymap 中
 //!   0 个 null、1 个 `{}`，按真实语料取 `{}` 口径）。map 键序：Go 按字节字典序，
@@ -204,8 +204,6 @@ pub struct OptionsDto {
     pub key_mapping: String,
     #[serde(rename = "keyboardLayout")]
     pub keyboard_layout: String,
-    #[serde(rename = "quickSwitch")]
-    pub quick_switch: QuickSwitchOptionDto,
     pub plugins: PluginsOptionDto,
     #[serde(rename = "commandFont")]
     pub command_font: CommandFontOptionDto,
@@ -228,30 +226,6 @@ pub struct PluginsOptionDto {
     pub disabled: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub removed: Vec<String>,
-}
-
-/// Go `QuickSwitchOptionDTO`。
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct QuickSwitchOptionDto {
-    #[serde(rename = "collectEnabled")]
-    pub collect_enabled: bool,
-    #[serde(rename = "autoShow")]
-    pub auto_show: bool,
-    #[serde(rename = "autoJumpOpen")]
-    pub auto_jump_open: bool,
-    #[serde(rename = "autoJumpSave")]
-    pub auto_jump_save: bool,
-    #[serde(rename = "pollIntervalMs")]
-    pub poll_interval_ms: i32,
-    #[serde(rename = "maxHistory")]
-    pub max_history: i32,
-    #[serde(rename = "overlayRows")]
-    pub overlay_rows: i32,
-    #[serde(rename = "overlayRowsCompact")]
-    pub overlay_rows_compact: i32,
-    #[serde(rename = "excludedPrefixes")]
-    pub excluded_prefixes: Vec<String>,
 }
 
 /// Go `WindowGroupDTO`（value/conditionType omitempty）。
@@ -617,17 +591,6 @@ fn options_to_dto(o: &m::Options) -> OptionsDto {
         language: o.language.clone(),
         key_mapping: o.key_mapping.clone(),
         keyboard_layout: o.keyboard_layout.clone(),
-        quick_switch: QuickSwitchOptionDto {
-            collect_enabled: o.quick_switch.collect_enabled,
-            auto_show: o.quick_switch.auto_show,
-            auto_jump_open: o.quick_switch.auto_jump_open,
-            auto_jump_save: o.quick_switch.auto_jump_save,
-            poll_interval_ms: o.quick_switch.poll_interval_ms,
-            max_history: o.quick_switch.max_history,
-            overlay_rows: o.quick_switch.overlay_rows,
-            overlay_rows_compact: o.quick_switch.overlay_rows_compact,
-            excluded_prefixes: o.quick_switch.excluded_prefixes.clone(),
-        },
         plugins: PluginsOptionDto {
             disabled: o.plugins.disabled.clone(),
             removed: o.plugins.removed.clone(),
@@ -818,17 +781,6 @@ fn dto_to_options(o: &OptionsDto) -> m::Options {
         language: o.language.clone(),
         key_mapping: o.key_mapping.clone(),
         keyboard_layout: o.keyboard_layout.clone(),
-        quick_switch: m::QuickSwitchOption {
-            collect_enabled: o.quick_switch.collect_enabled,
-            auto_show: o.quick_switch.auto_show,
-            auto_jump_open: o.quick_switch.auto_jump_open,
-            auto_jump_save: o.quick_switch.auto_jump_save,
-            poll_interval_ms: o.quick_switch.poll_interval_ms,
-            max_history: o.quick_switch.max_history,
-            overlay_rows: o.quick_switch.overlay_rows,
-            overlay_rows_compact: o.quick_switch.overlay_rows_compact,
-            excluded_prefixes: o.quick_switch.excluded_prefixes.clone(),
-        },
         plugins: m::PluginsOption {
             disabled: o.plugins.disabled.clone(),
             removed: o.plugins.removed.clone(),
@@ -884,10 +836,7 @@ mod tests {
              \"windowWidth\":\"\",\"windowShadowColor\":\"\",\"windowShadowOpacity\":\"\",\
              \"windowShadowSize\":\"\"},\"pathVariables\":[],\"startup\":false,\
              \"language\":\"\",\"keyMapping\":\"\",\"keyboardLayout\":\"\",\
-             \"quickSwitch\":{\"collectEnabled\":false,\"autoShow\":false,\
-             \"autoJumpOpen\":false,\"autoJumpSave\":false,\"pollIntervalMs\":0,\
-             \"maxHistory\":0,\"overlayRows\":0,\"overlayRowsCompact\":0,\
-             \"excludedPrefixes\":[]},\"plugins\":{\"disabled\":[]},\
+             \"plugins\":{\"disabled\":[]},\
              \"commandFont\":{\"sourcePath\":\"\",\"weight\":\"\"}},\
              \"selectedAction\":{\"hotkey\":\"\",\"enable\":false,\"mappings\":[]},\
              \"fileGroups\":[],\"matchTypes\":[]}"
@@ -998,7 +947,6 @@ mod tests {
             "options":{"hideMatrix":true,"keyfluxVersion":"9.9","windowGroups":[
                 {"id":1,"name":"g","value":"a.exe","conditionType":1}],
                 "pathVariables":[{"name":"P","value":"V"}],
-                "quickSwitch":{"collectEnabled":true,"excludedPrefixes":["a","b"]},
                 "plugins":{"disabled":["p1"]},
                 "commandFont":{"sourcePath":"C:/f.ttf","weight":"bold"}},
             "selectedAction":{"hotkey":"^!s","enable":true,"mappings":[

@@ -532,8 +532,10 @@ UI 恢复入口待随包源进部署树后另议。**残余注意**：P6 的「�
 配置对话框，当前 QuickSwitch 无 settings（开关走选项页），故删除已安全；但删插件后
 `options.quickSwitch` 段成为无害孤段（§6 既有结论）。
 
-**剩余待办**：P5（settings 声明 + plugin-settings.json 迁移 + `options.quickSwitch`
-段退役 + CONTRACTS §4 订正）与 P6（配置入口接住后收口）次轮；P7 另起提案。
+**剩余待办**：（已全部闭环）P5/P6 由后续批次落地；`options.quickSwitch` 段已于
+2026-10-02 全量移除（迁移函数 + 模型字段 + DTO 两端同删, GET /config 停出该段,
+api-parity 基线重录 23/23）—— §6「无害孤段」结论就此终结；P7 另立提案
+（plugin-action-decoupling.md, 已闭环）。
 
 ---
 

@@ -112,7 +112,6 @@ type OptionsDTO struct {
 	Language         string               `json:"language"`
 	KeyMapping       string               `json:"keyMapping"`
 	KeyboardLayout   string               `json:"keyboardLayout"`
-	QuickSwitch      QuickSwitchOptionDTO `json:"quickSwitch"`
 	Plugins          PluginsOptionDTO     `json:"plugins"`
 	CommandFont      CommandFontOptionDTO `json:"commandFont"`
 }
@@ -129,19 +128,6 @@ type CommandFontOptionDTO struct {
 type PluginsOptionDTO struct {
 	Disabled []string `json:"disabled"`
 	Removed  []string `json:"removed,omitempty"`
-}
-
-// QuickSwitchOptionDTO 对应 model.QuickSwitchOption, 与 OptionsDTO 成对 (CONTRACTS §5.2 双侧同步)。
-type QuickSwitchOptionDTO struct {
-	CollectEnabled     bool     `json:"collectEnabled"`
-	AutoShow           bool     `json:"autoShow"`
-	AutoJumpOpen       bool     `json:"autoJumpOpen"`
-	AutoJumpSave       bool     `json:"autoJumpSave"`
-	PollIntervalMs     int      `json:"pollIntervalMs"`
-	MaxHistory         int      `json:"maxHistory"`
-	OverlayRows        int      `json:"overlayRows"`
-	OverlayRowsCompact int      `json:"overlayRowsCompact"`
-	ExcludedPrefixes   []string `json:"excludedPrefixes"`
 }
 
 type WindowGroupDTO struct {
@@ -389,24 +375,10 @@ func optionsToDTO(o model.Options) OptionsDTO {
 		Language:       o.Language,
 		KeyMapping:     o.KeyMapping,
 		KeyboardLayout: o.KeyboardLayout,
-		QuickSwitch: QuickSwitchOptionDTO{
-			CollectEnabled:     o.QuickSwitch.CollectEnabled,
-			AutoShow:           o.QuickSwitch.AutoShow,
-			AutoJumpOpen:       o.QuickSwitch.AutoJumpOpen,
-			AutoJumpSave:       o.QuickSwitch.AutoJumpSave,
-			PollIntervalMs:     o.QuickSwitch.PollIntervalMs,
-			MaxHistory:         o.QuickSwitch.MaxHistory,
-			OverlayRows:        o.QuickSwitch.OverlayRows,
-			OverlayRowsCompact: o.QuickSwitch.OverlayRowsCompact,
-		},
 		CommandFont: CommandFontOptionDTO{
 			SourcePath: o.CommandFont.SourcePath,
 			Weight:     o.CommandFont.Weight,
 		},
-	}
-	if o.QuickSwitch.ExcludedPrefixes != nil {
-		dto.QuickSwitch.ExcludedPrefixes = make([]string, len(o.QuickSwitch.ExcludedPrefixes))
-		copy(dto.QuickSwitch.ExcludedPrefixes, o.QuickSwitch.ExcludedPrefixes)
 	}
 	if o.Plugins.Disabled != nil {
 		dto.Plugins.Disabled = make([]string, len(o.Plugins.Disabled))
@@ -618,24 +590,10 @@ func dtoToOptions(o OptionsDTO) model.Options {
 		Language:       o.Language,
 		KeyMapping:     o.KeyMapping,
 		KeyboardLayout: o.KeyboardLayout,
-		QuickSwitch: model.QuickSwitchOption{
-			CollectEnabled:     o.QuickSwitch.CollectEnabled,
-			AutoShow:           o.QuickSwitch.AutoShow,
-			AutoJumpOpen:       o.QuickSwitch.AutoJumpOpen,
-			AutoJumpSave:       o.QuickSwitch.AutoJumpSave,
-			PollIntervalMs:     o.QuickSwitch.PollIntervalMs,
-			MaxHistory:         o.QuickSwitch.MaxHistory,
-			OverlayRows:        o.QuickSwitch.OverlayRows,
-			OverlayRowsCompact: o.QuickSwitch.OverlayRowsCompact,
-		},
 		CommandFont: model.CommandFontOption{
 			SourcePath: o.CommandFont.SourcePath,
 			Weight:     o.CommandFont.Weight,
 		},
-	}
-	if o.QuickSwitch.ExcludedPrefixes != nil {
-		m.QuickSwitch.ExcludedPrefixes = make([]string, len(o.QuickSwitch.ExcludedPrefixes))
-		copy(m.QuickSwitch.ExcludedPrefixes, o.QuickSwitch.ExcludedPrefixes)
 	}
 	if o.Plugins.Disabled != nil {
 		m.Plugins.Disabled = make([]string, len(o.Plugins.Disabled))

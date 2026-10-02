@@ -310,9 +310,6 @@ pub fn run_headless() -> std::process::ExitCode {
     }
 
     let ctx = Arc::new(ServerContext::new());
-    // 一次性迁移（P5）：options.quickSwitch (deprecated) → plugin-settings.json。
-    // 幂等且失败静默；置于服务循环前，保证首个 settings 请求看到已迁移状态。
-    handlers_plugins::migrate_quick_switch_settings(&ctx);
     // 异步预热开机自启缓存：首次 GET /config 免等 schtasks（Go PreloadStartup）
     ctx.startup.preload();
 

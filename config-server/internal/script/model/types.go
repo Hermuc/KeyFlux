@@ -165,7 +165,6 @@ type Options struct {
 	Language         string            `json:"language"`
 	KeyMapping       string            `json:"keyMapping"`
 	KeyboardLayout   string            `json:"keyboardLayout"`
-	QuickSwitch      QuickSwitchOption `json:"quickSwitch"`
 	Plugins          PluginsOption     `json:"plugins"`
 	CommandFont      CommandFontOption `json:"commandFont"`
 }
@@ -198,22 +197,6 @@ type CommandFontOption struct {
 type PluginsOption struct {
 	Disabled []string `json:"disabled"`
 	Removed  []string `json:"removed,omitempty"`
-}
-
-// QuickSwitchOption 「快速切换 QuickSwitch」阶段 1 配置段 (config.json 的 options.quickSwitch)。
-// 🔴 2026-10-02 P5 起 **deprecated**: 配置已迁 plugin-settings.json (quick_switch 段,
-// 插件经 ConfigProvider 自取); 本段仅保留序列化与读取兼容 (回滚安全), 生成器不再消费。
-// 全量移除 (GET /config 停出该段 ⇒ api-parity 重录) 待一个兼容期后另做。
-type QuickSwitchOption struct {
-	CollectEnabled     bool     `json:"collectEnabled"`
-	AutoShow           bool     `json:"autoShow"`
-	AutoJumpOpen       bool     `json:"autoJumpOpen"`
-	AutoJumpSave       bool     `json:"autoJumpSave"`
-	PollIntervalMs     int      `json:"pollIntervalMs"`
-	MaxHistory         int      `json:"maxHistory"`
-	OverlayRows        int      `json:"overlayRows"`
-	OverlayRowsCompact int      `json:"overlayRowsCompact"`
-	ExcludedPrefixes   []string `json:"excludedPrefixes"`
 }
 
 type WindowGroup struct {

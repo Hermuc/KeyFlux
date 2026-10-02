@@ -90,7 +90,6 @@ mod tests {
                 "mouse",
                 "pathVariables",
                 "plugins",
-                "quickSwitch",
                 "scroll",
                 "startup",
                 "windowGroups",
