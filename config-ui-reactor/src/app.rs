@@ -412,7 +412,7 @@ impl Component for Shell {
                             .map(|root| root.join("bin").join("site")),
                     );
                 }
-                self.page_index = 1;
+                self.page_index = 0;
                 self.loading = false;
                 self.error = None;
                 // 插件目录预取（P7b）：type 9 动作编辑器的插件动作动态组消费
@@ -730,33 +730,6 @@ impl Component for Shell {
                     config.selected_action.hotkey = String::new();
                 }
                 self.hotkey_pending_save = true;
-            }
-            Message::SaEditType { kind } => {
-                // 编辑**当前选中**的分组：按选中 id 找 config.match_types 下标，
-                // 以 from_existing 草稿打开管理对话框（预选中该分组）。
-                self.mt_dialog = true;
-                self.mt_status = None;
-                self.mt_test_result = None;
-                self.mt_test.clear();
-                let selected_id = self
-                    .sa_selected_id(kind)
-                    .or_else(|| self.sa_selected_id(MATCH_FILE_EXT));
-                let draft = self
-                    .config
-                    .as_ref()
-                    .and_then(|config| {
-                        selected_id.as_deref().and_then(|id| {
-                            let index = config.match_types.iter().position(|mt| mt.id == id)?;
-                            let mt = config.match_types.get(index)?;
-                            Some(match_types_edit::MatchTypeDraft::from_existing(index, mt))
-                        })
-                    })
-                    .or_else(|| {
-                        self.config
-                            .as_ref()
-                            .map(|config| match_types_edit::MatchTypeDraft::new_draft(config, kind))
-                    });
-                self.mt_pick_set(draft);
             }
             Message::SaNewType { kind } => {
                 self.mt_dialog = true;
