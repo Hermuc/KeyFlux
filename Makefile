@@ -229,8 +229,10 @@ analyzers:
 #   在「插件未部署」的空目录上假绿, 插件自身的语法错误要等运行时才炸。
 #   robocopy 刻意**不带 /MIR**: 只增改, 不删 —— 用户自己导入到 data/plugins 的插件
 #   不会被这一步清掉 (仓库里的 plugins/examples 是「随软件分发的官方插件」单一真源)。
+#   2026-10-02 P4 墓碑: 复制后按 config.json options.plugins.removed 删除对应目录 ——
+#   用户主动删除的随包插件不再被同步带回 (tools/sync-plugins.ps1)。
 sync-plugins: | $(OUT_DIR)
-	MSYS_NO_PATHCONV=1 robocopy plugins/examples $(OUT_DIR)/data/plugins /E /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/sync-plugins.ps1 -OutDir "$(OUT_DIR)"
 
 # sync-out: 把编译产物同步到 OUT_DIR (robocopy 退出码 0-7 均为成功)
 # 守卫 ① 「部署树已就绪」(check-deploy-tree): 见该目标注释 —— 防止 OUT_DIR 写错后在别的

@@ -1,6 +1,7 @@
 package generators
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"settings/internal/script/model"
@@ -250,5 +251,39 @@ func TestPluginLateInit_QuickSwitchAbsent(t *testing.T) {
 	}
 	if !strings.Contains(boot2, "已在配置中停用") {
 		t.Fatalf("缺停用注释:\n%q", boot2)
+	}
+}
+
+// 墓碑 (2026-10-02 P4): options.plugins.removed 中的随包内置插件不注入、只产注释行
+// —— 目录被 sync-plugins 带回时不复活。文案与 Rust 同构 (parity 产物一致)。
+func TestPluginTombstone_SkipsInjection(t *testing.T) {
+	oldCfg := Cfg
+	Cfg = &model.Config{}
+	Cfg.Options.Plugins.Removed = []string{"quick_switch"}
+	defer func() { Cfg = oldCfg }()
+
+	pluginDir := t.TempDir()
+	for _, id := range []string{"quick_switch", "everything_search"} {
+		pdir := filepath.Join(pluginDir, id)
+		os.MkdirAll(pdir, 0o755)
+		os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(fmt.Sprintf(
+			`{"id": %q, "name": "X", "specVersion": 1, "entry": {"kind": "script", "file": "main.ahk", "func": "F"}}`, id)), 0o644)
+		os.WriteFile(filepath.Join(pdir, "main.ahk"), []byte("F(api) {}"), 0o644)
+	}
+	SetPluginsDir(pluginDir)
+	defer SetPluginsDir("")
+
+	inc, boot, late := pluginBlocks()
+	if strings.Contains(inc, "quick_switch") {
+		t.Fatalf("墓碑插件不得注入 include:\n%q", inc)
+	}
+	if !strings.Contains(boot, "\n; [插件] quick_switch 已被用户移除 (墓碑), 跳过加载") {
+		t.Fatalf("缺墓碑注释:\n%q", boot)
+	}
+	if !strings.Contains(boot, "PluginManager.LoadEntry(\"everything_search\")") {
+		t.Fatalf("其他插件应照常注入:\n%q", boot)
+	}
+	if strings.Contains(late, "InitQuickSwitch") {
+		t.Fatalf("墓碑插件晚初始化行不得产出:\n%q", late)
 	}
 }

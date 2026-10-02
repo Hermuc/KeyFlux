@@ -85,6 +85,19 @@ func disabledPluginSet() map[string]bool {
 	return out
 }
 
+// removedPluginSet 读取 config.options.plugins.removed (2026-10-02 P4 墓碑):
+// 用户主动删除的随包内置插件 ID —— 目录可能因随包同步/重装仍在, 墓碑让生成器
+// 跳过注入 (否则删了又活)。
+func removedPluginSet() map[string]bool {
+	out := map[string]bool{}
+	if Cfg != nil && Cfg.Options.Plugins.Removed != nil {
+		for _, id := range Cfg.Options.Plugins.Removed {
+			out[id] = true
+		}
+	}
+	return out
+}
+
 // renderPluginBlocks 单插件失败只产注释行, 不影响其他插件 (契约约束 4 错误隔离)。
 // 入口文件在生成期做存在性与路径安全校验: AHK 的 #Include 指向缺失文件会让整个
 // 脚本加载失败 (拖垮引擎), 必须在生成期拦下。
@@ -96,8 +109,15 @@ func renderPluginBlocks(dir string) (includes, bootstrap, lateInit string) {
 	}
 	cat := plugins.LoadCatalog(dir)
 	disabled := disabledPluginSet()
+	removed := removedPluginSet()
 	var inc, boot, late strings.Builder
 	for _, m := range cat.Plugins {
+		if removed[m.ID] {
+			// 墓碑 (config.options.plugins.removed, 2026-10-02 P4): 用户主动删除的
+			// 随包内置插件 —— 目录被同步带回时不复活
+			boot.WriteString(fmt.Sprintf("\n; [插件] %s 已被用户移除 (墓碑), 跳过加载", m.ID))
+			continue
+		}
 		if disabled[m.ID] {
 			// 启停持久化 (config.options.plugins.disabled): 停用插件不注入不注册,
 			// 落一行注释便于用户在生成产物里看到过滤结果

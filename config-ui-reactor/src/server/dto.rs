@@ -218,10 +218,13 @@ pub struct CommandFontOptionDto {
 }
 
 /// Go `PluginsOptionDTO`：disabled 空恒 `[]`（dto.go:409 契约）。
+/// removed 墓碑（2026-10-02 P4）：skip 空序列化，与 Go omitempty 同构。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PluginsOptionDto {
     pub disabled: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<String>,
 }
 
 /// Go `QuickSwitchOptionDTO`。
@@ -623,6 +626,7 @@ fn options_to_dto(o: &m::Options) -> OptionsDto {
         },
         plugins: PluginsOptionDto {
             disabled: o.plugins.disabled.clone(),
+            removed: o.plugins.removed.clone(),
         },
         command_font: CommandFontOptionDto {
             source_path: o.command_font.source_path.clone(),
@@ -822,6 +826,7 @@ fn dto_to_options(o: &OptionsDto) -> m::Options {
         },
         plugins: m::PluginsOption {
             disabled: o.plugins.disabled.clone(),
+            removed: o.plugins.removed.clone(),
         },
         command_font: m::CommandFontOption {
             source_path: o.command_font.source_path.clone(),

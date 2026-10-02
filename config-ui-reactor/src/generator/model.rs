@@ -226,6 +226,11 @@ pub struct QuickSwitchOption {
 #[serde(default)]
 pub struct PluginsOption {
     pub disabled: Vec<String>,
+    /// 墓碑（2026-10-02 P4）：用户主动删除的随包内置插件 ID。
+    /// 🔴 `skip_serializing_if` 与 Go `omitempty` 同构：空（常态）时字段消失，
+    /// 生成产物对旧基线逐字节等价。
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

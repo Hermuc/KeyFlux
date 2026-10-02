@@ -122,8 +122,11 @@ type CommandFontOptionDTO struct {
 }
 
 // PluginsOptionDTO 对应 model.PluginsOption, 与 OptionsDTO 成对 (CONTRACTS §5.2 双侧同步)。
+// Removed 墓碑 (2026-10-02 P4): omitempty —— 空 (常态) 时字段消失, GET /config
+// 产物对旧基线逐字节等价 (与 Rust skip_serializing_if 同构)。
 type PluginsOptionDTO struct {
 	Disabled []string `json:"disabled"`
+	Removed  []string `json:"removed,omitempty"`
 }
 
 // QuickSwitchOptionDTO 对应 model.QuickSwitchOption, 与 OptionsDTO 成对 (CONTRACTS §5.2 双侧同步)。
@@ -408,6 +411,10 @@ func optionsToDTO(o model.Options) OptionsDTO {
 	} else {
 		dto.Plugins.Disabled = []string{} // 空集合恒数组契约 (旧配置缺失该段 -> null -> [])
 	}
+	if len(o.Plugins.Removed) > 0 {
+		dto.Plugins.Removed = make([]string, len(o.Plugins.Removed))
+		copy(dto.Plugins.Removed, o.Plugins.Removed) // 墓碑: 非空才透传 (omitempty)
+	}
 	if o.WindowGroups != nil {
 		dto.WindowGroups = make([]WindowGroupDTO, len(o.WindowGroups))
 		for i, wg := range o.WindowGroups {
@@ -630,6 +637,10 @@ func dtoToOptions(o OptionsDTO) model.Options {
 	if o.Plugins.Disabled != nil {
 		m.Plugins.Disabled = make([]string, len(o.Plugins.Disabled))
 		copy(m.Plugins.Disabled, o.Plugins.Disabled)
+	}
+	if o.Plugins.Removed != nil {
+		m.Plugins.Removed = make([]string, len(o.Plugins.Removed))
+		copy(m.Plugins.Removed, o.Plugins.Removed) // 墓碑 (2026-10-02 P4)
 	}
 	if o.WindowGroups != nil {
 		m.WindowGroups = make([]model.WindowGroup, len(o.WindowGroups))

@@ -50,9 +50,12 @@ pub fn render_keyflux_ahk(
     catalog: Option<&Catalog>,
     plugins_dir: &Path,
 ) -> String {
-    // 停用插件集（Go `disabledPluginSet` 读 `generators.Cfg.Options.Plugins.Disabled`）。
+    // 停用/墓碑插件集（Go `disabledPluginSet` / `removedPluginSet` 读
+    // `generators.Cfg.Options.Plugins.Disabled|Removed`）。
     let disabled: HashSet<String> = config.options.plugins.disabled.iter().cloned().collect();
-    let (plugin_includes, plugin_bootstrap) = plugins::render_plugin_blocks(plugins_dir, &disabled);
+    let removed: HashSet<String> = config.options.plugins.removed.iter().cloned().collect();
+    let (plugin_includes, plugin_bootstrap) =
+        plugins::render_plugin_blocks(plugins_dir, &disabled, &removed);
 
     let mut out = String::new();
 
@@ -79,7 +82,7 @@ pub fn render_keyflux_ahk(
     // ---- L61: `{{- PLUGIN_LATE_INIT }}`（插件晚初始化扩展点，模板用 `{{-` 吃前导
     //      换行 ⇒ 行尾拼接约定）。非空 = `InitQuickSwitch({...})` 调用行（见
     //      plugins::render_late_init）；空块 = 零字节，与迁移前形态完全一致。
-    let plugin_late_init = plugins::render_late_init(config, plugins_dir, &disabled);
+    let plugin_late_init = plugins::render_late_init(config, plugins_dir, &disabled, &removed);
     if !plugin_late_init.is_empty() {
         out.push_str(plugin_late_init.trim_start_matches('\n'));
         out.push('\n');

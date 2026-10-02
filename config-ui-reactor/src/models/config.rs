@@ -336,12 +336,17 @@ pub struct CommandFontOption {
     pub weight: String,
 }
 
-/// 对应 Go `struct PluginsOption`。插件注册表（只记「已停用」）。
+/// 对应 Go `struct PluginsOption`。插件注册表（只记「已停用」+ 内置墓碑）。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginsOption {
     #[serde(default)]
     pub disabled: Vec<String>,
+    /// 用户主动删除的**随包内置**插件 ID 墓碑（2026-10-02 P4）。
+    /// 🔴 `skip_serializing_if` 与 Go `omitempty` 同构：空（常态）时字段消失，
+    /// GET /config 产物对旧基线逐字节等价（裸字段会产生 null vs [] 分歧）。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<String>,
 }
 
 /// 对应 Go `struct QuickSwitchOption`。
