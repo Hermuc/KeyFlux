@@ -146,7 +146,12 @@ pub fn hint_row(text: impl Into<String>) -> View {
 const SCHEME_COL_HOTKEY: f64 = 130.0;
 /// 第 3 列（开关）宽 —— 取值见 [`scheme_columns`] 的推导：贴近数据行原本 `Auto` 的实测宽度，
 /// 这样「把列宽钉死」不会挪动开关自身的位置。
-const SCHEME_COL_SWITCH: f64 = 96.0;
+///
+/// 🔴 2026-10-02：96 → 104。96 是拿 `ON`（墨迹 ≈18.4 DIP）反推的上界，**量错了字符串**
+/// —— `OFF`（最宽那条，墨迹 ≈24 DIP）在 96 下只剩 ≈20 DIP 槽位被裁成 `OF|`（用户报障）。
+/// 教训：**固定宽容器的契约测试必须拿"最宽的那条字符串"去量**（见
+/// [`scheme_switch_column_fits_switch_and_indicator`]）。
+const SCHEME_COL_SWITCH: f64 = 104.0;
 /// 第 2 列内容左缩进（表头与数据行经 [`scheme_inset`] 共用，不可能只改一边）。
 const SCHEME_INSET_HOTKEY: f64 = 8.0;
 /// 第 3 列内容左缩进（表头与数据行经 [`scheme_inset`] 共用，不可能只改一边）。
@@ -161,10 +166,11 @@ const SCHEME_INSET_SWITCH: f64 = 16.0;
 /// （用户报障；像素实测 @125%：`触发键` 偏右 61px、`开关` 偏右 69px）。
 /// 叠加第 2 列缩进表头漏了那 8px ⇒ 再偏 8。**修法 = 列宽一律固定 + 逐列缩进两边相同。**
 ///
-/// 第 3 列取 96：数据行原 `Auto` 的宽度实测落在 **92~96 DIP**（两条互相独立的像素实测：
+/// 第 3 列取 104：数据行原 `Auto` 的宽度实测落在 **92~96 DIP**（两条互相独立的像素实测：
 /// ① 由"第 3 列宽度差 56 DIP + 表头自身 ≈40 DIP"反解得 ≈95；② 由"卡片内容宽 503 − 名称列
-/// 281 − 触发键列 130"直接解得 ≈92）。**取上界 96** ⇒ 开关位置最多比旧观感左移 4 DIP、
-/// 绝不会右移去挤 `ON` 字，同时给「`OFF` 比 `ON` 宽」留出余量。
+/// 281 − 触发键列 130"直接解得 ≈92）。96 曾拿 `ON` 反推、裁掉 `OFF`（见
+/// [`SCHEME_COL_SWITCH`] 注释），2026-10-02 放宽到 104 ⇒ 开关位置左移 ≤8 DIP
+/// （表头与数据行同步移动，对齐不变），`OFF` 槽位 ≥28 DIP。
 ///
 /// 第 1 列仍是 STAR：它没有"需要与另一个 Grid 对齐的同名列头"之外的约束，且固定 124px 会把
 /// 「CapsLock + Space」截断（旧注释的结论仍然成立）。
@@ -475,7 +481,10 @@ mod tests {
     fn scheme_switch_column_fits_switch_and_indicator() {
         let track = 40.0; // WinUI ToggleSwitch 轨道宽
         let gap = 8.0; // 开关与指示字之间 StackPanel::spacing
-        let indicator = 24.0; // ON/OFF 字的排版宽度上界（"ON" 实测墨迹 ≈18.4）
+        // 🔴 必须拿**最宽的那条字符串**量：`OFF` 实测墨迹 ≈24 DIP（`ON` 仅 ≈18.4）。
+        // 96 时代拿 `ON` 反推留 24 上界 ⇒ `OFF` 被裁成 `OF|`（2026-10-02 用户报障）。
+        // 上界再放 4 DIP 余量 = 28。
+        let indicator = 28.0;
         let needed = SCHEME_INSET_SWITCH + track + gap + indicator;
         assert!(
             SCHEME_COL_SWITCH >= needed,
