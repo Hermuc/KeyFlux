@@ -572,15 +572,12 @@ mod tests {
     #[test]
     fn get_config_uses_null_tolerant_parse() {
         let sandbox = Sandbox::new("get-null");
-        sandbox.write_config(
-            r#"{"keymaps":null,"options":{"plugins":{"disabled":null},"quickSwitch":null}}"#,
-        );
+        sandbox.write_config(r#"{"keymaps":null,"options":{"plugins":{"disabled":null}}}"#);
         let reply = build_get_config(&sandbox.paths(), false);
         assert_eq!(reply.status, 200);
         let body = String::from_utf8(reply.body).unwrap();
-        // 旧配置缺失段 → 默认值补齐（ParseConfig 语义）+ 空集合恒 []
-        assert!(body.contains("\"collectEnabled\":true"), "{body}");
-        assert!(body.contains("\"pollIntervalMs\":800"), "{body}");
+        // 旧配置缺失段 → 空集合恒 []；deprecated quickSwitch 段已整体移除（2026-10-02）
         assert!(body.contains("\"disabled\":[]"), "{body}");
+        assert!(!body.contains("quickSwitch"), "{body}");
     }
 }

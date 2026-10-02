@@ -114,7 +114,6 @@ func syntheticKeyOrderConfigJSON(t *testing.T) string {
 			Language:       "zh-CN",
 			KeyboardLayout: "",
 			Mouse:          Mouse{TipSymbol: "🐶"},
-			QuickSwitch:    DefaultQuickSwitchOption(),
 			// 显式空切片 (而非缺省) —— 两侧「nil 语义差异」是**另一类**已知分歧
 			// (Go nil slice -> `null`, Rust `Vec` -> `[]`), 会让本用例失焦。本用例
 			// 只锁「键序 + 转义 + 缩进 + 尾换行」, 故把这三段非 map 字段钉成两侧同形。

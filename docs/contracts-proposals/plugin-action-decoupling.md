@@ -154,8 +154,8 @@ P7 = 拆 K1/K2（协议）+ K3（机制泛化）。K4 随 K1 自动消解。
 **定向 diff 审计 = synthetic 基线恰 1 行**（`QuickSwitchGoto()` → `PluginAction(...)`,
 factory 基线零变化）; api-parity 双腿 23/23（**零重录** —— actionId omitempty,
 api-parity 沙箱配置无插件动作绑定）; 机械验收 grep = 核心层零功能性命中
-（残余仅注释/测试/兼容层: P5 迁移函数与 deprecated options.quickSwitch 段, 待兼容期后
-另批移除）。
+（残余仅注释/测试; P5 迁移函数与 deprecated options.quickSwitch 段已于 2026-10-02
+兼容段移除批次全量删除 —— GET /config 停出该段, api-parity 基线已重录）。
 **部署实证**: 生产树后端/面板 md5 双侧一致（C58E0C95...）; 产物重生成
 （`bin/KeyFlux.ahk` mtime 11:43, L62 `InitQuickSwitch()`; 生产配置无插件动作绑定 ⇒
 无 PluginAction 行属预期）; 引擎日志 goto + clear_history 双注册; engine_error 零新条目。
