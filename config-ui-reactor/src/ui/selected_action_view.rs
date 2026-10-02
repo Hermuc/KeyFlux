@@ -561,6 +561,72 @@ where
 }
 
 /// 卡内「＋ 新建匹配类型」文字链（2553；旧 `TypeCardVm.CreateType` 入口）。
+/// 文件后缀卡：内联后缀编辑器（「✎ 编辑后缀」切换链 + 展开态的串编辑行）。
+/// 仅 fileExt 卡调用；`draft` = None 表示收起。
+pub fn exts_editor(
+    open: bool,
+    draft: Option<String>,
+    on_value: impl IntoPayloadCallback<String>,
+    on_save: impl IntoUnitCallback,
+    on_toggle: impl IntoUnitCallback,
+) -> View {
+    // 切换链与取消共用同一动作（IntoUnitCallback 消费一次 ⇒ 先物化成可 Clone 的 Callback）
+    let toggle_callback = on_toggle.into_unit_callback();
+    let toggle_for_cancel = toggle_callback.clone();
+    // 切换链（2596「✎ 编辑后缀」；造型同 2553 新建链）
+    let link = Button::new()
+        .resource_overrides(
+            ResourceOverrides::new()
+                .set("ButtonBackground", Color::transparent())
+                .set("ButtonBorderBrush", Color::transparent())
+                .set("ButtonBackgroundPointerOver", Color::transparent())
+                .set("ButtonBorderBrushPointerOver", Color::transparent()),
+        )
+        .on_click(toggle_callback)
+        .content(
+            TextBlock::new()
+                .text(i18n::t("2596"))
+                .font_size(13.0)
+                .foreground(theme::accent_solid()),
+        );
+
+    if !open {
+        return link;
+    }
+
+    // 展开态：后缀串输入（逗号分隔，normalize_exts 语义）+ 保存/取消
+    let editor: View = Border::new()
+        .background(theme::sand())
+        .corner_radius(theme::radius_sm())
+        .padding(Thickness::new(12.0, 10.0, 12.0, 10.0))
+        .content(
+            StackPanel::new().spacing(8.0).children((
+                TextBox::new()
+                    .text(draft.unwrap_or_default())
+                    .min_height(34.0)
+                    .border_brush(theme::solid(INPUT_STROKE))
+                    .on_text_changed(on_value),
+                StackPanel::new()
+                    .orientation(Orientation::Horizontal)
+                    .spacing(8.0)
+                    .horizontal_alignment(HorizontalAlignment::Right)
+                    .children((
+                        Button::new().on_click(on_save).content(
+                            TextBlock::new()
+                                .text(i18n::t("610"))
+                                .foreground(theme::solid(theme::WHITE)),
+                        ),
+                        Button::new().on_click(toggle_for_cancel).content(
+                            TextBlock::new()
+                                .text(i18n::t("611"))
+                                .foreground(theme::solid(theme::CHARCOAL)),
+                        ),
+                    )),
+            )),
+        );
+    StackPanel::new().spacing(8.0).children((link, editor))
+}
+
 pub fn new_type_link(on_click: impl IntoUnitCallback) -> View {
     Button::new()
         .resource_overrides(
