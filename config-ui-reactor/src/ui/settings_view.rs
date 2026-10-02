@@ -316,8 +316,8 @@ where
                     "✕",
                     15.0,
                     theme::ERROR_CRIMSON,
-                    // 已启用方案不可删除（用户定版 2026-10-02）：禁用态由 WinUI
-                    // 自动灰化内容。
+                    // 已启用方案不可删除（用户定版 2026-10-02）：禁用钮由
+                    // icon_button 统一置灰（STONE_GRAY）。
                     can_delete && !enabled,
                     on_delete,
                 )),

@@ -22,6 +22,10 @@ pub mod settings_view;
 /// 2026-10-01 用户定版：此类按钮一律无边框无底色。WinUI Button 默认模板带
 /// 边框底色，须覆盖 **全部 8 个视觉态**资源键（含 Pressed/Disabled——只盖静态
 /// 态会在按下时闪回默认边框）；回调走 `on_click`。
+///
+/// 2026-10-02 用户定版：**禁用态图标置灰**（`STONE_GRAY`）——ghost 覆盖透明化了
+/// WinUI 自身的禁用灰化，若仍按传入色（多为红色 ✕）渲染，会"看着能点、点了没反应"
+/// （快捷键方案启用行删除钮报障）。
 pub fn icon_button<C: IntoUnitCallback>(
     glyph: &str,
     font_size: f64,
@@ -47,7 +51,11 @@ pub fn icon_button<C: IntoUnitCallback>(
             TextBlock::new()
                 .text(glyph.to_string())
                 .font_size(font_size)
-                .foreground(theme::solid(color)),
+                .foreground(theme::solid(if enabled {
+                    color
+                } else {
+                    theme::STONE_GRAY
+                })),
         )
 }
 
