@@ -10,9 +10,15 @@ use std::time::Duration;
 
 use crate::models::{MarketCatalog, MarketPluginEntry};
 
-/// 市场目录地址（发布侧：仓库 `plugins/marketplace.json`）。
-pub const CATALOG_URL: &str =
-    "https://raw.githubusercontent.com/Hermuc/KeyFlux/main/plugins/marketplace.json";
+/// 市场目录源（**顺序尝试**）：GitHub raw 直连 → jsDelivr CDN。
+/// 两者可达性互补（raw 在部分国内网络被劫持/阻断；jsDelivr 间歇不稳），
+/// 逐源尝试取第一个成功者。清单内容同源（同一仓库文件），无信任差异。
+pub const CATALOG_URLS: [&str; 2] = [
+    "https://raw.githubusercontent.com/Hermuc/KeyFlux/main/plugins/marketplace.json",
+    "https://cdn.jsdelivr.net/gh/Hermuc/KeyFlux@main/plugins/marketplace.json",
+];
+/// 兼容旧引用的主源。
+pub const CATALOG_URL: &str = CATALOG_URLS[0];
 
 /// 外部网络超时（对齐旧版 15s）。
 const EXTERNAL_TIMEOUT: Duration = Duration::from_secs(15);
@@ -83,20 +89,35 @@ pub fn can_install(entry: &MarketEntry) -> bool {
 }
 
 fn external_agent() -> ureq::Agent {
+    // TLS 根证书跟随 **OS 信任库**（PlatformVerifier）：内置 webpki-roots 不含
+    // 用户安装的代理/企业根，国内网络下 raw.githubusercontent 被劫持重签时恒报
+    // UnknownIssuer（2026-10-02 实测）；跟随系统库与 git/curl 行为一致。
+    let tls = ureq::tls::TlsConfig::builder()
+        .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+        .build();
     let config = ureq::Agent::config_builder()
+        .tls_config(tls)
         .timeout_global(Some(EXTERNAL_TIMEOUT))
         .http_status_as_error(false)
         .build();
     config.into()
 }
 
-/// 拉取并解析市场目录（外部网络；失败返回可展示的原因）。
+/// 拉取并解析市场目录（外部网络；逐源尝试，全部失败返回带源的原因）。
 pub fn fetch_catalog() -> Result<MarketCatalog, String> {
     let agent = external_agent();
-    let mut response = agent
-        .get(CATALOG_URL)
-        .call()
-        .map_err(|error| error.to_string())?;
+    let mut last_error = String::new();
+    for url in CATALOG_URLS {
+        match fetch_catalog_from(&agent, url) {
+            Ok(catalog) => return Ok(catalog),
+            Err(error) => last_error = format!("{url}: {error}"),
+        }
+    }
+    Err(last_error)
+}
+
+fn fetch_catalog_from(agent: &ureq::Agent, url: &str) -> Result<MarketCatalog, String> {
+    let mut response = agent.get(url).call().map_err(|error| error.to_string())?;
 
     let status = response.status().as_u16();
     let text = response

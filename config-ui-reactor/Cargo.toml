@@ -35,7 +35,10 @@ tiny_http = "0.12"
 # R2 插件导入（POST /api/plugins/import）：解包 zip 到临时目录再原子落盘。
 # 只开 deflate（Go archive/zip 同样只支持 store/deflate），关掉默认的全部加密/压缩特性。
 zip = { version = "2", default-features = false, features = ["deflate"] }
-ureq = "3.4.2"
+# platform-verifier: 市场目录走系统证书库（Windows 证书存储）——内置 webpki-roots
+# 不含用户安装的代理/企业根，国内网络下 raw.githubusercontent 被劫持时恒报
+# UnknownIssuer（2026-10-02 实测）。跟随 OS 信任库 = git/curl 同行为。
+ureq = { version = "3.4.2", features = ["platform-verifier"] }
 windows-reactor = "0.100"
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_UI_Controls_Dialogs", "Win32_UI_WindowsAndMessaging"] }
 
