@@ -215,6 +215,11 @@ fn read_manifest(dir: &Path) -> Result<WireManifest, String> {
 }
 
 /// Go `parseManifest`：剥 BOM → 解析 → 校验（经 generator 面复用）。
+/// 🔴 走 [`gplugins::validate_manifest_body`]（**不含内置 ID 检查**）——目录加载
+/// 与 zip 安装共用本解析，随包内置插件 quick_switch 以标准插件形态存在于
+/// `data/plugins/`；内置 ID 冒名拦截由调用方按路径决定：zip 安装在下方补
+/// [`gplugins::validate_manifest`] 严格版，目录列表天然放行（2026-10-02 修：
+/// 之前在此误用严格版 ⇒ 面板列表页报「与内置插件冲突」）。
 pub(crate) fn parse_manifest_wire(raw: &[u8]) -> Result<WireManifest, String> {
     let raw = raw.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(raw);
     let mut value: serde_json::Value =
@@ -223,7 +228,7 @@ pub(crate) fn parse_manifest_wire(raw: &[u8]) -> Result<WireManifest, String> {
     let mut wire: WireManifest =
         serde_json::from_value(value).map_err(|error| format!("plugin.json 解析失败: {error}"))?;
     wire.canonicalize();
-    gplugins::validate_manifest(&wire.to_generator())?;
+    gplugins::validate_manifest_body(&wire.to_generator())?;
     Ok(wire)
 }
 
@@ -369,6 +374,8 @@ pub(crate) fn install_from_zip(data: &[u8], user_dir: &Path) -> Result<WireManif
 
         let raw = std::fs::read(root.join("plugin.json")).map_err(|error| error.to_string())?;
         let manifest = parse_manifest_wire(&raw)?;
+        // 导入路径走严格版：第三方包不得冒用内置 ID (目录列表路径不受此限)。
+        gplugins::validate_manifest(&manifest.to_generator())?;
 
         let dest = user_dir.join(&manifest.id);
         if dest.exists() {
@@ -650,4 +657,26 @@ pub(crate) fn save_plugin_settings(ctx: &ServerContext, id: &str, body: &[u8]) -
         values: &merged,
     };
     HttpReply::json(200, marshal_go_json(&dto))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 回归 (2026-10-02): 目录列表路径必须放行内置 ID —— 随包内置插件
+    /// quick_switch 以标准插件形态存在于 data/plugins/, 面板列表此前误走
+    /// 严格版校验而报「与内置插件冲突」。冒名拦截只属导入 API (zip 安装处)。
+    #[test]
+    fn parse_manifest_wire_allows_builtin_id() {
+        let raw = r#"{
+            "id": "quick_switch", "name": "快速切换", "nameEn": "Quick Switch",
+            "version": "1.0.0", "specVersion": 1, "description": "内置",
+            "entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"},
+            "permissions": ["window"]
+        }"#
+        .as_bytes();
+        let manifest = parse_manifest_wire(raw)
+            .unwrap_or_else(|error| panic!("目录解析应放行内置 ID: {error}"));
+        assert_eq!(manifest.id, "quick_switch");
+    }
 }
