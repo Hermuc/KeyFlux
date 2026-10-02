@@ -1,7 +1,7 @@
 //! 插件页的**纯逻辑**（零 UI 依赖）。
 //!
 //! 逐项复刻 `config-ui-avalonia/ViewModels/PluginsPageViewModel.cs` 的可判定部分：
-//! 统一卡片列表（首卡恒为内置 QuickSwitch）+ 启停开关分流 + 状态/显示派生 + 空态判定。
+//! 统一卡片列表（目录驱动，含随包内置插件）+ 启停开关分流 + 状态/显示派生 + 空态判定。
 //!
 //! 开关语义（与旧版一致）：
 //! * **内置卡**（`quick_switch`）直通 `options.quickSwitch.collectEnabled`；
@@ -13,7 +13,6 @@ use crate::models::{
     Config, PluginListResponse, PluginManifest, PluginSetting, PluginSettingsResponse,
     QuickSwitchOption,
 };
-use crate::services::i18n;
 
 /// 内置插件 ID（与 Go `internal/plugins.BuiltinPluginIDs` 对应）。
 pub const BUILTIN_PLUGIN_IDS: [&str; 1] = ["quick_switch"];
@@ -30,7 +29,7 @@ pub struct PluginCard {
     pub version: Option<String>,
     pub description: String,
     pub author: String,
-    /// 内置插件（首卡 QuickSwitch；不可删除，开关直通 `collectEnabled`）。
+    /// 内置插件（quick_switch；不可删除，开关直通 `collectEnabled`）。
     pub is_builtin: bool,
     /// 是否可删除（仅用户插件）。
     pub can_delete: bool,
@@ -70,39 +69,19 @@ pub fn is_builtin(id: &str) -> bool {
     BUILTIN_PLUGIN_IDS.contains(&id)
 }
 
-/// 合成内置 QuickSwitch 卡（复刻 `CreateQuickSwitchCard`）。
-pub fn quick_switch_card(config: &Config) -> PluginCard {
-    PluginCard {
-        id: QUICK_SWITCH_ID.to_string(),
-        name: i18n::t("2408"),
-        name_en: Some("Quick Switch".to_string()),
-        version: None,
-        description: i18n::t("2422"),
-        author: String::new(),
-        is_builtin: true,
-        can_delete: false,
-        can_configure: true,
-        enabled: config.options.quick_switch.collect_enabled,
-    }
-}
-
-/// 由目录响应 + 当前配置构建统一卡片列表（首卡恒为内置 QuickSwitch）。
+/// 由目录响应 + 当前配置构建统一卡片列表。
+///
+/// 🔴 目录驱动 (2026-10-02 反转, 用户裁定「删掉旧的合成卡」)：quick_switch 不再
+/// 前置合成 —— 随包内置插件以标准插件形态存在于 data/plugins/，由目录扫描发现并
+/// 经 [`card_from`] 渲染（带版本号/作者/manifest 描述）。开关语义不变：
+/// builtin 卡的 enabled 读 `options.quickSwitch.collect_enabled`（见 card_from），
+/// 写回走 [`apply_enabled`] 的 is_builtin 分支。
 pub fn build_cards(config: &Config, catalog: &PluginListResponse) -> Vec<PluginCard> {
-    let mut cards = vec![quick_switch_card(config)];
-
-    cards.extend(
-        catalog
-            .plugins
-            .iter()
-            // 🔴 去重守卫 (2026-10-01 P2 插件化): quick_switch 自本期起以标准插件
-            // 形态存在于 data/plugins/ (会被目录扫描发现), 但其**专用卡**仍由首卡
-            // 合成 (开关写 options.quickSwitch.collect_enabled, 非 disabled 列表,
-            // 见 apply_enabled 的 is_builtin 分支) —— 不跳过会出现两张同 ID 卡。
-            // 切到目录驱动卡 + 墓碑语义属 P4 (提案 §6)。
-            .filter(|manifest| manifest.id != QUICK_SWITCH_ID)
-            .map(|manifest| card_from(config, manifest)),
-    );
-    cards
+    catalog
+        .plugins
+        .iter()
+        .map(|manifest| card_from(config, manifest))
+        .collect()
 }
 
 /// 单个用户插件卡（复刻 `PluginCardVm` 的派生字段）。
@@ -123,13 +102,20 @@ pub fn card_from(config: &Config, manifest: &PluginManifest) -> PluginCard {
                 .as_ref()
                 .map(|settings| !settings.is_empty())
                 .unwrap_or(false),
-        // 缺省启用：仅当登记在 `disabled` 中才算停用
-        enabled: !config
-            .options
-            .plugins
-            .disabled
-            .iter()
-            .any(|id| id == &manifest.id),
+        // 开关状态源按卡类型分流 (2026-10-02 目录驱动反转): builtin (quick_switch)
+        // 读 options.quickSwitch.collect_enabled —— 与 apply_enabled 的 is_builtin
+        // 写回分支、生成期 {{ PLUGIN_LATE_INIT }} 的渲染条件同源; 用户插件读
+        // disabled 表 (= 登记即停用)。
+        enabled: if builtin {
+            config.options.quick_switch.collect_enabled
+        } else {
+            !config
+                .options
+                .plugins
+                .disabled
+                .iter()
+                .any(|id| id == &manifest.id)
+        },
     }
 }
 
@@ -438,19 +424,23 @@ mod tests {
     }
 
     #[test]
-    fn cards_start_with_builtin_quick_switch() {
+    fn builtin_quick_switch_is_directory_driven() {
         let mut config = Config::default();
         config.options.quick_switch.collect_enabled = true;
-        let cards = build_cards(&config, &PluginListResponse::default());
+        let catalog = PluginListResponse {
+            plugins: vec![manifest(QUICK_SWITCH_ID, "快速切换", Some("1.0.0"), 0)],
+            errors: None,
+        };
+        let cards = build_cards(&config, &catalog);
 
-        assert_eq!(cards.len(), 1, "无用户插件时仅内置卡");
+        assert_eq!(cards.len(), 1, "目录驱动: 内置卡也来自目录扫描, 无合成前置");
         let card = &cards[0];
         assert_eq!(card.id, QUICK_SWITCH_ID);
         assert!(card.is_builtin);
-        assert!(!card.can_delete, "内置卡不可删除");
+        assert!(!card.can_delete, "内置卡不可删除 (墓碑属 P4)");
         assert!(card.can_configure, "内置卡可配置");
-        assert!(card.enabled, "直通 collectEnabled");
-        assert_eq!(card.name_en.as_deref(), Some("Quick Switch"));
+        assert!(card.enabled, "开关状态源 = collectEnabled");
+        assert_eq!(card.version_text(), "v1.0.0", "版本号来自 manifest");
     }
 
     #[test]
@@ -469,14 +459,14 @@ mod tests {
         };
 
         let cards = build_cards(&config, &catalog);
-        assert_eq!(cards.len(), 3, "内置 + 2 用户");
-        assert!(cards[1].enabled, "未登记 disabled ⇒ 默认启用");
-        assert!(!cards[2].enabled, "登记在 disabled ⇒ 停用");
-        assert!(cards[1].can_delete);
-        assert!(!cards[1].can_configure, "无 settings 声明的用户卡不可配置");
-        assert!(cards[2].can_configure, "有 settings 声明则可配置");
-        assert_eq!(cards[1].version_text(), "v1.0");
-        assert_eq!(cards[2].version_text(), "", "无版本 ⇒ 空徽标");
+        assert_eq!(cards.len(), 2, "目录驱动: 2 用户卡, 无合成前置");
+        assert!(cards[0].enabled, "未登记 disabled ⇒ 默认启用");
+        assert!(!cards[1].enabled, "登记在 disabled ⇒ 停用");
+        assert!(cards[0].can_delete);
+        assert!(!cards[0].can_configure, "无 settings 声明的用户卡不可配置");
+        assert!(cards[1].can_configure, "有 settings 声明则可配置");
+        assert_eq!(cards[0].version_text(), "v1.0");
+        assert_eq!(cards[1].version_text(), "", "无版本 ⇒ 空徽标");
     }
 
     #[test]
@@ -545,7 +535,11 @@ mod tests {
 
     #[test]
     fn empty_and_error_states_follow_legacy() {
-        let builtin_only = vec![quick_switch_card(&Config::default())];
+        // 目录驱动 (2026-10-02): builtin 卡也来自 card_from (无独立合成构造器)。
+        let builtin_only = vec![card_from(
+            &Config::default(),
+            &manifest(QUICK_SWITCH_ID, "快速切换", Some("1.0.0"), 0),
+        )];
         assert!(show_empty_state(false, None, &builtin_only));
         assert!(
             !show_empty_state(true, None, &builtin_only),
@@ -559,7 +553,7 @@ mod tests {
         let with_user = {
             let config = Config::default();
             vec![
-                quick_switch_card(&config),
+                card_from(&config, &manifest(QUICK_SWITCH_ID, "快速切换", None, 0)),
                 card_from(&config, &manifest("a", "A", None, 0)),
             ]
         };
