@@ -79,6 +79,10 @@ pub struct Action {
     pub remap_to_key: String,
     #[serde(rename = "actionValueID", skip_serializing_if = "is_zero")]
     pub value_id: i32,
+    /// 插件动作 ID `<pluginId>.<actionId>`（P7b；typeID 9 专用，双字段过渡 ——
+    /// 渲染优先于 valueID；空串不出场，与 Go `actionId,omitempty` 对齐）。
+    #[serde(rename = "actionId", skip_serializing_if = "String::is_empty")]
+    pub action_id: String,
     #[serde(rename = "winTitle", skip_serializing_if = "String::is_empty")]
     pub win_title: String,
     #[serde(skip_serializing_if = "String::is_empty")]

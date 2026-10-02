@@ -12,12 +12,12 @@ class PluginManager {
   ; permissions 词表 (冻结, 契约 §4)
   static PERMISSIONS := ["selection", "run", "clipboard", "window", "settings", "events"]
 
-  ; ---- 插件动作注册表 (命令注册表范式; 2026-10-01 QuickSwitch 插件化 P2 落地) ----
-  ; 核心对插件实现**零静态引用**: 生成端 callMap 只产出 InvokeAction("<pluginId>",
-  ; "<actionId>"), 插件在入口内经 APIView.RegisterAction("<actionId>", <fn>) 注册实现。
+  ; ---- 插件动作注册表 (命令注册表范式; 2026-10-01 插件化 P2 落地) ----
+  ; 核心对插件实现**零静态引用**: 生成端只产出 PluginAction("<pluginId>",
+  ; "<actionId>") (P7b), 插件在入口内经 APIView.RegisterAction("<actionId>", <fn>) 注册实现。
   ; 🔴 为什么必须经表间接寻址而不能直调: AHK v2 直调未定义函数是**加载期致命错误**
-  ;   (2026-10-01 探针实测, 见提案 docs/contracts-proposals/quickswitch-pluginization.md
-  ;   §0.5) —— 若核心薄壳直调插件符号, 插件被删除/停用后整个引擎无法启动。
+  ;   (2026-10-01 探针实测, 见插件化提案 §0.5) —— 若核心薄壳直调插件符号,
+  ;   插件被删除/停用后整个引擎无法启动。
   ;   缺席 => 记日志返回 false, 绝不抛错 (可删除性保证)。
   static Actions := Map()        ; "<pluginId>:<actionId>" -> Func
 
@@ -180,4 +180,15 @@ class PluginManager {
       FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " msg "`n", "logs\plugin_manager.log")
     }
   }
+}
+
+/**
+ * 插件动作统一入口 (2026-10-02 P7b 全局薄壳): 生成端 keymap 行直接调用本函数,
+ * 转发到动作注册表。核心不知道任何具体插件/动作名 —— 寻址完全由配置 actionId 驱动。
+ * 为什么是全局函数而非 PluginManager.PluginAction: 生成端产出的是无限定名调用,
+ * 全局命名空间与 AHK v2 函数解析规则一致 (类静态调用亦可, 但全局名最短最稳)。
+ * @return true = 动作已执行; false = 动作不可用 (静默, 不打断调用方)
+ */
+PluginAction(pluginId, actionId) {
+  return PluginManager.InvokeAction(pluginId, actionId)
 }

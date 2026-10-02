@@ -85,9 +85,11 @@ type ActionDTO struct {
 	Comment       string `json:"comment,omitempty"`
 	Hotkey        string `json:"hotkey,omitempty"`
 	// 下面的字段因动作类型而异
-	KeysToSend         string `json:"keysToSend,omitempty"`
-	RemapToKey         string `json:"remapToKey,omitempty"`
-	ValueID            int    `json:"actionValueID,omitempty"`
+	KeysToSend string `json:"keysToSend,omitempty"`
+	RemapToKey string `json:"remapToKey,omitempty"`
+	ValueID    int    `json:"actionValueID,omitempty"`
+	// ActionID 插件动作 "<pluginId>.<actionId>" (P7b 双字段过渡; 仅 typeID 9 有意义)。
+	ActionID           string `json:"actionId,omitempty"`
 	WinTitle           string `json:"winTitle,omitempty"`
 	Target             string `json:"target,omitempty"`
 	Args               string `json:"args,omitempty"`
@@ -287,6 +289,7 @@ func actionToDTO(a model.Action) ActionDTO {
 		KeysToSend:         a.KeysToSend,
 		RemapToKey:         a.RemapToKey,
 		ValueID:            a.ValueID,
+		ActionID:           a.ActionID,
 		WinTitle:           a.WinTitle,
 		Target:             a.Target,
 		Args:               a.Args,

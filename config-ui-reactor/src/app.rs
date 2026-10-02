@@ -359,6 +359,17 @@ impl Component for Shell {
                     }
                 }
             }
+            Message::SelectPluginAction { action_id } => {
+                let old_value = self
+                    .current_action_mut()
+                    .map(|action| action_editor::select_plugin_action(action, &action_id))
+                    .unwrap_or(-1);
+                if old_value >= 0
+                    && let Some(type_id) = self.current_action().map(|action| action.type_id)
+                {
+                    self.maybe_refresh_abbr_enable(type_id, type_id, old_value, 0);
+                }
+            }
             Message::WindowSpy => {
                 if let Some(port) = self.port {
                     let _ = context.spawn_background(move |_token| {
@@ -404,6 +415,9 @@ impl Component for Shell {
                 self.page_index = 0;
                 self.loading = false;
                 self.error = None;
+                // 插件目录预取（P7b）：type 9 动作编辑器的插件动作动态组消费
+                // `plugin_catalog`；启动即取，不等用户进插件页。
+                self.reload_plugins(context);
                 // 行为目录快照（选中动作页消费；失败时目录为空 = 下拉空，不阻断页面）
                 let _ = context.spawn_background(move |_token| {
                     let api = crate::services::transport::new_settings_api(port);
@@ -1345,11 +1359,24 @@ impl Component for Shell {
             }
             Message::PluginDeleted { id, result } => match result {
                 Ok(()) => {
-                    // 注册表孤儿项清理（旧版行为包先例：config 变更统一走保存链路）
+                    // 注册表孤儿项清理（旧版行为包先例：config 变更统一走保存链路）。
+                    // P7b: bundled 判定以删除前目录里的 manifest 标记为准（墓碑只
+                    // 该打在随包分发的插件上）。
+                    let bundled = self
+                        .plugin_catalog
+                        .as_ref()
+                        .and_then(|catalog| {
+                            catalog
+                                .plugins
+                                .iter()
+                                .find(|manifest| manifest.id == id)
+                                .map(|manifest| manifest.bundled)
+                        })
+                        .unwrap_or(false);
                     let cleaned = self
                         .config
                         .as_mut()
-                        .map(|config| plugins::remove_from_registry(config, &id))
+                        .map(|config| plugins::remove_from_registry(config, &id, bundled))
                         .unwrap_or(false);
                     if cleaned {
                         self.save_now(context);

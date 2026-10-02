@@ -134,9 +134,13 @@ type Action struct {
 	Comment       string `json:"comment,omitempty"`
 	Hotkey        string `json:"hotkey,omitempty"`
 	// 下面的字段因动作类型而异
-	KeysToSend         string `json:"keysToSend,omitempty"`
-	RemapToKey         string `json:"remapToKey,omitempty"`
-	ValueID            int    `json:"actionValueID,omitempty"`
+	KeysToSend string `json:"keysToSend,omitempty"`
+	RemapToKey string `json:"remapToKey,omitempty"`
+	ValueID    int    `json:"actionValueID,omitempty"`
+	// ActionID 插件动作 ID "<pluginId>.<actionId>" (P7b; 仅 typeID 9 有意义)。
+	// 双字段过渡: 新保存同时写 ValueID=9 (子类型标记) 与本字段, 渲染时本字段优先;
+	// 旧字段退役另立 compat 期批次。
+	ActionID           string `json:"actionId,omitempty"`
 	WinTitle           string `json:"winTitle,omitempty"`
 	Target             string `json:"target,omitempty"`
 	Args               string `json:"args,omitempty"`

@@ -143,6 +143,9 @@ pub(crate) struct WireManifest {
     /// Go `Manifest.Provides`（P7a；`*Provides` omitempty ⇒ nil 不出场）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provides: Option<WireProvides>,
+    /// Go `Manifest.Bundled`（P7b；omitempty ⇒ false 不出场）。
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub bundled: bool,
 }
 
 impl WireSetting {
@@ -227,6 +230,7 @@ impl WireManifest {
                     })
                     .collect(),
             }),
+            bundled: self.bundled,
         }
     }
 }

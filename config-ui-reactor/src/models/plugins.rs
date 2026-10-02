@@ -36,6 +36,9 @@ pub struct PluginManifest {
     /// 能力提供块（P7a 协议扩容；缺省 = 无。消费方 = P7b 动作下拉动态化）。
     #[serde(default)]
     pub provides: Option<PluginProvides>,
+    /// 随包分发标记（P7b）：随包插件为 true，「内置/用户」判定真源。
+    #[serde(default)]
+    pub bundled: bool,
 }
 
 /// 插件入口声明。

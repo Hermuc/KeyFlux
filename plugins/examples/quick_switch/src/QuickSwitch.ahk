@@ -280,7 +280,19 @@ _QuickSwitchSwitchToHistory() {
   QSSTATE.mode := "history"
 }
 
-; ---- 热键入口 (被 type9_keyflux.ahk 的薄壳 QuickSwitchGoto() 转调) ----
+; ---- 手动动作入口 2: 清空切换历史 (2026-10-02 P7b 回归 P6 移除的「清空历史」入口) ----
+; 经动作注册表触发 (配置 actionId = "quick_switch.clear_history"); 失败静默。
+QuickSwitchClearHistory() {
+  global QSSTATE
+  try {
+    if (HistClear(QSHistoryPath())) {
+      QSSTATE.histStore := HistLoad(QSHistoryPath())
+    }
+  } catch {
+  }
+}
+
+; ---- 热键入口 (动作 "goto"; 2026-10-02 P7b 起由生成端 PluginAction() 经注册表转调) ----
 ; 约束: 本函数内零 Shell 枚举、零磁盘 IO; 只使用已缓存候选。
 QuickSwitchRun() {
   global QSCFG, QSSTATE

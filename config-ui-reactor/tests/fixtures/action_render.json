@@ -1026,7 +1026,7 @@
       },
       "remapInHotIf": false,
       "inAbbrContext": false,
-      "out": "km.Map(\"*6\", _ =\u003e QuickSwitchGoto(), , \"ahk_group MY_WINDOW_GROUP_2\", 2)"
+      "out": ""
     },
     {
       "in": {
@@ -1037,7 +1037,7 @@
       },
       "remapInHotIf": false,
       "inAbbrContext": true,
-      "out": "QuickSwitchGoto()"
+      "out": ""
     },
     {
       "in": {
@@ -1351,7 +1351,8 @@
             {
               "windowGroupID": 0,
               "actionTypeID": 9,
-              "actionValueID": 9
+              "actionValueID": 9,
+              "actionId": "quick_switch.goto"
             }
           ]
         }

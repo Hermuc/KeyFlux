@@ -8,6 +8,7 @@
   "author": "KeyFlux",
   "entry": {"kind": "script", "file": "main.ahk", "func": "EverythingSearchMain"},
   "permissions": ["selection", "run", "settings"],
+  "bundled": true,
   "settings": [
     {
       "key": "triggerKey",

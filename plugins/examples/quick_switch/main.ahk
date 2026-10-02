@@ -14,9 +14,10 @@
 ;   src/QuickSwitch.ahk          编排: 轮询 + 收集 + 自动跳转 + InitQuickSwitch(配置)
 ;
 ; 与引擎的接线 (2026-10-01 插件化 P2, 提案 docs/contracts-proposals/quickswitch-pluginization.md):
-;   ① 动作通道: 本入口把 QuickSwitchRun 注册为动作 "goto"; 核心侧薄壳
-;      QuickSwitchGoto() (bin/lib/actions/builtins/type9_keyflux.ahk, 生成端
-;      callMap[9]) 经 PluginManager.InvokeAction("quick_switch", "goto") 间接寻址 ——
+;   ① 动作通道: 本入口把 QuickSwitchRun 注册为动作 "goto" (P7b 另注册
+;      "clear_history" = 清空切换历史, 回归 P6 移除的清空入口); 生成端 callMap[9]
+;      (valueID=9 子类型 + actionId) 直接产出 PluginAction("quick_switch", "<actionId>")
+;      (PluginManager.ahk 全局薄壳) 经动作注册表间接寻址 ——
 ;      核心对本插件零静态引用, 本插件被删除/停用时该调用点静默返回 false。
 ;   ② 配置通道 (2026-10-02 P5): 晚初始化扩展点 ({{ PLUGIN_LATE_INIT }}) 注入无参
 ;      InitQuickSwitch() 调用 (保持原调用时机, InitKeymap 之后), 配置由插件运行时
@@ -44,5 +45,9 @@ QuickSwitchMain(api) {
   ; 动作自描述: 核心薄壳经注册表间接寻址, 本插件缺席时调用点静默降级。
   if (!api.RegisterAction("goto", QuickSwitchRun)) {
     throw Error("quick_switch: 动作注册失败 (goto)")
+  }
+  ; 清空切换历史 (P7b; manifest provides.actions 声明, 面板动作下拉可见)。
+  if (!api.RegisterAction("clear_history", QuickSwitchClearHistory)) {
+    throw Error("quick_switch: 动作注册失败 (clear_history)")
   }
 }

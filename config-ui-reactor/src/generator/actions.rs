@@ -396,9 +396,26 @@ fn builtin_functions8(config: &Config, action: &Action, in_abbr_context: bool) -
 
 // --------------------------------------------------------------------------- TypeID 9
 
-/// Go `keyfluxActions9`：KeyFlux 自身动作（暂停/重载/退出/设置/进缩写/大写锁定/锁定/快速切换）。
+/// Go `keyfluxActions9`：KeyFlux 自身动作（暂停/重载/退出/设置/进缩写/大写锁定/锁定）
+/// + 插件动作（P7b：actionId = `<pluginId>.<actionId>`，valueID 9 = 子类型标记）。
 fn keyflux_actions9(config: &Config, action: &Action, in_abbr_context: bool) -> String {
     let mut ctx = config.get_hotkey_context(action);
+
+    // P7b: 插件动作绑定（双字段过渡 —— actionId 渲染优先；valueID 9 继续写，
+    // 供旧版本识别「插件动作」子类型）。核心对具体插件零知识：只按 "." 拆分转发，
+    // 寻址由运行时动作注册表完成（插件缺席即静默失败，可删除性保证）。
+    if !action.action_id.is_empty() {
+        let Some((plugin_id, action_id)) = action.action_id.split_once('.') else {
+            return String::new();
+        };
+        let call = format!("PluginAction(\"{plugin_id}\", \"{action_id}\")");
+        if in_abbr_context {
+            return call;
+        }
+        let hotkey = &action.hotkey;
+        return format!("km.Map(\"{hotkey}\", _ => {call}{ctx})");
+    }
+
     let call = match action.value_id {
         1 => "KeyFluxToggleSuspend()",
         2 => "KeyFluxReload()",
@@ -408,7 +425,8 @@ fn keyflux_actions9(config: &Config, action: &Action, in_abbr_context: bool) -> 
         6 => "EnterCapslockAbbr()",
         7 => "ToggleCapslock()",
         8 => "km.ToggleLock",
-        9 => "QuickSwitchGoto()",
+        // 旧式 valueID 9 且无 actionId 的遗留绑定：生成端无法定位插件动作，跳过
+        // （出厂配置 2026-09-23 起已无此绑定；用户重新绑定即写入 actionId）。
         _ => return String::new(),
     };
 

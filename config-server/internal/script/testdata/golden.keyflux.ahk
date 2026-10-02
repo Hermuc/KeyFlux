@@ -128,7 +128,7 @@ InitKeymap()
   km.Map("*q", _ => EnterCapslockAbbr())
   km.Map("*r", km.ToggleLock)
   km.Map("*w", _ => EnterSemicolonAbbr(semiHook, semiHookAbbrWindow))
-  km.Map("*z", _ => QuickSwitchGoto())
+  km.Map("*z", _ => PluginAction("quick_switch", "goto"))
 
   ; 媒体控制
   km6 := KeymapManager.NewKeymap("*F13", "媒体控制", "", "ahk_group GROUP_DISABLE_KEYMAP_6")

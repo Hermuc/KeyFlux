@@ -49,13 +49,12 @@ func PluginBootstrap() string {
 }
 
 // PluginLateInit 模板函数 {{ PLUGIN_LATE_INIT }}: 插件晚初始化扩展点
-// (2026-10-01 QuickSwitch 插件化 P2 引入; 模板中位于 InitKeymap() 与 OnExit 之间)。
+// (2026-10-01 插件化 P2 引入; 模板中位于 InitKeymap() 与 OnExit 之间)。
 // 产出「必须晚于 InitKeymap()」的插件初始化行, 每行以 \n 前导, 空块 = 零字节
 // (行尾拼接约定, 与 PLUGIN_INCLUDES/BOOTSTRAP 同款)。
-// 当前唯一消费方 = quick_switch 的 InitQuickSwitch() 无参调用行 (2026-10-02 P5 起):
-// 代码随插件搬入 data/plugins/quick_switch/, 配置经 ConfigProvider 运行时自取
-// (plugin-settings.json), 生成器与 options.quickSwitch 已解耦; 插件被禁用/入口缺失
-// => 不产出 (可删除性保证)。特判泛化 (manifest 声明晚初始化函数) 属 P7。
+// P7b 起**全声明驱动**: 需要「晚于 InitKeymap」初始化的插件在 manifest `entry.late`
+// 声明函数名, 此处渲染为无参调用 (配置由插件运行时自取, P5 定式)。插件被禁用/
+// 入口缺失/未声明 => 不产出 (可删除性保证)。
 func PluginLateInit() string {
 	_, _, late := pluginBlocks()
 	return late
@@ -139,11 +138,10 @@ func renderPluginBlocks(dir string) (includes, bootstrap, lateInit string) {
 		inc.WriteString(fmt.Sprintf("\n#Include ../data/plugins/%s/%s", m.ID, m.Entry.File))
 		boot.WriteString(fmt.Sprintf("\nPluginManager.Register(%s)", ahkManifestLiteral(m)))
 		boot.WriteString(fmt.Sprintf("\nPluginManager.LoadEntry(%s)", ahkStringLit(m.ID)))
-		if m.ID == "quick_switch" {
-			// P5 (2026-10-02): 晚初始化改无参调用 —— 配置已迁 plugin-settings.json,
-			// 插件经 ConfigProvider 自取 (QuickSwitch.ahk), 生成器不再读 options.quickSwitch
-			// (核心对插件配置零知识的 P5 一步; P7 将以 manifest 声明泛化此特判)。
-			late.WriteString("\nInitQuickSwitch()")
+		if m.Entry.Late != "" {
+			// P7b (2026-10-02): 晚初始化全声明驱动 —— manifest entry.late 声明
+			// 函数名, 渲染为无参调用; 生成端对任何具体插件零知识。
+			late.WriteString("\n" + m.Entry.Late + "()")
 		}
 	}
 	for _, e := range cat.Errors {

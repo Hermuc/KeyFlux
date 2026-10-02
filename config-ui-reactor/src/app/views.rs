@@ -1271,6 +1271,9 @@ impl Shell {
     }
 
     /// 类型 2/3/4/7/9：枚举单选（两两一行）。
+    ///
+    /// P7b：type 9 追加插件动作动态组（目录聚合 `provides.actions[]`；内置快路径
+    /// 1-8 红线不动）。目录未加载或无声明 ⇒ 不渲染插件动作区。
     pub(super) fn editor_radio_group(
         &self,
         action: &Action,
@@ -1279,18 +1282,47 @@ impl Shell {
         let is_abbr = self.current_keymap().map(keymap::is_abbr).unwrap_or(false);
         let rows = action_editor::radio_rows(action.type_id, is_abbr);
         let group_name = format!("kf-radio-{}-{}", action.type_id, self.window_group_id);
-        action_editor_view::radio_rows(&rows, &group_name, action.value_id, |item| {
-            context.callback(move |checked: bool| {
-                if checked {
-                    Message::SelectRadio {
-                        value_id: item.value_id,
-                        label_key: item.label_key,
+        let mut sections: Vec<(usize, View)> = vec![(
+            0,
+            action_editor_view::radio_rows(&rows, &group_name, action.value_id, |item| {
+                context.callback(move |checked: bool| {
+                    if checked {
+                        Message::SelectRadio {
+                            value_id: item.value_id,
+                            label_key: item.label_key,
+                        }
+                    } else {
+                        Message::Noop
                     }
-                } else {
-                    Message::Noop
-                }
-            })
-        })
+                })
+            }),
+        )];
+        if action.type_id == 9 {
+            let groups = action_editor::plugin_action_groups(self.plugin_catalog.as_ref());
+            if !groups.is_empty() {
+                sections.push((
+                    1,
+                    action_editor_view::plugin_action_rows(
+                        &groups,
+                        &group_name,
+                        &action.action_id,
+                        |item| {
+                            let action_id = item.full_id.clone();
+                            context.callback(move |checked: bool| {
+                                if checked {
+                                    Message::SelectPluginAction {
+                                        action_id: action_id.clone(),
+                                    }
+                                } else {
+                                    Message::Noop
+                                }
+                            })
+                        },
+                    ),
+                ));
+            }
+        }
+        StackPanel::new().spacing(4.0).keyed_children(sections)
     }
 
     /// 类型 5：重映射按键。

@@ -245,6 +245,11 @@ pub struct Action {
     #[serde(default, rename = "actionValueID")]
     pub value_id: i32,
 
+    /// 插件动作 ID `<pluginId>.<actionId>`（P7b；仅 typeID 9 有意义）。
+    /// 双字段过渡：新保存同时写 `value_id=9`（子类型标记）与本字段，渲染时本字段优先。
+    #[serde(default, rename = "actionId")]
+    pub action_id: String,
+
     #[serde(default)]
     pub win_title: String,
 

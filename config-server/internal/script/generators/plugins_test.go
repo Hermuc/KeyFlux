@@ -170,17 +170,16 @@ func TestRenderPluginBlocks_NonScriptEntry(t *testing.T) {
 	}
 }
 
-// quick_switch 晚初始化行: P5 (2026-10-02) 起为无参 InitQuickSwitch() ——
-// 配置由插件运行时经 ConfigProvider 自取 (plugin-settings.json), 生成器不再
-// 读 options.quickSwitch (核心对插件配置零知识的一步; 特判泛化属 P7)。
-func TestPluginLateInit_QuickSwitch(t *testing.T) {
+// 晚初始化行: P7b (2026-10-02) 起全声明驱动 —— manifest entry.late 声明函数名,
+// 渲染为无参调用 (配置由插件运行时经 ConfigProvider 自取; 生成器对具体插件零知识)。
+func TestPluginLateInit_DeclaredByManifest(t *testing.T) {
 	dir := t.TempDir()
 	pdir := filepath.Join(dir, "quick_switch")
 	os.MkdirAll(pdir, 0o755)
 	os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
 		"id": "quick_switch", "name": "快速切换", "nameEn": "Quick Switch",
 		"version": "1.0.0", "specVersion": 1, "description": "内置插件化",
-		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"},
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain", "late": "InitQuickSwitch"},
 		"permissions": ["window"]
 	}`), 0o644)
 	os.WriteFile(filepath.Join(pdir, "main.ahk"), []byte("QuickSwitchMain(api) {}"), 0o644)
@@ -197,9 +196,9 @@ func TestPluginLateInit_QuickSwitch(t *testing.T) {
 	}
 }
 
-// quick_switch 被禁用/入口缺失时晚初始化行不得产出 (可删除性保证: AHK v2 直调
-// 未定义函数是加载期致命错误, 删除插件后 InitQuickSwitch 符号不存在)。
-func TestPluginLateInit_QuickSwitchAbsent(t *testing.T) {
+// 声明了晚初始化的插件被禁用/入口缺失时晚初始化行不得产出 (可删除性保证: AHK v2
+// 直调未定义函数是加载期致命错误, 删除插件后该符号不存在)。
+func TestPluginLateInit_DeclaredAbsent(t *testing.T) {
 	oldCfg := Cfg
 	Cfg = &model.Config{}
 	Cfg.Options.QuickSwitch = model.QuickSwitchOption{CollectEnabled: true}
@@ -211,7 +210,7 @@ func TestPluginLateInit_QuickSwitchAbsent(t *testing.T) {
 	os.MkdirAll(pdir, 0o755)
 	os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(`{
 		"id": "quick_switch", "name": "快速切换", "specVersion": 1,
-		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"}
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain", "late": "InitQuickSwitch"}
 	}`), 0o644)
 	SetPluginsDir(dir)
 	_, boot, late := pluginBlocks()
@@ -228,7 +227,7 @@ func TestPluginLateInit_QuickSwitchAbsent(t *testing.T) {
 	os.MkdirAll(pdir2, 0o755)
 	os.WriteFile(filepath.Join(pdir2, "plugin.json"), []byte(`{
 		"id": "quick_switch", "name": "快速切换", "specVersion": 1,
-		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain"}
+		"entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain", "late": "InitQuickSwitch"}
 	}`), 0o644)
 	os.WriteFile(filepath.Join(pdir2, "main.ahk"), []byte("QuickSwitchMain(api) {}"), 0o644)
 	oldDisabled := Cfg.Options.Plugins.Disabled
@@ -256,8 +255,12 @@ func TestPluginTombstone_SkipsInjection(t *testing.T) {
 	for _, id := range []string{"quick_switch", "everything_search"} {
 		pdir := filepath.Join(pluginDir, id)
 		os.MkdirAll(pdir, 0o755)
+		late := ", \"late\": \"InitQuickSwitch\""
+		if id != "quick_switch" {
+			late = ""
+		}
 		os.WriteFile(filepath.Join(pdir, "plugin.json"), []byte(fmt.Sprintf(
-			`{"id": %q, "name": "X", "specVersion": 1, "entry": {"kind": "script", "file": "main.ahk", "func": "F"}}`, id)), 0o644)
+			`{"id": %q, "name": "X", "specVersion": 1, "entry": {"kind": "script", "file": "main.ahk", "func": "F"%s}}`, id, late)), 0o644)
 		os.WriteFile(filepath.Join(pdir, "main.ahk"), []byte("F(api) {}"), 0o644)
 	}
 	SetPluginsDir(pluginDir)
