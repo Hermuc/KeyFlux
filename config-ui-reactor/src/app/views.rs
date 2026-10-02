@@ -410,8 +410,22 @@ impl Shell {
                     "fileExt"
                 },
             }));
-        let mut card_children: Vec<(usize, View)> =
-            vec![(0, header), (1, toggles_area), (2, new_type), (3, detail)];
+        // 编辑当前分组（✎）：以卡种类预定位；SaEditType 内部再按选中 id 精确锁定
+        let edit_type =
+            selected_action_view::edit_type_link(context.message(Message::SaEditType {
+                kind: if match_type == MATCH_TEXT_TYPE {
+                    "text"
+                } else {
+                    "fileExt"
+                },
+            }));
+        let mut card_children: Vec<(usize, View)> = vec![
+            (0, header),
+            (1, toggles_area),
+            (2, edit_type),
+            (3, new_type),
+            (4, detail),
+        ];
         // 页内状态条（▶ 执行失败等）：仅渲染在**当前点亮**的卡上
         if is_selected_type && let Some((text, is_error)) = &self.sa_status {
             card_children.push((
