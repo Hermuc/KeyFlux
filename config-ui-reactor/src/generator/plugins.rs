@@ -526,7 +526,7 @@ fn ahk_string_lit(s: &str) -> String {
 /// 扩展点，位于 `InitKeymap()` 与 `OnExit` 之间）。产出「必须晚于 InitKeymap」的插件
 /// 初始化行，行尾拼接约定（非空时自带前导 `\n`），空块 = 零字节。
 ///
-/// 当前唯一消费方 = quick_switch 的 `InitQuickSwitch()` 无参调用行（2026-10-02 P5
+/// 首个消费方 = quick_switch (机制自 P7b 起全声明驱动) 的 `InitQuickSwitch()` 无参调用行（2026-10-02 P5
 /// 起：代码随插件搬入 `data/plugins/quick_switch/`，配置经 ConfigProvider 运行时
 /// 自取 `plugin-settings.json`，生成器与 `options.quickSwitch` 已解耦；提案
 /// `docs/contracts-proposals/quickswitch-pluginization.md`）。存在性/禁用判定与

@@ -80,7 +80,7 @@ pub fn render_keyflux_ahk(
     out.push_str(ENGINE_INIT);
 
     // ---- L61: `{{- PLUGIN_LATE_INIT }}`（插件晚初始化扩展点，模板用 `{{-` 吃前导
-    //      换行 ⇒ 行尾拼接约定）。非空 = `InitQuickSwitch()` 无参调用行（P5 起，
+    //      换行 ⇒ 行尾拼接约定）。非空时输出对应 late-init 调用行 (首个消费方 quick_switch)（P5 起，
     //      配置由插件运行时自取，见 plugins::render_late_init）；空块 = 零字节。
     let plugin_late_init = plugins::render_late_init(plugins_dir, &disabled, &removed);
     if !plugin_late_init.is_empty() {

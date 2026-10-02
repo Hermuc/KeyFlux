@@ -10,7 +10,8 @@
 //! ⚠️ 0.100.0 实测约束（勿照抄 master 文档）：
 //! * `View` **不**实现 `LayoutControl` ⇒ `grid_row` 只能设在**未收尾的 builder** 上。
 //! * `Component::Message` 必须 `Clone` ⇒ 后端子进程经 `Arc<Mutex<Option<BackendSession>>>` 旁路移交。
-//! * 弹窗用 `ComponentContext::open_window`（无 `run_window`）。
+//! * 弹窗现统一走 `ContentDialog`（旧「会崩溃」结论已被 2026-10 的生产使用推翻；
+//! * `open_window` 通道保留但全仓零调用）。
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -156,7 +157,7 @@ pub struct Shell {
     delay_scheme: usize,
     /// 选项页一次性提示（开机自启结果 / 保存校验失败原因）。
     settings_notice: Option<String>,
-    /// 部署根路径（`<deploy>`；用于「清空历史」定位 `data/quickswitch/history.tsv`）。
+    /// 部署根路径（`<deploy>`；用于 acrylic 偏好落盘（ui-prefs.json）与 CLI 模式静态站目录定位）。
     data_root: Option<std::path::PathBuf>,
     /// 行为目录快照（选中动作页；`GET /api/behaviors`）。
     catalog: sa::Catalog,
