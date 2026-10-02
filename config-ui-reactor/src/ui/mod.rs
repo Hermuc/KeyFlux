@@ -6,6 +6,8 @@
 
 use windows_reactor::*;
 
+use crate::theme;
+
 pub mod abbr_view;
 pub mod action_editor;
 pub mod doc_assets;
@@ -14,6 +16,40 @@ pub mod markdown_view;
 pub mod plugins_view;
 pub mod selected_action_view;
 pub mod settings_view;
+
+/// 无边框图形按钮（▶ 测试 / ✕ 删除等图标钮的**唯一构造点**）。
+///
+/// 2026-10-01 用户定版：此类按钮一律无边框无底色。WinUI Button 默认模板带
+/// 边框底色，须覆盖 **全部 8 个视觉态**资源键（含 Pressed/Disabled——只盖静态
+/// 态会在按下时闪回默认边框）；回调走 `on_click`。
+pub fn icon_button<C: IntoUnitCallback>(
+    glyph: &str,
+    font_size: f64,
+    color: Color,
+    enabled: bool,
+    on_click: C,
+) -> View {
+    let transparent = Color::transparent();
+    let ghost = ResourceOverrides::new()
+        .set("ButtonBackground", transparent)
+        .set("ButtonBorderBrush", transparent)
+        .set("ButtonBackgroundPointerOver", transparent)
+        .set("ButtonBorderBrushPointerOver", transparent)
+        .set("ButtonBackgroundPressed", transparent)
+        .set("ButtonBorderBrushPressed", transparent)
+        .set("ButtonBackgroundDisabled", transparent)
+        .set("ButtonBorderBrushDisabled", transparent);
+    Button::new()
+        .is_enabled(enabled)
+        .resource_overrides(ghost)
+        .on_click(on_click)
+        .content(
+            TextBlock::new()
+                .text(glyph.to_string())
+                .font_size(font_size)
+                .foreground(theme::solid(color)),
+        )
+}
 
 /// ToggleSwitch 的「开/关」内置文案置空槽。
 ///

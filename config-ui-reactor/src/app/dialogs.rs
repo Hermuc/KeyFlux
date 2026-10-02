@@ -363,15 +363,13 @@ impl Shell {
                                         Message::MtRuleValue(rule, value)
                                     }),
                                 )),
-                            Button::new()
-                                .grid_column(2)
-                                .is_enabled(draft.rules.len() > 1)
-                                .on_click(context.message(Message::MtRuleRemove(rule)))
-                                .content(
-                                    TextBlock::new()
-                                        .text("✕")
-                                        .foreground(theme::solid(theme::ERROR_CRIMSON)),
-                                ),
+                            Border::new().grid_column(2).content(crate::ui::icon_button(
+                                "✕",
+                                15.0,
+                                theme::ERROR_CRIMSON,
+                                draft.rules.len() > 1,
+                                context.message(Message::MtRuleRemove(rule)),
+                            )),
                         )),
                 ));
             }
@@ -564,15 +562,13 @@ impl Shell {
                                         }),
                                     ),
                                 ),
-                            Button::new()
-                                .grid_column(2)
-                                .is_enabled(draft.applies.len() > 1)
-                                .on_click(context.message(Message::BhAppliesRemove(row)))
-                                .content(
-                                    TextBlock::new()
-                                        .text("✕")
-                                        .foreground(theme::solid(theme::ERROR_CRIMSON)),
-                                ),
+                            Border::new().grid_column(2).content(crate::ui::icon_button(
+                                "✕",
+                                15.0,
+                                theme::ERROR_CRIMSON,
+                                draft.applies.len() > 1,
+                                context.message(Message::BhAppliesRemove(row)),
+                            )),
                         )),
                 ));
             }

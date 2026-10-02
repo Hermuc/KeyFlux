@@ -326,7 +326,13 @@ mod tests {
         assert!(body.contains("\"matchTypes\":[]"), "{body}");
         assert!(body.contains("\"startup\":false"), "{body}");
         assert!(body.contains("\"hideMatrix\":true"), "{body}");
-        assert!(body.contains("\"keyfluxVersion\":\"\""), "{body}");
+        // 期望与实际同源：keyfluxVersion 由 option_env! 编译期烘焙 —— 测试在设了
+        // KEYFLUX_VERSION 的 shell 里构建时，期望值必须跟随（否则假红，2026-10-02 实测）。
+        let expected_version = option_env!("KEYFLUX_VERSION").unwrap_or("");
+        assert!(
+            body.contains(&format!("\"keyfluxVersion\":\"{expected_version}\"")),
+            "{body}"
+        );
 
         let reply = build_get_config(&sandbox.paths(), true);
         assert!(

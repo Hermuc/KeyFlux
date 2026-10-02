@@ -130,7 +130,8 @@ where
                 .into(),
         ));
     }
-    if !card.author.is_empty() {
+    // 作者行：官方（KeyFlux）不出——无信息量（2026-10-02 用户定版）；第三方保留。
+    if !card.author.is_empty() && card.author != "KeyFlux" {
         details.push((
             details.len(),
             TextBlock::new()
@@ -171,14 +172,15 @@ where
     // 再右边**——开关 / 状态字 / 删除横向一行；不可删除（内置）时不渲染，不留空槽。
     // 卸载入口：旧版 `IsVisible=CanDelete`（内置卡**不渲染**此钮），tooltip 912。
     let delete: View = if card.can_delete {
-        Button::new()
+        Border::new()
             .vertical_alignment(VerticalAlignment::Center)
-            .on_click(on_delete)
-            .content(
-                TextBlock::new()
-                    .text("✕")
-                    .foreground(theme::solid(theme::ERROR_CRIMSON)),
-            )
+            .content(crate::ui::icon_button(
+                "✕",
+                15.0,
+                theme::ERROR_CRIMSON,
+                true,
+                on_delete,
+            ))
     } else {
         View::empty()
     };

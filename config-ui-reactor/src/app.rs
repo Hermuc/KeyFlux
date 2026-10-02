@@ -1743,6 +1743,9 @@ impl Component for Shell {
 
         let nav: View = NavigationView::new()
             .grid_row(1)
+            // 关掉 WinUI 控件默认的左上角返回箭头占位（Auto 模式渲染；KeyFlux
+            // 是单层导航无历史栈，且未接任何 BackRequested 处理 ⇒ 纯占位）。
+            .is_back_button_visible(NavigationViewBackButtonVisible::Collapsed)
             .pane_title("KeyFlux")
             // 侧栏宽度：WinUI NavigationView 默认 OpenPaneLength=320，明显宽于旧设计
             // （旧 Avalonia `ColumnDefinitions="264,*"` ⇒ theme::SIDEBAR_WIDTH=264）⇒ 显式收紧。
