@@ -1537,12 +1537,10 @@ impl Shell {
                                 Button::new()
                                     .on_click(context.message(Message::ToggleComments))
                                     .horizontal_alignment(HorizontalAlignment::Right)
-                                    .content(
-                                        TextBlock::new()
-                                            .text("收起 »")
-                                            .font_size(theme::FONT_CAPTION)
-                                            .foreground(theme::stone_gray()),
-                                    ),
+                                    // 两个状态（收起 » / « 备注）同用默认字号与前景色，
+                                    // 保证点击前后按钮尺寸一致（用户定版 2026-10-03：
+                                    // 此前收起态 12 号小字，比备注态小一圈）
+                                    .content(TextBlock::new().text("收起 »")),
                             ),
                         Border::new().grid_row(1).content(comments),
                     )),
