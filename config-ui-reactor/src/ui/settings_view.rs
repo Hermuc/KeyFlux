@@ -20,7 +20,7 @@ pub fn section_card<C: IntoUnitCallback>(
 ) -> View {
     let indicator = if open { "-" } else { "+" };
     // 头部按钮做 ghost 透明化（WinUI Button 默认模板自带底色边框，否则标题看着
-    // 像大卡里又嵌了一个小框；须覆盖全部 8 个视觉态，见 [`icon_button`] 注释）
+    // 像大卡里又嵌了一个小框；全 8 视觉态规则见 crate::ui::ghost_button_overrides）
     let header: View = Button::new()
         .resource_overrides(crate::ui::ghost_button_overrides())
         .on_click(on_toggle)
