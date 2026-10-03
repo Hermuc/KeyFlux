@@ -103,7 +103,9 @@ class EverythingSettings {
 }
 
 class EverythingSearch {
+    static RunCount := 0
     static Run(query, limit) {
+        EverythingSearch.RunCount += 1
         return {ok: false, error: 0, items: []}
     }
 }
@@ -116,6 +118,34 @@ class EverythingProviders {
 /** Session.__New 会复位 GUI 降级额度 (真源 Providers 未 #Include -> 最小 stub)。 */
 class EverythingGuiProvider {
     static AllowLaunch := true
+}
+
+/**
+ * IME 捕获通道 stub (真源 src/EverythingIme.ahk 未 #Include)。默认「IME 关闭」= 维持
+ * 旧行为 (字母直入检索词); 断言 14 通过 TestOpen/TestResult 开关驱动两条路径。
+ */
+class EverythingIme {
+    static TestOpen := false
+    static TestResult := ""
+    static AttachCount := 0
+    static DetachCount := 0
+    static Attach() {
+        EverythingIme.AttachCount += 1
+    }
+    static Detach() {
+        EverythingIme.DetachCount += 1
+    }
+    static Open() {
+        return EverythingIme.TestOpen
+    }
+    static Composing() {
+        return false
+    }
+    static PendingResult() {
+        t := EverythingIme.TestResult
+        EverythingIme.TestResult := ""
+        return t
+    }
 }
 
 ; 错误码常量 (真源 src/EverythingProviders.ahk 顶部; 探针未包含该文件,
@@ -262,6 +292,9 @@ ResetObservers() {
     EverythingDropdown.Hints := []
     EverythingDropdown.HideCount := 0
     StubInputHook.StopCount := 0
+    EverythingSearch.RunCount := 0
+    EverythingIme.AttachCount := 0
+    EverythingIme.DetachCount := 0
 }
 
 ; ============================================================
@@ -491,6 +524,36 @@ r17 := s17.OnKey(StubInputHook(), EverythingSession.VK_BACK, 0, "probe")
 Verify(r17 = true && HostRecorder.Count("EchoBackspace") = 1 && s17.query = "",
     "13b 空检索词下退格: 会话仍处搜索态, 退格被消费且经端口回显, 检索词保持空",
     "实际 r=" r17 " EchoBackspace=" HostRecorder.Count("EchoBackspace") " query=" s17.query)
+
+; --- 断言 14: IME 上屏捕获 (2026-10-03 中文检索修复) ---
+;     14a IME 开启时, 拼音字母不得并入检索词、不得回显 (检索词只来自上屏文本);
+;     14b 轮询排水: 上屏文本 ("临时") 并入检索词并触发重查;
+;     14c 会话 Close: Detach 恰 1 次 (附着/定时器生命周期)。
+ResetObservers()
+s18 := EverythingSession(0)
+r18 := s18.OnChar(StubInputHook(), " ", "probe")     ; 触发 (空种子 => 空检索词)
+Verify(r18 = true && EverythingIme.AttachCount = 1,
+    "14a-0 进入搜索模式: IME 通道 Attach 恰 1 次",
+    "实际 r=" r18 " Attach=" EverythingIme.AttachCount)
+EverythingIme.TestOpen := true
+r19 := s18.OnChar(StubInputHook(), "l", "probe")     ; 拼音字母 (IME 组合输入)
+r20 := s18.OnChar(StubInputHook(), "i", "probe")
+Verify(r19 = true && r20 = true && s18.query = "" && HostRecorder.Count("EchoChar") = 0,
+    "14a IME 开启: 字母不并入检索词、不回显 (防拼音污染)",
+    "实际 r=" r19 "/" r20 " query=" s18.query " EchoChar=" HostRecorder.Count("EchoChar"))
+EverythingIme.TestOpen := false
+EverythingIme.TestResult := "临时"
+ResetObservers()
+s18._PollIme()                                       ; 轮询排水 (生产由 SetTimer 驱动)
+Verify(s18.query = "临时" && EverythingSearch.RunCount = 1,
+    "14b 上屏文本并入检索词并触发重查",
+    "实际 query=" s18.query " Run=" EverythingSearch.RunCount)
+s18.Close()
+Verify(EverythingIme.DetachCount = 1,
+    "14c 会话 Close: IME 通道 Detach 恰 1 次",
+    "实际 Detach=" EverythingIme.DetachCount)
+EverythingIme.TestOpen := false
+EverythingIme.TestResult := ""
 
 ; ============================================================
 ; 汇总
