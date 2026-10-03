@@ -18,6 +18,8 @@
 ;   src/EverythingSearch.ahk     编排: 拉起 Everything + 通道选择 + 失败重试
 ;   src/EverythingDropdown.ahk   浮层: 不激活 ListView, 锚定命令框下方
 ;   src/EverythingSession.ahk    命令框会话状态机 + 控制器 (CommandInputHooks provider)
+;   src/EverythingIme.ahk        IME 上屏文本捕获 (透传模式中文检索的检索词来源;
+;                                IMM32 + AttachThreadInput 跨进程读命令框输入法上下文)
 ;
 ; 设置 (manifest.settings, 在设置面板点插件卡编辑):
 ;   triggerKey     前置触发键 (默认空格), 在命令框里按它触发搜索
@@ -36,6 +38,7 @@
 #Include src/EverythingMessages.ahk
 #Include src/EverythingSettings.ahk
 #Include src/EverythingProviders.ahk
+#Include src/EverythingIme.ahk
 #Include src/EverythingSearch.ahk
 #Include src/EverythingDropdown.ahk
 #Include src/EverythingSession.ahk

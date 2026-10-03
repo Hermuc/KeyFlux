@@ -43,6 +43,32 @@ class EverythingHost {
   }
 
   /**
+   * 命令框窗口句柄 (隐藏窗口也查 —— 命令框「存在但隐藏」是常态)。
+   * @returns {Ptr} hwnd; 找不到 = 0。IME 捕获 (EverythingIme) 与锚点几何共用本查找。
+   */
+  static CommandBoxWindow() {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.CommandBoxWindow()
+    return this._FindBoxWindow()
+  }
+
+  /** 找命令框窗口: 先查可见, 再查隐藏。找不到 = 0。 */
+  static _FindBoxWindow() {
+    cls := "ahk_class MyKeymap_Command_Input ahk_exe KeyFlux-CommandInput.exe"
+    hwnd := 0
+    try {
+      hwnd := WinExist(cls)
+      if (!hwnd) {
+        DetectHiddenWindows true
+        try hwnd := WinExist(cls)
+        DetectHiddenWindows false
+      }
+    }
+    return hwnd ? hwnd : 0
+  }
+
+  /**
    * 命令框**可见白框**锚点 (物理像素, 与 WinGetPos 同空间)。
    * @returns {Object} {x, y, w, bottom} —— 可见白框左/上/宽/可见底边; 命令框不存在时返回 ""。
    */
@@ -54,21 +80,12 @@ class EverythingHost {
       return this._AnchorCache
 
     ; ---- 找窗口: 先查可见, 再查隐藏 (命令框「存在但隐藏」是常态, 见旧 _AnchorRect 注释) ----
-    cls := "ahk_class MyKeymap_Command_Input ahk_exe KeyFlux-CommandInput.exe"
     bx := 0, by := 0, bw := 0, bh := 0, found := false
     try {
-      hwnd := WinExist(cls)
+      hwnd := this._FindBoxWindow()
       if (hwnd) {
         WinGetPos(&bx, &by, &bw, &bh, hwnd)
         found := true
-      } else {
-        DetectHiddenWindows true
-        try hwndH := WinExist(cls)
-        DetectHiddenWindows false
-        if (IsSet(hwndH) && hwndH) {
-          WinGetPos(&bx, &by, &bw, &bh, hwndH)
-          found := true
-        }
       }
     }
     if (!found)
