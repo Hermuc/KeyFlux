@@ -464,15 +464,18 @@ where
             .text_wrapping(TextWrapping::Wrap)
             .into()
     } else {
+        // 标签列用 Auto：1012 文案「目标命令 / URL / 脚本」远超原定宽 64 DIP，
+        // 文字被右侧输入框压住截断（用户报障 2026-10-03）；Auto 按实际墨迹自适应
         Grid::new()
-            .columns([GridLength::Pixel(64.0), GridLength::STAR])
+            .columns([GridLength::Auto, GridLength::STAR])
             .row_spacing(6.0)
             .children((
                 TextBlock::new()
                     .text(i18n::t("1012"))
                     .font_size(theme::FONT_CAPTION)
                     .foreground(theme::stone_gray())
-                    .vertical_alignment(VerticalAlignment::Center),
+                    .vertical_alignment(VerticalAlignment::Center)
+                    .margin(Thickness::new(0.0, 0.0, 8.0, 0.0)),
                 Border::new().grid_column(1).content(
                     TextBox::new()
                         .text(value.to_string())
