@@ -1,0 +1,87 @@
+{
+  "id": "quick_switch",
+  "name": "快速切换",
+  "nameEn": "Quick Switch",
+  "version": "1.0.0",
+  "specVersion": 1,
+  "description": "在文件对话框出现时自动收集最近使用的文件夹, 提供一键跳转与候选浮层。",
+  "author": "KeyFlux",
+  "entry": {"kind": "script", "file": "main.ahk", "func": "QuickSwitchMain", "late": "InitQuickSwitch"},
+  "permissions": ["window", "settings"],
+  "provides": {
+    "actions": [
+      {"id": "goto", "label": "快速切换", "labelEn": "Quick Switch", "kind": "plugin"},
+      {"id": "clear_history", "label": "清空切换历史", "labelEn": "Clear switch history", "kind": "plugin"}
+    ]
+  },
+  "bundled": true,
+  "settings": [
+    {
+      "key": "collectEnabled",
+      "type": "bool",
+      "label": "启用收集",
+      "labelEn": "Collect folders",
+      "default": "true",
+      "hint": "关闭后不再自动收集与自动弹出, 手动「快速切换」动作仍可用。"
+    },
+    {
+      "key": "autoShow",
+      "type": "bool",
+      "label": "自动弹出浮层",
+      "labelEn": "Auto-show overlay",
+      "default": "true"
+    },
+    {
+      "key": "autoJumpOpen",
+      "type": "bool",
+      "label": "打开对话框自动跳转",
+      "labelEn": "Auto-jump in open dialogs",
+      "default": "true"
+    },
+    {
+      "key": "autoJumpSave",
+      "type": "bool",
+      "label": "保存对话框自动跳转",
+      "labelEn": "Auto-jump in save dialogs",
+      "default": "false"
+    },
+    {
+      "key": "pollIntervalMs",
+      "type": "number",
+      "label": "轮询间隔 (毫秒)",
+      "labelEn": "Poll interval (ms)",
+      "default": "800"
+    },
+    {
+      "key": "maxHistory",
+      "type": "number",
+      "label": "历史条数上限",
+      "labelEn": "Max history entries",
+      "default": "200"
+    },
+    {
+      "key": "overlayRows",
+      "type": "number",
+      "label": "浮层候选行数",
+      "labelEn": "Overlay rows",
+      "default": "8"
+    },
+    {
+      "key": "overlayRowsCompact",
+      "type": "number",
+      "label": "紧凑浮层候选行数",
+      "labelEn": "Compact overlay rows",
+      "default": "4"
+    },
+    {
+      "key": "excludedPrefixes",
+      "type": "text",
+      "label": "排除目录前缀",
+      "labelEn": "Excluded prefixes",
+      "default": "",
+      "hint": "每行一个路径前缀, 匹配的目录不收集。",
+      "hintEn": "One path prefix per line. Matching folders are not collected.",
+      "multiline": true
+    }
+  ]
+}
