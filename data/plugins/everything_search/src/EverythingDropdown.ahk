@@ -2,24 +2,22 @@
 ; EverythingDropdown —— 结果下拉浮层 (渲染层)。
 ;
 ; 职责边界 (与 QuickSwitchUI.ahk 同款分层约定):
-;   * 入参 = items:Array<{path,name,isFolder}> + index + 锚点;
+;   * 入参 = items:Array<{path,name,isFolder}> + index + 锚点矩形 (来自 EverythingHost);
 ;   * 唯一出参 = 回调 onPick(item);
-;   * 不查 Everything、不读配置、不发键、不持有命令框句柄。
+;   * 不查 Everything、不读配置、不发键、**不找命令框窗口** (锚点几何全在 Host 端口)。
 ;
 ; 为什么自建浮层而不是「塞进命令框」: 命令框本体是上游预编译二进制
 ; (bin/KeyFlux-CommandInput.exe, 无源码), 只有 WM_CHAR 单向通道, 没有任何
-; 「投递候选列表」接口 (实测其内部无 ListBox/ListView 资源)。故下拉列表只能由
-; 引擎侧自绘, 锚定在命令框正下方 —— 视觉上仍是「command 下方的下拉列表」。
+; 「投递候选列表」接口 (实测其内部无 ListBox/ListView 资源)。命令框窗口不能像
+; Flow Launcher 那样整体变高 (SizeToContent) —— 连续延伸只能由第二个窗口拼轮廓。
 ;
-; 2026-09-19 视觉重构: 把结果列表做成命令框的「向下延伸」, 视觉上只有一个框。
-;   * 配色对齐命令框磨砂白: 背景 #FFFFFF、文字近黑、Segoe UI、无表格线/无列头/无 3D 边框;
-;   * 顶部「伸进」命令框可见白色内部 (实测透明底边 + 盖圆角) —— 盖住命令框自带的底部
-;     圆角与阴影, 于是读成一个「圆顶、向下延伸」的整体, 而不是两个独立圆角卡片;
-;   * 宽度贴近命令框内宽 (ED_SIDE), 底部按 borderRadius 收圆角 (ED_RADIUS)。
-;
-; 「不激活」实现: -Caption + WS_EX_NOACTIVATE(0x08000000) 且 Show("NA"),
-; 显示后前台仍是用户原来的窗口, 命令框输入不受影响。
-; 错误隔离: 全部 GUI 调用 try/catch, 失败静默 (最坏情况 = 没有下拉, 功能降级但不崩)。
+; 2026-10-03 连体重构 (用户需求「列表是命令框的连续延伸, 不是框下另挂一个独立框」,
+; 参照 Flow Launcher 单窗长高的轮廓): 命令框底部圆角在两角留出**透明弧口**, 本浮层
+; 顶边升起 earR 盖住弧口, 用 SetWindowRgn 把「顶部中段」从区域**豁口裁掉** ——
+;   * 两只方角耳朵 (earR×earR) 填平命令框底角 => 侧边轮廓从框顶直线贯通到列表底;
+;   * 中段豁口完全不绘制 => 命令框底边像素原样透出, 充当 Flow 式的查询区/结果区分隔线;
+;   * 没有大面积半透明重叠 => 旧方案「0.9 盖 0.9 双重混合出白带」的接缝根源消除。
+; 区域 = 圆角矩形 ∪ 顶部整条(填平方角) − 顶部中段(豁口), 见 _ApplyRegion。
 ; ============================================================
 #Warn All, Off
 
@@ -35,24 +33,13 @@ global ED_ROWS := 30              ; 可见行数上限 (不滚动, 与锚点高�
                                   ;   实际显示行数 = min(搜索返回条数, ED_ROWS) —— 搜索条数
                                   ;   由插件设置 limit (默认 20, 上限 300) 独立控制。
 global ED_ROW_H := 22            ; 行高 (像素; 由 s10 字体近似, 与 ListView 实际行高接近)
-; 连体策略: 下拉面板顶部要「伸进」命令框的可见白色内部, 把命令框自身的底部圆角 + 阴影
-; 整段盖住, 于是视觉上只剩一个「圆顶的、向下延伸」的整体, 而不是两个独立的圆角卡片。
-;   * ED_INSET_FB: 命令框「窗口底边 → 可见白色底边」的透明区高度兜底 (实测 ≈ 24, 含 shadowSize)。
-;   * ED_COVER:    再往上多盖「底部圆角+边框+阴影」的高度 (半径 10 + 边框 3 ≈ 13, 取 16 留余量)。
-;   * 有真机采样时用 ED_INSET_FB 兜底, 采样成功则用实测值。
-global ED_INSET_FB := 24         ; 透明底边估算 (px)
-global ED_COVER := 16            ; 额外向上盖住圆角/边框/阴影 (半径10+边框3+余量≈16, px)
-global ED_SIDE := 0              ; 左右内缩 (px)。🔴 2026-09-21 由 8 改 **0**: 用户要求
-                                 ;   「下方列表与上方命令框同宽」—— 内缩 8 会让浮层左右各窄
-                                 ;   8px（且旧实现还有额外偏差），实测浮层比命令框**宽** 66px。
-                                 ;   现在取 0 = 与命令框窗口左右边缘严格对齐。
-; 🔴 命令框 DWM 阴影左右边距 (px, 单侧)。2026-09-21 由**三次独立截图逐像素量测**确定:
-;   三次结果完全一致 —— 窗口宽 925, 可见白框恒为 x=42..882 (宽 841) ⇒ 单侧阴影 42px。
-;   用途: 像素扫描 (BitBlt) 失败时的几何兜底。DComp 自绘窗口在 BitBlt 下可能抓成黑图,
-;   此时按此常量内缩, 宽度仍与用户看到的白框一致。
-;   ⚠ 该值针对当前 DWM/主题; 若系统主题或命令框 skin 变化导致阴影宽度改变, 需重新量测。
-global ED_BOX_SHADOW_X := 42
-global ED_RADIUS := 10           ; 与命令框 borderRadius 相同的圆角半径 (px)
+; 连体几何 (2026-10-03, 见文件头): 耳朵尺寸 = 命令框底角弧口的**物理像素**半径。
+; 命令框 skin 的 borderRadius=10 是逻辑 DIP, 物理像素 = 10 * DPI/96 (125% 下 ≈13)。
+; 🔴 耳朵必须 ≥ 弧口: 小了弧口残留桌面色缝隙; 大了多盖一点白底 (白上盖白, 不可见)。
+;   故 Ceil 取整向上偏。旧的 ED_INSET_FB / ED_COVER / ED_SIDE / ED_BOX_SHADOW_X
+;   (命令框阴影边距、透明底边、白框宽度) 属命令框内部知识, 已整体迁入 EverythingHost。
+global ED_EAR_DIP := 10          ; 命令框 borderRadius (逻辑 DIP, 与 skin 同源)
+global ED_RADIUS := 10           ; 本浮层底部圆角半径 (px, 与命令框 borderRadius 呼应)
 global ED_ALPHA := 230           ; 整窗不透明度 (≈0.9, 对齐命令框磨砂白 0.9); 让浮层与命令框同质感
 
 ; ---- 配色 (对齐命令框磨砂白体系) ----
@@ -120,7 +107,8 @@ class EverythingDropdown {
     global ED_LV, ED_ROWS
     this.Ensure()
     rect := this._AnchorRect(items.Length)
-    try ED_LV.Move(0, 0, rect.w, rect.h)
+    ; 列表内容从「耳朵行」之下开始 (窗口内 y=ear 起), 顶部 earR 高的耳朵带不归 ListView
+    try ED_LV.Move(0, rect.ear, rect.w, rect.h - rect.ear)
     try ED_LV.ModifyCol(1, rect.w - 4)
 
     try ED_LV.Delete()
@@ -132,12 +120,12 @@ class EverythingDropdown {
     this._ShowAt(rect)
   }
 
-  /** 显示一行提示文本 (无结果 / 通道不可用 / 引导继续输入)。 */
+  /** 显示一行提示文本 (无结果 / 通道不可用)。空检索词的初始态**不走这里** (Session 直接 Hide)。 */
   static ShowHint(text) {
     global ED_LV
     this.Ensure()
     rect := this._AnchorRect(1)
-    try ED_LV.Move(0, 0, rect.w, rect.h)
+    try ED_LV.Move(0, rect.ear, rect.w, rect.h - rect.ear)
     try ED_LV.ModifyCol(1, rect.w - 4)
     try ED_LV.Delete()
     try ED_LV.Add(, text)
@@ -177,302 +165,86 @@ class EverythingDropdown {
   ; ---- 内部 ----
 
   /**
-   * 锚点矩形: 命令框正下方, 宽度跟随命令框, 高度按行数收敛到屏幕工作区内。
-   * 顶部「伸进」命令框可见白色内部 (测得的透明底边 + 盖圆角), 让命令框 + 本面板
-   * 读成一个「圆顶的、向下延伸」的整体, 而非两个独立的圆角卡片。
+   * 布局矩形: 锚点来自 EverythingHost.CommandBoxAnchor() (命令框**可见白框** {x,y,w,bottom})。
+   * 浮层顶边 = 白框底边 − earR (升起一只耳朵的高度盖住命令框底角弧口, 见文件头连体几何);
+   * 列表内容区从白框底边开始 (窗口内 y = earR 起) —— 中段豁口把命令框底边原样透出当分隔线。
+   * 锚点拿不到 (命令框进程未起) 时放屏幕下方, 与命令框常规位置错开 (历史行为)。
    */
   static _AnchorRect(rows) {
-    global ED_ROWS, ED_ROW_H, ED_INSET_FB, ED_COVER, ED_SIDE, ED_BOX_SHADOW_X
+    global ED_ROWS, ED_ROW_H
     if (rows < 1)
       rows := 1
     if (rows > ED_ROWS)
       rows := ED_ROWS
+    earR := this._EarRadius()
 
-    bx := 0, by := 0, bw := 700, bh := 0, found := false, insetLog := ED_INSET_FB
-    try {
-      hwnd := WinExist("ahk_class MyKeymap_Command_Input ahk_exe KeyFlux-CommandInput.exe")
-      if (hwnd) {
-        WinGetPos(&bx, &by, &bw, &bh, hwnd)
-        found := true
-        m := this._BoxBottomInset(hwnd, bx, by, bw, bh)
-        if (m >= 0)
-          insetLog := m
-      } else {
-        ; 🔴 命令框「存在但隐藏」是**常态而非异常** (2026-09-21): 按前置键搜索时,
-        ;   SeedFromSelection 会先 ActivateBackend() 把前台切回原窗口, 命令框可能因此隐藏;
-        ;   而 WinExist 默认忽略隐藏窗口 ⇒ 返回 0。
-        ;   旧实现在这时走「屏幕居中兜底」(屏宽-700)/2, 屏高/3 —— 实测 1920x1200 下即
-        ;   (610,404), **恰好落在命令框矩形 (497..1422, 300..500) 正中** ⇒ 浮层直接盖住
-        ;   命令框 (用户报障「搜索结果不在命令框下, 而是覆盖了命令框」)。
-        ;   改为: 开隐藏检测再查一次。命令框窗口其实一直都在, 拿得到真实矩形 ⇒ 仍按命令框
-        ;   正常锚定, 只是**不做底边像素采样** —— 隐藏态的屏幕像素不是命令框本体,
-        ;   采了只会得到错误的伸进量, 直接用兜底值 (ED_INSET_FB) 更稳。
-        hwndH := 0
-        DetectHiddenWindows true
-        try hwndH := WinExist("ahk_class MyKeymap_Command_Input ahk_exe KeyFlux-CommandInput.exe")
-        DetectHiddenWindows false
-        if (hwndH) {
-          WinGetPos(&bx, &by, &bw, &bh, hwndH)
-          found := true
-          insetLog := ED_INSET_FB
-        }
-      }
-    }
-    if (!found) {
-      ; 连隐藏窗口也查不到 (命令框进程未起): 仍保持浮层可见, 但**不要放到屏心** ——
-      ; 那正是命令框的常驻区域。改放屏幕下方, 与命令框常规位置错开。
-      bx := (A_ScreenWidth - 700) // 2
-      by := A_ScreenHeight - (ED_ROWS * ED_ROW_H + 40)
-      bw := 700
-      bh := 0
-      insetLog := 0
+    x := 0, w := 0, y := 0
+    a := EverythingHost.CommandBoxAnchor()
+    if (IsObject(a) && a.w >= 180) {
+      x := a.x
+      w := a.w
+      y := a.bottom - earR
+    } else {
+      w := 700
+      x := (A_ScreenWidth - w) // 2
+      y := A_ScreenHeight - (rows * ED_ROW_H + 40 + earR)
     }
 
-    ; ---- 水平对齐: 取命令框的**可见白框**左右边缘 (2026-09-21) ----
-    ; 🔴 为什么不能直接用 WinGetPos 的 bx/bw: 命令框是 DComp 自绘 + DWM 阴影窗口,
-    ;   窗口矩形**含透明阴影外边距** (实测单侧 42px)。用户看到的是白框,
-    ;   所以锚定必须以「白框」为准, 否则浮层比命令框宽/窄, 观感上不是一体的。
-    cx := bx, cw := bw
-    if (found) {
-      vis := this._BoxVisibleRect(bx, by, bw, bh)
-      if (vis.left >= 0 && vis.right > vis.left) {
-        cx := vis.left
-        cw := vis.right - vis.left + 1
-      } else {
-        ; 🔴 双保险 (2026-09-21): 像素扫描失败时**不再回落窗口矩形** (含 42px 阴影 ⇒ 浮层比
-        ;   白框宽 84px, 正是用户三次报障的症状)。改用**实测确定的几何**: 命令框 DWM 阴影
-        ;   左右各 42px (三次独立截图逐像素量测结果完全一致: 白框 42..882 / 窗口宽 925)。
-        ;   实机验证 (2026-09-21): DComp 自绘窗口 BitBlt 恒黑, 像素路走不通 ⇒ 实际生效的
-        ;   就是本兜底路径 (运行时日志 path=geom x=539 w=841, 与白框一致)。
-        inset := ED_BOX_SHADOW_X
-        if (bw > inset * 2 + 180) {
-          cx := bx + inset
-          cw := bw - inset * 2
-        }
-      }
-    }
-
-    x := cx + ED_SIDE
-    w := cw - ED_SIDE * 2
-    if (w < 180)
-      w := 180
-    ; 伸进 (insetLog + ED_COVER), 盖住命令框的透明底边 + 圆角 + 阴影。
-    ; 🔴 封顶 (2026-09-21): 伸进量再大也不得越过命令框下半部 —— 否则浮层会盖住框体本身。
-    ;   上限取设计基准 ED_INSET_FB + ED_COVER (=40)。底边采样是「读屏幕像素找近白行」的
-    ;   启发式, 在深色背景/半透明框体上可能给出偏大的值; 封顶后即使采样异常, 浮层顶边
-    ;   也不会进入框体上半部 (配合下方 `if (y < by+4)` 的夹取双保险)。
-    over := insetLog + ED_COVER
-    if (over > ED_INSET_FB + ED_COVER)
-      over := ED_INSET_FB + ED_COVER
-    y := by + bh - over
-    ; 极短窗口时的安全兜底: 至少从窗口顶边之内 4px 起 (正常情况不会触发)
-    if (y < by + 4)
-      y := by + 4
-    h := rows * ED_ROW_H + 14     ; 底部多留白: 让最后一行远离底边, 圆角 + 阴影呼吸
-
+    hList := rows * ED_ROW_H + 14     ; 底部多留白: 让最后一行远离底边, 圆角 + 阴影呼吸
+    h := earR + hList
     ; 不越出屏幕 (取主屏高度做保守收敛)
     if (y + h > A_ScreenHeight)
       h := A_ScreenHeight - y - 4
-    if (h < ED_ROW_H)
-      h := ED_ROW_H
-    return {x: x, y: y, w: w, h: h}
+    if (h < earR + ED_ROW_H)
+      h := earR + ED_ROW_H
+    return {x: x, y: y, w: w, h: h, ear: earR}
   }
 
   /**
-   * 实测命令框**可见白框**的左右边缘 (逻辑像素), 供浮层水平对齐使用。
-   *
-   * 🔴 为什么需要 (2026-09-21): 命令框窗口矩形含 DWM 阴影 + DComp 自绘的**透明外边距**
-   *   (实测窗口 bw 比可见白框宽约 66px)。用户视觉上的"命令框"是那块白框, 所以浮层要
-   *   与白框同宽同 x, 不能直接用 WinGetPos 的 bx/bw, 否则浮层明显比命令框宽。
-   *
-   * 方法: 在窗口垂直中部取一行, 从两侧向中间扫, 找第一个「近白」像素 —— 即白框边缘。
-   * 取多行采样后取中位数抗噪 (抗文字/图标干扰)。DPI 安全: BitBlt 按物理坐标采样,
-   * 结果按比例换算回逻辑像素 (与 WinGetPos 同空间)。
-   *
-   * @returns {object} {left, right}; 任一边测不到时 left = -1 (调用方回落到窗口矩形)。
+   * 耳朵半径 (物理 px) = 命令框 borderRadius (DIP) × DPI 缩放, 向上取整。
+   * 🔴 耳朵必须 ≥ 命令框底角弧口的物理半径: 小了弧口残留桌面色缝隙; 大了多盖一点白底
+   *   (白上盖白, 不可见)。故 Ceil 偏大不偏小。
    */
-  static _BoxVisibleRect(bx, by, bw, bh) {
-    try {
-      if (!IsNumber(bx) || !IsNumber(by) || bw < 40 || bh < 20)
-        return {left: -1, right: -1}
-
-      ; 🔴 DPI 空间说明 (2026-09-21 三次修复 —— 真根因):
-      ;   WinGetPos 在本进程 (AHK, DPI-aware) 下返回的 bx/by/bw/bh **已经是物理像素**,
-      ;   与 BitBlt 的屏幕 DC 源坐标**同空间** ⇒ **不得再乘 scale**。
-      ;   旧实现乘了 scale(1.25) 得到 px=Round(497*1.25)=621, pw=Round(925*1.25)=1156,
-      ;   即从屏幕 (621,375) 抓一张 1156x250 的图 —— 完全错位, 抓到的不是命令框
-      ;   ⇒ 扫描恒失败 ⇒ 回落窗口矩形 (925) ⇒ 用户三次报障「还是不一样宽」。
-      ;   实测佐证: 屏幕 LOGPIXELSX=120 (scale=1.25), 但截图坐标系与 WinGetPos 坐标
-      ;   直接相加即吻合 (白框 42..882 对应屏幕 539..1379), 证明无额外缩放。
-      px := Round(bx)
-      py := Round(by)
-      pw := Round(bw)
-      ph := Round(bh)
-      if (pw < 40 || ph < 20)
-        return {left: -1, right: -1}
-
-      hdcScr := DllCall("user32.dll\GetDC", "ptr", 0, "ptr")
-      hdcMem := DllCall("gdi32.dll\CreateCompatibleDC", "ptr", hdcScr, "ptr")
-      hbmp := DllCall("gdi32.dll\CreateCompatibleBitmap", "ptr", hdcScr, "int", pw, "int", ph, "ptr")
-      DllCall("gdi32.dll\SelectObject", "ptr", hdcMem, "ptr", hbmp)
-      DllCall("gdi32.dll\BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", pw, "int", ph
-            , "ptr", hdcScr, "int", px, "int", py, "uint", 0x00CC0020)
-
-      ; 多行采样 (垂直 30%~70%, 步长 ph/16) 后取中位数 —— 文字/图标会造成局部误判。
-      ; 🔴 扫描深度必须覆盖真实阴影边距 (2026-09-21 二次修复): 首版硬编码只扫 20px,
-      ;   实测命令框阴影单侧 **42px** ⇒ 从两侧扫 20px 根本够不到白框边缘, 全部返回 -1
-      ;   ⇒ 回落到窗口矩形 ⇒ 浮层仍然比白框宽 (用户二次报障「还是不一样宽」)。
-      ;   改为扫「最多 1/4 窗口宽」, 足以覆盖任何合理阴影, 又不会把整窗扫完 (防误判)。
-      maxScan := pw // 4
-      if (maxScan < 8)
-        maxScan := 8
-      lefts := [], rights := []
-      fy := Round(ph * 0.30)
-      while (fy <= Round(ph * 0.70)) {
-        L := -1
-        xx := 1
-        while (xx <= maxScan) {
-          c := DllCall("gdi32.dll\GetPixel", "ptr", hdcMem, "int", xx, "int", fy, "uint")
-          r := c & 0xFF, g := (c >> 8) & 0xFF, b := (c >> 16) & 0xFF
-          if (r >= 200 && g >= 200 && b >= 200) {
-            L := xx
-            break
-          }
-          xx += 1
-        }
-        R := -1
-        xx := 1
-        while (xx <= maxScan) {
-          xr := pw - 1 - xx
-          if (xr < 1)
-            break
-          c := DllCall("gdi32.dll\GetPixel", "ptr", hdcMem, "int", xr, "int", fy, "uint")
-          r := c & 0xFF, g := (c >> 8) & 0xFF, b := (c >> 16) & 0xFF
-          if (r >= 200 && g >= 200 && b >= 200) {
-            R := xr
-            break
-          }
-          xx += 1
-        }
-        if (L >= 0 && R > L) {
-          lefts.Push(L)
-          rights.Push(R)
-        }
-        fy += (ph // 16 > 0) ? (ph // 16) : 4
-      }
-
-      DllCall("gdi32.dll\DeleteObject", "ptr", hbmp)
-      DllCall("gdi32.dll\DeleteDC", "ptr", hdcMem)
-      DllCall("user32.dll\ReleaseDC", "ptr", 0, "ptr", hdcScr)
-
-      if (lefts.Length = 0)
-        return {left: -1, right: -1}
-      lefts.Sort()
-      rights.Sort()
-      mi := (lefts.Length + 1) // 2
-      Lm := lefts[mi], Rm := rights[mi]
-      if (Rm <= Lm)
-        return {left: -1, right: -1}
-      ; 扫描坐标即窗口内物理偏移, 与 bx 同空间 ⇒ 直接相加, 不再 /scale。
-      return {left: bx + Lm, right: bx + Rm}
-    }
-    return {left: -1, right: -1}
-  }
-
-  /**
-   * 实测命令框「窗口底边 → 可见白色底边」的透明区高度 (逻辑像素), 供顶部伸进量使用。
-   * 方法: 采样屏幕中心列, 从窗口底边向上找第一个「近白」像素行 —— 那行即命令框可见底边。
-   * DPI 安全: BitBlt 用物理坐标采样, 再按 DPI 比例换算回逻辑像素 (与 WinGetPos 同空间)。
-   * @returns {number} 透明区高度(逻辑)。失败返回 -1 (调用方用 ED_INSET_FB 兜底)。
-   */
-  static _BoxBottomInset(hwnd, bx, by, bw, bh) {
-    global ED_INSET_FB
-    try {
-      if (!hwnd || !IsNumber(bx) || !IsNumber(by) || bw < 40 || bh < 20)
-        return -1
-      ; 🔴 同 _BoxVisibleRect: WinGetPos 返回值已是物理像素, 与 BitBlt 同空间, **不得乘 scale**
-      ;   (2026-09-21 三次修复)。旧实现乘 1.25 导致 BitBlt 抓错区域 ⇒ 采样恒失败。
-      px := Round(bx)
-      py := Round(by)
-      pw := Round(bw)
-      ph := Round(bh)
-      if (pw < 40 || ph < 20)
-        return -1
-
-      hdcScr := DllCall("user32.dll\GetDC", "ptr", 0, "ptr")
-      hdcMem := DllCall("gdi32.dll\CreateCompatibleDC", "ptr", hdcScr, "ptr")
-      hbmp := DllCall("gdi32.dll\CreateCompatibleBitmap", "ptr", hdcScr, "int", pw, "int", ph, "ptr")
-      DllCall("gdi32.dll\SelectObject", "ptr", hdcMem, "ptr", hbmp)
-      DllCall("gdi32.dll\BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", pw, "int", ph, "ptr", hdcScr, "int", px, "int", py, "uint", 0x00CC0020)
-
-      cx := pw // 2
-      inset := ph
-      Loop 3 {   ; 中心列 + 左右偏移列, 取 max(近白行 = 最大可见底边) 抗噪
-        off := (A_Index - 1) * (pw // 8)
-        xc := cx + ((A_Index = 1) ? 0 : ((A_Index = 2) ? -off : off))
-        if (xc < 2) xc := 2
-        if (xc > pw - 3) xc := pw - 3
-        Loop ph {
-          yy := ph - A_Index
-          if (yy < 0)
-            break
-          c := DllCall("gdi32.dll\GetPixel", "ptr", hdcMem, "int", xc, "int", yy, "uint")
-          r := c & 0xFF, gg := (c >> 8) & 0xFF, bb := (c >> 16) & 0xFF
-          if (r >= 160 && gg >= 160 && bb >= 160) {
-            if (ph - 1 - yy < inset)
-              inset := ph - 1 - yy
-            break
-          }
-        }
-      }
-
-      DllCall("gdi32.dll\DeleteObject", "ptr", hbmp)
-      DllCall("gdi32.dll\DeleteDC", "ptr", hdcMem)
-      DllCall("user32.dll\ReleaseDC", "ptr", 0, "ptr", hdcScr)
-
-      if (inset >= ph)
-        return -1
-      ; 同 _BoxVisibleRect: 扫描坐标已是物理像素且与 WinGetPos 同空间 ⇒ 不 /scale。
-      res := inset
-      if (res < 2 || res > bh)
-        return -1
-      return res
-    }
-    return -1
+  static _EarRadius() {
+    global ED_EAR_DIP
+    r := Ceil(ED_EAR_DIP * A_ScreenDPI / 96)
+    return (r < 4) ? 4 : r
   }
 
   static _ShowAt(rect) {
-    global ED_GUI, ED_RADIUS, ED_ALPHA
+    global ED_GUI, ED_ALPHA
     try ED_GUI.Show("NA x" rect.x " y" rect.y " w" rect.w " h" rect.h)
-    ; Show 后再设圆角区域; 失败静默 (退化为方角, 功能不受影响)
-    if (ED_RADIUS > 0) {
-      try this._RoundBottom(rect.w, rect.h)
-    }
-    ; 同质感延续体: 整窗 0.9 半透明 + DWM 柔和外阴影, 与命令框磨砂白同质感,
-    ; 阴影从命令框底部自然延续到本浮层底部, 配合顶部伸进, 读成一个「圆顶向下延伸」的整体,
-    ; 而不是「不透明白平板塞在半透明框下」的两个独立块。
+    ; Show 后再设区域; 失败静默 (退化为方角整矩形, 功能不受影响)
+    try this._ApplyRegion(rect.w, rect.h, rect.ear)
+    ; 同质感延续体: 整窗 0.9 半透明 + DWM 柔和外阴影, 与命令框磨砂白同质感。
     try WinSetTransparent(ED_ALPHA, "ahk_id " ED_GUI.Hwnd)
     try this.FrameShadow(ED_GUI.Hwnd)
   }
 
-  ; 用区域把窗口底部两角做成圆角 (与命令框 borderRadius=10 呼应)。顶边保持直角以无缝对接命令框。
-  ; 实现: 圆角矩形 + 顶端 r 高的实心条 OR 合并 => 上边缘两角被填平, 下边缘两角保留圆角。
-  ; 失败静默退回方角。
-  static _RoundBottom(w, h) {
+  /**
+   * 连体区域: 圆角矩形 ∪ 顶部整条(顶角填平成方耳朵) − 顶部中段(豁口)。
+   *   * 两只 earR 方耳朵盖住命令框底角的透明弧口 ⇒ 侧边轮廓从框顶直线贯通到列表底;
+   *   * 中段豁口**不绘制** ⇒ 命令框底边像素原样透出, 充当查询区/结果区的天然分隔线;
+   *   * 没有大面积半透明重叠 ⇒ 旧方案「0.9 盖 0.9 双重混合出白带」的接缝根源消除。
+   * 失败静默退回方角整矩形 (耳朵缺失 = 弧口可见, 功能不受影响)。
+   */
+  static _ApplyRegion(w, h, earR) {
     global ED_GUI, ED_RADIUS
-    r := ED_RADIUS
     hwnd := ED_GUI.Hwnd
-    if (hwnd = 0 || w < r || h < r)
+    if (hwnd = 0 || w < earR * 2 + 8 || h < earR + ED_RADIUS)
       return
-
-    rgn := DllCall("gdi32.dll\CreateRoundRectRgn", "int", 0, "int", 0, "int", w, "int", h, "int", 2 * r, "int", 2 * r, "ptr")
+    rgn := DllCall("gdi32.dll\CreateRoundRectRgn", "int", 0, "int", 0, "int", w, "int", h, "int", 2 * ED_RADIUS, "int", 2 * ED_RADIUS, "ptr")
     if (rgn = 0)
       return
-    ; 填平顶部 r 高整条, 把上边缘两角变直角 (联动命令框的平底), 下边缘两角仍是圆角
-    strip := DllCall("gdi32.dll\CreateRectRgn", "int", 0, "int", 0, "int", w, "int", r, "ptr")
-    if (strip != 0) {
-      DllCall("gdi32.dll\CombineRgn", "ptr", rgn, "ptr", rgn, "ptr", strip, "int", 2) ; RGN_OR
-      DllCall("gdi32.dll\DeleteObject", "ptr", strip)
+    top := DllCall("gdi32.dll\CreateRectRgn", "int", 0, "int", 0, "int", w, "int", earR, "ptr")
+    if (top != 0) {
+      DllCall("gdi32.dll\CombineRgn", "ptr", rgn, "ptr", rgn, "ptr", top, "int", 2)   ; RGN_OR: 顶角填平方角
+      DllCall("gdi32.dll\DeleteObject", "ptr", top)
+    }
+    mid := DllCall("gdi32.dll\CreateRectRgn", "int", earR, "int", 0, "int", w - earR, "int", earR, "ptr")
+    if (mid != 0) {
+      DllCall("gdi32.dll\CombineRgn", "ptr", rgn, "ptr", rgn, "ptr", mid, "int", 4)   ; RGN_DIFF: 中段豁口
+      DllCall("gdi32.dll\DeleteObject", "ptr", mid)
     }
     DllCall("user32.dll\SetWindowRgn", "ptr", hwnd, "ptr", rgn, "int", 1)
     ; SetWindowRgn 成功后系统接管/管理 rgn 所有权, 不再手动 DeleteObject(rgn)

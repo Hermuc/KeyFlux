@@ -124,6 +124,8 @@ class EverythingSession {
     ; GUI 降级通道的「每会话只弹一次」额度在此复位 (见 EverythingGuiProvider 注释:
     ; 2026-10-03 用户报障 —— 降级态下每击键都弹 Everything 主窗口)
     EverythingGuiProvider.AllowLaunch := true
+    ; 命令框锚点几何缓存按会话复位 (像素扫描有成本, 会话内缓存于 EverythingHost)
+    EverythingHost.ResetAnchorCache()
   }
 
   ; ---- 输入 ----
@@ -232,12 +234,14 @@ class EverythingSession {
     EverythingHost.ActivateCommandWindow()
   }
 
-  /** 按当前检索词刷新浮层 (空词/失败/无结果分别给引导文案)。 */
+  /** 按当前检索词刷新浮层。空词 = 初始态: **不出任何浮层** (2026-10-03 需求:
+   *  「尚未输入文字时命令框保持初始样式」), 此前会弹一行引导提示框 —— 那正是
+   *  「框下另挂一个独立框」观感的来源之一。 */
   Refresh() {
     if (Trim(this.query, " `t`r`n") = "") {
       this.items := []
       this.index := 0
-      EverythingDropdown.ShowHint(EverythingMessages.T("hint_no_selection"))
+      EverythingDropdown.Hide()
       return
     }
 
