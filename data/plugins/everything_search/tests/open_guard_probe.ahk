@@ -120,34 +120,6 @@ class EverythingGuiProvider {
     static AllowLaunch := true
 }
 
-/**
- * IME 捕获通道 stub (真源 src/EverythingIme.ahk 未 #Include)。默认「IME 关闭」= 维持
- * 旧行为 (字母直入检索词); 断言 14 通过 TestOpen/TestResult 开关驱动两条路径。
- */
-class EverythingIme {
-    static TestOpen := false
-    static TestResult := ""
-    static AttachCount := 0
-    static DetachCount := 0
-    static Attach() {
-        EverythingIme.AttachCount += 1
-    }
-    static Detach() {
-        EverythingIme.DetachCount += 1
-    }
-    static Open() {
-        return EverythingIme.TestOpen
-    }
-    static Composing() {
-        return false
-    }
-    static PendingResult() {
-        t := EverythingIme.TestResult
-        EverythingIme.TestResult := ""
-        return t
-    }
-}
-
 ; 错误码常量 (真源 src/EverythingProviders.ahk 顶部; 探针未包含该文件,
 ; 但断言 12 的 OnChar→Refresh→_ErrorKey 路径会比较它们 —— 补齐避免未定义全局)
 global ES_ERR_NOT_FOUND := "es-not-found"
@@ -293,8 +265,6 @@ ResetObservers() {
     EverythingDropdown.HideCount := 0
     StubInputHook.StopCount := 0
     EverythingSearch.RunCount := 0
-    EverythingIme.AttachCount := 0
-    EverythingIme.DetachCount := 0
 }
 
 ; ============================================================
@@ -491,15 +461,15 @@ Verify(ExplorerRecorder.Calls.Length = 0 && EverythingDropdown.HideCount = 0 && 
     "实际 Launch=" ExplorerRecorder.Calls.Length " Hide=" EverythingDropdown.HideCount " closed=" s15.closed)
 
 ; --- 断言 12: 引擎依赖全部经 EverythingHost 端口 (2026-10-03 端口化) ---
-;     触发键进入搜索模式 => UnlockForSearch + GetSelection (经 SeedFromSelection) 各 1 次;
+;     触发键进入搜索模式 => GetSelection (经 SeedFromSelection) 1 次 (锁英, 见断言 14);
 ;     激活后的普通字符 => EchoChar 1 次且检索词追加; 退格 => EchoBackspace 1 次。
 ;     这组断言同时是「别把直连引擎全局的旧写法改回来」的反向护栏 (直连时 HostRecorder
 ;     全零, 12a-12c 必红)。
 ResetObservers()
 s16 := EverythingSession(0)
 r13 := s16.OnChar(StubInputHook(), " ", "probe")     ; 前置位置的触发键
-Verify(r13 = true && HostRecorder.Count("UnlockForSearch") = 1 && HostRecorder.Count("GetSelection") = 1,
-    "12a 触发键: UnlockForSearch 与 GetSelection 各走 1 次 (经 Host 端口)",
+Verify(r13 = true && HostRecorder.Count("GetSelection") = 1 && HostRecorder.Count("UnlockForSearch") = 0,
+    "12a 触发键: GetSelection 走 1 次 (经 Host 端口), UnlockForSearch 零调用 (锁英)",
     "实际 r=" r13 " Unlock=" HostRecorder.Count("UnlockForSearch") " GetSel=" HostRecorder.Count("GetSelection"))
 r14 := s16.OnChar(StubInputHook(), "a", "probe")     ; 激活后的普通字符
 Verify(r14 = true && HostRecorder.Count("EchoChar") = 1 && s16.query = "a",
@@ -525,35 +495,23 @@ Verify(r17 = true && HostRecorder.Count("EchoBackspace") = 1 && s17.query = "",
     "13b 空检索词下退格: 会话仍处搜索态, 退格被消费且经端口回显, 检索词保持空",
     "实际 r=" r17 " EchoBackspace=" HostRecorder.Count("EchoBackspace") " query=" s17.query)
 
-; --- 断言 14: IME 上屏捕获 (2026-10-03 中文检索修复) ---
-;     14a IME 开启时, 拼音字母不得并入检索词、不得回显 (检索词只来自上屏文本);
-;     14b 轮询排水: 上屏文本 ("临时") 并入检索词并触发重查;
-;     14c 会话 Close: Detach 恰 1 次 (附着/定时器生命周期)。
+; --- 断言 14: 搜索模式锁英回归护栏 (2026-10-03 实测定版) ---
+;     触发后**不得**调用 UnlockForSearch (透传已被实测否决: IME 组合吞键 + 上屏不可见 +
+;     24H2 禁 AttachThreadInput ⇒ 三路全断); 字母照常直入检索词 (中文命中靠
+;     Everything pinyin=1)。谁把透传接回来, 14a 即红。
 ResetObservers()
 s18 := EverythingSession(0)
-r18 := s18.OnChar(StubInputHook(), " ", "probe")     ; 触发 (空种子 => 空检索词)
-Verify(r18 = true && EverythingIme.AttachCount = 1,
-    "14a-0 进入搜索模式: IME 通道 Attach 恰 1 次",
-    "实际 r=" r18 " Attach=" EverythingIme.AttachCount)
-EverythingIme.TestOpen := true
-r19 := s18.OnChar(StubInputHook(), "l", "probe")     ; 拼音字母 (IME 组合输入)
-r20 := s18.OnChar(StubInputHook(), "i", "probe")
-Verify(r19 = true && r20 = true && s18.query = "" && HostRecorder.Count("EchoChar") = 0,
-    "14a IME 开启: 字母不并入检索词、不回显 (防拼音污染)",
-    "实际 r=" r19 "/" r20 " query=" s18.query " EchoChar=" HostRecorder.Count("EchoChar"))
-EverythingIme.TestOpen := false
-EverythingIme.TestResult := "临时"
+r18 := s18.OnChar(StubInputHook(), " ", "probe")     ; 触发
+Verify(r18 = true && HostRecorder.Count("UnlockForSearch") = 0,
+    "14a 触发后: UnlockForSearch 零调用 (搜索模式保持锁英)",
+    "实际 r=" r18 " Unlock=" HostRecorder.Count("UnlockForSearch"))
+r19 := s18.OnChar(StubInputHook(), "s", "probe")
+r20 := s18.OnChar(StubInputHook(), "h", "probe")
+r21 := s18.OnChar(StubInputHook(), "i", "probe")
+Verify(r19 = true && r20 = true && r21 = true && s18.query = "shi" && HostRecorder.Count("EchoChar") = 3,
+    "14b 锁英模式下拼音字母直入检索词并回显",
+    "实际 query=" s18.query " EchoChar=" HostRecorder.Count("EchoChar"))
 ResetObservers()
-s18._PollIme()                                       ; 轮询排水 (生产由 SetTimer 驱动)
-Verify(s18.query = "临时" && EverythingSearch.RunCount = 1,
-    "14b 上屏文本并入检索词并触发重查",
-    "实际 query=" s18.query " Run=" EverythingSearch.RunCount)
-s18.Close()
-Verify(EverythingIme.DetachCount = 1,
-    "14c 会话 Close: IME 通道 Detach 恰 1 次",
-    "实际 Detach=" EverythingIme.DetachCount)
-EverythingIme.TestOpen := false
-EverythingIme.TestResult := ""
 
 ; ============================================================
 ; 汇总
