@@ -211,6 +211,13 @@ class HostRecorder {
         HostRecorder.Calls.Push(["IsChinese"])
         return true
     }
+    static ResetAnchorCache() {
+        HostRecorder.Calls.Push(["ResetAnchorCache"])
+    }
+    static CommandBoxAnchor() {
+        HostRecorder.Calls.Push(["CommandBoxAnchor"])
+        return ""          ; 探针无命令框: 走渲染层屏幕兜底路径
+    }
 }
 
 EverythingHost.Impl := HostRecorder
@@ -469,6 +476,21 @@ r15 := s16.OnKey(StubInputHook(), EverythingSession.VK_BACK, 0, "probe")
 Verify(r15 = true && HostRecorder.Count("EchoBackspace") = 1 && s16.query = "",
     "12c 退格: EchoBackspace 经端口 1 次, 检索词回退",
     "实际 r=" r15 " EchoBackspace=" HostRecorder.Count("EchoBackspace") " query=" s16.query)
+
+; --- 断言 13: 空检索词 = 初始态, 不出任何浮层 (2026-10-03 需求) ---
+;     触发后取不到选中文字 => 检索词空 => Refresh 应只 Hide (不出提示行)。
+;     此前会弹「没有选中文字 — 继续输入检索词」提示框 —— 「框下另挂独立框」观感来源之一。
+ResetObservers()
+s17 := EverythingSession(0)
+r16 := s17.OnChar(StubInputHook(), " ", "probe")     ; 触发键; GetSelection(记录器) 返回空
+Verify(r16 = true && EverythingDropdown.HideCount = 1 && EverythingDropdown.Hints.Length = 0,
+    "13a 空检索词: 不出提示浮层, 浮层 Hide 恰 1 次 (命令框保持初始态)",
+    "实际 r=" r16 " Hide=" EverythingDropdown.HideCount " Hints=" EverythingDropdown.Hints.Length)
+ResetObservers()
+r17 := s17.OnKey(StubInputHook(), EverythingSession.VK_BACK, 0, "probe")
+Verify(r17 = true && HostRecorder.Count("EchoBackspace") = 1 && s17.query = "",
+    "13b 空检索词下退格: 会话仍处搜索态, 退格被消费且经端口回显, 检索词保持空",
+    "实际 r=" r17 " EchoBackspace=" HostRecorder.Count("EchoBackspace") " query=" s17.query)
 
 ; ============================================================
 ; 汇总
