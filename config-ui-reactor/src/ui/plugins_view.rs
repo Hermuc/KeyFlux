@@ -413,15 +413,45 @@ pub fn setting_row<
     let mut children: Vec<(usize, View)> = Vec::new();
 
     let label = crate::services::plugins::setting_label(setting, english);
+    // `bool` 类型（2026-10-01 协议扩展）：渲染成开关，**不是**文本框。
+    // 值仍走同一条字符串通道（"true"/"false"）⇒ 无需新增消息、后端无需新分支 ——
+    // 协议里 `bool` 本来就是字符串承载（`ConfigProvider` 只有扁平字符串存储）。
+    let is_bool = crate::services::plugins::is_bool(setting);
+    // 开关放文字**右边**（用户定版 2026-10-03）：此前开关独占一行压在标签下方。
+    // 开关只构建一次（回调被消费），放标签行还是独立行由有无标签决定。
+    let mut switch: Option<View> = if is_bool {
+        Some(crate::ui::compact_switch(
+            crate::services::plugins::bool_value(value),
+            on_toggle,
+        ))
+    } else {
+        None
+    };
     if !label.is_empty() {
-        children.push((
-            children.len(),
-            TextBlock::new()
+        if let Some(row_switch) = switch.take() {
+            let label_text: View = TextBlock::new()
                 .text(label)
                 .font_size(theme::FONT_BODY)
                 .foreground(theme::near_black())
-                .into(),
-        ));
+                .vertical_alignment(VerticalAlignment::Center)
+                .into();
+            children.push((
+                children.len(),
+                StackPanel::new()
+                    .orientation(Orientation::Horizontal)
+                    .spacing(12.0)
+                    .children((label_text, row_switch)),
+            ));
+        } else {
+            children.push((
+                children.len(),
+                TextBlock::new()
+                    .text(label)
+                    .font_size(theme::FONT_BODY)
+                    .foreground(theme::near_black())
+                    .into(),
+            ));
+        }
     }
 
     let hint = crate::services::plugins::setting_hint(setting, english);
@@ -450,14 +480,10 @@ pub fn setting_row<
         ));
     }
 
-    // `bool` 类型（2026-10-01 协议扩展）：渲染成开关，**不是**文本框。
-    // 值仍走同一条字符串通道（"true"/"false"）⇒ 无需新增消息、后端无需新分支 ——
-    // 协议里 `bool` 本来就是字符串承载（`ConfigProvider` 只有扁平字符串存储）。
-    if crate::services::plugins::is_bool(setting) {
-        let switch: View =
-            crate::ui::compact_switch(crate::services::plugins::bool_value(value), on_toggle);
-        children.push((children.len(), switch));
-    } else {
+    // `bool` 且无标签：开关单独成行（有标签时已并入标签行，见上）
+    if let Some(standalone) = switch {
+        children.push((children.len(), standalone));
+    } else if !is_bool {
         // ⚠️ 0.100.0 的 TextBox 无 `MaxLength`（长度上限由保存前的校验兜底，口径同后端）
         let mut editor = TextBox::new()
             .text(value.to_string())
