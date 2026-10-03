@@ -17,15 +17,11 @@ pub mod plugins_view;
 pub mod selected_action_view;
 pub mod settings_view;
 
-/// 无边框图形按钮（▶ 测试 / ✕ 删除等图标钮的**唯一构造点**）。
+/// WinUI Button 的 ghost 透明覆盖（**唯一构造点**）：盖掉默认模板的底色与边框。
 ///
-/// 2026-10-01 用户定版：此类按钮一律无边框无底色。WinUI Button 默认模板带
-/// 边框底色，须覆盖 **全部 8 个视觉态**资源键（含 Pressed/Disabled——只盖静态
-/// 态会在按下时闪回默认边框）；回调走 `on_click`。
-///
-/// 2026-10-02 用户定版：**禁用态图标置灰**（`STONE_GRAY`）——ghost 覆盖透明化了
-/// WinUI 自身的禁用灰化，若仍按传入色（多为红色 ✕）渲染，会"看着能点、点了没反应"
-/// （快捷键方案启用行删除钮报障）。
+/// 须覆盖 **全部 8 个视觉态**资源键（Background/BorderBrush × 正常/PointerOver/
+/// Pressed/Disabled）——只盖静态态，按下时会闪回默认边框（2026-10-01 实证）。
+/// 使用方：[`icon_button`] 及一切需要"无边框无底色"的 Button（如分区卡头部）。
 pub fn ghost_button_overrides() -> ResourceOverrides {
     let transparent = Color::transparent();
     ResourceOverrides::new()
@@ -39,6 +35,11 @@ pub fn ghost_button_overrides() -> ResourceOverrides {
         .set("ButtonBorderBrushDisabled", transparent)
 }
 
+/// 无边框图形按钮（▶ 测试 / ✕ 删除等图标钮的**唯一构造点**）。
+///
+/// 2026-10-02 用户定版：**禁用态图标置灰**（`STONE_GRAY`）——ghost 覆盖透明化了
+/// WinUI 自身的禁用灰化，若仍按传入色（多为红色 ✕）渲染，会"看着能点、点了没反应"
+/// （快捷键方案启用行删除钮报障）。无边框底色由 [`ghost_button_overrides`] 提供。
 pub fn icon_button<C: IntoUnitCallback>(
     glyph: &str,
     font_size: f64,

@@ -397,7 +397,8 @@ pub fn market_entry<C: IntoUnitCallback>(
         .content(StackPanel::new().spacing(0.0).keyed_children(rows))
 }
 
-/// 声明式设置行：标签 + 提示 + 编辑器（`char`/`text`/`number` 用文本框，`file` 加「选择文件」）。
+/// 声明式设置行：标签 + 提示 + 编辑器（`char`/`text`/`number` 用文本框，`file` 加「选择文件」；
+/// `bool` 用开关且并入标签行右侧，无标签时独立成行）。
 pub fn setting_row<
     C: IntoPayloadCallback<String>,
     T: IntoPayloadCallback<bool>,
