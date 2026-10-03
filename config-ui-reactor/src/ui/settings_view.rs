@@ -19,22 +19,27 @@ pub fn section_card<C: IntoUnitCallback>(
     body: View,
 ) -> View {
     let indicator = if open { "-" } else { "+" };
-    let header: View = Button::new().on_click(on_toggle).content(
-        StackPanel::new()
-            .orientation(Orientation::Horizontal)
-            .spacing(8.0)
-            .children((
-                TextBlock::new()
-                    .text(indicator)
-                    .font_size(theme::FONT_CARD_TITLE)
-                    .foreground(theme::solid(theme::ACCENT)),
-                TextBlock::new()
-                    .text(title.into())
-                    .font_size(theme::FONT_CARD_TITLE)
-                    .font_weight(FontWeight::SEMI_BOLD)
-                    .foreground(theme::near_black()),
-            )),
-    );
+    // 头部按钮做 ghost 透明化（WinUI Button 默认模板自带底色边框，否则标题看着
+    // 像大卡里又嵌了一个小框；须覆盖全部 8 个视觉态，见 [`icon_button`] 注释）
+    let header: View = Button::new()
+        .resource_overrides(crate::ui::ghost_button_overrides())
+        .on_click(on_toggle)
+        .content(
+            StackPanel::new()
+                .orientation(Orientation::Horizontal)
+                .spacing(8.0)
+                .children((
+                    TextBlock::new()
+                        .text(indicator)
+                        .font_size(theme::FONT_CARD_TITLE)
+                        .foreground(theme::solid(theme::ACCENT)),
+                    TextBlock::new()
+                        .text(title.into())
+                        .font_size(theme::FONT_CARD_TITLE)
+                        .font_weight(FontWeight::SEMI_BOLD)
+                        .foreground(theme::near_black()),
+                )),
+        );
 
     let mut children: Vec<(usize, View)> = vec![(0, header)];
     if open {
@@ -103,6 +108,9 @@ pub fn check_row<C: IntoPayloadCallback<bool>>(
 }
 
 /// 下拉行（按索引选中/回调）。
+///
+/// ComboBox 须显式 Stretch 才会与同列的 TextBox 等宽（TextBox 默认撑满 STAR 列，
+/// ComboBox 默认按 min_width 渲染 ⇒ 快捷键方案行比触发延时行窄，用户报障 2026-10-03）。
 pub fn combo_row<C: IntoPayloadCallback<Option<usize>>>(
     label: impl Into<String>,
     items: &[String],
@@ -113,6 +121,7 @@ pub fn combo_row<C: IntoPayloadCallback<Option<usize>>>(
         .items_source(items.to_vec())
         .selected_index(selected)
         .min_width(180.0)
+        .horizontal_alignment(HorizontalAlignment::Stretch)
         .on_selection_changed(on_change)
         .into();
     field_row(label, control)
@@ -324,21 +333,36 @@ where
         ))
 }
 
+// ------------------------------------------- 「自定义热键」两列契约（表头 ⇄ 数据行共用）
+
+/// 热键列宽（表头与数据行共用，分改会错位）。
+const HOTKEY_COL_HOTKEY: f64 = 100.0;
+/// 功能按钮宽（用户定版 2026-10-03：撑满整列太宽，收窄为定宽）。
+const HOTKEY_COL_FUNCTION: f64 = 200.0;
+/// 功能列与热键列的间距（用户定版：适当空开、不要太大）。
+const HOTKEY_GAP: f64 = 12.0;
+
 /// 「自定义热键」列头（404 触发键 / 1117 功能）。
+///
+/// 「功能」标签与数据行的功能按钮同起点：列宽/缩进一律取
+/// [`HOTKEY_COL_HOTKEY`] / [`HOTKEY_GAP`]，与 [`hotkey_row`] 同源。
 pub fn hotkey_header() -> View {
     Grid::new()
-        .columns([GridLength::Pixel(100.0), GridLength::STAR])
+        .columns([GridLength::Pixel(HOTKEY_COL_HOTKEY), GridLength::STAR])
         .children((
             TextBlock::new()
                 .text(i18n::t("404"))
                 .font_size(theme::FONT_CAPTION)
                 .foreground(theme::stone_gray()),
-            Border::new().grid_column(1).content(
-                TextBlock::new()
-                    .text(i18n::t("1117"))
-                    .font_size(theme::FONT_CAPTION)
-                    .foreground(theme::stone_gray()),
-            ),
+            Border::new()
+                .grid_column(1)
+                .margin(Thickness::new(HOTKEY_GAP, 0.0, 0.0, 0.0))
+                .content(
+                    TextBlock::new()
+                        .text(i18n::t("1117"))
+                        .font_size(theme::FONT_CAPTION)
+                        .foreground(theme::stone_gray()),
+                ),
         ))
 }
 
@@ -361,25 +385,40 @@ where
         .min_width(110.0)
         .on_text_changed(on_change)
         .into();
-    let function_button: View = Button::new().on_click(on_edit).content(
-        TextBlock::new()
-            .text(if function.is_empty() {
-                "-".to_string()
-            } else {
-                function.to_string()
-            })
-            .font_size(theme::FONT_BODY)
-            .foreground(theme::solid(theme::CHARCOAL))
-            .text_wrapping(TextWrapping::Wrap),
-    );
+    // 功能按钮定宽（用户定版 2026-10-03：撑满整列太宽）。与热键列的间距走
+    // [`HOTKEY_GAP`]，列头「功能」标签同起点（见 [`hotkey_header`]）。
+    let function_button: View = Button::new()
+        .on_click(on_edit)
+        .width(HOTKEY_COL_FUNCTION)
+        .horizontal_alignment(HorizontalAlignment::Left)
+        .horizontal_content_alignment(HorizontalAlignment::Left)
+        .vertical_content_alignment(VerticalAlignment::Center)
+        .content(
+            TextBlock::new()
+                .text(if function.is_empty() {
+                    "-".to_string()
+                } else {
+                    function.to_string()
+                })
+                .font_size(theme::FONT_BODY)
+                .foreground(theme::solid(theme::CHARCOAL))
+                .text_wrapping(TextWrapping::Wrap),
+        );
     let delete: View = crate::ui::icon_button("✕", 15.0, theme::ERROR_CRIMSON, true, on_delete);
 
     Grid::new()
-        .columns([GridLength::Pixel(100.0), GridLength::STAR, GridLength::Auto])
+        .columns([
+            GridLength::Pixel(HOTKEY_COL_HOTKEY),
+            GridLength::STAR,
+            GridLength::Auto,
+        ])
         .margin(Thickness::new(0.0, 0.0, 0.0, 2.0))
         .children((
             hotkey_box,
-            Border::new().grid_column(1).content(function_button),
+            Border::new()
+                .grid_column(1)
+                .margin(Thickness::new(HOTKEY_GAP, 0.0, 0.0, 0.0))
+                .content(function_button),
             Border::new()
                 .grid_column(2)
                 .margin(Thickness::new(4.0, 0.0, 0.0, 0.0))
