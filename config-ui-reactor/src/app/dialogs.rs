@@ -642,7 +642,7 @@ impl Shell {
                 }
             }))
             .content(
-                // 125% DPI 下内容区 ~496 DIP（同 441 行注释）：520 会把「新增一个」推出裁掉
+                // 125% DPI 下内容区 ~496 DIP（同 441 行注释）：520 会把「新增」推出裁掉
                 ScrollViewer::new()
                     .max_height(460.0)
                     .min_width(480.0)
