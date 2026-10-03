@@ -131,10 +131,6 @@ class EverythingSession {
     EverythingHost.ResetAnchorCache()
   }
 
-  ; IME 上屏文本轮询间隔 (ms)。提交 → 并入检索词 → 重查; 40ms 远小于人工击键间隔,
-  ; 两次提交之间必然观察到「组合串空」窗口 (提交判定依赖它, 见 EverythingIme)。
-  static IME_POLL_MS := 40
-
   ; ---- 输入 ----
 
   OnChar(ih, char, scope) {
@@ -158,23 +154,16 @@ class EverythingSession {
       if (c != EverythingSettings.TriggerKey)
         return false
       this.active := true
-      ; 已进入搜索模式: 放开中文输入 (KeyOpt 文本键透传, 允许中文检索)。传 ih 供运行时切换。
-      EverythingHost.UnlockForSearch(ih)
-      ; IME 上屏捕获通道: 透传模式下中文上屏直达命令框、不经 OnChar (架构边界,
-      ; 见 EverythingIme 头注释) —— 本通道把上屏文本并入检索词 (用户报障:
-      ; 打「临时」结果匹配拼音 linshi)。不可用时静默降级为旧行为 (拼音直入检索词)。
-      EverythingIme.Attach()
-      SetTimer(ObjBindMethod(this, "_PollIme"), EverythingSession.IME_POLL_MS)
+      ; 🔴 搜索模式保持**锁英** (2026-10-03 实测定版, 推翻 ImeGuard 的「放开中文」设计):
+      ;   透传模式下 IME 从首字母起组合, 组合期全部按键 (含上屏中文) 不经 InputHook
+      ;   (日志实证: 打 shi 只收到 's', 检索词停在单字母; 上屏中文直投命令框不可见),
+      ;   24H2 又禁跨进程 AttachThreadInput (err=87) ⇒ IME 捕获三路全断。
+      ;   而 Everything pinyin=1 (用户已开启, es.exe 阳性对照验证) 让拼音检索词直接
+      ;   命中中文文件名 ⇒ 锁英 = 显示与检索词一致 (都是拼音字母) + 中文结果, 全链自洽。
       this.SeedFromSelection()
       this.Refresh()
       return true     ; 消费触发键本身 (不投递到命令框)
     }
-
-    ; 🔴 IME 打开 = 字母/空格是输入法的组合输入 (会被组合成中文上屏), 不得并入检索词
-    ;   (否则检索词=拼音、命令框=中文, 两条通道分叉 —— 本修复的根源)。上屏文本由
-    ;   _PollIme 轮询并入。IME 关闭 (纯英文态) 维持旧行为: 字符直入检索词 + 视觉回显。
-    if (EverythingIme.Open())
-      return true
 
     ; 已激活: 继续输入 = 追加检索词; 同时投递字符让命令框显示 (视觉回显)
     this.query .= c
@@ -190,21 +179,11 @@ class EverythingSession {
       return true
 
     if (vk = EverythingSession.VK_BACK) {
-      ; 🔴 IME 组合期 (组合串非空): 退格由 IME 自行处理 (编辑组合串), 会话层不得
-      ;   动检索词/投递退格 —— 上屏文本尚未发生, 检索词无需回退。
-      if (EverythingIme.Composing())
-        return true
       if (this.query != "")
         this.query := SubStr(this.query, 1, -1)
       EverythingHost.EchoBackspace(ih, vk, sc)   ; 命令框视觉同步退格
       this.Refresh()
       return true
-    }
-    if (vk = EverythingSession.VK_RETURN) {
-      ; 🔴 IME 组合期的回车 = 「上屏提交」而非「打开选中项」—— 消费掉 (物理键仍经 V
-      ;   透传到达 IME 完成提交), 提交后的中文由 _PollIme 并入检索词。组合空 = 正常打开。
-      if (EverythingIme.Composing())
-        return true
     }
     if (vk = EverythingSession.VK_UP) {
       this.Move(-1)
@@ -372,30 +351,11 @@ class EverythingSession {
     }
   }
 
-  /** 收尾: 隐藏浮层 (可重复调用)。同时撤销 active —— 关闭后到达的重复 Enter 通知必须被拒。
-   *  并停 IME 轮询定时器 + 解除线程附着 (可重复调用须幂等)。 */
+  /** 收尾: 隐藏浮层 (可重复调用)。同时撤销 active —— 关闭后到达的重复 Enter 通知必须被拒。 */
   Close() {
     this.closed := true
     this.active := false
-    try SetTimer(ObjBindMethod(this, "_PollIme"), 0)
-    EverythingIme.Detach()
     EverythingDropdown.Hide()
-  }
-
-  ; ---- IME 上屏轮询 (透传模式中文检索的检索词来源, 见 EverythingIme 头注释) ----
-
-  _PollIme() {
-    if (this.closed || !this.active) {
-      SetTimer(ObjBindMethod(this, "_PollIme"), 0)
-      return
-    }
-    text := EverythingIme.PendingResult()
-    if (text = "")
-      return
-    ; 上屏文本并入检索词。**不 EchoChar**: IME 提交时已把 WM_CHAR 直投命令框,
-    ; 再投就是双份显示。组合期本就未追加字母 (OnChar 已拦), 故这里是纯增量。
-    this.query .= text
-    this.Refresh()
   }
 
   ; ---- 内部 ----
