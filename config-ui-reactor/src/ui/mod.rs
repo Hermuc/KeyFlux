@@ -26,15 +26,9 @@ pub mod settings_view;
 /// 2026-10-02 用户定版：**禁用态图标置灰**（`STONE_GRAY`）——ghost 覆盖透明化了
 /// WinUI 自身的禁用灰化，若仍按传入色（多为红色 ✕）渲染，会"看着能点、点了没反应"
 /// （快捷键方案启用行删除钮报障）。
-pub fn icon_button<C: IntoUnitCallback>(
-    glyph: &str,
-    font_size: f64,
-    color: Color,
-    enabled: bool,
-    on_click: C,
-) -> View {
+pub fn ghost_button_overrides() -> ResourceOverrides {
     let transparent = Color::transparent();
-    let ghost = ResourceOverrides::new()
+    ResourceOverrides::new()
         .set("ButtonBackground", transparent)
         .set("ButtonBorderBrush", transparent)
         .set("ButtonBackgroundPointerOver", transparent)
@@ -42,10 +36,19 @@ pub fn icon_button<C: IntoUnitCallback>(
         .set("ButtonBackgroundPressed", transparent)
         .set("ButtonBorderBrushPressed", transparent)
         .set("ButtonBackgroundDisabled", transparent)
-        .set("ButtonBorderBrushDisabled", transparent);
+        .set("ButtonBorderBrushDisabled", transparent)
+}
+
+pub fn icon_button<C: IntoUnitCallback>(
+    glyph: &str,
+    font_size: f64,
+    color: Color,
+    enabled: bool,
+    on_click: C,
+) -> View {
     Button::new()
         .is_enabled(enabled)
-        .resource_overrides(ghost)
+        .resource_overrides(ghost_button_overrides())
         .on_click(on_click)
         .content(
             TextBlock::new()
