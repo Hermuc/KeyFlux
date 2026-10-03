@@ -120,6 +120,33 @@ class EverythingGuiProvider {
     static AllowLaunch := true
 }
 
+/**
+ * 查询输入面 stub (真源 src/EverythingQueryEdit.ahk 未 #Include): 记录 Show/Hide/Focus
+ * 次数; SimText 模拟「用户在 Edit 里的输入」(含 IME 上屏), 供轮询同步断言。
+ */
+class EverythingQueryEdit {
+    static ShowCount := 0
+    static HideCount := 0
+    static FocusCount := 0
+    static SimText := ""
+    static Show(rect, initial := "") {
+        EverythingQueryEdit.ShowCount += 1
+        EverythingQueryEdit.SimText := initial
+    }
+    static Hide() {
+        EverythingQueryEdit.HideCount += 1
+    }
+    static Focus() {
+        EverythingQueryEdit.FocusCount += 1
+    }
+    static SetText(t) {
+        EverythingQueryEdit.SimText := t
+    }
+    static GetText() {
+        return EverythingQueryEdit.SimText
+    }
+}
+
 ; 错误码常量 (真源 src/EverythingProviders.ahk 顶部; 探针未包含该文件,
 ; 但断言 12 的 OnChar→Refresh→_ErrorKey 路径会比较它们 —— 补齐避免未定义全局)
 global ES_ERR_NOT_FOUND := "es-not-found"
@@ -213,12 +240,15 @@ class HostRecorder {
         HostRecorder.Calls.Push(["IsChinese"])
         return true
     }
+    static HideCommandBox() {
+        HostRecorder.Calls.Push(["HideCommandBox"])
+    }
     static ResetAnchorCache() {
         HostRecorder.Calls.Push(["ResetAnchorCache"])
     }
     static CommandBoxAnchor() {
         HostRecorder.Calls.Push(["CommandBoxAnchor"])
-        return ""          ; 探针无命令框: 走渲染层屏幕兜底路径
+        return {x: 100, y: 100, w: 841, h: 96, bottom: 196}   ; 假锚点: 让输入面/浮层几何走真实代码
     }
 }
 
@@ -265,6 +295,10 @@ ResetObservers() {
     EverythingDropdown.HideCount := 0
     StubInputHook.StopCount := 0
     EverythingSearch.RunCount := 0
+    EverythingQueryEdit.SimText := ""
+    EverythingQueryEdit.ShowCount := 0
+    EverythingQueryEdit.HideCount := 0
+    EverythingQueryEdit.FocusCount := 0
 }
 
 ; ============================================================
@@ -468,16 +502,16 @@ Verify(ExplorerRecorder.Calls.Length = 0 && EverythingDropdown.HideCount = 0 && 
 ResetObservers()
 s16 := EverythingSession(0)
 r13 := s16.OnChar(StubInputHook(), " ", "probe")     ; 前置位置的触发键
-Verify(r13 = true && HostRecorder.Count("GetSelection") = 1 && HostRecorder.Count("UnlockForSearch") = 0,
-    "12a 触发键: GetSelection 走 1 次 (经 Host 端口), UnlockForSearch 零调用 (锁英)",
+Verify(r13 = true && HostRecorder.Count("GetSelection") = 1 && HostRecorder.Count("UnlockForSearch") = 1,
+    "12a 触发键: GetSelection 与 UnlockForSearch 各走 1 次 (透传给查询输入面)",
     "实际 r=" r13 " Unlock=" HostRecorder.Count("UnlockForSearch") " GetSel=" HostRecorder.Count("GetSelection"))
 r14 := s16.OnChar(StubInputHook(), "a", "probe")     ; 激活后的普通字符
-Verify(r14 = true && HostRecorder.Count("EchoChar") = 1 && s16.query = "a",
-    "12b 激活后字符: EchoChar 经端口 1 次, 检索词追加",
-    "实际 r=" r14 " EchoChar=" HostRecorder.Count("EchoChar") " query=" s16.query)
+Verify(r14 = true && s16.query = "" && HostRecorder.Count("EchoChar") = 0,
+    "12b 激活后字符: 只消费 (文本由查询输入面原生持有, 经轮询同步)",
+    "实际 r=" r14 " query=" s16.query " EchoChar=" HostRecorder.Count("EchoChar"))
 r15 := s16.OnKey(StubInputHook(), EverythingSession.VK_BACK, 0, "probe")
-Verify(r15 = true && HostRecorder.Count("EchoBackspace") = 1 && s16.query = "",
-    "12c 退格: EchoBackspace 经端口 1 次, 检索词回退",
+Verify(r15 = true && HostRecorder.Count("EchoBackspace") = 0 && s16.query = "",
+    "12c 退格: 只消费 (Edit 原生删字符, 轮询同步检索词)",
     "实际 r=" r15 " EchoBackspace=" HostRecorder.Count("EchoBackspace") " query=" s16.query)
 
 ; --- 断言 13: 空检索词 = 初始态, 不出任何浮层 (2026-10-03 需求) ---
@@ -491,27 +525,36 @@ Verify(r16 = true && EverythingDropdown.HideCount = 1 && EverythingDropdown.Hint
     "实际 r=" r16 " Hide=" EverythingDropdown.HideCount " Hints=" EverythingDropdown.Hints.Length)
 ResetObservers()
 r17 := s17.OnKey(StubInputHook(), EverythingSession.VK_BACK, 0, "probe")
-Verify(r17 = true && HostRecorder.Count("EchoBackspace") = 1 && s17.query = "",
-    "13b 空检索词下退格: 会话仍处搜索态, 退格被消费且经端口回显, 检索词保持空",
-    "实际 r=" r17 " EchoBackspace=" HostRecorder.Count("EchoBackspace") " query=" s17.query)
+Verify(r17 = true && s17.query = "" && HostRecorder.Count("EchoBackspace") = 0,
+    "13b 空检索词下退格: 只消费 (Edit 原生处理), 检索词保持空",
+    "实际 r=" r17 " query=" s17.query " EchoBackspace=" HostRecorder.Count("EchoBackspace"))
 
-; --- 断言 14: 搜索模式锁英回归护栏 (2026-10-03 实测定版) ---
-;     触发后**不得**调用 UnlockForSearch (透传已被实测否决: IME 组合吞键 + 上屏不可见 +
-;     24H2 禁 AttachThreadInput ⇒ 三路全断); 字母照常直入检索词 (中文命中靠
-;     Everything pinyin=1)。谁把透传接回来, 14a 即红。
+; --- 断言 14: 查询输入面 (2026-10-03 Flow 式定版) ---
+;     14a 触发 => 隐藏命令框 + 显示输入面 + 焦点 (IME 随焦点附着);
+;     14b 用户在 Edit 里输入 (模拟 IME 上屏 "临时") => 轮询并入检索词并重查;
+;     14c OnChar 不再触碰检索词 (Edit 原生持有, 防双份处理);
+;     14d Close => 输入面 Hide 恰 1 次。
 ResetObservers()
 s18 := EverythingSession(0)
 r18 := s18.OnChar(StubInputHook(), " ", "probe")     ; 触发
-Verify(r18 = true && HostRecorder.Count("UnlockForSearch") = 0,
-    "14a 触发后: UnlockForSearch 零调用 (搜索模式保持锁英)",
-    "实际 r=" r18 " Unlock=" HostRecorder.Count("UnlockForSearch"))
-r19 := s18.OnChar(StubInputHook(), "s", "probe")
-r20 := s18.OnChar(StubInputHook(), "h", "probe")
-r21 := s18.OnChar(StubInputHook(), "i", "probe")
-Verify(r19 = true && r20 = true && r21 = true && s18.query = "shi" && HostRecorder.Count("EchoChar") = 3,
-    "14b 锁英模式下拼音字母直入检索词并回显",
-    "实际 query=" s18.query " EchoChar=" HostRecorder.Count("EchoChar"))
-ResetObservers()
+Verify(r18 = true && EverythingQueryEdit.ShowCount = 1 && HostRecorder.Count("HideCommandBox") = 1
+    && HostRecorder.Count("UnlockForSearch") = 1 && EverythingQueryEdit.FocusCount >= 1,
+    "14a 触发: 命令框隐藏 + 输入面显示/聚焦 + 透传放开",
+    "实际 r=" r18 " Show=" EverythingQueryEdit.ShowCount " HideBox=" HostRecorder.Count("HideCommandBox")
+    . " Unlock=" HostRecorder.Count("UnlockForSearch") " Focus=" EverythingQueryEdit.FocusCount)
+EverythingQueryEdit.SimText := "临时"                  ; 模拟用户 IME 上屏
+s18._SyncQuery()                                      ; 生产由 SetTimer 驱动
+Verify(s18.query = "临时" && EverythingSearch.RunCount = 1,
+    "14b 输入面文本轮询并入检索词并重查",
+    "实际 query=" s18.query " Run=" EverythingSearch.RunCount)
+r19 := s18.OnChar(StubInputHook(), "x", "probe")      ; 按键事件 (物理键实际进 Edit)
+Verify(r19 = true && s18.query = "临时" && EverythingSearch.RunCount = 1,
+    "14c OnChar 只消费不触碰检索词 (Edit 原生持有文本)",
+    "实际 r=" r19 " query=" s18.query " Run=" EverythingSearch.RunCount)
+s18.Close()
+Verify(EverythingQueryEdit.HideCount = 1,
+    "14d 会话 Close: 输入面 Hide 恰 1 次",
+    "实际 Hide=" EverythingQueryEdit.HideCount)
 
 ; ============================================================
 ; 汇总

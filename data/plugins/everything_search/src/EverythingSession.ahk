@@ -111,6 +111,10 @@ class EverythingSession {
   ; 通知」, 不阻断用户真的再按一次回车。
   static DEBOUNCE_MS := 400
 
+  ; 查询输入面文本轮询间隔 (ms): Edit 是检索词的唯一真源 (IME 上屏/字母/退格原生发生
+  ; 在控件里), 轮询差分 → 检索词更新 → 重查。40ms 远小于人工输入节奏。
+  static QUERY_SYNC_MS := 40
+
   ; 会话状态
   chars := 0              ; 本次会话已收到的普通字符数 (0 = 触发键仍处「前置」位置)
   active := false         ; 是否已触发 (检索中)
@@ -154,21 +158,29 @@ class EverythingSession {
       if (c != EverythingSettings.TriggerKey)
         return false
       this.active := true
-      ; 🔴 搜索模式保持**锁英** (2026-10-03 实测定版, 推翻 ImeGuard 的「放开中文」设计):
-      ;   透传模式下 IME 从首字母起组合, 组合期全部按键 (含上屏中文) 不经 InputHook
-      ;   (日志实证: 打 shi 只收到 's', 检索词停在单字母; 上屏中文直投命令框不可见),
-      ;   24H2 又禁跨进程 AttachThreadInput (err=87) ⇒ IME 捕获三路全断。
-      ;   而 Everything pinyin=1 (用户已开启, es.exe 阳性对照验证) 让拼音检索词直接
-      ;   命中中文文件名 ⇒ 锁英 = 显示与检索词一致 (都是拼音字母) + 中文结果, 全链自洽。
+      ; 🔴 查询输入面 (2026-10-03 Flow 式定版): 中文检索要求「IME 上屏的中文 = 检索词」,
+      ;   而命令框是预编译二进制、文本无回读通道 (InputHook 拿不到组合期按键/上屏文本;
+      ;   24H2 禁跨进程 AttachThreadInput ⇒ IMM 捕获也不可用)。解法 = Flow Launcher 同款:
+      ;   搜索模式由本插件在命令框位置覆盖一个**真实 Edit 控件** (EverythingQueryEdit),
+      ;   命令框隐藏, 焦点交给 Edit ⇒ IME 组合/上屏原生发生在控件里, 检索词 = GetText()
+      ;   轮询直读 —— 显示与检索词天然一致, 零跨进程障碍。透传 (UnlockForSearch) 必须
+      ;   保留: 物理键要经 InputHook 的 V 透传到达焦点窗口 (现在的 Edit)。
+      EverythingHost.UnlockForSearch(ih)
+      EverythingHost.HideCommandBox()
+      a := EverythingHost.CommandBoxAnchor()
+      if (IsObject(a)) {
+        EverythingQueryEdit.Show(a, "")
+        SetTimer(ObjBindMethod(this, "_SyncQuery"), EverythingSession.QUERY_SYNC_MS)
+      }
       this.SeedFromSelection()
+      EverythingQueryEdit.SetText(this.query)
+      EverythingQueryEdit.Focus()
       this.Refresh()
       return true     ; 消费触发键本身 (不投递到命令框)
     }
 
-    ; 已激活: 继续输入 = 追加检索词; 同时投递字符让命令框显示 (视觉回显)
-    this.query .= c
-    EverythingHost.EchoChar(ih, c)
-    this.Refresh()
+    ; 已激活: 输入文本由查询输入面 (Edit) 原生持有, 检索词经 _SyncQuery 轮询同步 ——
+    ; OnChar 只负责消费 (防止引擎做缩写模糊匹配/双份回显)。
     return true
   }
 
@@ -179,10 +191,8 @@ class EverythingSession {
       return true
 
     if (vk = EverythingSession.VK_BACK) {
-      if (this.query != "")
-        this.query := SubStr(this.query, 1, -1)
-      EverythingHost.EchoBackspace(ih, vk, sc)   ; 命令框视觉同步退格
-      this.Refresh()
+      ; 退格由查询输入面原生处理 (Edit 自删字符); 检索词经 _SyncQuery 同步 ——
+      ; 这里只消费, 不得再截断 query (会双删) / 投递退格 (命令框已隐藏)。
       return true
     }
     if (vk = EverythingSession.VK_UP) {
@@ -238,7 +248,8 @@ class EverythingSession {
     }
     this.capturing := false
     ; 焦点还原 (返回值忽略: 激活失败只损失显示, 搜索路径不依赖焦点)
-    EverythingHost.ActivateCommandWindow()
+    ; 焦点还原: 搜索模式下输入面 (Edit) 取代命令框承载焦点/IME —— 还原给它而非命令框
+    EverythingQueryEdit.Focus()
   }
 
   /** 按当前检索词刷新浮层。空词 = 初始态: **不出任何浮层** (2026-10-03 需求:
@@ -355,7 +366,23 @@ class EverythingSession {
   Close() {
     this.closed := true
     this.active := false
+    try SetTimer(ObjBindMethod(this, "_SyncQuery"), 0)
+    EverythingQueryEdit.Hide()
     EverythingDropdown.Hide()
+  }
+
+  ; ---- 查询输入面轮询 (Edit 文本 = 检索词唯一真源, 见 EverythingQueryEdit 头注释) ----
+
+  _SyncQuery() {
+    if (this.closed || !this.active) {
+      SetTimer(ObjBindMethod(this, "_SyncQuery"), 0)
+      return
+    }
+    t := EverythingQueryEdit.GetText()
+    if (t = this.query)
+      return
+    this.query := t
+    this.Refresh()
   }
 
   ; ---- 内部 ----

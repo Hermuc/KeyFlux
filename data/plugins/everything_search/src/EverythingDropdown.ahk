@@ -25,6 +25,7 @@ global ED_GUI := 0
 global ED_LV := 0
 global ED_BUILT := false
 global ED_ONPICK := 0
+global ED_WHEEL := false          ; WM_MOUSEWHEEL 监听已注册 (只注册一次)
 global ED_ROWS := 30              ; 可见行数上限 (不滚动, 与锚点高度共同决定)。
                                   ; 🔴 2026-09-21 由 16 提到 30: 用户要求「默认能展示的列表
                                   ;   太少, 再拉长一点」。30 行高 = 30*22+14 = 674px, 命令框
@@ -93,6 +94,16 @@ class EverythingDropdown {
     try lv.OnEvent("Click", EverythingDropdown._OnClick)
     try lv.OnEvent("DoubleClick", EverythingDropdown._OnClick)
 
+    ; Shift+滚轮横向滚动: 全局监听一次 (回调内部按「消息归属 + 浮层可见 + Shift 按下」过滤)
+    ; 🔴 回调必须走**文件级转发函数** ED_WheelForward —— OnMessage 对类静态方法直传
+    ;   (EverythingDropdown._Wheel) 报 ValueError: Invalid callback (AHK v2 实测;
+    ;   自由函数/Bind/ObjBindMethod 均可, 见 engine_error.log 2026-10-03)
+    global ED_WHEEL
+    if (!ED_WHEEL) {
+      ED_WHEEL := true
+      OnMessage(0x020A, ED_WheelForward)   ; WM_MOUSEWHEEL
+    }
+
     ED_GUI := g
     ED_LV := lv
     ED_BUILT := true
@@ -109,7 +120,6 @@ class EverythingDropdown {
     rect := this._AnchorRect(items.Length)
     ; 列表内容从「耳朵行」之下开始 (窗口内 y=ear 起), 顶部 earR 高的耳朵带不归 ListView
     try ED_LV.Move(0, rect.ear, rect.w, rect.h - rect.ear)
-    try ED_LV.ModifyCol(1, rect.w - 4)
 
     try ED_LV.Delete()
     for it in items {
@@ -118,6 +128,7 @@ class EverythingDropdown {
     }
     this.Select(index)
     this._ShowAt(rect)
+    this._FitColumns(rect)       ; 列宽自适应 + 初始滚到文件名端 (须在显示后, 隐藏时滚动范围不生效)
   }
 
   /** 显示一行提示文本 (无结果 / 通道不可用)。空检索词的初始态**不走这里** (Session 直接 Hide)。 */
@@ -130,6 +141,60 @@ class EverythingDropdown {
     try ED_LV.Delete()
     try ED_LV.Add(, text)
     this._ShowAt(rect)
+  }
+
+  /**
+   * 结果列适配 (2026-10-03 用户定版「优先显示文件名, 目录可显示不全」):
+   *   * 列宽取 max(最长行墨迹, 可视宽) ⇒ 长路径可经 Shift+滚轮 (见 _Wheel) 横向滚动看全;
+   *   * 显示后滚到最右端 ⇒ 默认视图 = 文件名可见、目录头部被裁 (左对齐 + 滚动右端的
+   *     组合, 视觉等同「右对齐」且向左滚动时路径头部自然展开 —— 可滚动列里右对齐
+   *     会让尾部粘在视外右缘, 反而无法浏览);
+   *   * ⚠ 必须在 _ShowAt **之后**调用 —— 隐藏窗口上 LVM_SCROLL 滚动范围不生效 (实测)。
+   *   * ⚠ ModifyCol 第 2 参是**选项串**: `ModifyCol(1, w, "Right")` 会把 "Right" 当
+   *     列标题改名而非对齐 (实测, 表头隐藏时不可见); 宽度+对齐应写 `"w Left"`。
+   */
+  static _FitColumns(rect) {
+    global ED_LV
+    viewW := rect.w - 4
+    maxW := 0
+    n := 0
+    try n := ED_LV.GetCount()
+    Loop n {
+      t := ""
+      try t := ED_LV.GetText(A_Index, 1)
+      w := this._TextWidth(t)
+      if (w > maxW)
+        maxW := w
+    }
+    colW := (maxW > 0) ? maxW + 24 : viewW
+    if (colW < viewW)
+      colW := viewW
+    try ED_LV.ModifyCol(1, colW)                 ; 左对齐 (文本列默认)
+    dx := colW - viewW
+    if (dx > 0)
+      try SendMessage(0x1014, dx, 0, ED_LV.Hwnd)   ; LVM_SCROLL(0x1014=LVM_FIRST+20): 滚到最右 (文件名端可见)
+  }
+
+  /** 用 ListView 自身字体测量文本墨迹宽 (px); 失败返回 0 (调用方回落可视宽)。 */
+  static _TextWidth(s) {
+    global ED_LV
+    if (s = "")
+      return 0
+    hdc := 0
+    try hdc := DllCall("user32\GetDC", "ptr", ED_LV.Hwnd, "ptr")
+    if (!hdc)
+      return 0
+    hfont := 0
+    try hfont := SendMessage(0x0031, 0, 0, ED_LV.Hwnd)   ; WM_GETFONT
+    old := 0
+    if (hfont)
+      old := DllCall("gdi32\SelectObject", "ptr", hdc, "ptr", hfont, "ptr")
+    cx := 0, cy := 0
+    DllCall("gdi32\GetTextExtentPoint32W", "ptr", hdc, "str", s, "int", StrLen(s), "int*", &cx := 0, "int*", &cy := 0)
+    if (hfont)
+      DllCall("gdi32\SelectObject", "ptr", hdc, "ptr", old)
+    DllCall("user32\ReleaseDC", "ptr", ED_LV.Hwnd, "ptr", hdc)
+    return cx
   }
 
   /** 高亮第 index 行 (越界则收敛到范围内)。 */
@@ -276,4 +341,31 @@ class EverythingDropdown {
     if (path != "" && ED_ONPICK != 0)
       ED_ONPICK(path)
   }
+
+  /**
+   * Shift+滚轮 = 结果列表横向滚动 (2026-10-03 用户定版): 滚轮向前 (delta<0) 向左看
+   * 路径头部, 向后向右看文件名端。返回 0 吞掉消息 ⇒ 不触发默认垂直滚动;
+   * 非 Shift / 非本浮层窗口的滚轮一律放行 (return "" = 不干预)。
+   */
+  static _Wheel(wParam, lParam, msg, hwnd) {
+    global ED_GUI, ED_LV, ED_BUILT
+    if (!ED_BUILT)
+      return ""
+    ; 不按 hwnd 过滤: 滚轮可能路由到焦点窗口 (查询输入面) 而非列表 —— 只要浮层可见
+    ; 且 Shift 按下, 横滚就是明确意图 (浮层可见期间本进程仅会话相关窗口收得到滚轮)
+    if (!DllCall("IsWindowVisible", "ptr", ED_GUI.Hwnd, "int"))
+      return ""
+    if (!GetKeyState("Shift", "P"))
+      return ""
+    delta := (wParam >> 16) & 0xFFFF
+    if (delta >= 0x8000)
+      delta -= 65536
+    SendMessage(0x1014, (delta < 0) ? 60 : -60, 0, ED_LV.Hwnd)   ; LVM_SCROLL(0x1014) ±60px
+    return 0
+  }
+}
+
+; 文件级 OnMessage 转发 (类静态方法直传 OnMessage 会报 Invalid callback, 见 _Wheel 注释)
+ED_WheelForward(wParam, lParam, msg, hwnd) {
+  return EverythingDropdown._Wheel(wParam, lParam, msg, hwnd)
 }
