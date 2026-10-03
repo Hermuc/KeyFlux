@@ -699,10 +699,12 @@ impl Shell {
                             .hotkeys
                             .iter()
                             .map(|(hotkey, actions)| {
+                                // 功能列显示翻译后的功能名（comment 存的是 "label:<i18n键>"
+                                // 引用，i18n::t 负责剥前缀查表；与右侧备注汇总列同口径）
                                 let function = actions
                                     .iter()
                                     .find(|action| !action.comment.is_empty())
-                                    .map(|action| action.comment.clone())
+                                    .map(|action| i18n::t(&action.comment))
                                     .unwrap_or_default();
                                 (hotkey.clone(), function)
                             })
