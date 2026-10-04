@@ -40,3 +40,5 @@ bin/font/font.*.ttf
 
 # 本机 CodeBuddy/WorkBuddy 环境的本地工作数据 (不入库)
 .codebuddy/
+# ZCode 本地工作数据 (工作流草稿/运行记录/逆向分析副本, 不入库)
+.zcode/
