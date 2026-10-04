@@ -113,6 +113,25 @@ class EverythingHost {
     return (r > 0) ? StrGet(buf, r, "UTF-16") : ""
   }
 
+  /**
+   * 前台移交给命令框 (引擎侧 SetForegroundWindow): 引擎的输入钩子收到了最近输入事件
+   *   ⇒ 引擎调 SetForegroundWindow 有权成功 (Windows 前台锁的豁免条件);
+   *   而命令框自身进程从未收到输入 ⇒ 它自己的 SetForegroundWindow 会被前台锁拒绝
+   *   (2026-10-04 用户实测「输入不了文字」的根因: 0x404 只摘了 NOACTIVATE,
+   *   但框进程的前台锁豁免不存在, SetForegroundWindow 静默失败 → 键盘继续流向原窗口)。
+   * 前台移交给框后, 框线程队列获得键盘焦点 ⇒ IME 组合窗跟随命令框 ✓。
+   */
+  static BoxForeground() {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.BoxForeground()
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return false
+    try DllCall("user32\SetForegroundWindow", "ptr", hwnd)
+    return true
+  }
+
   /** 查询 IME 组合态 (0x405): 真 = 组合中 (回车是上屏提交, 引擎不得当「打开」)。 */
   static BoxQueryComposing() {
     impl := EverythingHost.Impl
