@@ -1,4 +1,4 @@
-//! v1 渲染后端 (design C §2.5): GDI + 整窗 layered alpha + LWA_COLORKEY 透明带 + DWM 阴影钩子。
+//! v1 渲染后端 (design C §2.5): GDI + 整窗 layered alpha + SetWindowRgn 形状裁切 + DWM 阴影钩子。
 //!
 //! 合成数学照抄参考实现 (净观感与原框逐像素 Δ2 已验证):
 //!   * 整窗 alpha = round(backgroundOpacity × 255)      (EverythingQueryEdit.ahk:158-159);
@@ -9,14 +9,13 @@
 //!     (:252-262 口径; R28「阴影 = DWM 系统阴影机制」)。
 //!
 //! 机制注记 (design A 探针实证, 本机当场运行):
-//!   * 42px 透明带 + 圆角裁切用 **LWA_COLORKEY** (#FF00FF, 与内容色域恒不相交) ——
-//!     SetWindowRgn 在 SetLayeredWindowAttributes 分层窗口上返回 TRUE 但不参与合成
+//!   * 42px 透明带 + 圆角裁切用 **SetWindowRgn** (圆角矩形区域, 惟一形状来源) ——
+//!     阴影钩子组合尤甚; 而「SetWindowRgn + LWA_ALPHA」组合已被 EverythingQueryEdit
+//!     (AHK 参考实现, 同机同 OS) 长期验证可用 —— 故弃色键改区域。区域外像素被裁切,
+//!     品红底色仅作区域失效时的显性诊断色
 //!     (design A 探针 V2 实证), 故不采 region 方案;
-//!   * ⚠ **LWA_ALPHA 与 LWA_COLORKEY 必须在同一次 SetLayeredWindowAttributes 调用里
 //!     同时声明** (2026-10-04 活体踩坑, cmdinput-re/probe_diag.py): 分两次调用时,
-//!     后一次会把未声明的属性**重置回默认** (先 LWA_ALPHA(230) 再 LWA_COLORKEY → alpha
 //!     被重置为 255, 整窗变不透明, 净背景 #FFFFFF ≠ 原版 #E6E6E6; 反向单 flag 调用亦
-//!     清掉色键, 带 #FF00FF 外露)。本文件所有 SLWA 调用一律两 flag 同发;
 //!   * 分层窗口无 DWM 阴影 (探针 outer5px 逐位同底色) → 42px 带 = 纯透明, 带**无内阴影**
 //!     (design A §4.4 的诚实降级, R28 为 should 级); DWM 钩子零成本零风险保留, 有效则白赚;
 //!     windowShadow* 三键在 v1 只解析不渲染 (v2 DComp 后端以 D2D1Shadow 消费三键)。
@@ -43,14 +42,15 @@ use windows::Win32::Graphics::Dwm::{
 use windows::Win32::Graphics::Gdi::{
     AddFontResourceExW, CreateFontW, CreateRoundRectRgn, CreateSolidBrush, DeleteObject, DrawTextW,
     FillRect, FR_PRIVATE, GetDC, HBRUSH, HFONT, HRGN, HGDIOBJ, ReleaseDC, SelectClipRgn,
-    SelectObject, SetBkMode, SetTextColor, ValidateRect, ANTIALIASED_QUALITY, CLIP_DEFAULT_PRECIS,
+    SelectObject, SetBkMode, SetTextColor, SetWindowRgn, ValidateRect, ANTIALIASED_QUALITY,
+    CLIP_DEFAULT_PRECIS,
     DEFAULT_CHARSET, DRAW_TEXT_FORMAT, DT_CENTER, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, FW_BOLD,
     OUT_DEFAULT_PRECIS, TRANSPARENT,
 };
 use windows::Win32::System::Threading::Sleep;
 use windows::Win32::UI::Controls::MARGINS;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CharUpperW, SetLayeredWindowAttributes, LWA_ALPHA, LWA_COLORKEY,
+    CharUpperW, SetLayeredWindowAttributes, LWA_ALPHA,
 };
 
 use crate::config;
@@ -63,7 +63,6 @@ use crate::win::resources;
 /// 懒创建的 GDI 资源 (R23: 首次 WM_PAINT 才创建)。
 struct Resources {
     font: HFONT,
-    key_brush: HBRUSH,    // 色键刷 (透明裁切; 绝不用于可见内容)
     bg_brush: HBRUSH,     // 背景刷 (backgroundColor)
     grid_brush: HBRUSH,   // 网格刷 (grid_content_color 反解色)
     border_brush: HBRUSH, // 边框刷 (borderColor@borderOpacity 向背景混色)
@@ -74,7 +73,6 @@ impl Drop for Resources {
     fn drop(&mut self) {
         unsafe {
             let _ = DeleteObject(HGDIOBJ(self.font.0));
-            let _ = DeleteObject(HGDIOBJ(self.key_brush.0));
             let _ = DeleteObject(HGDIOBJ(self.bg_brush.0));
             let _ = DeleteObject(HGDIOBJ(self.grid_brush.0));
             let _ = DeleteObject(HGDIOBJ(self.border_brush.0));
@@ -106,15 +104,11 @@ impl GdiBackend {
         }
     }
 
-    /// 整窗 layered 属性: alpha + 色键**单次调用**同时声明 (见模块注记 —— 分次调用会互相重置)。
+    /// 整窗 layered 属性: 仅 alpha (形状由 SetWindowRgn 负责, 见模块注记 ——
+    /// 24H2 上 LWA_COLORKEY 不生效, 品红带外露; 2026-10-04 弃色键)。
     fn lwa(&self, alpha: u8) {
         unsafe {
-            let _ = SetLayeredWindowAttributes(
-                self.hwnd,
-                COLORREF(config::COLORKEY),
-                alpha,
-                LWA_ALPHA | LWA_COLORKEY,
-            );
+            let _ = SetLayeredWindowAttributes(self.hwnd, COLORREF(0), alpha, LWA_ALPHA);
         }
     }
 
@@ -179,7 +173,6 @@ impl GdiBackend {
             }
         };
 
-        let key_brush = brush(Rgb(0xFF, 0x00, 0xFF))?; // = config::COLORKEY (#FF00FF)
         let bg_brush = brush(s.background_color)?;
         let grid_brush = brush(grid)?;
         let border_brush = brush(border)?;
@@ -203,7 +196,6 @@ impl GdiBackend {
 
         Ok(Resources {
             font,
-            key_brush,
             bg_brush,
             grid_brush,
             border_brush,
@@ -223,14 +215,14 @@ impl GdiBackend {
                 return Err(BackendError::new("GetDC failed"));
             }
 
-            // 1) 全客户区色键 → 42px 边带 + 圆角外区域合成时完全剔除 (探针 V1 实证)
+            // 1) 全客户区铺背景色 (42px 边带 + 圆角外由 SetWindowRgn 裁切, 不可见)
             let whole = RECT {
                 left: 0,
                 top: 0,
                 right: state.width_px,
                 bottom: state.height_px,
             };
-            FillRect(hdc, &whole, res.key_brush);
+            FillRect(hdc, &whole, res.bg_brush);
 
             // 裁剪到白框圆角区域 (GDI 裁剪; 与色键配合, 边带像素恒为色键)
             SelectClipRgn(hdc, Some(res.clip));
@@ -370,16 +362,9 @@ impl RenderBackend for GdiBackend {
         let alpha = skin::window_alpha(state.skin);
 
         unsafe {
-            // 整窗 alpha + 色键 —— 一次调用两 flag 同发 (R28: alpha = round(opacity×255);
-            // 活体定案: 分次调用时后一次重置前一次属性 → 必须合并, 见模块注记)
-            SetLayeredWindowAttributes(
-                self.hwnd,
-                COLORREF(config::COLORKEY),
-                alpha,
-                LWA_ALPHA | LWA_COLORKEY,
-            )
-            .map_err(|e| {
-                BackendError::with_hresult("SetLayeredWindowAttributes(LWA_ALPHA|LWA_COLORKEY) failed", e.code().0 as u32)
+            // 整窗 alpha (R28: alpha = round(opacity×255)); 形状由 SetWindowRgn 负责
+            SetLayeredWindowAttributes(self.hwnd, COLORREF(0), alpha, LWA_ALPHA).map_err(|e| {
+                BackendError::with_hresult("SetLayeredWindowAttributes(LWA_ALPHA) failed", e.code().0 as u32)
             })?;
 
             // DWM 阴影钩子 (R28, 参考实现 :252-262 同款; 分层窗上大概率无效, 零成本保留)
@@ -414,6 +399,24 @@ impl RenderBackend for GdiBackend {
         )
         .as_colorref());
         self.res = Some(Self::create_resources(state)?);
+
+        // 形状: 圆角矩形区域 (四周缩 42px 带, 与白框重合) —— 区域外一律裁切,
+        // 品红底色不可能外露 (区域参与合成已由 EverythingQueryEdit 同机实测)
+        let r = (state.skin.border_radius.round() as i32).max(0);
+        let inset = geometry::band_inset_px(state.dpi);
+        let rgn = unsafe {
+            CreateRoundRectRgn(
+                inset,
+                inset,
+                state.width_px - inset,
+                state.height_px - inset,
+                2 * r,
+                2 * r,
+            )
+        };
+        if !rgn.0.is_null() {
+            unsafe { SetWindowRgn(self.hwnd, Some(rgn), true) };
+        }
         Ok(())
     }
 
