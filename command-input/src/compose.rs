@@ -184,18 +184,6 @@ impl Plan {
     pub fn shadow_extent_px(&self) -> i32 {
         (self.shadow.sigma * crate::config::SHADOW_REGION_SIGMA + self.shadow.dy).ceil() as i32 + 1
     }
-
-    /// 供调试/单测的 alpha 掩码。
-    pub fn alpha_mask(&self) -> Vec<u8> {
-        let mut out = vec![0u8; (self.w * self.h) as usize];
-        for y in 0..self.h {
-            for x in 0..self.w {
-                let (a, _) = self.pixel(x, y, [255.0; 3]);
-                out[(y * self.w + x) as usize] = to_u8(a * 255.0);
-            }
-        }
-        out
-    }
 }
 
 fn mix(a: f64, b: f64, t: f64) -> f64 {

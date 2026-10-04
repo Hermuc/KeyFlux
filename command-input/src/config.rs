@@ -125,8 +125,6 @@ pub const SHADOW_DY_DIP: f64 = 1.6;
 pub const SHADOW_REGION_SIGMA: f64 = 3.0;
 /// WS_EX_NOACTIVATE 位。
 pub const WS_EX_NOACTIVATE: u32 = 0x0800_0000;
-/// GWL_EXSTYLE 索引。
-pub const GWL_EXSTYLE_IDX: i32 = -20;
 
 /// R17: WM_CHAR wParam 低 16 位 == 8 → 退格。
 pub const CHAR_BACKSPACE: u16 = 8;
@@ -157,10 +155,6 @@ pub const FONT_HEIGHT_DIP: f64 = 44.0;
 pub const TEXT_PAD_RATIO: f64 = 0.14;
 /// 参考实现 :48: bin/font/font.ttf 实测家族名 (用户更换命令字体后需同步)。
 pub const FONT_FAMILY: &str = "更纱黑体 SC";
-
-/// 渲染透明机制的色键 (design A 探针 V1 实证): #FF00FF, 与内容色域
-/// (白/黑/#F7F8FC 网格/灰阶 AA) 恒不相交。COLORREF = 0x00BBGGRR。
-pub const COLORKEY: u32 = 0x00FF00FF;
 
 /// R4: 壳固定持有的 WS_EX_ 位 = WS_EX_TOPMOST(0x0800_0000) | WS_EX_NOACTIVATE(0x8)
 /// —— 显示语义, 不可放弃 (R4/R9)。后端经 `RenderBackend::ex_style_additions()` 追加:
