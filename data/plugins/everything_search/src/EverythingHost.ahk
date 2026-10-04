@@ -140,18 +140,9 @@ class EverythingHost {
     }
   }
 
-  /**
-   * 命令框窗口句柄 (隐藏窗口也查 —— 命令框「存在但隐藏」是常态)。
-   * @returns {Ptr} hwnd; 找不到 = 0。读回 (WM_GETTEXT) / 激活 / 结果推送共用本查找。
+  /** 找命令框窗口: 先查可见, 再查隐藏。找不到 = 0。
+   *  (内部 9 处调用方直接用本方法; 曾有公开包装 CommandBoxWindow 因零调用方于 2026-10-04 移除)。
    */
-  static CommandBoxWindow() {
-    impl := EverythingHost.Impl
-    if (IsObject(impl))
-      return impl.CommandBoxWindow()
-    return this._FindBoxWindow()
-  }
-
-  /** 找命令框窗口: 先查可见, 再查隐藏。找不到 = 0。 */
   static _FindBoxWindow() {
     cls := "ahk_class MyKeymap_Command_Input ahk_exe KeyFlux-CommandInput.exe"
     hwnd := 0

@@ -141,7 +141,7 @@ pub const SCREEN_CENTER_RATIO: f64 = 0.5;
 /// R11 公式中的 96.0 DIP 基准。
 pub const DIP_BASE_DPI: f64 = 96.0;
 
-// ---- R13/R23/R28 渲染标定常数 (参考实现 EverythingQueryEdit.ahk 实测口径) ----
+// ---- R13/R23/R28 渲染标定常数 (参考实现 doc/reference/EverythingQueryEdit.ahk 实测口径) ----
 /// R13: 白框缩进 = 42px @125% → DIP 化 33.6 (band = round(33.6 × dpi / 96))。
 /// 引擎锚点常数 margin := 42 (EverythingHost.ahk:111) 依赖此几何。
 pub const BAND_INSET_DIP: f64 = 33.6;

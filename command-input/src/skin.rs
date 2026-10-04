@@ -2,7 +2,7 @@
 //!
 //! 解析口径: 行式 `key = value`,`#RRGGBB` / 十进制 / 小数; fail-safe —— 未知键忽略、
 //! 单键非法回落该键内建默认、全文件缺失由调用方传 `""` 得 `DEFAULT`
-//! (R27; 对齐参考实现 EverythingQueryEdit.ahk:163-192 的 `_Skin` 语义)。
+//! (R27; 对齐参考实现 doc/reference/EverythingQueryEdit.ahk:163-192 的 `_Skin` 语义)。
 //! 合成公式逐行移植自参考实现 (已实测净观感与原框 Δ2 以内):
 //!   - 整窗 alpha = round(backgroundOpacity × 255)      (同 :158-159);
 //!   - 网格内容色反解 `_GridContentColor`               (同 :199-215);
@@ -225,6 +225,7 @@ pub fn grid_content_color(s: &Skin) -> Rgb {
 
 /// R28/参考实现 :158-159: 整窗不透明度 = round(backgroundOpacity × 255)。
 /// 0.9 → 229.5 → 230 (round half away from zero, 与 AHK Round 同口径)。
+/// 生产路径已不消费 (2026-10-04 起改逐像素合成 `fill_alpha`); 保留作参考口径快照 + 单测锁定。
 pub fn window_alpha(s: &Skin) -> u8 {
     (s.background_opacity * 255.0).round().clamp(0.0, 255.0) as u8
 }

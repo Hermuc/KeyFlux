@@ -7,7 +7,8 @@ exe 名 + 消息语义 + 标题 `" "`,spec.md:19)。
 - 行为规格:`D:\PortableApps\cmdinput-re\spec.md`(R1-R37,24 must)
 - 选定设计:方案 C(模块化优先:`RenderBackend` trait + GDI 首版落地 + DComp 渐进补齐),
   `D:\PortableApps\cmdinput-re\design-C.md`
-- 皮肤数学移植源:`D:\PortableApps\KeyFlux-main\data\plugins\everything_search\src\EverythingQueryEdit.ahk`
+- 皮肤数学移植源:`doc/reference/EverythingQueryEdit.ahk`(2026-10-04 自插件树收编的只读快照,
+  逐字节 = git `840ffe6^` 删除版; 行号引用仍有效, 详见 `doc/reference/README.md`)
 
 ## 构建(本机必须经 env.ps1)
 
