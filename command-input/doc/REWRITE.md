@@ -8,7 +8,7 @@ KeyFlux 命令输入框（窗口类 `MyKeymap_Command_Input`）从原版可执�
 - 行为规格与评审工件在仓库外 `D:\PortableApps\cmdinput-re\`（spec.md / design-A|B|C.md /
   matrix.md / 探针脚本 / 截图），有意不入库
 - 参考实现（皮肤数学移植源）：
-  `data\plugins\everything_search\src\EverythingQueryEdit.ahk`
+  `doc\reference\EverythingQueryEdit.ahk`（2026-10-04 自插件树收编的只读快照）
 
 ---
 
@@ -60,7 +60,8 @@ GDI 首版落地 + DComp 渐进补齐）经八准则字典序评审，矩阵 v2 
 1. **42px 透明带/圆角用 `LWA_COLORKEY`，而非 design C §2.5 主案的
    `SetWindowRgn`+`DwmExtendFrameIntoClientArea`**。依据：design A 探针实证 region 在
    `SetLayeredWindowAttributes` 分层窗上不参与合成；参考实现
-   `EverythingQueryEdit.ahk:159`（`WinSetTransparent` = LWA_ALPHA 分层）+ :76-78（每次
+   `EverythingQueryEdit.ahk:159`（`WinSetTransparent` = LWA_ALPHA 分层；收编副本见
+   `doc\reference\`，行号同旧版）+ :76-78（每次
    Show 内依次 `_RoundAll` :241-244 `CreateRoundRectRgn`+`SetWindowRgn` 与
    `FrameShadow` :252-262）正是同一机制组合，且经多轮 Δ2 活体验收。DWM 阴影钩子保留
    （分层窗上仍有效，截图证实）。
@@ -247,4 +248,4 @@ Start-Process D:\PortableApps\KeyFlux\KeyFlux.exe -WorkingDirectory D:\PortableA
 - 行为规格（R1-R37，24 must）：`D:\PortableApps\cmdinput-re\spec.md`
 - 设计三案与评审矩阵：`design-A.md` / `design-B.md` / `design-C.md` / `matrix.md`（v2，含反方攻击复裁）
 - 逆向中间产物：`wndproc.md`、`imports.txt`、`strings.txt` 等（`cmdinput-re/`）
-- 参考实现：`data\plugins\everything_search\src\EverythingQueryEdit.ahk`
+- 参考实现：`doc\reference\EverythingQueryEdit.ahk`（收编快照，见该目录 README）
