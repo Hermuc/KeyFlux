@@ -57,6 +57,25 @@ pub const APP_RESULTS_CLEAR: u32 = 0x0408;
 /// wParam = 1 基行号 (0 = 无), lParam = 1 点选 (打开) / 2 高亮变化 (悬停/滚轮)。
 pub const APP_RESULTS_NOTIFY: u32 = 0x0409;
 
+// ---- 2026-10-04 搜索徽标协议 (查询区右侧固定图标; 插件提供, 命令框只认字形编号) ----
+//
+// 解耦口径: 命令框不知道任何插件 —— 它只知道「徽标 = 一个编号的矢量字形」。
+// 插件 (everything_search) 在搜索模式激活时发 0x40A, 会话收尾发 0x40B; 命令框侧
+// 另有兜底: 徽标随会话存在 (0x401/0x402/0x403 一律清除, 同结果列表的「活不过一次
+// 会话」), 即使插件漏发隐藏消息也不会残留。
+/// 0x40A = 显示徽标: wParam = 字形编号 (`badge::GLYPH_*`; 未注册编号忽略)。
+pub const APP_BADGE_SHOW: u32 = 0x040A;
+/// 0x40B = 隐藏徽标 (wParam/lParam 忽略)。
+pub const APP_BADGE_HIDE: u32 = 0x040B;
+
+// ---- 搜索徽标几何 (DIP; 与皮肤 18 键解耦, 同 LIST_* 口径) ----
+/// 字形盒边长 (DIP): @125% = 25px (对照参照图中的放大镜占位)。
+pub const BADGE_SIZE_DIP: f64 = 20.0;
+/// 字形盒右缘距白框右缘的距离 (DIP): @125% = 20px。
+pub const BADGE_MARGIN_DIP: f64 = 16.0;
+/// 描边宽 (DIP): @125% = 2px (与查询区 1px 网格线区分层, 与列表 3px 强调条之间)。
+pub const BADGE_STROKE_DIP: f64 = 1.6;
+
 // ---- 结果列表面板几何 (DIP; 与皮肤 18 键解耦 —— 皮肤文件由生成端产出,
 //      新增列表键会牵动生成器与 parity 基线, 故 v1 走内建常数) ----
 /// 结果行高 (DIP)。

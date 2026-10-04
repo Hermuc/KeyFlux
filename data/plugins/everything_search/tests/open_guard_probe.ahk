@@ -254,6 +254,17 @@ class HostRecorder {
         HostRecorder.Calls.Push(["ClearResults"])
         return true
     }
+    ; ---- 搜索徽标端口 (0x40A/0x40B) ----
+    ; 只记录调用: 真实实现发 SendMessageTimeoutW 到命令框窗口; 探针不建窗口。
+    ; 记录用于「搜索模式开/关与徽标状态同步」断言 (组 16)。
+    static ShowBadge() {
+        HostRecorder.Calls.Push(["ShowBadge"])
+        return true
+    }
+    static HideBadge() {
+        HostRecorder.Calls.Push(["HideBadge"])
+        return true
+    }
     /** 最近一次指定端口调用的记录数组 (无 = 空数组; 元素 [0]=名字 [1..]=参数)。 */
     static LastArgs(name) {
         i := HostRecorder.Calls.Length
@@ -706,6 +717,27 @@ okH := IsObject(bufH) && bufH.Size = 19 && NumGet(bufH, 4, "Int") = -1 && NumGet
 Verify(okH,
     "15h 0x406 载荷: 中文按 UTF-8 (3 字节/字) 编码, len = 字节数; index 0 → selected -1 (无高亮)",
     "实际 size=" (IsObject(bufH) ? bufH.Size : "非 Buffer") " selected=" (IsObject(bufH) ? NumGet(bufH, 4, "Int") : "n/a"))
+
+; --- 断言 16: 搜索徽标与搜索模式同生命周期 (2026-10-04 新增: 0x40A/0x40B) ---
+;     16a 触发 (进入搜索模式) => ShowBadge 恰 1 次 (查询区右侧放大镜 = 搜索模式可视标识);
+;     16b 会话 Close => HideBadge 恰 1 次;
+;     16c Close 幂等: 重复收尾不重复发 0x40B (命令框侧对 0x401/0x402/0x403 另有
+;         「徽标活不过一次会话」兜底, 由 command-input/src/protocol.rs 单测锁定)。
+ResetObservers()
+s19 := EverythingSession(0)
+r22 := s19.OnChar(StubInputHook(), " ", "probe")     ; 触发 = 进入搜索模式
+Verify(r22 = true && HostRecorder.Count("ShowBadge") = 1,
+    "16a 进入搜索模式: 徽标显示经端口 (0x40A) 恰 1 次",
+    "实际 r=" r22 " ShowBadge=" HostRecorder.Count("ShowBadge"))
+ResetObservers()
+s19.Close()
+Verify(HostRecorder.Count("HideBadge") = 1,
+    "16b 会话收尾: 徽标隐藏经端口 (0x40B) 恰 1 次",
+    "实际 HideBadge=" HostRecorder.Count("HideBadge"))
+s19.Close()
+Verify(HostRecorder.Count("HideBadge") = 1,
+    "16c Close 幂等: 重复收尾不重复发 0x40B (closed 短路)",
+    "实际 HideBadge=" HostRecorder.Count("HideBadge"))
 
 ; ============================================================
 ; 汇总

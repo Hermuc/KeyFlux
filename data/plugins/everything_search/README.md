@@ -120,6 +120,8 @@ everything.exe -startup
 | `0x407` | 引擎 → 命令框 | `wParam` = 0 基下标（`-1` = 无高亮）。单向，命令框**不回推**（防回声环） |
 | `0x408` | 引擎 → 命令框 | 收起列表（窗口回落基准高） |
 | `0x409` | 命令框 → 引擎 | `wParam` = 1 基行号；`lParam` = `1` 点选（打开） / `2` 高亮变化（悬停/滚轮） |
+| `0x40A` | 引擎 → 命令框 | **显示搜索徽标**：`wParam` = 字形编号（`1` = 放大镜，与 `command-input/src/badge.rs` 注册表同值）。查询区右侧固定图标，位置锚定查询区（列表展开不影响）。搜索模式激活时发送 |
+| `0x40B` | 引擎 → 命令框 | **隐藏搜索徽标**。会话收尾（`Close`）时发送；命令框侧对 0x401/0x402/0x403 另有「徽标活不过一次会话」兜底清除 |
 
 - 载荷编解码的**单一真源** = `command-input/src/results.rs::encode_payload` / `decode_payload`
   （Rust 单测锁定格式）；AHK 侧镜像 = `EverythingHost.BuildResultsPayload`，探针第 15 组
@@ -151,7 +153,7 @@ everything.exe -startup
 | `src/EverythingSettings.ahk` | 设置读取与归一（不做 IO） |
 | `src/EverythingProviders.ahk` | 查询通道抽象：`es-cli`（首选）/ `gui-launch`（降级） |
 | `src/EverythingSearch.ahk` | 编排：拉起 Everything + 选通道 + 失败重试 |
-| `src/EverythingHost.ahk` | 引擎依赖的**唯一端口**（引擎 API 演进只改此文件；结果推送 0x406/0x407/0x408 也在这里） |
+| `src/EverythingHost.ahk` | 引擎依赖的**唯一端口**（引擎 API 演进只改此文件；结果推送 0x406/0x407/0x408 与搜索徽标 0x40A/0x40B 也在这里） |
 | `src/EverythingResults.ahk` | 结果列表**视图端口**：只把行文本推给命令框（渲染/几何在命令框内），并接收 0x409 回推 |
 | `src/EverythingSession.ahk` | 命令框会话状态机 + 控制器（`CommandInputHooks` provider） |
 | `tests/open_guard_probe.ahk` | 守卫链 + 结果推送契约回归探针（51 项；stub 引擎端口，不建窗口） |

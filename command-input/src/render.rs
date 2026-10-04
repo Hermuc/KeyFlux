@@ -31,6 +31,8 @@ pub struct FrameState<'a> {
     pub base_height_px: i32,
     /// 结果列表面板状态 (2026-10-04: 命令框向下延伸的列表)
     pub results: &'a ResultsState,
+    /// 搜索徽标 (2026-10-04): Some(字形编号) = 查询区右侧绘制; None = 不绘制
+    pub badge: Option<u32>,
 }
 
 /// 后端错误 (R29: 壳弹原版格式错误框并立即终止, 不静默带病运行)。

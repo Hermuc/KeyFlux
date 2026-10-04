@@ -20,6 +20,10 @@
 //! 结果列表面板 (2026-10-04, 用户需求「列表是命令框本体的向下延伸」): 列表状态随会话
 //!   存在 (与文本同生命周期): 0x401 显示时清、0x402/0x403 隐藏时清 —— 插件无需额外
 //!   收尾消息, 框自己保证「列表活不过一次会话」。
+//!
+//! 搜索徽标 (2026-10-04, 用户需求「查询区右侧固定图标, 由插件提供并渲染」): 同一口径 ——
+//!   `badge` 随会话存在 (0x401/0x402/0x403 一律清除), 插件只在搜索模式激活/收尾时发
+//!   0x40A/0x40B; 命令框只认字形编号 (`crate::badge`), 不知道任何插件。
 
 use crate::results::ResultsState;
 use crate::sound::SoundKey;
@@ -44,6 +48,10 @@ pub enum AppEvent {
     SetSelection(i32),
     /// 0x408: 收起结果列表
     ClearResults,
+    /// 0x40A: 显示搜索徽标 (字形编号; 未注册编号被忽略 —— 对端错误不得带崩框)
+    ShowBadge(u32),
+    /// 0x40B: 隐藏搜索徽标
+    HideBadge,
     /// WM_DESTROY (R18)
     Destroy,
 }
@@ -69,17 +77,19 @@ pub enum Command {
     Quit,
 }
 
-/// 会话状态 (R22): 文本 + 可见性 + 淡出时长 (构造期自皮肤注入一次, R26) + 结果列表。
+/// 会话状态 (R22): 文本 + 可见性 + 淡出时长 (构造期自皮肤注入一次, R26) + 结果列表 + 徽标。
 pub struct AppState {
     pub text: TextBuf,
     pub visible: bool,
     pub fade_duration_secs: f64,
     /// 结果列表面板状态 (2026-10-04)
     pub results: ResultsState,
+    /// 搜索徽标 (2026-10-04): Some(字形编号) = 显示; 随会话存在 (0x401/0x402/0x403 清除)
+    pub badge: Option<u32>,
 }
 
 impl AppState {
-    /// R22: 启动态 = 空串、隐藏、无结果列表。
+    /// R22: 启动态 = 空串、隐藏、无结果列表、无徽标。
     /// 可视行数上限先取兜底值, WM_CREATE 拿到屏幕尺寸后经
     /// `results.set_visible_max` 收敛 (见 win::wndproc::on_create)。
     pub fn new(fade_duration_secs: f64) -> Self {
@@ -88,6 +98,7 @@ impl AppState {
             visible: false,
             fade_duration_secs,
             results: ResultsState::new(crate::config::LIST_MAX_ROWS),
+            badge: None,
         }
     }
 }
@@ -98,8 +109,9 @@ pub fn on_event(ev: AppEvent, st: &mut AppState) -> Vec<Command> {
         AppEvent::ShowClear => {
             // R14: ②无条件清空 (幂等, 每次都清空重显); wArg/lParam 语义不存在, 壳已忽略。
             st.text.clear();
-            // 新会话不该继承上一会话的结果列表 (框自己保证「列表活不过一次会话」)
+            // 新会话不该继承上一会话的结果列表与徽标 (框自己保证「活不过一次会话」)
             st.results.clear();
+            st.badge = None;
             st.visible = true;
             vec![
                 Command::PlaySound(SoundKey::Show), // R14① (清空前播放, R24)
@@ -151,10 +163,29 @@ pub fn on_event(ev: AppEvent, st: &mut AppState) -> Vec<Command> {
                 vec![]
             }
         }
+        AppEvent::ShowBadge(glyph) => {
+            // 未注册字形 = 对端错误 → 忽略 (不崩、不重绘); 同值重复 → 幂等零指令
+            if !crate::badge::is_known(glyph) || st.badge == Some(glyph) {
+                vec![]
+            } else {
+                st.badge = Some(glyph);
+                // 徽标不改窗口几何 (锚定查询区) ⇒ 只重绘, 无 Relayout
+                vec![Command::Redraw { pre_show: false }]
+            }
+        }
+        AppEvent::HideBadge => {
+            // 幂等: 无徽标时零指令
+            if st.badge.take().is_some() {
+                vec![Command::Redraw { pre_show: false }]
+            } else {
+                vec![]
+            }
+        }
         AppEvent::HideFade => {
             // R15: 只隐藏, 不清文本, 无音效; 时长 = 皮肤 hideAnimationDuration (附录 C #2)
             st.visible = false;
             st.results.clear();
+            st.badge = None;
             vec![
                 Command::BeginFade {
                     duration_secs: st.fade_duration_secs,
@@ -167,6 +198,7 @@ pub fn on_event(ev: AppEvent, st: &mut AppState) -> Vec<Command> {
             // R16: cancel 音效 → 立即隐藏, 无动画, 不清文本
             st.visible = false;
             st.results.clear();
+            st.badge = None;
             vec![
                 Command::PlaySound(SoundKey::Cancel),
                 Command::HideWindow,
@@ -424,6 +456,62 @@ mod tests {
     fn select_without_results_is_noop() {
         let mut st = state();
         assert_eq!(on_event(AppEvent::SetSelection(3), &mut st), vec![]);
+    }
+
+    // ---- 2026-10-04 搜索徽标 (0x40A/0x40B) ----
+
+    /// 0x40A: 显示 → 重绘 (无 Relayout —— 锚定查询区, 不改几何); 同值幂等零指令。
+    #[test]
+    fn show_badge_semantics() {
+        let mut st = state();
+        let cmds = on_event(AppEvent::ShowBadge(crate::badge::GLYPH_MAGNIFIER), &mut st);
+        assert_eq!(cmds, vec![Command::Redraw { pre_show: false }]);
+        assert_eq!(st.badge, Some(crate::badge::GLYPH_MAGNIFIER));
+        // 同值重复 = 幂等
+        assert_eq!(
+            on_event(AppEvent::ShowBadge(crate::badge::GLYPH_MAGNIFIER), &mut st),
+            vec![]
+        );
+    }
+
+    /// 0x40A 未注册字形 = 对端错误 → 忽略 (零指令、状态不变 —— 不带崩命令框)。
+    #[test]
+    fn show_badge_unknown_glyph_ignored() {
+        let mut st = state();
+        assert_eq!(on_event(AppEvent::ShowBadge(0), &mut st), vec![]);
+        assert_eq!(on_event(AppEvent::ShowBadge(999), &mut st), vec![]);
+        assert_eq!(st.badge, None);
+    }
+
+    /// 0x40B: 有徽标才重绘; 幂等 (无徽标零指令)。
+    #[test]
+    fn hide_badge_is_idempotent() {
+        let mut st = state();
+        assert_eq!(on_event(AppEvent::HideBadge, &mut st), vec![]);
+        on_event(AppEvent::ShowBadge(crate::badge::GLYPH_MAGNIFIER), &mut st);
+        assert_eq!(
+            on_event(AppEvent::HideBadge, &mut st),
+            vec![Command::Redraw { pre_show: false }]
+        );
+        assert_eq!(st.badge, None);
+        assert_eq!(on_event(AppEvent::HideBadge, &mut st), vec![]);
+    }
+
+    /// 徽标随会话存在 (与结果列表同口径): 0x401 显示 / 0x402·0x403 隐藏一律清除 ——
+    /// 即使插件漏发 0x40B 也不残留 (命令框侧兜底, 框自己保证「活不过一次会话」)。
+    #[test]
+    fn badge_never_survives_a_session() {
+        for ev in [
+            AppEvent::ShowClear,
+            AppEvent::HideFade,
+            AppEvent::CancelHide,
+        ] {
+            let mut st = state();
+            on_event(AppEvent::ShowBadge(crate::badge::GLYPH_MAGNIFIER), &mut st);
+            assert!(st.badge.is_some());
+            on_event(ev.clone(), &mut st);
+            assert_eq!(st.badge, None, "{ev:?} 必须清徽标");
+        }
     }
 
     /// R18: Destroy → Quit。

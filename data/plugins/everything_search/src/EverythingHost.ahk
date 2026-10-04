@@ -38,6 +38,9 @@ class EverythingHost {
   static MSG_SET_RESULTS := 0x004A      ; = WM_COPYDATA (dwData 区分归属)
   static MSG_SET_SELECTION := 0x0407    ; 只移动高亮 (wParam = 0 基下标; -1 = 无)
   static MSG_CLEAR_RESULTS := 0x0408    ; 收起列表 (窗口回落基准高度)
+  static MSG_BADGE_SHOW := 0x040A       ; 显示搜索徽标 (wParam = 字形编号)
+  static MSG_BADGE_HIDE := 0x040B       ; 隐藏搜索徽标
+  static BADGE_MAGNIFIER := 1           ; 放大镜字形 (与 command-input/src/badge.rs 注册表同值)
   static PAYLOAD_MAGIC := 0x3152464B    ; 'K','F','R','1' 的小端 u32
   static MAX_PAYLOAD_BYTES := 4194304   ; 4MiB (与 command-input 的 MAX_PAYLOAD_BYTES 同值)
   static NO_SELECTION := -1             ; 载荷/0x407 的「无高亮」(与 command-input results.rs 同值)
@@ -98,6 +101,40 @@ class EverythingHost {
       return false
     r := 0
     try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", EverythingHost.MSG_CLEAR_RESULTS
+        , "ptr", 0, "ptr", 0, "uint", 0x0008, "uint", 300, "ptr*", &r := 0)
+    return true
+  }
+
+  /**
+   * 显示搜索徽标 (0x40A): 查询区右侧固定放大镜图标。
+   * 解耦口径: 命令框只认**字形编号** (本插件传 BADGE_MAGNIFIER), 不知道 everything_search
+   * 的存在 —— 本方法即插件侧的全部接入面, 移除插件 = 不再发送 0x40A/0x40B, 命令框零改动
+   * (徽标另有「随会话清除」兜底, 插件崩溃也不会残留图标)。
+   * @returns {Boolean} 是否已送达
+   */
+  static ShowBadge() {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.ShowBadge()
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return false
+    r := 0
+    try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", EverythingHost.MSG_BADGE_SHOW
+        , "ptr", EverythingHost.BADGE_MAGNIFIER, "ptr", 0, "uint", 0x0008, "uint", 300, "ptr*", &r := 0)
+    return true
+  }
+
+  /** 隐藏搜索徽标 (0x40B)。会话收尾 (Close) 时调用; 命令框侧对 0x401/0x402/0x403 也有兜底清除。 */
+  static HideBadge() {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.HideBadge()
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return false
+    r := 0
+    try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", EverythingHost.MSG_BADGE_HIDE
         , "ptr", 0, "ptr", 0, "uint", 0x0008, "uint", 300, "ptr*", &r := 0)
     return true
   }
