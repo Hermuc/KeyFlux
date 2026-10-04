@@ -595,7 +595,7 @@ impl Shell {
     }
 
     /// 缩写页命令框执行（复刻 `AbbrPageViewModel.RunCmd`）：
-    /// `del <缩写>` 删除 · `rn <新名>` 重命名当前选中 · 其余视为选中（不存在时由 `ensure_action` 惰性创建）。
+    /// `del <缩写>` 删除 · `rn <新名>` 重命名当前选中 · 其余**添加/切换**到该缩写。
     pub(super) fn run_abbr_command(&mut self) {
         let selected = self.selected_hotkey.clone().unwrap_or_default();
         let input = self.cmd_text.clone();
@@ -617,7 +617,16 @@ impl Shell {
                     keymap::change_hotkey(keymap, &from, &to);
                 });
             }
-            abbr::AbbrCommand::Select { .. } => {}
+            abbr::AbbrCommand::Select { hotkey } => {
+                // 卡片文案「输入 ab 按回车添加/切换到 ab」：目标键**不存在时立即新增**条目
+                // （旧版只设选中、条目延后到编辑动作才惰性创建 ⇒ 与文案不符，按文案修正）。
+                let group = self.window_group_id;
+                if let Some(keymap_id) = self.current_keymap_id()
+                    && let Some(config) = self.config.as_mut()
+                {
+                    let _ = keymap::ensure_action(config, keymap_id, &hotkey, group);
+                }
+            }
         }
 
         // `del` 分支把选中置空（C# 的 `SelectedHotkey = ""`）；其余为新的目标键
