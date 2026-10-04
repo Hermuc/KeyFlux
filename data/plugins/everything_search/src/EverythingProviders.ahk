@@ -61,7 +61,8 @@ class EverythingEsProvider extends EverythingProvider {
 
   Search(query, limit) {
     out := this._OutFile()
-    cmd := '"' this.exe '" -timeout 4000 -n ' limit this._SortArgs() ' -export-txt "' out '"' this._QuerySuffix(query)
+    nArg := (limit > 0) ? " -n " limit : ""
+    cmd := '"' this.exe '" -timeout 4000' nArg this._SortArgs() ' -export-txt "' out '"' this._QuerySuffix(query)
     code := 0
     try {
       code := RunWait(cmd, , "Hide")
@@ -109,7 +110,7 @@ class EverythingEsProvider extends EverythingProvider {
       if (p = "")
         continue
       items.Push({path: p, name: this._BaseName(p), isFolder: isFolder})
-      if (items.Length >= limit)
+      if (limit > 0 && items.Length >= limit)
         break
     }
     return items

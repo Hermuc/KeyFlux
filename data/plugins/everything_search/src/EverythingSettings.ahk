@@ -62,13 +62,17 @@ class EverythingSettings {
     return Trim(StrReplace(v, '"'), " `t`r`n")
   }
 
-  /** 结果条数归一: 1-300, 非法值回落 20 (非数字输入不能让算术抛异常)。 */
+  /**
+   * 结果条数归一 (2026-10-04 用户定版: 无上限):
+   *   - 空 / 非数字 → 0 = 不限制 (es.exe 去掉 -n 参数);
+   *   - 数字 → 至少 1 (防 0/负值让 es 输出异常)。
+   */
   static NormLimit(v) {
     if (v = "" || !IsNumber(v))
-      return 20
+      return 0
     n := Integer(v)
-    if (n < 1 || n > 300)
-      return 20
+    if (n < 1)
+      return 0
     return n
   }
 }

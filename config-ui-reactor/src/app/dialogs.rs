@@ -65,8 +65,8 @@ impl Shell {
             .on_closed(context.callback(|result: ContentDialogResult| Message::PsClosed(result)))
             .content(
                 ScrollViewer::new()
-                    .max_height(430.0)
-                    .min_width(480.0)
+                    .max_height(720.0)
+                    .min_width(560.0)
                     .content(StackPanel::new().spacing(0.0).keyed_children(rows)),
             )
     }
