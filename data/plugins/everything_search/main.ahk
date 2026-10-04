@@ -47,16 +47,11 @@
 #Include src/EverythingResults.ahk
 #Include src/EverythingSession.ahk
 
-; 控制器引用 (调试/后续扩展用; 保持全局避免被 GC 回收)
-global __everythingSearchController := 0
-
 /**
  * 插件入口 (manifest entry.func)。
  * @param api 按 permissions 裁剪的 API 视图 (selection / run / settings)
  */
 EverythingSearchMain(api) {
-  global __everythingSearchController
-
   EverythingSettings.Load(api)
 
   ctrl := EverythingController(api)
@@ -66,5 +61,6 @@ EverythingSearchMain(api) {
   }
   ; 命令框鼠标交互 (点选/悬停) 回推通道: 只在安装时注册一次, 重载插件仅换目标 (见 InstallNotify)
   EverythingResults.InstallNotify(ctrl)
-  __everythingSearchController := ctrl
+  ; 存活性: CommandInputHooks.Providers (静态数组) 与 EverythingResults._target (静态类变量)
+  ; 已持有 ctrl 引用, 无需额外全局 (曾有的 __everythingSearchController 只写不读, 2026-10-04 移除)
 }
