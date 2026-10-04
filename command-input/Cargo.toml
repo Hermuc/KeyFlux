@@ -1,0 +1,33 @@
+[package]
+name = "cmdinput"
+version = "1.0.0"
+edition = "2021"
+description = "KeyFlux-CommandInput: KeyFlux command input window (class MyKeymap_Command_Input) rewritten in Rust. Drop-in replacement when deployed as KeyFlux-CommandInput.exe."
+
+[lib]
+name = "cmdinput"
+path = "src/lib.rs"
+
+[[bin]]
+name = "keyflux-command-input"
+path = "src/main.rs"
+
+[dependencies]
+# windows crate (design-C §3): 唯一第三方依赖; 0.62.2 为本机缓存实测可用版本。
+windows = { version = "=0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Media_Audio",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    "Win32_UI_Controls",
+    "Win32_UI_HiDpi",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+strip = true
+lto = true
