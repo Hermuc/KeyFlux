@@ -1,0 +1,14 @@
+[package]
+name = "kf-reactor-poc"
+version = "0.0.0"
+edition = "2024"          # 与官方 reactor 样例一致（rustc 1.98 支持）
+publish = false
+
+[dependencies]
+windows-reactor = "0.100"
+
+[build-dependencies]
+windows-reactor-setup = "0.100"   # 自包含部署：把 Windows App Runtime 落到 profile 输出目录
+
+[profile.dev]
+# 保持默认
