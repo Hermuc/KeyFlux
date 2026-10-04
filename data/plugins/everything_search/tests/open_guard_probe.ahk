@@ -249,6 +249,9 @@ class HostRecorder {
     static BoxActivateForSearch() {
         HostRecorder.Calls.Push(["BoxActivateForSearch"])
     }
+    static BoxForeground() {
+        HostRecorder.Calls.Push(["BoxForeground"])
+    }
     static BoxGetText() {
         HostRecorder.Calls.Push(["BoxGetText"])
         return EverythingQueryEdit.SimText

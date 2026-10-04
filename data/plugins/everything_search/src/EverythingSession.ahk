@@ -165,6 +165,7 @@ class EverythingSession {
       ;   透传 (UnlockForSearch) 仍必须: 物理键经 InputHook V 透传到达焦点窗口 (命令框)。
       EverythingHost.UnlockForSearch(ih)
       EverythingHost.BoxActivateForSearch()
+      EverythingHost.BoxForeground()
       this.SeedFromSelection()
       SetTimer(ObjBindMethod(this, "_SyncQuery"), EverythingSession.QUERY_SYNC_MS)
       this.Refresh()
