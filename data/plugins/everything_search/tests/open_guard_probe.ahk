@@ -112,30 +112,13 @@ class EverythingGuiProvider {
 }
 
 /**
- * 查询输入面 stub (真源 src/EverythingQueryEdit.ahk 未 #Include): 记录 Show/Hide/Focus
- * 次数; SimText 模拟「用户在 Edit 里的输入」(含 IME 上屏), 供轮询同步断言。
+ * 命令框文本模拟 (历史名 EverythingQueryEdit: 真源查询输入面已随 840ffe6 架构反转删除,
+ * 本类剩余角色 = 「命令框缓冲里的文本」)。SimText 模拟用户在框内的输入 (含 IME 上屏),
+ * 由 HostRecorder.BoxGetText 读回 / SetSimText 写入 —— 供轮询同步断言。
+ * (旧版还有 Show/Hide/Focus 计数器与 SetText/GetText, 随输入面退役于 2026-10-04 移除。)
  */
 class EverythingQueryEdit {
-    static ShowCount := 0
-    static HideCount := 0
-    static FocusCount := 0
     static SimText := ""
-    static Show(rect, initial := "") {
-        EverythingQueryEdit.ShowCount += 1
-        EverythingQueryEdit.SimText := initial
-    }
-    static Hide() {
-        EverythingQueryEdit.HideCount += 1
-    }
-    static Focus() {
-        EverythingQueryEdit.FocusCount += 1
-    }
-    static SetText(t) {
-        EverythingQueryEdit.SimText := t
-    }
-    static GetText() {
-        return EverythingQueryEdit.SimText
-    }
 }
 
 ; 错误码常量 (真源 src/EverythingProviders.ahk 顶部; 探针未包含该文件,
@@ -380,9 +363,6 @@ ResetObservers() {
     StubInputHook.StopCount := 0
     EverythingSearch.RunCount := 0
     EverythingQueryEdit.SimText := ""
-    EverythingQueryEdit.ShowCount := 0
-    EverythingQueryEdit.HideCount := 0
-    EverythingQueryEdit.FocusCount := 0
 }
 
 ; ============================================================
