@@ -4,9 +4,11 @@
 //!   WM_CREATE / 0x401 / 0x402 / 0x403 / WM_CHAR / WM_PAINT / WM_DESTROY
 //!   (+ WM_NCCREATE 锚点写入, 内部细节无消息契约, R3 注)。
 //!
-//! ⚠ R19 阴性面 (must): 其余**一切**消息 (含 WM_CLOSE / WM_GETTEXT / WM_SETTEXT /
-//!   WM_KEYDOWN / WM_IME_* / WM_DPICHANGED / WM_SIZE / WM_ERASEBKGND …) 一律
-//!   `DefWindowProcW`, 禁止扩充分派表 —— 特别是:
+//! ⚠ R19 阴性面 (原版契约): 原版对 WM_GETTEXT / WM_SETTEXT / WM_IME_* 等一律
+//!   `DefWindowProcW` (文本只写)。2026-10-04 Rust 版**有意扩展**: WM_GETTEXT(_LENGTH)
+//!   = 读回通道 / WM_IME_START·END = 组合态标志 / 0x404·0x405 = 搜索激活与查询 ——
+//!   其余消息 (含 WM_CLOSE / WM_SETTEXT / WM_KEYDOWN / WM_DPICHANGED …) 仍一律
+//!   `DefWindowProcW`, 特别是:
 //!   - **WM_CLOSE 故意不在分派表** → DefWindowProc 默认销毁 → WM_DESTROY (R18 链);
 //!   - WM_GETTEXT 默认只返回标题 " " (文本只写, R19);
 //!   - WM_SETTEXT 走默认标题通道, 绝不触碰文本缓冲 (R19 活体铁证语义);
@@ -14,10 +16,13 @@
 
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::InvalidateRect;
+use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
-    DefWindowProcW, GetSystemMetrics, GetWindowLongPtrW, PostQuitMessage, SetWindowLongPtrW,
-    SetWindowPos, ShowWindow, GWLP_USERDATA, HWND_TOPMOST, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE,
-    WM_CREATE, WM_DESTROY, WM_NCCREATE, WM_PAINT, CREATESTRUCTW,
+    DefWindowProcW, GetSystemMetrics, GetWindowLongPtrW, PostQuitMessage,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow, GWLP_USERDATA,
+    WINDOW_LONG_PTR_INDEX,
+    HWND_TOPMOST, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE, WM_CREATE, WM_DESTROY, WM_NCCREATE,
+    WM_PAINT, CREATESTRUCTW,
 };
 
 use crate::config;
@@ -45,6 +50,8 @@ pub struct Shell {
     pub sound: Box<dyn SoundBackend>,
     /// 渲染设备是否已初始化 (R23 懒创建: 首个 WM_PAINT / 0x401 预绘)
     pub inited: bool,
+    /// IME 组合态 (2026-10-04 扩展: WM_IME_START/END 维护; 0x404 查询; 回车语义判定)
+    pub composing: bool,
 }
 
 impl Shell {
@@ -242,6 +249,48 @@ pub(crate) unsafe extern "system" fn wndproc(
             let cmds = on_event(AppEvent::Char(ch), &mut shell.state);
             execute(shell, hwnd, cmds);
             LRESULT(0)
+        }
+
+        // ---- 2026-10-04 协议扩展 (Rust 版自有; 中文检索读回/激活/组合态) ----
+        config::APP_SEARCH_ACTIVATE => {
+            // 摘除 NOACTIVATE + 前台 + 焦点: IME 组合窗跟随本窗口,
+            // 上屏中文经 WM_CHAR 进入文本缓冲 (引擎轮询 WM_GETTEXT 读回)
+            unsafe {
+                let ex = GetWindowLongPtrW(hwnd, WINDOW_LONG_PTR_INDEX(config::GWL_EXSTYLE_IDX)) as u32;
+                let _ = SetWindowLongPtrW(
+                    hwnd,
+                    WINDOW_LONG_PTR_INDEX(config::GWL_EXSTYLE_IDX),
+                    (ex & !config::WS_EX_NOACTIVATE) as isize,
+                );
+                let _ = SetForegroundWindow(hwnd);
+                let _ = SetFocus(Some(hwnd));
+            }
+            LRESULT(0)
+        }
+        config::APP_SEARCH_STATE => LRESULT(shell.composing as isize),
+        config::WM_GETTEXT_VAL => {
+            // 读回通道: 文本缓冲按 UTF-16 写入调用方缓冲 (系统跨进程编组),
+            // 返回拷贝码元数 (不含 NUL); wParam = 容量, lParam = 缓冲
+            let cap = wparam.0 as usize;
+            let units = shell.state.text.units();
+            let n = units.len().min(cap.saturating_sub(1));
+            if n > 0 {
+                let dst = lparam.0 as *mut u16;
+                for (i, u) in units.iter().take(n).enumerate() {
+                    unsafe { *dst.add(i) = *u };
+                }
+                unsafe { *dst.add(n) = 0 };
+            }
+            LRESULT(n as isize)
+        }
+        config::WM_GETTEXTLENGTH_VAL => LRESULT(shell.state.text.len() as isize),
+        config::WM_IME_START => {
+            shell.composing = true;
+            DefWindowProcW(hwnd, msg, wparam, lparam) // IME UI 交默认流程
+        }
+        config::WM_IME_END => {
+            shell.composing = false;
+            DefWindowProcW(hwnd, msg, wparam, lparam)
         }
 
         WM_PAINT => match on_paint(shell, hwnd) {

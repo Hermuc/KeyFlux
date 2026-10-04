@@ -19,12 +19,11 @@
 ;   src/EverythingDropdown.ahk   浮层: 不激活 ListView, 锚定命令框下方
 ;   src/EverythingSession.ahk    命令框会话状态机 + 控制器 (CommandInputHooks provider)
 ;
-;   🔴 中文检索口径 (2026-10-03 Flow 式定版): 搜索模式由 EverythingQueryEdit 在命令框
-;      位置覆盖一个真实 Edit 控件承载输入 (命令框隐藏) —— IME 组合/上屏/退格原生发生
-;      在控件里, 检索词 = 控件文本轮询直读, 显示与检索词天然一致。
-;      (此前两条路线均被实测否决: 透传+上屏捕获 —— IME 组合吞掉首字母后全部按键、
-;      上屏中文不经 InputHook、24H2 禁跨进程 AttachThreadInput; 锁英+拼音 —— 用户要求
-;      必须输入中文, 拼音不够精准。)
+;   🔴 中文检索口径 (2026-10-04 定版): 搜索模式**就在命令框本体输入** —— 0x404 激活
+;      (框摘 NOACTIVATE 自取前台+焦点), IME 组合窗跟随命令框, 上屏中文经 WM_CHAR 进
+;      框内缓冲; 引擎轮询 WM_GETTEXT 读回 = 检索词 (显示与检索词天然一致)。
+;      (历史: 闭源原版无读回通道 → 覆盖式 QueryEdit 曾是过渡方案, 随命令框 Rust 化退役;
+;       透传+IMM 捕获路线被 24H2 实测否决。Everything pinyin=1 保留为拼音检索增强。)
 ;
 ; 设置 (manifest.settings, 在设置面板点插件卡编辑):
 ;   triggerKey     前置触发键 (默认空格), 在命令框里按它触发搜索
@@ -43,7 +42,6 @@
 #Include src/EverythingMessages.ahk
 #Include src/EverythingSettings.ahk
 #Include src/EverythingProviders.ahk
-#Include src/EverythingQueryEdit.ahk
 #Include src/EverythingSearch.ahk
 #Include src/EverythingDropdown.ahk
 #Include src/EverythingSession.ahk

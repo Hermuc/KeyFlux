@@ -246,6 +246,23 @@ class HostRecorder {
     static ResetAnchorCache() {
         HostRecorder.Calls.Push(["ResetAnchorCache"])
     }
+    static BoxActivateForSearch() {
+        HostRecorder.Calls.Push(["BoxActivateForSearch"])
+    }
+    static BoxGetText() {
+        HostRecorder.Calls.Push(["BoxGetText"])
+        return EverythingQueryEdit.SimText
+    }
+    static BoxSendText(text) {
+        HostRecorder.Calls.Push(["BoxSendText", text])
+    }
+    static SetSimText(t) {
+        EverythingQueryEdit.SimText := t
+    }
+    static BoxQueryComposing() {
+        HostRecorder.Calls.Push(["BoxQueryComposing"])
+        return false
+    }
     static CommandBoxAnchor() {
         HostRecorder.Calls.Push(["CommandBoxAnchor"])
         return {x: 100, y: 100, w: 841, h: 96, bottom: 196}   ; 假锚点: 让输入面/浮层几何走真实代码
@@ -529,32 +546,36 @@ Verify(r17 = true && s17.query = "" && HostRecorder.Count("EchoBackspace") = 0,
     "13b 空检索词下退格: 只消费 (Edit 原生处理), 检索词保持空",
     "实际 r=" r17 " query=" s17.query " EchoBackspace=" HostRecorder.Count("EchoBackspace"))
 
-; --- 断言 14: 查询输入面 (2026-10-03 Flow 式定版) ---
-;     14a 触发 => 隐藏命令框 + 显示输入面 + 焦点 (IME 随焦点附着);
-;     14b 用户在 Edit 里输入 (模拟 IME 上屏 "临时") => 轮询并入检索词并重查;
-;     14c OnChar 不再触碰检索词 (Edit 原生持有, 防双份处理);
-;     14d Close => 输入面 Hide 恰 1 次。
+; --- 断言 14: 搜索模式 = 命令框本体输入 (2026-10-04 定版) ---
+;     14a 触发 => UnlockForSearch + BoxActivateForSearch + BoxSendText(种子) 各 1 次;
+;         HideCommandBox 零调用 (命令框保持可见 —— 「不换框」核心契约);
+;     14b 轮询读回: BoxGetText 模拟 IME 上屏 ("临时") => query 更新 + 重查 1 次;
+;     14c OnChar 只消费 (字母不重复处理, 框内原生持有);
+;     14d Close => BoxQueryComposing 不再触发 (定时器停), Dropdown Hide 1 次。
 ResetObservers()
 s18 := EverythingSession(0)
-r18 := s18.OnChar(StubInputHook(), " ", "probe")     ; 触发
-Verify(r18 = true && EverythingQueryEdit.ShowCount = 1 && HostRecorder.Count("HideCommandBox") = 1
-    && HostRecorder.Count("UnlockForSearch") = 1 && EverythingQueryEdit.FocusCount >= 1,
-    "14a 触发: 命令框隐藏 + 输入面显示/聚焦 + 透传放开",
-    "实际 r=" r18 " Show=" EverythingQueryEdit.ShowCount " HideBox=" HostRecorder.Count("HideCommandBox")
-    . " Unlock=" HostRecorder.Count("UnlockForSearch") " Focus=" EverythingQueryEdit.FocusCount)
-EverythingQueryEdit.SimText := "临时"                  ; 模拟用户 IME 上屏
+r18 := s18.OnChar(StubInputHook(), " ", "probe")     ; 触发 (种子来自选择, 记录器返回空)
+Verify(r18 = true && HostRecorder.Count("UnlockForSearch") = 1
+    && HostRecorder.Count("BoxActivateForSearch") >= 1 && HostRecorder.Count("HideCommandBox") = 0,
+    "14a 触发: 透传放开 + 0x404 激活(≥1) + 命令框保持可见 (HideCommandBox 零调用)",
+    "实际 r=" r18 " Unlock=" HostRecorder.Count("UnlockForSearch") " Act=" HostRecorder.Count("BoxActivateForSearch") " HideBox=" HostRecorder.Count("HideCommandBox"))
+r19 := s18.OnChar(StubInputHook(), "x", "probe")     ; 激活后的普通字符
+Verify(r19 = true && s18.query = "" && HostRecorder.Count("EchoChar") = 0,
+    "14b 激活后字符: 只消费 (检索词以命令框 WM_GETTEXT 读回为准)",
+    "实际 r=" r19 " query=" s18.query " EchoChar=" HostRecorder.Count("EchoChar"))
+HostRecorder.SetSimText("临时")                       ; 模拟 IME 上屏进入框内缓冲
 s18._SyncQuery()                                      ; 生产由 SetTimer 驱动
 Verify(s18.query = "临时" && EverythingSearch.RunCount = 1,
-    "14b 输入面文本轮询并入检索词并重查",
+    "14c WM_GETTEXT 读回: 上屏文本并入检索词并重查",
     "实际 query=" s18.query " Run=" EverythingSearch.RunCount)
-r19 := s18.OnChar(StubInputHook(), "x", "probe")      ; 按键事件 (物理键实际进 Edit)
-Verify(r19 = true && s18.query = "临时" && EverythingSearch.RunCount = 1,
-    "14c OnChar 只消费不触碰检索词 (Edit 原生持有文本)",
-    "实际 r=" r19 " query=" s18.query " Run=" EverythingSearch.RunCount)
+r20 := s18.OnKey(StubInputHook(), EverythingSession.VK_RETURN, 0, "probe")
+Verify(r20 = true && HostRecorder.Count("BoxQueryComposing") >= 1,
+    "14d 回车: 组合态查询经端口 (非组合 → 打开路径)",
+    "实际 r=" r20 " Composing=" HostRecorder.Count("BoxQueryComposing"))
 s18.Close()
-Verify(EverythingQueryEdit.HideCount = 1,
-    "14d 会话 Close: 输入面 Hide 恰 1 次",
-    "实际 Hide=" EverythingQueryEdit.HideCount)
+Verify(EverythingDropdown.HideCount >= 1,
+    "14e 会话 Close: 浮层收起 (命令框由引擎隐藏路径接管)",
+    "实际 Hide=" EverythingDropdown.HideCount)
 
 ; ============================================================
 ; 汇总

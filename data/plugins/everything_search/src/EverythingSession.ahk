@@ -158,29 +158,21 @@ class EverythingSession {
       if (c != EverythingSettings.TriggerKey)
         return false
       this.active := true
-      ; 🔴 查询输入面 (2026-10-03 Flow 式定版): 中文检索要求「IME 上屏的中文 = 检索词」,
-      ;   而命令框是预编译二进制、文本无回读通道 (InputHook 拿不到组合期按键/上屏文本;
-      ;   24H2 禁跨进程 AttachThreadInput ⇒ IMM 捕获也不可用)。解法 = Flow Launcher 同款:
-      ;   搜索模式由本插件在命令框位置覆盖一个**真实 Edit 控件** (EverythingQueryEdit),
-      ;   命令框隐藏, 焦点交给 Edit ⇒ IME 组合/上屏原生发生在控件里, 检索词 = GetText()
-      ;   轮询直读 —— 显示与检索词天然一致, 零跨进程障碍。透传 (UnlockForSearch) 必须
-      ;   保留: 物理键要经 InputHook 的 V 透传到达焦点窗口 (现在的 Edit)。
+      ; 🔴 搜索模式回**命令框本体** (2026-10-04 定版): 命令框已是我们的 Rust 代码,
+      ;   0x404 让它摘除 NOACTIVATE 并自取前台+焦点 ⇒ IME 组合窗跟随命令框,
+      ;   上屏中文经 WM_CHAR 进入框内文本缓冲, 引擎轮询 WM_GETTEXT 读回 = 检索词
+      ;   (此前 QueryEdit 覆盖输入面方案退役 —— 不再"在另一个新的框里输入")。
+      ;   透传 (UnlockForSearch) 仍必须: 物理键经 InputHook V 透传到达焦点窗口 (命令框)。
       EverythingHost.UnlockForSearch(ih)
-      EverythingHost.HideCommandBox()
-      a := EverythingHost.CommandBoxAnchor()
-      if (IsObject(a)) {
-        EverythingQueryEdit.Show(a, "")
-        SetTimer(ObjBindMethod(this, "_SyncQuery"), EverythingSession.QUERY_SYNC_MS)
-      }
+      EverythingHost.BoxActivateForSearch()
       this.SeedFromSelection()
-      EverythingQueryEdit.SetText(this.query)
-      EverythingQueryEdit.Focus()
+      SetTimer(ObjBindMethod(this, "_SyncQuery"), EverythingSession.QUERY_SYNC_MS)
       this.Refresh()
-      return true     ; 消费触发键本身 (不投递到命令框)
+      return true     ; 消费触发键本身 (空间不投递到命令框)
     }
 
-    ; 已激活: 输入文本由查询输入面 (Edit) 原生持有, 检索词经 _SyncQuery 轮询同步 ——
-    ; OnChar 只负责消费 (防止引擎做缩写模糊匹配/双份回显)。
+    ; 已激活: 输入 (字母/中文上屏/退格) 由命令框原生持有, 检索词经 _SyncQuery 轮询
+    ;   WM_GETTEXT 同步 —— OnChar 只负责消费 (防止引擎做缩写模糊匹配/双份回显)。
     return true
   }
 
@@ -191,8 +183,8 @@ class EverythingSession {
       return true
 
     if (vk = EverythingSession.VK_BACK) {
-      ; 退格由查询输入面原生处理 (Edit 自删字符); 检索词经 _SyncQuery 同步 ——
-      ; 这里只消费, 不得再截断 query (会双删) / 投递退格 (命令框已隐藏)。
+      ; 退格由命令框原生处理 (透传直达, ch==8 → 框内 pop_back); 检索词经
+      ; _SyncQuery 轮询同步 —— 这里只消费, 不再截断 query / 投递退格 (会双删)。
       return true
     }
     if (vk = EverythingSession.VK_UP) {
@@ -204,6 +196,10 @@ class EverythingSession {
       return true
     }
     if (vk = EverythingSession.VK_RETURN) {
+      ; 🔴 IME 组合态判定 (0x405, 确定性非启发式): 组合中 = 该回车是「上屏提交」
+      ;   (物理键经透传直达 IME, 提交文本随后进框) —— 消费, 不打开结果。
+      if (EverythingHost.BoxQueryComposing())
+        return true
       ; 「打开一次 → 收会话」只在**成功**时收尾 (2026-09-30 收尾补丁): 旧写法无条件 Close +
       ; ih.Stop, 于是失败路径 (空/失效路径) 出的那行提示会被紧随其后的 Hide() 立刻收起 ——
       ; 用户视角是「按回车毫无反应」(OpenSelected 的守卫链见其注释)。
@@ -247,9 +243,8 @@ class EverythingSession {
       this.query := ""
     }
     this.capturing := false
-    ; 焦点还原 (返回值忽略: 激活失败只损失显示, 搜索路径不依赖焦点)
-    ; 焦点还原: 搜索模式下输入面 (Edit) 取代命令框承载焦点/IME —— 还原给它而非命令框
-    EverythingQueryEdit.Focus()
+    ; 焦点还原: 搜索模式下命令框自取前台+焦点 (0x404), 种子已在框内
+    EverythingHost.BoxActivateForSearch()
   }
 
   /** 按当前检索词刷新浮层。空词 = 初始态: **不出任何浮层** (2026-10-03 需求:
@@ -367,18 +362,17 @@ class EverythingSession {
     this.closed := true
     this.active := false
     try SetTimer(ObjBindMethod(this, "_SyncQuery"), 0)
-    EverythingQueryEdit.Hide()
     EverythingDropdown.Hide()
   }
 
-  ; ---- 查询输入面轮询 (Edit 文本 = 检索词唯一真源, 见 EverythingQueryEdit 头注释) ----
+  ; ---- 查询轮询 (命令框内文本 = 检索词唯一真源, 经 WM_GETTEXT 读回) ----
 
   _SyncQuery() {
     if (this.closed || !this.active) {
       SetTimer(ObjBindMethod(this, "_SyncQuery"), 0)
       return
     }
-    t := EverythingQueryEdit.GetText()
+    t := EverythingHost.BoxGetText()
     if (t = this.query)
       return
     this.query := t

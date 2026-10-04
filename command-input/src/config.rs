@@ -23,6 +23,24 @@ pub const APP_CANCEL: u32 = 0x0403;
 /// R7/R17: WM_CHAR = 唯一文本写入通道 (wParam 低 16 位 = 码元)。
 pub const WM_CHAR_VAL: u32 = 0x0102;
 
+// ---- 2026-10-04 协议扩展 (Rust 版自有; 引擎对接面) ----
+/// 0x404 = 搜索激活: 摘除 WS_EX_NOACTIVATE + SetForegroundWindow + SetFocus
+/// (IME 组合窗跟随本窗口, 上屏中文经 WM_CHAR 进入文本缓冲)。
+pub const APP_SEARCH_ACTIVATE: u32 = 0x0404;
+/// 0x405 = 查询 IME 组合态 (LRESULT 1 = 组合中, 0 = 否)。引擎回车语义判定用。
+pub const APP_SEARCH_STATE: u32 = 0x0405;
+/// WM_GETTEXT (0x000D) = 读回通道: 返回文本缓冲 (原版只返回标题空格)。
+pub const WM_GETTEXT_VAL: u32 = 0x000D;
+/// WM_GETTEXTLENGTH (0x000E) = 返回文本码元数。
+pub const WM_GETTEXTLENGTH_VAL: u32 = 0x000E;
+/// IME 组合消息 (焦点窗口原生收到; 只记标志, 其余交 DefWindowProc)。
+pub const WM_IME_START: u32 = 0x010D;
+pub const WM_IME_END: u32 = 0x010E;
+/// WS_EX_NOACTIVATE 位。
+pub const WS_EX_NOACTIVATE: u32 = 0x0800_0000;
+/// GWL_EXSTYLE 索引。
+pub const GWL_EXSTYLE_IDX: i32 = -20;
+
 /// R17: WM_CHAR wParam 低 16 位 == 8 → 退格。
 pub const CHAR_BACKSPACE: u16 = 8;
 /// R17/R24: WM_CHAR ch == 0x20 (空格) → spaceKey.wav; 其余 → keydown.wav。
