@@ -15,7 +15,9 @@
 //!   - 0x401/0x402/0x403 的 wParam/lParam 完全忽略 (R14/R15/R16)。
 
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::Graphics::Gdi::InvalidateRect;
+use windows::Win32::Graphics::Gdi::{
+    CreateRoundRectRgn, InvalidateRect, SetWindowRgn,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
     DefWindowProcW, GetSystemMetrics, GetWindowLongPtrW, PostQuitMessage,
@@ -253,15 +255,11 @@ pub(crate) unsafe extern "system" fn wndproc(
 
         // ---- 2026-10-04 协议扩展 (Rust 版自有; 中文检索读回/激活/组合态) ----
         config::APP_SEARCH_ACTIVATE => {
-            // 摘除 NOACTIVATE + 前台 + 焦点: IME 组合窗跟随本窗口,
-            // 上屏中文经 WM_CHAR 进入文本缓冲 (引擎轮询 WM_GETTEXT 读回)
+            // 前台 + 焦点: IME 组合窗跟随本窗口, 上屏中文经 WM_CHAR 进入文本缓冲。
+            // 🔴 不改 WS_EX_NOACTIVATE —— SetWindowLongPtrW(GWL_EXSTYLE) 会重置
+            //   SetWindowRgn 窗口区域 → 42px 透明边带瞬间全部可见 (用户报障闪现)。
+            //   MSDN: NOACTIVATE 仅阻止鼠标点击激活, 程序化 SetForegroundWindow 不受影响。
             unsafe {
-                let ex = GetWindowLongPtrW(hwnd, WINDOW_LONG_PTR_INDEX(config::GWL_EXSTYLE_IDX)) as u32;
-                let _ = SetWindowLongPtrW(
-                    hwnd,
-                    WINDOW_LONG_PTR_INDEX(config::GWL_EXSTYLE_IDX),
-                    (ex & !config::WS_EX_NOACTIVATE) as isize,
-                );
                 let _ = SetForegroundWindow(hwnd);
                 let _ = SetFocus(Some(hwnd));
             }
