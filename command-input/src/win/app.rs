@@ -7,7 +7,7 @@
 //! - 进程级阴性 (R19): 无网络 / 无注册表 / 无钩子 / 无文件日志 / 不读命令行参数 (R6)。
 
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{HINSTANCE, HMODULE};
+use windows::Win32::Foundation::{HINSTANCE, HMODULE, HWND};
 use windows::Win32::Graphics::Gdi::HBRUSH;
 use windows::Win32::System::Com::{
     CoInitializeEx, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
@@ -15,8 +15,8 @@ use windows::Win32::System::Com::{
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DispatchMessageW, GetMessageW, LoadCursorW, RegisterClassW, TranslateMessage,
-    CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, HCURSOR, HICON, IDC_ARROW, MSG, WNDCLASSW,
-    WINDOW_EX_STYLE, WS_POPUP,
+    CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, HCURSOR, HICON, IDC_ARROW, MSG, WINDOW_EX_STYLE,
+    WNDCLASSW, WS_POPUP,
 };
 
 use crate::config;
@@ -28,8 +28,8 @@ use crate::win::dpi;
 use crate::win::error;
 use crate::win::resources;
 use crate::win::single_instance;
-use crate::win::wndproc::{wndproc, Shell};
 use crate::win::wide;
+use crate::win::wndproc::{wndproc, Shell};
 
 /// 库形态入口: 阻塞消息循环直至 WM_QUIT, 返回进程退出码。
 /// 嵌入方 (未来 Rust 化的宿主) 可在任意线程调用 —— 注意: 类名 / 互斥名为全局单例
@@ -66,15 +66,22 @@ pub fn run() -> i32 {
         skin,
         dpi: (config::DIP_BASE_DPI, config::DIP_BASE_DPI), // WM_CREATE 定案 (R11/R12)
         geom: Default::default(),
+        cur_h: 0, // WM_CREATE 定案 (= geom.h; 有结果列表时 = geom.h + list_extra)
         backend: Box::new(backend),
         sound: Box::new(sound),
         inited: false,
         composing: false,
+        notify_target: HWND::default(), // 0x406 的 wParam (结果交互回推目标)
     });
 
     let hmodule: HMODULE = match unsafe { GetModuleHandleW(None) } {
         Ok(m) => m,
-        Err(e) => error::fatal(file!(), line!(), &format!("GetModuleHandleW failed: {e}"), 0),
+        Err(e) => error::fatal(
+            file!(),
+            line!(),
+            &format!("GetModuleHandleW failed: {e}"),
+            0,
+        ),
     };
 
     // ⑦ R3: RegisterClassW (非 ExW, 无小图标 —— R37 裁定图标可省略)
@@ -136,7 +143,7 @@ pub fn run() -> i32 {
     let mut msg = MSG::default();
     loop {
         let r = unsafe { GetMessageW(&mut msg, None, 0, 0) };
-        if r.as_bool() == false {
+        if !r.as_bool() {
             break;
         }
         unsafe {

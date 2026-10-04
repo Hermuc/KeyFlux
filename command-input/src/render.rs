@@ -11,6 +11,7 @@
 //! 为什么 fade_out 在 trait 上: 淡出机制与渲染载体强耦合
 //! (GDI = layered alpha 步进; DComp = UIAnimation 挂 DComp 属性)。
 
+use crate::results::ResultsState;
 use crate::skin::Skin;
 
 /// 一次绘制所需的全部状态 (壳在 WM_PAINT / 0x401 / 0x402 时构造)。
@@ -23,8 +24,12 @@ pub struct FrameState<'a> {
     pub dpi: f64,
     /// 窗口宽 (物理像素, 925 @125%)
     pub width_px: i32,
-    /// 窗口高 (物理像素, 200 @125%)
+    /// 当前窗口高 (物理像素; 有结果列表时 = 基准高 + `geometry::list_extra_px`)
     pub height_px: i32,
+    /// 基准窗口高 (无列表态, R11 创建期定案) —— 决定查询区高度与列表分隔线位置
+    pub base_height_px: i32,
+    /// 结果列表面板状态 (2026-10-04: 命令框向下延伸的列表)
+    pub results: &'a ResultsState,
 }
 
 /// 后端错误 (R29: 壳弹原版格式错误框并立即终止, 不静默带病运行)。
@@ -86,4 +91,11 @@ pub trait RenderBackend {
     /// 隐藏完成后的回调 (GDI: 把整窗 alpha 从 0 复原, 保证 R10-5「引擎直接 WinShow
     /// 亦正常显示」; DComp 可 no-op)。design A §2.10: 复原必须发生在 SW_HIDE **之后**。
     fn on_hidden(&mut self) {}
+
+    /// 窗口尺寸变化 (结果列表展开/收起): 重建形状区域 (SetWindowRgn) 与绘制裁剪区域。
+    /// 壳在 SetWindowPos 之后、重绘之前调用; 默认 no-op (无形状概念的实现无需关心)。
+    fn resize(&mut self, state: &FrameState) -> Result<(), BackendError> {
+        let _ = state;
+        Ok(())
+    }
 }

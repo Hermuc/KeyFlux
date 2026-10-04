@@ -4,7 +4,8 @@
 ; 功能: 在命令框 (CapsLock 命令框 / KeyFlux-CommandInput) 内按下「前置触发键」(默认空格) 时,
 ;   - 取当前选中文字作为检索词 (SelectionContext, 即引擎的选中文本通道);
 ;   - 调用 Everything 检索本机文件名/文件夹名包含该文字的项目 (官方命令行 es.exe);
-;   - 结果以不激活的下拉浮层展示在命令框正下方, ↑↓ 选择、回车在资源管理器中打开;
+;   - 结果由**命令框本体**向下长高展示 (同一个圆角白框: 查询区 + 分隔线 + 结果行),
+;     ↑↓ 选择、回车在资源管理器中打开, 鼠标点选/悬停同样可用;
 ;   - Everything 未运行时按配置路径**静默**拉起 (`-startup`, 后台托盘, 不弹主窗口、不抢焦点)。
 ;
 ; 分层 (每层只依赖下一层, 便于替换与测试):
@@ -16,7 +17,7 @@
 ;   src/EverythingSettings.ahk   设置读写与归一 (plugin-settings.json, 经 api.GetSetting)
 ;   src/EverythingProviders.ahk  查询通道抽象: es-cli (首选) / gui-launch (降级)
 ;   src/EverythingSearch.ahk     编排: 拉起 Everything + 通道选择 + 失败重试
-;   src/EverythingDropdown.ahk   浮层: 不激活 ListView, 锚定命令框下方
+;   src/EverythingResults.ahk    结果列表视图端口: 只把数据推给命令框 (渲染/几何在命令框内)
 ;   src/EverythingSession.ahk    命令框会话状态机 + 控制器 (CommandInputHooks provider)
 ;
 ;   🔴 中文检索口径 (2026-10-04 定版): 搜索模式**就在命令框本体输入** —— 0x404 激活
@@ -43,7 +44,7 @@
 #Include src/EverythingSettings.ahk
 #Include src/EverythingProviders.ahk
 #Include src/EverythingSearch.ahk
-#Include src/EverythingDropdown.ahk
+#Include src/EverythingResults.ahk
 #Include src/EverythingSession.ahk
 
 ; 控制器引用 (调试/后续扩展用; 保持全局避免被 GC 回收)
@@ -63,5 +64,7 @@ EverythingSearchMain(api) {
     ; 重复加载 (重载引擎时旧实例未注销) 或拦截点缺失 —— 报错交给 PluginManager 记录并隔离
     throw Error("everything_search: 命令框拦截点注册失败")
   }
+  ; 命令框鼠标交互 (点选/悬停) 回推通道: 只在安装时注册一次, 重载插件仅换目标 (见 InstallNotify)
+  EverythingResults.InstallNotify(ctrl)
   __everythingSearchController := ctrl
 }

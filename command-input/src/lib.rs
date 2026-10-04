@@ -10,6 +10,8 @@
 //!     - `geometry`  R11/R13/R28 几何公式 (截断取整; 闭环单测 925/200/497/300)
 //!     - `easing`    R15 Accelerate-Decelerate 0.5/0.5
 //!     - `protocol`  R14-R19/R22 事件分派状态机 (AppEvent → Command)
+//!     - `results`   结果列表面板模型 + 0x406 载荷编解码 (命令框向下延伸的列表状态)
+//!     - `compose`   逐像素合成数学 (白边/填充/阴影 → 预乘 RGBA)
 //!     - `sound`     R24 触发点枚举 + SoundBackend trait
 //!     - `render`    RenderBackend trait (唯一渲染缝; 零 Win32 类型)
 //!   系统粘合 (windows crate 唯一出口):
@@ -21,11 +23,13 @@
 //! 见 `D:\PortableApps\cmdinput-re\design-C.md`; §K 读回通道 (R32-R36) 本轮不实现,
 //! 扩展点 = wndproc 的 WM_NCCREATE 锚点与 textbuf 容量语义。
 
+pub mod compose;
 pub mod config;
 pub mod easing;
 pub mod geometry;
 pub mod protocol;
 pub mod render;
+pub mod results;
 pub mod skin;
 pub mod sound;
 pub mod textbuf;
@@ -34,5 +38,6 @@ pub mod win;
 pub use geometry::FrameGeom;
 pub use protocol::{on_event, AppEvent, AppState, Command};
 pub use render::{BackendError, FrameState, RenderBackend};
+pub use results::ResultsState;
 pub use skin::{Skin, DEFAULT as DEFAULT_SKIN};
 pub use textbuf::TextBuf;

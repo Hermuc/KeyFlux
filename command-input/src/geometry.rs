@@ -4,6 +4,7 @@
 //! 闭环基准 (R11): dpi=120、windowWidth=700、windowYPos=0.25、屏 1920×1200
 //! → W=925、H=200、X=497、Y=300。R12: 仅创建期调用一次, 之后用存值。
 
+use crate::compose;
 use crate::config;
 use crate::skin::Skin;
 
@@ -71,6 +72,122 @@ pub fn text_pitch_px(dpi: f64) -> i32 {
 /// 参考实现 :69 口径: 文字水平内边距 = round(白框高 × 0.14)。
 pub fn text_pad_px(frame_h: i32) -> i32 {
     (frame_h as f64 * config::TEXT_PAD_RATIO).round() as i32
+}
+
+// ---- 结果列表面板几何 (2026-10-04: 命令框向下延伸) ----
+//
+// 展开形态 = 同一个圆角白框向下长高 list_extra_px:
+//   [ 查询区 (基准内容高, 网格 + 大字 ) | 分隔线 | 结果行 × N | 底部留白 ]
+// 侧边/底部透明带 (band) 与查询区完全同构 ⇒ 轮廓从框顶直线贯通到列表底,
+// 与 Flow Launcher 的单窗长高形态一致 (不再需要第二个窗口拼轮廓)。
+
+fn dip_px(dip: f64, dpi: f64) -> i32 {
+    (dip * dpi / config::DIP_BASE_DPI).round() as i32
+}
+
+/// 结果行高像素 (@125% = 38px)。
+pub fn list_row_h_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_ROW_DIP, dpi).max(8)
+}
+
+/// 结果行字号像素 (CreateFontW 取负值; @125% = 21px)。
+pub fn list_font_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_FONT_DIP, dpi).max(8)
+}
+
+/// 查询区/结果区分隔线高像素 (@125% = 1px)。
+pub fn list_separator_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_SEPARATOR_DIP, dpi).max(1)
+}
+
+/// 列表底部留白像素 (@125% = 10px)。
+pub fn list_bottom_pad_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_BOTTOM_PAD_DIP, dpi).max(0)
+}
+
+/// 结果行文本水平内边距像素 (@125% = 20px)。
+pub fn list_text_pad_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_TEXT_PAD_DIP, dpi).max(0)
+}
+
+/// 选中行强调条宽像素 (@125% = 4px)。
+pub fn list_accent_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_ACCENT_DIP, dpi).max(1)
+}
+
+/// 滚动条宽像素 (@125% = 4px)。
+pub fn list_scrollbar_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_SCROLLBAR_DIP, dpi).max(2)
+}
+
+/// 滚动条距内缘像素 (@125% = 10px)。
+pub fn list_scrollbar_margin_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_SCROLLBAR_MARGIN_DIP, dpi).max(0)
+}
+
+/// 列表面板附加高度 (px)。`0` 行 = 无列表 = 不加高 (窗口保持基准几何, R11 不变)。
+pub fn list_extra_px(visible_rows: usize, dpi: f64) -> i32 {
+    if visible_rows == 0 {
+        return 0;
+    }
+    list_separator_px(dpi) + visible_rows as i32 * list_row_h_px(dpi) + list_bottom_pad_px(dpi)
+}
+
+/// 查询区内容底边 (窗口坐标) —— 也是列表分隔线的上沿。
+/// = 基准窗口高 − band (>0 时恒等于「白框内查询区的下边界」)。
+pub fn query_bottom_px(base_height_px: i32, dpi: f64) -> i32 {
+    (base_height_px - band_inset_px(dpi)).max(0)
+}
+
+/// 展开后屏幕能容纳的可见行数 (≥1; 兜底不越屏)。
+pub fn max_list_rows(dpi: f64, screen_h: i32, y: i32, base_height_px: i32) -> usize {
+    let row = list_row_h_px(dpi).max(1);
+    let avail = screen_h
+        - y
+        - base_height_px
+        - config::LIST_MIN_SCREEN_MARGIN_PX
+        - list_separator_px(dpi)
+        - list_bottom_pad_px(dpi);
+    if avail < row {
+        return 1;
+    }
+    ((avail / row) as usize).clamp(1, config::LIST_MAX_ROWS)
+}
+
+// ---- 逐像素合成几何 (2026-10-04: 白边 / 阴影; 见 crate::compose) ----
+
+/// 白边宽度 (**像素, 保留小数**): 3 DIP @125% = 3.75px。原版实测「3 个纯白 + 1 个
+/// 248 弱像素」正是 3.75px 的 AA 表现; 取整成 4px 会多出一列实色 (v1 的 `.round()`
+/// 口径即如此, 但 v1 根本没画边 —— 本函数是新口径的唯一来源)。
+pub fn ring_width_px(s: &Skin, dpi: f64) -> f64 {
+    s.border_width.max(0.0) * dpi / config::DIP_BASE_DPI
+}
+
+/// 圆角半径 (像素, 保留小数): 10 DIP @125% = 12.5px (原版圆角实测 dx≈11@dy0)。
+pub fn corner_radius_px(s: &Skin, dpi: f64) -> f64 {
+    s.border_radius.max(0.0) * dpi / config::DIP_BASE_DPI
+}
+
+/// 阴影高斯 σ (像素) = `windowShadowSize`(DIP) × 增益 (实测反解, 见 config 注释)。
+pub fn shadow_sigma_px(s: &Skin, dpi: f64) -> f64 {
+    s.window_shadow_size.max(0.0) * dpi / config::DIP_BASE_DPI * config::SHADOW_SIGMA_GAIN
+}
+
+/// 阴影垂直偏移 (像素; 正 = 向下)。
+pub fn shadow_dy_px(dpi: f64) -> f64 {
+    config::SHADOW_DY_DIP * dpi / config::DIP_BASE_DPI
+}
+
+/// 白框圆角矩形 (像素坐标, 供 `compose::Plan`)。
+pub fn frame_shape(s: &Skin, dpi: f64, w: i32, h: i32) -> compose::Shape {
+    let inset = band_inset_px(dpi) as f64;
+    compose::Shape {
+        l: inset,
+        t: inset,
+        r: w as f64 - inset,
+        b: h as f64 - inset,
+        radius: corner_radius_px(s, dpi),
+    }
 }
 
 #[cfg(test)]
@@ -162,5 +279,84 @@ mod tests {
     #[test]
     fn text_pad_matches_reference() {
         assert_eq!(text_pad_px(116), 16);
+    }
+
+    /// 结果列表面板 @125%: 行高 38 / 字号 21 / 分隔 1 / 底部留白 10 / 文本内边距 20。
+    #[test]
+    fn list_metrics_at_125() {
+        assert_eq!(list_row_h_px(120.0), 38); // round(30 × 1.25)
+        assert_eq!(list_font_px(120.0), 21); // round(17 × 1.25)
+        assert_eq!(list_separator_px(120.0), 1); // round(1 × 1.25)
+        assert_eq!(list_bottom_pad_px(120.0), 10); // round(8 × 1.25)
+        assert_eq!(list_text_pad_px(120.0), 20); // round(16 × 1.25)
+        assert_eq!(list_accent_px(120.0), 4); // round(3 × 1.25)
+        assert_eq!(list_scrollbar_px(120.0), 4); // round(3 × 1.25)
+                                                 // 100% 下即为 DIP 原值
+        assert_eq!(list_row_h_px(96.0), 30);
+        assert_eq!(list_font_px(96.0), 17);
+    }
+
+    /// 列表附加高度: 0 行 = 不加高 (基准几何逐字节不变); N 行 = 分隔 + N×行高 + 留白。
+    #[test]
+    fn list_extra_height() {
+        assert_eq!(list_extra_px(0, 120.0), 0);
+        assert_eq!(list_extra_px(4, 120.0), 1 + 4 * 38 + 10);
+        // 闭环: 12 行 @125% → 200 + 467 = 667 高, 底边 300+667=967 < 1200 (不越屏)
+        let base = window_rect(120.0, 120.0, 1920, 1200, &default_skin());
+        assert_eq!(list_extra_px(12, 120.0), 467);
+        assert_eq!(base.h + list_extra_px(12, 120.0), 667);
+        assert!(base.y + 667 <= 1200);
+    }
+
+    /// 查询区内容底边: base_h − band (= 116 + 42 = 158 处的白框下沿)。
+    #[test]
+    fn query_bottom_matches_frame() {
+        let base = window_rect(120.0, 120.0, 1920, 1200, &default_skin());
+        // 白框下沿 = base_h − inset = 158; 查询区内容高 = 158 − 42 = 116 ✓
+        assert_eq!(query_bottom_px(base.h, 120.0), 158);
+        assert_eq!(query_bottom_px(base.h, 120.0) - band_inset_px(120.0), 116);
+    }
+
+    /// 可见行数按屏幕收敛: 常规 1200 高屏 → 上限 12; 极矮屏 → 至少 1 行。
+    #[test]
+    fn max_rows_clamps_to_screen() {
+        let base = window_rect(120.0, 120.0, 1920, 1200, &default_skin());
+        assert_eq!(max_list_rows(120.0, 1200, base.y, base.h), 12);
+        assert_eq!(max_list_rows(120.0, 420, base.y, base.h), 1);
+    }
+
+    /// 逐像素合成几何 @125%: 白边 **3.75px** (原版实测「3 满 + 1 弱(248)」正是 3.75 的
+    /// AA 表现; 取整成 4 会多一列实色), 圆角 12.5px, 阴影 σ≈3.0px, 下移 2px。
+    /// 100% 下退回 DIP 原值 ⇒ 皮肤语义与 DPI 解耦。
+    #[test]
+    fn per_pixel_style_metrics() {
+        let s = crate::skin::DEFAULT;
+        assert!((ring_width_px(&s, 120.0) - 3.75).abs() < 1e-9);
+        assert!((ring_width_px(&s, 96.0) - 3.0).abs() < 1e-9);
+        assert!((corner_radius_px(&s, 120.0) - 12.5).abs() < 1e-9);
+        assert!((corner_radius_px(&s, 96.0) - 10.0).abs() < 1e-9);
+        // σ = windowShadowSize(3.0 DIP)×dpi/96 × SHADOW_SIGMA_GAIN(0.80) = 3.0px @125%
+        // (原版框外剖面 A/B 拟合值; 见 config::SHADOW_SIGMA_GAIN)
+        assert!((shadow_sigma_px(&s, 120.0) - 3.0).abs() < 1e-9);
+        assert!((shadow_dy_px(120.0) - 2.0).abs() < 1e-9);
+    }
+
+    /// 白框形状 = 窗口四周缩 band 的圆角矩形 (与 `content_rect_client` 同源 ⇒
+    /// 「框体可见范围」在两处必须一致); 列表展开只改底边, 圆角/顶边不动。
+    #[test]
+    fn frame_shape_matches_content_rect() {
+        let s = crate::skin::DEFAULT;
+        let g = window_rect(120.0, 120.0, 1920, 1200, &s);
+        let sh = frame_shape(&s, 120.0, g.w, g.h);
+        let (cx, cy, cw, ch) = content_rect_client(g, 120.0);
+        assert_eq!((sh.l as i32, sh.t as i32), (cx, cy));
+        assert_eq!(
+            (sh.r as i32 - sh.l as i32, sh.b as i32 - sh.t as i32),
+            (cw, ch)
+        );
+        let sh2 = frame_shape(&s, 120.0, g.w, g.h + list_extra_px(12, 120.0));
+        assert_eq!(sh2.t, sh.t, "展开只向下长高, 顶边不动");
+        assert_eq!(sh2.b - sh.b, 467.0, "底边 = +12 行附加高");
+        assert!((sh2.radius - 12.5).abs() < 1e-9, "圆角不随高度变");
     }
 }
