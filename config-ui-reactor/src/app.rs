@@ -300,7 +300,13 @@ impl Component for Shell {
                 // 回车执行：0.100.0 无键盘事件 API ⇒ 命令框用 `accepts_return(true)`，
                 // 回车插入的尾部换行即执行信号（见 `ui::abbr_view` 模块说明）。
                 if text.ends_with('\n') {
-                    self.cmd_text = text.trim_end_matches(['\n', '\r']).to_string();
+                    // 2026-10-04 修复: 多行文本(粘贴/输入法组合)在中间也含换行,
+                    // trim_end 只删尾部 => 中间换行残留在命令里。全部移除后再执行。
+                    let cleaned: String = text
+                        .chars()
+                        .filter(|&c| c != '\n' && c != '\r')
+                        .collect();
+                    self.cmd_text = cleaned.trim().to_string();
                     self.run_abbr_command();
                 } else {
                     self.cmd_text = text;
