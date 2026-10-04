@@ -256,8 +256,6 @@ mod tests {
         assert_eq!(grid_first_offset(step), 24);
         assert_eq!(grid_step_px(96.0), 20);
         // 下限 8 (参考实现 :144-145)
-        let mut s = default_skin();
-        let _ = &mut s;
         assert_eq!(grid_step_px(30.0), 8); // round(20×30/96)=6 → clamp 8
     }
 
