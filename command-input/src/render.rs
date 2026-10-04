@@ -1,6 +1,7 @@
 //! 渲染后端契约 (design C §2.3): 唯一渲染缝。core 侧零 Win32 类型 (hwnd 用 usize)。
 //!
-//! - v1 实现 = `win::backend_gdi` (GDI + 整窗 layered alpha + 色键透明带);
+//! - v1 实现 = `win::backend_gdi` (GDI 画内容色 → `UpdateLayeredWindow` 逐像素 alpha 自合成;
+//!   早期的整窗 `LWA_ALPHA` + 色键透明带已被 b9428ec/5e314dd 两轮替换);
 //! - v2 扩展点 = DComp 后端 (D3D11+D2D1+DComp+DirectWrite+UIAnimation, 原链复刻,
 //!   `ex_style_additions` 改声明 WS_EX_NOREDIRECTIONBITMAP(0x20_0000) → ex-style
 //!   0x0820_0008 与原版全等)。两端互不引用, 壳不感知差异。
@@ -88,7 +89,7 @@ pub trait RenderBackend {
     /// 返回后壳执行 ShowWindow(SW_HIDE)。
     fn fade_out(&mut self, duration_secs: f64);
 
-    /// 隐藏完成后的回调 (GDI: 把整窗 alpha 从 0 复原, 保证 R10-5「引擎直接 WinShow
+    /// 隐藏完成后的回调 (GDI: 把预乘帧缓存增益从 0 复原, 保证 R10-5「引擎直接 WinShow
     /// 亦正常显示」; DComp 可 no-op)。design A §2.10: 复原必须发生在 SW_HIDE **之后**。
     fn on_hidden(&mut self) {}
 
