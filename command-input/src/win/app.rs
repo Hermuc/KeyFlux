@@ -69,6 +69,7 @@ pub fn run() -> i32 {
         backend: Box::new(backend),
         sound: Box::new(sound),
         inited: false,
+        composing: false,
     });
 
     let hmodule: HMODULE = match unsafe { GetModuleHandleW(None) } {

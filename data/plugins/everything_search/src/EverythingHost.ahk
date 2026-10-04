@@ -82,6 +82,69 @@ class EverythingHost {
   }
 
   /**
+   * 搜索激活 (0x404): 命令框摘除 NOACTIVATE、自取前台+焦点 ⇒ IME 组合进命令框。
+   * 引擎 (提权/同用户) → 命令框: SendMessageTimeout 不受 UIPI 限制 (同完整性级别)。
+   */
+  static BoxActivateForSearch() {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.BoxActivateForSearch()
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return false
+    r := 0
+    try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", 0x0404
+        , "ptr", 0, "ptr", 0, "uint", 0x0008, "uint", 300, "ptr*", &r := 0)
+    return true
+  }
+
+  /** 读取命令框当前文本 (WM_GETTEXT, 系统跨进程编组; 含 IME 上屏中文)。 */
+  static BoxGetText() {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.BoxGetText()
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return ""
+    buf := Buffer(1024)
+    r := 0
+    try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", 0x000D
+        , "ptr", 512, "ptr", buf, "uint", 0x0008, "uint", 300, "ptr*", &r := 0)
+    return (r > 0) ? StrGet(buf, r, "UTF-16") : ""
+  }
+
+  /** 查询 IME 组合态 (0x405): 真 = 组合中 (回车是上屏提交, 引擎不得当「打开」)。 */
+  static BoxQueryComposing() {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.BoxQueryComposing()
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return false
+    r := 0
+    try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", 0x0405
+        , "ptr", 0, "ptr", 0, "uint", 0x0008, "uint", 300, "ptr*", &r := 0)
+    return (r != 0)
+  }
+
+  /** 种子文本推入命令框 (WM_CHAR 逐码元, 框原生追加+显示; 每字符播键音 = 原版行为)。 */
+  static BoxSendText(text) {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.BoxSendText()
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return false
+    len := StrLen(text)
+    Loop len {
+      u := NumGet(StrPtr(text), (A_Index - 1) * 2, "u16")   ; UTF-16 码元
+      try PostMessage(0x0102, u, 0, hwnd)
+      Sleep 10
+    }
+    return true
+  }
+
+  /**
    * 命令框**可见白框**锚点 (物理像素, 与 WinGetPos 同空间)。
    *
    * 🔴 几何为**实测常数** (2026-10-03, 图1 逐像素复测 + 2026-09-21 三次独立截图一致):
