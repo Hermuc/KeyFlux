@@ -8,6 +8,7 @@
 //!   - `error`           R29 初始化失败显式化 (原版格式弹窗 + 终止);
 //!   - `audio`           R24 winmm 音效后端;
 //!   - `backend_gdi`     v1 渲染后端 (RenderBackend 实现);
+//!   - `shell_icon`      系统文件图标提取 + 缓存 (SHGetFileInfoW; Flow 版式结果行用);
 //!   - `wndproc`         唯一 Win32→core 翻译层 (协议速查表逐行)。
 
 pub mod app;
@@ -16,6 +17,7 @@ pub mod backend_gdi;
 pub mod dpi;
 pub mod error;
 pub mod resources;
+pub mod shell_icon;
 pub mod single_instance;
 pub mod wndproc;
 

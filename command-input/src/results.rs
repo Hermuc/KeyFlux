@@ -12,11 +12,37 @@
 //! 职责边界: 本模块只做**数据与窗口**的推导 (哪些行可见 / 滚动到哪 / 载荷编解码),
 //!   像素尺寸由 `geometry` 推、绘制由 `win::backend_gdi` 做。
 
-/// 结果行展示文本 (UTF-8; 由载荷解码而来, 渲染时转 UTF-16)。
-pub type Item = String;
+/// 结果行展示数据 (2026-10-04 二版: Flow Launcher 双行版式)。
+///
+/// * `title`    = 文件名 (含后缀) —— 上行, 主文字色 (黑);
+/// * `subtitle` = 完整路径 —— 下行, 灰 (小一号); 同时是**图标提取键**
+///   (命令框按路径经 `SHGetFileInfoW` 取系统文件图标, 与 Flow Launcher 的
+///   「UI 层自提图标」同架构; 空 = 无图标无路径, 单行居中, 供提示行)。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Item {
+    pub title: String,
+    pub subtitle: String,
+}
 
-/// 0x406 载荷魔数: 字节序 = `K` `F` `R` `1` (小端 u32 存放 → 0x3152_464B)。
-pub const PAYLOAD_MAGIC: u32 = 0x3152_464B;
+impl Item {
+    pub fn new(title: impl Into<String>, subtitle: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            subtitle: subtitle.into(),
+        }
+    }
+
+    /// 单行提示 (无路径无图标, 行内垂直居中)。
+    pub fn hint(text: impl Into<String>) -> Self {
+        Self::new(text, "")
+    }
+}
+
+/// 0x406 载荷魔数: 字节序 = `K` `F` `R` `2` (小端 u32 → 0x3252_464B)。
+///
+/// 二版 (双行 + 路径图标键): 与一版 `KFR1` (单字符串/项) **不兼容** —— 魔数即版本号,
+/// 旧框收到 KFR2 一律拒收 (静默忽略), 新框收到 KFR1 同样拒收; 两端同批部署。
+pub const PAYLOAD_MAGIC: u32 = 0x3252_464B;
 
 /// 载荷头字节数 = 魔数(4) + selected(4) + count(4)。
 pub const HEADER_BYTES: usize = 12;
@@ -70,8 +96,8 @@ impl ResultsState {
         &self.items
     }
 
-    pub fn item(&self, index: usize) -> Option<&str> {
-        self.items.get(index).map(|s| s.as_str())
+    pub fn item(&self, index: usize) -> Option<&Item> {
+        self.items.get(index)
     }
 
     pub fn len(&self) -> usize {
@@ -163,20 +189,23 @@ impl ResultsState {
 ///
 /// 布局 (全小端):
 /// ```text
-///   [0..4)   魔数 'KFR1'
+///   [0..4)   魔数 'KFR2'
 ///   [4..8)   selected  i32  (-1 = 无高亮; 0 基)
 ///   [8..12)  count     u32
-///   重复 count 次: [len u32][len 字节 UTF-8]
+///   重复 count 次: [title_len u32][title UTF-8][sub_len u32][sub UTF-8]
 /// ```
 pub fn encode_payload(items: &[Item], selected: i32) -> Vec<u8> {
-    let mut out = Vec::with_capacity(HEADER_BYTES + 32 * items.len());
+    let mut out = Vec::with_capacity(HEADER_BYTES + 48 * items.len());
     out.extend_from_slice(&PAYLOAD_MAGIC.to_le_bytes());
     out.extend_from_slice(&selected.to_le_bytes());
     out.extend_from_slice(&(items.len() as u32).to_le_bytes());
     for it in items {
-        let b = it.as_bytes();
-        out.extend_from_slice(&(b.len() as u32).to_le_bytes());
-        out.extend_from_slice(b);
+        let t = it.title.as_bytes();
+        let s = it.subtitle.as_bytes();
+        out.extend_from_slice(&(t.len() as u32).to_le_bytes());
+        out.extend_from_slice(t);
+        out.extend_from_slice(&(s.len() as u32).to_le_bytes());
+        out.extend_from_slice(s);
     }
     out
 }
@@ -196,17 +225,29 @@ pub fn decode_payload(bytes: &[u8]) -> Option<(Vec<Item>, i32)> {
     let mut off = HEADER_BYTES;
     let mut items: Vec<Item> = Vec::with_capacity(count.min(1024));
     for _ in 0..count {
+        // title
         if off + 4 > bytes.len() {
             return None;
         }
-        let len = u32::from_le_bytes(bytes[off..off + 4].try_into().ok()?) as usize;
+        let tlen = u32::from_le_bytes(bytes[off..off + 4].try_into().ok()?) as usize;
         off += 4;
-        if off + len > bytes.len() {
+        if off + tlen > bytes.len() {
             return None;
         }
-        // 非法 UTF-8 用替换字符兜底 (宁可视错, 不可整表拒收)
-        items.push(String::from_utf8_lossy(&bytes[off..off + len]).into_owned());
-        off += len;
+        let title = String::from_utf8_lossy(&bytes[off..off + tlen]).into_owned();
+        off += tlen;
+        // subtitle
+        if off + 4 > bytes.len() {
+            return None;
+        }
+        let slen = u32::from_le_bytes(bytes[off..off + 4].try_into().ok()?) as usize;
+        off += 4;
+        if off + slen > bytes.len() {
+            return None;
+        }
+        let subtitle = String::from_utf8_lossy(&bytes[off..off + slen]).into_owned();
+        off += slen;
+        items.push(Item { title, subtitle });
     }
     Some((items, selected))
 }
@@ -216,22 +257,27 @@ mod tests {
     use super::*;
 
     fn items(n: usize) -> Vec<Item> {
-        (0..n).map(|i| format!("C:\\dir\\file{i}.txt")).collect()
+        (0..n)
+            .map(|i| Item::new(format!("file{i}.txt"), format!("C:\\dir\\file{i}.txt")))
+            .collect()
     }
 
     /// 载荷往返: 项集/高亮逐字节一致 (AHK 侧镜像的格式锁定)。
     #[test]
     fn payload_round_trip() {
         let src = vec![
-            "a".to_string(),
-            "C:\\中文\\路径.txt".to_string(),
-            "".to_string(),
+            Item::new("a", "C:\\a.txt"),
+            Item::new("路径.txt", "C:\\中文\\路径.txt"),
+            Item::hint(""),
         ];
         let bytes = encode_payload(&src, 1);
-        assert_eq!(&bytes[0..4], b"KFR1");
+        assert_eq!(&bytes[0..4], b"KFR2");
         assert_eq!(
             bytes.len(),
-            HEADER_BYTES + (4 + 1) + (4 + "C:\\中文\\路径.txt".len()) + 4
+            HEADER_BYTES
+                + (4 + 1 + 4 + "C:\\a.txt".len())
+                + (4 + "路径.txt".len() + 4 + "C:\\中文\\路径.txt".len())
+                + (4 + 0 + 4 + 0)
         );
         let (items, sel) = decode_payload(&bytes).expect("decode");
         assert_eq!(items, src);
@@ -248,15 +294,19 @@ mod tests {
         assert_eq!(sel, NO_SELECTION);
     }
 
-    /// 解码防御: 魔数不符 / 截断 / 长度超限 一律 None。
+    /// 解码防御: 魔数不符 (含旧版 KFR1 —— 魔数即版本号) / 截断 / 超限 一律 None。
     #[test]
     fn decode_rejects_malformed() {
         assert!(decode_payload(&[]).is_none());
         assert!(decode_payload(b"XXXX").is_none());
-        let mut bad = encode_payload(&["abc".to_string()], 0);
+        let mut bad = encode_payload(&[Item::hint("abc")], 0);
         bad[0] = b'X';
         assert!(decode_payload(&bad).is_none());
-        let good = encode_payload(&["abc".to_string()], 0);
+        // 旧版一版载荷 (单字符串布局) 必须被拒 —— KFR1 魔数不符
+        let mut old = encode_payload(&[Item::hint("abc")], 0);
+        old[3] = b'1';
+        assert!(decode_payload(&old).is_none());
+        let good = encode_payload(&[Item::hint("abc")], 0);
         assert!(decode_payload(&good[..good.len() - 1]).is_none()); // 截断
         assert!(decode_payload(&good[..8]).is_none()); // 头不全
         let huge = vec![0u8; MAX_PAYLOAD_BYTES + 1];
@@ -266,7 +316,7 @@ mod tests {
     /// 解码: count 声明大于实际数据 ⇒ None (不做部分接受)。
     #[test]
     fn decode_rejects_count_overflow() {
-        let mut b = encode_payload(&["a".to_string()], 0);
+        let mut b = encode_payload(&[Item::hint("a")], 0);
         b[8..12].copy_from_slice(&9u32.to_le_bytes());
         assert!(decode_payload(&b).is_none());
     }

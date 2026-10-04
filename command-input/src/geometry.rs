@@ -90,9 +90,24 @@ pub fn list_row_h_px(dpi: f64) -> i32 {
     dip_px(config::LIST_ROW_DIP, dpi).max(8)
 }
 
-/// 结果行字号像素 (CreateFontW 取负值; @125% = 21px)。
-pub fn list_font_px(dpi: f64) -> i32 {
-    dip_px(config::LIST_FONT_DIP, dpi).max(8)
+/// 结果行**标题**字号像素 (CreateFontW 取负值; @125% = 18px)。
+pub fn list_title_font_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_TITLE_FONT_DIP, dpi).max(8)
+}
+
+/// 结果行**副标题**字号像素 (@125% = 14px)。
+pub fn list_sub_font_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_SUB_FONT_DIP, dpi).max(6)
+}
+
+/// 结果行左侧文件图标边长像素 (@125% = 35px)。
+pub fn list_icon_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_ICON_DIP, dpi).max(8)
+}
+
+/// 图标与文本的水平间距像素 (@125% = 13px)。
+pub fn list_icon_gap_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_ICON_GAP_DIP, dpi).max(0)
 }
 
 /// 查询区/结果区分隔线高像素 (@125% = 1px)。
@@ -319,31 +334,38 @@ mod tests {
         assert_eq!(text_pad_px(116), 16);
     }
 
-    /// 结果列表面板 @125%: 行高 38 / 字号 21 / 分隔 1 / 底部留白 10 / 文本内边距 20。
+    /// 结果列表面板 @125%: 行高 58 (Flow Launcher 58px@1x) / 标题 18 / 副标题 14 /
+    /// 图标 35 / 图标间距 13 / 分隔 1 / 底部留白 10 / 文本内边距 20。
     #[test]
     fn list_metrics_at_125() {
-        assert_eq!(list_row_h_px(120.0), 38); // round(30 × 1.25)
-        assert_eq!(list_font_px(120.0), 21); // round(17 × 1.25)
+        assert_eq!(list_row_h_px(120.0), 58); // round(46 × 1.25) = 58
+        assert_eq!(list_title_font_px(120.0), 18); // round(14 × 1.25)
+        assert_eq!(list_sub_font_px(120.0), 14); // round(11 × 1.25)
+        assert_eq!(list_icon_px(120.0), 35); // round(28 × 1.25)
+        assert_eq!(list_icon_gap_px(120.0), 13); // round(10 × 1.25)
         assert_eq!(list_separator_px(120.0), 1); // round(1 × 1.25)
         assert_eq!(list_bottom_pad_px(120.0), 10); // round(8 × 1.25)
         assert_eq!(list_text_pad_px(120.0), 20); // round(16 × 1.25)
         assert_eq!(list_accent_px(120.0), 4); // round(3 × 1.25)
         assert_eq!(list_scrollbar_px(120.0), 4); // round(3 × 1.25)
                                                  // 100% 下即为 DIP 原值
-        assert_eq!(list_row_h_px(96.0), 30);
-        assert_eq!(list_font_px(96.0), 17);
+        assert_eq!(list_row_h_px(96.0), 46);
+        assert_eq!(list_title_font_px(96.0), 14);
+        assert_eq!(list_sub_font_px(96.0), 11);
+        assert_eq!(list_icon_px(96.0), 28);
     }
 
     /// 列表附加高度: 0 行 = 不加高 (基准几何逐字节不变); N 行 = 分隔 + N×行高 + 留白。
     #[test]
     fn list_extra_height() {
         assert_eq!(list_extra_px(0, 120.0), 0);
-        assert_eq!(list_extra_px(4, 120.0), 1 + 4 * 38 + 10);
-        // 闭环: 12 行 @125% → 200 + 467 = 667 高, 底边 300+667=967 < 1200 (不越屏)
+        assert_eq!(list_extra_px(4, 120.0), 1 + 4 * 58 + 10);
+        // 闭环: 11 行 (max_list_rows @1200 高屏的收敛值) @125% → 200 + 649 = 849 高,
+        // 底边 300+849=1149 < 1200 (不越屏)
         let base = window_rect(120.0, 120.0, 1920, 1200, &default_skin());
-        assert_eq!(list_extra_px(12, 120.0), 467);
-        assert_eq!(base.h + list_extra_px(12, 120.0), 667);
-        assert!(base.y + 667 <= 1200);
+        assert_eq!(list_extra_px(11, 120.0), 649);
+        assert_eq!(base.h + list_extra_px(11, 120.0), 849);
+        assert!(base.y + 849 <= 1200);
     }
 
     /// 查询区内容底边: base_h − band (= 116 + 42 = 158 处的白框下沿)。
@@ -355,11 +377,11 @@ mod tests {
         assert_eq!(query_bottom_px(base.h, 120.0) - band_inset_px(120.0), 116);
     }
 
-    /// 可见行数按屏幕收敛: 常规 1200 高屏 → 上限 12; 极矮屏 → 至少 1 行。
+    /// 可见行数按屏幕收敛: 常规 1200 高屏 → 11 行 (行高 58px); 极矮屏 → 至少 1 行。
     #[test]
     fn max_rows_clamps_to_screen() {
         let base = window_rect(120.0, 120.0, 1920, 1200, &default_skin());
-        assert_eq!(max_list_rows(120.0, 1200, base.y, base.h), 12);
+        assert_eq!(max_list_rows(120.0, 1200, base.y, base.h), 11);
         assert_eq!(max_list_rows(120.0, 420, base.y, base.h), 1);
     }
 
@@ -392,9 +414,9 @@ mod tests {
             (sh.r as i32 - sh.l as i32, sh.b as i32 - sh.t as i32),
             (cw, ch)
         );
-        let sh2 = frame_shape(&s, 120.0, g.w, g.h + list_extra_px(12, 120.0));
+        let sh2 = frame_shape(&s, 120.0, g.w, g.h + list_extra_px(11, 120.0));
         assert_eq!(sh2.t, sh.t, "展开只向下长高, 顶边不动");
-        assert_eq!(sh2.b - sh.b, 467.0, "底边 = +12 行附加高");
+        assert_eq!(sh2.b - sh.b, 649.0, "底边 = +11 行附加高");
         assert!((sh2.radius - 12.5).abs() < 1e-9, "圆角不随高度变");
     }
 }
