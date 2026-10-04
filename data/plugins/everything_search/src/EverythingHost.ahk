@@ -23,28 +23,126 @@
 class EverythingHost {
   static Impl := 0        ; 0 = 未替换 (走引擎全局); 其余 = 同名方法的可调用对象
 
-  ; ---- 命令框锚点 (可见白框几何) ----
+  ; ---- 结果列表面板端口 (命令框向下延伸的列表; 2026-10-04) ----
   ;
-  ; 为什么在端口层: 命令框的窗口类名 / DWM 阴影边距 / 透明底边都属于「命令框内部知识」,
-  ; 原先散在渲染层 (EverythingDropdown) 里 —— 渲染层因此无法复用到别的锚点。收敛到这里后
-  ; 渲染层只消费 {x, y, w, bottom}, 对「命令框是什么」零知识。
-  ;
-  ; 会话级缓存: 像素扫描 (BitBlt) 每次约几 ms, 而检索是**逐击键**的 —— 每击键扫一次纯属
-  ; 浪费。命令框会话期间位置不变, 故首查缓存、会话开始 (EverythingSession.__New) 复位。
+  ; 为什么经窗口消息而不是让插件自建窗口: 用户需求 —— 列表必须是命令框**本体的**
+  ; 向下延伸 (Flow Launcher / uTools 形态)。命令框 (command-input/) 因此自身具备
+  ; 「长高 + 绘制列表」的能力, 插件只把数据推过去。
+  ; 与既有协议 (0x401-0x405) 同构: 命令框窗口的消息面就是本插件与它之间的唯一契约,
+  ; 新增能力**只加消息, 不改既有语义**。
+  ; 载荷 = WM_COPYDATA + 自定义 dwData 魔数 'KFR1'; 逐字节格式定义在
+  ; `command-input/src/results.rs::encode_payload` (两端必须一致, 由该文件单测锁定),
+  ; 跨进程由系统编组, 不共享指针。
 
-  static _AnchorCache := 0
+  static WM_COPYDATA := 0x004A
+  static MSG_SET_RESULTS := 0x004A      ; = WM_COPYDATA (dwData 区分归属)
+  static MSG_SET_SELECTION := 0x0407    ; 只移动高亮 (wParam = 0 基下标; -1 = 无)
+  static MSG_CLEAR_RESULTS := 0x0408    ; 收起列表 (窗口回落基准高度)
+  static PAYLOAD_MAGIC := 0x3152464B    ; 'K','F','R','1' 的小端 u32
+  static MAX_PAYLOAD_BYTES := 4194304   ; 4MiB (与 command-input 的 MAX_PAYLOAD_BYTES 同值)
+  static NO_SELECTION := -1             ; 载荷/0x407 的「无高亮」(与 command-input results.rs 同值)
 
-  /** 复位锚点缓存 (每会话开始调用; 命令框位置跨会话可能改变)。 */
-  static ResetAnchorCache() {
+  /**
+   * 推送结果列表 (0x406)。
+   * @param lines 展示文本数组 (顺序即列表顺序)
+   * @param index 高亮行 (1 基; 0 = 无高亮 —— 提示行)
+   * @returns {Boolean} 是否已送达 (命令框未运行 / 载荷构造失败 = false)
+   */
+  static ShowResults(lines, index) {
     impl := EverythingHost.Impl
     if (IsObject(impl))
-      return impl.ResetAnchorCache()
-    this._AnchorCache := 0
+      return impl.ShowResults(lines, index)
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return false
+    buf := EverythingHost.BuildResultsPayload(lines, index)
+    if (!IsObject(buf))
+      return false
+    ; COPYDATASTRUCT 布局 (x64 有对齐填充): dwData@0, cbData@A_PtrSize, lpData@(对齐后)。
+    ; 🔴 不能用 A_PtrSize+4 当 lpData 偏移 —— 64 位下 cbData(4B) 后补 4B 填充, lpData 在 16。
+    cds := Buffer((A_PtrSize = 8) ? 24 : 12, 0)
+    NumPut("Ptr", EverythingHost.PAYLOAD_MAGIC, cds, 0)
+    NumPut("UInt", buf.Size, cds, A_PtrSize)
+    NumPut("Ptr", buf.Ptr, cds, (A_PtrSize = 8) ? 16 : 8)
+    ; wParam = 本脚本窗口 (A_ScriptHwnd) —— 命令框记录它作为鼠标交互的回推目标;
+    ; 用 SendMessageTimeout (限时 800ms): 命令框侧解码/重排极快, 超时说明它卡住,
+    ; 此时插件不该被拖住 (返回 0 ⇒ false)。
+    r := 0
+    try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", EverythingHost.MSG_SET_RESULTS
+        , "ptr", A_ScriptHwnd, "ptr", cds, "uint", 0x0008, "uint", 800, "ptr*", &r := 0)
+    return (r != 0)
+  }
+
+  /** 只移动高亮 (0x407); 命令框**不会**回推本消息 (单向, 防回声环)。@param index 1 基; 0 = 无 */
+  static SelectResult(index) {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.SelectResult(index)
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return false
+    idx := (index >= 1) ? index - 1 : EverythingHost.NO_SELECTION
+    r := 0
+    try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", EverythingHost.MSG_SET_SELECTION
+        , "ptr", idx, "ptr", 0, "uint", 0x0008, "uint", 300, "ptr*", &r := 0)
+    return true
+  }
+
+  /** 收起结果列表 (0x408): 命令框窗口回落基准高度, 列表内容清空。 */
+  static ClearResults() {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.ClearResults()
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return false
+    r := 0
+    try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", EverythingHost.MSG_CLEAR_RESULTS
+        , "ptr", 0, "ptr", 0, "uint", 0x0008, "uint", 300, "ptr*", &r := 0)
+    return true
+  }
+
+  /**
+   * 构造 0x406 载荷 (Buffer)。格式 (全小端):
+   *   [0..4) 魔数 'KFR1' ; [4..8) selected i32 ; [8..12) count u32 ;
+   *   重复 count 次: [len u32][len 字节 UTF-8]
+   * @returns {Buffer|0} 0 = 构造失败 (超限 / 编码异常) —— 调用方据此拒绝发送
+   */
+  static BuildResultsPayload(lines, index) {
+    try {
+      n := lines.Length
+      lens := []
+      total := 12
+      for l in lines {
+        b := StrPut(l, "UTF-8") - 1     ; StrPut 返回含 NUL 的字节数
+        lens.Push(b)
+        total += 4 + b
+      }
+      if (total > EverythingHost.MAX_PAYLOAD_BYTES)
+        return 0
+      buf := Buffer(total, 0)
+      NumPut("UInt", EverythingHost.PAYLOAD_MAGIC, buf, 0)
+      NumPut("Int", (index >= 1) ? index - 1 : EverythingHost.NO_SELECTION, buf, 4)
+      NumPut("UInt", n, buf, 8)
+      off := 12
+      i := 1
+      for l in lines {
+        b := lens[i]
+        NumPut("UInt", b, buf, off)
+        if (b > 0)
+          StrPut(l, buf.Ptr + off + 4, "UTF-8")
+        off += 4 + b
+        i += 1
+      }
+      return buf
+    } catch {
+      return 0
+    }
   }
 
   /**
    * 命令框窗口句柄 (隐藏窗口也查 —— 命令框「存在但隐藏」是常态)。
-   * @returns {Ptr} hwnd; 找不到 = 0。IME 捕获 (EverythingIme) 与锚点几何共用本查找。
+   * @returns {Ptr} hwnd; 找不到 = 0。读回 (WM_GETTEXT) / 激活 / 结果推送共用本查找。
    */
   static CommandBoxWindow() {
     impl := EverythingHost.Impl
@@ -168,37 +266,6 @@ class EverythingHost {
       Sleep 10
     }
     return true
-  }
-
-  /**
-   * 命令框**可见白框**锚点 (物理像素, 与 WinGetPos 同空间)。
-   *
-   * 🔴 几何为**实测常数** (2026-10-03, 图1 逐像素复测 + 2026-09-21 三次独立截图一致):
-   *   可见白框 = 窗口矩形四周各缩 42px —— 925x200 窗口 → 841x116 白框
-   *   (水平 42 与垂直 42 完全对称; 42px 即命令框 DWM 阴影 + 自绘透明外边距)。
-   *   旧的启发式像素扫描已删除: 独立验证证明框体未渲染时扫描采到背景亮像素
-   *   (inset=126 vs 真实 42), 采样不可靠; 常数更稳。
-   *   ⚠ 若上游命令框的 DWM 阴影/皮肤 shadowSize 变化, 需重测此常数。
-   * @returns {Object} {x, y, w, h, bottom} —— 可见白框左/上/宽/高/可见底边; 命令框不存在时返回 ""。
-   */
-  static CommandBoxAnchor() {
-    impl := EverythingHost.Impl
-    if (IsObject(impl))
-      return impl.CommandBoxAnchor()
-    if (this._AnchorCache != 0)
-      return this._AnchorCache
-
-    hwnd := this._FindBoxWindow()
-    if (!hwnd)
-      return ""
-    bx := 0, by := 0, bw := 0, bh := 0
-    try WinGetPos(&bx, &by, &bw, &bh, hwnd)
-
-    margin := 42   ; DWM 阴影 + 透明外边距, 四面对称 (实测, 见上)
-    if (bw < margin * 2 + 180 || bh < margin * 2 + 40)
-      return ""
-    this._AnchorCache := {x: bx + margin, y: by + margin, w: bw - margin * 2, h: bh - margin * 2, bottom: by + bh - margin}
-    return this._AnchorCache
   }
 
   ; ---- 引擎全局访问端口 ----

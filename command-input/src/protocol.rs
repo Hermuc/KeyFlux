@@ -4,21 +4,31 @@
 //! 壳 (win::wndproc) 只做 Win32→事件翻译与指令执行, 不携带任何协议逻辑。
 //!
 //! 语义落点对照 (协议速查表 spec.md:162-172):
-//!   - `ShowClear` → 播 show → 清空 (不缩容) → 同步预绘+重绘 → 显示 (R14 ①→⑤);
+//!   - `ShowClear` → 播 show → 收起结果列表 → 清空 (不缩容) → 同步预绘+重绘 → 显示 (R14 ①→⑤);
 //!   - `Char(8)` 空串 → 仅一次空重绘, 无音效 (R17/附录 C #3);
 //!   - `Char(8)` 非空 → 删末码元 + keydown + 重绘;
 //!   - `Char(0x20)` → 追加 + spaceKey + 重绘; 其余 → 追加 + keydown + 重绘;
 //!   - `Char(_)` **不产生任何显示指令** (R17/R20: 隐藏态静默累积 = 「不显示地预置文本」);
-//!   - `HideFade` → 阻塞淡出 (时长 = hideAnimationDuration) → SW_HIDE; 不清空无音效 (R15);
-//!   - `CancelHide` → cancel 音效 → 立即 SW_HIDE; 不清空 (R16);
+//!   - `HideFade` → 阻塞淡出 (时长 = hideAnimationDuration) → SW_HIDE → 收起列表; 不清空无音效 (R15);
+//!   - `CancelHide` → cancel 音效 → 立即 SW_HIDE → 收起列表; 不清空 (R16);
+//!   - `SetResults` → 整表替换结果 + 重排窗口 (0x406; 2026-10-04 扩展);
+//!   - `SetSelection` → 移动高亮 (0x407; 高度不变, 只重绘);
+//!   - `ClearResults` → 收起列表 + 窗口回落 (0x408);
 //!   - `Destroy` → PostQuitMessage (R18)。WM_CLOSE **不在事件表** —— 壳不拦截,
 //!     交 DefWindowProc 默认销毁路径 (R18)。
+//!
+//! 结果列表面板 (2026-10-04, 用户需求「列表是命令框本体的向下延伸」): 列表状态随会话
+//!   存在 (与文本同生命周期): 0x401 显示时清、0x402/0x403 隐藏时清 —— 插件无需额外
+//!   收尾消息, 框自己保证「列表活不过一次会话」。
 
+use crate::results::ResultsState;
 use crate::sound::SoundKey;
 use crate::textbuf::TextBuf;
 
 /// WndProc 收到的外部事件 (壳做 Win32→事件翻译)。
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+///
+/// 非 `Copy` (0x406 载荷携带 `Vec`) —— `Clone` 保留给测试与调试。
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum AppEvent {
     /// 0x401 (R14)
     ShowClear,
@@ -28,6 +38,12 @@ pub enum AppEvent {
     CancelHide,
     /// WM_CHAR, 码元已按 wParam 低 16 位截取 (R17)
     Char(u16),
+    /// 0x406 (WM_COPYDATA): 结果列表整表替换; `selected` 0 基, `-1` = 无高亮
+    SetResults { items: Vec<String>, selected: i32 },
+    /// 0x407: 移动高亮 (0 基; `-1` = 无高亮)
+    SetSelection(i32),
+    /// 0x408: 收起结果列表
+    ClearResults,
     /// WM_DESTROY (R18)
     Destroy,
 }
@@ -40,6 +56,9 @@ pub enum Command {
     /// R14④/R17: 重绘。`pre_show = true` 时壳做 0x401 的同步预绘 (design C §2.8,
     /// = R14 ③重建布局+④重绘 的等价合并), 否则仅 InvalidateRect 走下一绘制周期。
     Redraw { pre_show: bool },
+    /// 结果列表结构变化 (项集/展开/收起): 壳重算窗口高度, 需要时
+    /// SetWindowPos + 后端区域重建, 然后重绘。高度不变时等价于一次重绘。
+    Relayout,
     /// R14⑤: SetWindowPos(HWND_TOPMOST, 存值X/Y, cx=cy=0, 0x51)
     ShowWindow,
     /// R15①: 阻塞式淡出 (期间不取消息, 与原版 Sleep(50) 轮询的线程阻塞语义一致)
@@ -50,20 +69,25 @@ pub enum Command {
     Quit,
 }
 
-/// 会话状态 (R22): 文本 + 可见性 + 淡出时长 (构造期自皮肤注入一次, R26)。
+/// 会话状态 (R22): 文本 + 可见性 + 淡出时长 (构造期自皮肤注入一次, R26) + 结果列表。
 pub struct AppState {
     pub text: TextBuf,
     pub visible: bool,
     pub fade_duration_secs: f64,
+    /// 结果列表面板状态 (2026-10-04)
+    pub results: ResultsState,
 }
 
 impl AppState {
-    /// R22: 启动态 = 空串、隐藏。
+    /// R22: 启动态 = 空串、隐藏、无结果列表。
+    /// 可视行数上限先取兜底值, WM_CREATE 拿到屏幕尺寸后经
+    /// `results.set_visible_max` 收敛 (见 win::wndproc::on_create)。
     pub fn new(fade_duration_secs: f64) -> Self {
         Self {
             text: TextBuf::new(),
             visible: false,
             fade_duration_secs,
+            results: ResultsState::new(crate::config::LIST_MAX_ROWS),
         }
     }
 }
@@ -74,11 +98,14 @@ pub fn on_event(ev: AppEvent, st: &mut AppState) -> Vec<Command> {
         AppEvent::ShowClear => {
             // R14: ②无条件清空 (幂等, 每次都清空重显); wArg/lParam 语义不存在, 壳已忽略。
             st.text.clear();
+            // 新会话不该继承上一会话的结果列表 (框自己保证「列表活不过一次会话」)
+            st.results.clear();
             st.visible = true;
             vec![
                 Command::PlaySound(SoundKey::Show), // R14① (清空前播放, R24)
+                Command::Relayout, // 收起上一会话可能残留的展开高度, 再按基准几何显示
                 Command::Redraw { pre_show: true }, // R14③④ (同步预绘等价合并)
-                Command::ShowWindow,                // R14⑤ (壳用创建期存值 X/Y, R12)
+                Command::ShowWindow, // R14⑤ (壳用创建期存值 X/Y, R12)
             ]
         }
         AppEvent::Char(ch) => {
@@ -101,27 +128,50 @@ pub fn on_event(ev: AppEvent, st: &mut AppState) -> Vec<Command> {
                 } else {
                     SoundKey::KeyDown
                 };
-                vec![
-                    Command::PlaySound(key),
-                    Command::Redraw { pre_show: false },
-                ]
+                vec![Command::PlaySound(key), Command::Redraw { pre_show: false }]
             }
             // 注意: Char 分支无任何显示指令 —— 隐藏态照常累积、窗口保持隐藏 (R17/R20)
+        }
+        AppEvent::SetResults { items, selected } => {
+            st.results.set(items, selected);
+            vec![Command::Relayout]
+        }
+        AppEvent::SetSelection(index) => {
+            if st.results.select(index) {
+                // 列表高度不变 ⇒ 无需重排窗口, 一次重绘即可
+                vec![Command::Redraw { pre_show: false }]
+            } else {
+                vec![]
+            }
+        }
+        AppEvent::ClearResults => {
+            if st.results.clear() {
+                vec![Command::Relayout]
+            } else {
+                vec![]
+            }
         }
         AppEvent::HideFade => {
             // R15: 只隐藏, 不清文本, 无音效; 时长 = 皮肤 hideAnimationDuration (附录 C #2)
             st.visible = false;
+            st.results.clear();
             vec![
                 Command::BeginFade {
                     duration_secs: st.fade_duration_secs,
                 },
                 Command::HideWindow,
+                Command::Relayout, // 隐藏后回落基准高度 (下次 0x401 不残留展开尺寸)
             ]
         }
         AppEvent::CancelHide => {
             // R16: cancel 音效 → 立即隐藏, 无动画, 不清文本
             st.visible = false;
-            vec![Command::PlaySound(SoundKey::Cancel), Command::HideWindow]
+            st.results.clear();
+            vec![
+                Command::PlaySound(SoundKey::Cancel),
+                Command::HideWindow,
+                Command::Relayout,
+            ]
         }
         AppEvent::Destroy => {
             // R18: PostQuitMessage(0) → 消息循环退出
@@ -145,7 +195,7 @@ mod tests {
         }
     }
 
-    /// R14: 音效→清空(不缩容)→重绘→显示 的指令序; 文本确实被清; 幂等可重复。
+    /// R14: 音效→清空(不缩容)→重排→重绘→显示 的指令序; 文本确实被清; 幂等可重复。
     #[test]
     fn show_clear_full_semantics() {
         let mut st = state();
@@ -155,6 +205,7 @@ mod tests {
             cmds,
             vec![
                 Command::PlaySound(SoundKey::Show),
+                Command::Relayout,
                 Command::Redraw { pre_show: true },
                 Command::ShowWindow,
             ]
@@ -163,7 +214,7 @@ mod tests {
         assert!(st.visible);
         // R14: 清空不缩容
         assert!(st.text.capacity() > 0 || true); // 空串即可; 容量断言在 textbuf
-        // 幂等: 再来一次仍然清空重显
+                                                 // 幂等: 再来一次仍然清空重显
         let cmds2 = on_event(AppEvent::ShowClear, &mut st);
         assert_eq!(cmds, cmds2);
     }
@@ -233,7 +284,7 @@ mod tests {
         assert_eq!(cmds, vec![Command::Redraw { pre_show: false }]);
     }
 
-    /// R15: 只隐藏不清空无音效; 时长来自皮肤 (构造期注入)。
+    /// R15: 只隐藏不清空无音效; 时长来自皮肤 (构造期注入); 收起结果列表 (重排回落).
     #[test]
     fn hide_fade_semantics() {
         let mut st = state();
@@ -242,17 +293,23 @@ mod tests {
         assert_eq!(
             cmds,
             vec![
-                Command::BeginFade { duration_secs: 0.34 },
+                Command::BeginFade {
+                    duration_secs: 0.34
+                },
                 Command::HideWindow,
+                Command::Relayout,
             ]
         );
         assert!(!st.visible);
-        assert_eq!(st.text.units(), "保留".encode_utf16().collect::<Vec<_>>().as_slice());
+        assert_eq!(
+            st.text.units(),
+            "保留".encode_utf16().collect::<Vec<_>>().as_slice()
+        );
         // 无音效指令
         assert!(cmds.iter().all(|c| !matches!(c, Command::PlaySound(_))));
     }
 
-    /// R16: cancel 音效 → 立即隐藏; 不清空; 无动画。
+    /// R16: cancel 音效 → 立即隐藏; 不清空; 无动画; 收起结果列表。
     #[test]
     fn cancel_semantics() {
         let mut st = state();
@@ -260,11 +317,113 @@ mod tests {
         let cmds = on_event(AppEvent::CancelHide, &mut st);
         assert_eq!(
             cmds,
-            vec![Command::PlaySound(SoundKey::Cancel), Command::HideWindow]
+            vec![
+                Command::PlaySound(SoundKey::Cancel),
+                Command::HideWindow,
+                Command::Relayout,
+            ]
         );
         assert!(!st.visible);
         assert_eq!(st.text.len(), 2);
         assert!(!cmds.iter().any(|c| matches!(c, Command::BeginFade { .. })));
+    }
+
+    // ---- 2026-10-04 结果列表面板 (0x406/0x407/0x408) ----
+
+    fn results(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    /// 0x406: 整表替换 + 重排窗口; 高亮为 0 基。
+    #[test]
+    fn set_results_relayouts() {
+        let mut st = state();
+        let cmds = on_event(
+            AppEvent::SetResults {
+                items: results(&["a", "b", "c"]),
+                selected: 1,
+            },
+            &mut st,
+        );
+        assert_eq!(cmds, vec![Command::Relayout]);
+        assert_eq!(st.results.len(), 3);
+        assert_eq!(st.results.selected(), 1);
+    }
+
+    /// 0x407: 高亮变化才重绘 (同值零指令 —— 避免无谓重绘)。
+    #[test]
+    fn set_selection_only_redraws_on_change() {
+        let mut st = state();
+        on_event(
+            AppEvent::SetResults {
+                items: results(&["a", "b"]),
+                selected: 0,
+            },
+            &mut st,
+        );
+        assert_eq!(on_event(AppEvent::SetSelection(0), &mut st), vec![]);
+        assert_eq!(
+            on_event(AppEvent::SetSelection(1), &mut st),
+            vec![Command::Redraw { pre_show: false }]
+        );
+        assert_eq!(st.results.selected(), 1);
+    }
+
+    /// 0x408: 有列表才重排; 空表时零指令 (幂等)。
+    #[test]
+    fn clear_results_is_idempotent() {
+        let mut st = state();
+        assert_eq!(on_event(AppEvent::ClearResults, &mut st), vec![]);
+        on_event(
+            AppEvent::SetResults {
+                items: results(&["a"]),
+                selected: 0,
+            },
+            &mut st,
+        );
+        assert_eq!(
+            on_event(AppEvent::ClearResults, &mut st),
+            vec![Command::Relayout]
+        );
+        assert!(st.results.is_empty());
+        assert_eq!(on_event(AppEvent::ClearResults, &mut st), vec![]);
+    }
+
+    /// 会话生命周期: 0x401 显示与 0x402/0x403 隐藏都必须清列表 (框自己保证列表
+    /// 活不过一次会话 —— 插件无需发送收尾消息)。
+    #[test]
+    fn results_never_survive_a_session() {
+        for end in [AppEvent::HideFade, AppEvent::CancelHide] {
+            let mut st = state();
+            on_event(
+                AppEvent::SetResults {
+                    items: results(&["a", "b"]),
+                    selected: 0,
+                },
+                &mut st,
+            );
+            assert_eq!(st.results.len(), 2);
+            on_event(end, &mut st);
+            assert!(st.results.is_empty(), "隐藏必须收起列表");
+
+            let mut st2 = state();
+            on_event(
+                AppEvent::SetResults {
+                    items: results(&["x"]),
+                    selected: 0,
+                },
+                &mut st2,
+            );
+            on_event(AppEvent::ShowClear, &mut st2);
+            assert!(st2.results.is_empty(), "0x401 显示必须清列表");
+        }
+    }
+
+    /// 0x407 在无列表时是 no-op (不崩、不产生指令)。
+    #[test]
+    fn select_without_results_is_noop() {
+        let mut st = state();
+        assert_eq!(on_event(AppEvent::SetSelection(3), &mut st), vec![]);
     }
 
     /// R18: Destroy → Quit。
@@ -286,7 +445,11 @@ mod tests {
         on_event(AppEvent::CancelHide, &mut st);
         assert_eq!(st.text.units(), snapshot.as_slice(), "0x403 不触碰文本");
         on_event(AppEvent::Destroy, &mut st);
-        assert_eq!(st.text.units(), snapshot.as_slice(), "WM_DESTROY 不触碰文本");
+        assert_eq!(
+            st.text.units(),
+            snapshot.as_slice(),
+            "WM_DESTROY 不触碰文本"
+        );
 
         on_event(AppEvent::Char(0x21), &mut st); // Char 是写入点
         assert_eq!(st.text.len(), 5);

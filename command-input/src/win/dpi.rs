@@ -9,8 +9,7 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Gdi::{MonitorFromWindow, HMONITOR, MONITOR_DEFAULTTONEAREST};
 use windows::Win32::UI::HiDpi::{
     GetDpiForMonitor, SetProcessDpiAwareness, SetProcessDpiAwarenessContext,
-    DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, MDT_EFFECTIVE_DPI,
-    PROCESS_PER_MONITOR_DPI_AWARE,
+    DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, MDT_EFFECTIVE_DPI, PROCESS_PER_MONITOR_DPI_AWARE,
 };
 use windows::Win32::UI::WindowsAndMessaging::SetProcessDPIAware;
 

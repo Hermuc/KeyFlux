@@ -128,7 +128,6 @@ class EverythingSearch {
    * @returns {{ok:Boolean, error:String, items:Array<{path,name,isFolder}>}}
    */
   static Run(query, limit) {
-    try FileAppend(FormatTime(A_Now, "HH:mm:ss") " es query=[" query "] limit=" limit "`n", A_Temp "\kf_es_debug.log", "UTF-8")
     if (Trim(query, " `t`r`n") = "")
       return {ok: false, error: ES_ERR_EMPTY, items: []}
 
