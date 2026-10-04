@@ -488,7 +488,9 @@ pub fn setting_row<
         // ⚠️ 0.100.0 的 TextBox 无 `MaxLength`（长度上限由保存前的校验兜底，口径同后端）
         let mut editor = TextBox::new()
             .text(value.to_string())
-            .min_width(280.0)
+            // file 类型有「浏览」按钮同行: min_width 降低防按钮被推出弹窗可视宽
+            // (2026-10-04 用户报障; 非 file 类型维持 280)
+            .min_width(if crate::services::plugins::is_file(setting) { 180.0 } else { 280.0 })
             .on_text_changed(on_change);
         // `text` 且声明 `multiline`（2026-10-02 P5）：接受回车 + 换行分隔值
         // （首个消费方 = quick_switch.excludedPrefixes），复用 action_editor 的形态。
