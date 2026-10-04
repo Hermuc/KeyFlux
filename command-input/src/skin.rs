@@ -223,6 +223,14 @@ pub fn grid_content_color(s: &Skin) -> Rgb {
     )
 }
 
+/// 搜索徽标描边色 (内容色空间): 与查询区文字同族 (`keyColor @keyOpacity` 叠面板内容色)。
+/// 🔴 实测教训 (2026-10-04 活体探针): 首版复用网格内容色 —— 与面板底色只差 ≤4 级,
+/// 图标「画了但看不见」; 徽标是前景字形不是底纹, 必须用文字同族色。
+/// **不新增皮肤键** (同 LIST_* 口径, 派生自既有 18 键)。
+pub fn badge_color(s: &Skin) -> Rgb {
+    over(s.key_color, s.key_opacity, panel_content_color(s))
+}
+
 /// R28/参考实现 :158-159: 整窗不透明度 = round(backgroundOpacity × 255)。
 /// 0.9 → 229.5 → 230 (round half away from zero, 与 AHK Round 同口径)。
 /// 生产路径已不消费 (2026-10-04 起改逐像素合成 `fill_alpha`); 保留作参考口径快照 + 单测锁定。

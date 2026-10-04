@@ -76,6 +76,7 @@ macro_rules! frame_state {
             height_px: $shell.cur_h,
             base_height_px: $shell.geom.h,
             results: &$shell.state.results,
+            badge: $shell.state.badge,
         }
     };
 }
@@ -437,6 +438,18 @@ pub(crate) unsafe extern "system" fn wndproc(
         config::APP_RESULTS_CLEAR => {
             // 0x408: 收起列表 (窗口回落基准高)
             let cmds = on_event(AppEvent::ClearResults, &mut shell.state);
+            execute(shell, hwnd, cmds);
+            LRESULT(0)
+        }
+        config::APP_BADGE_SHOW => {
+            // 0x40A: wParam = 字形编号 (未注册编号由 on_event 忽略 —— 对端错误不带崩框)
+            let cmds = on_event(AppEvent::ShowBadge(wparam.0 as u32), &mut shell.state);
+            execute(shell, hwnd, cmds);
+            LRESULT(0)
+        }
+        config::APP_BADGE_HIDE => {
+            // 0x40B: 隐藏徽标 (wParam/lParam 忽略)
+            let cmds = on_event(AppEvent::HideBadge, &mut shell.state);
             execute(shell, hwnd, cmds);
             LRESULT(0)
         }

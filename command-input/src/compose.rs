@@ -130,6 +130,13 @@ fn erfc(x: f64) -> f64 {
     }
 }
 
+/// 搜索徽标绘制层 (几何来自 `crate::badge`, 颜色由皮肤派生)。
+#[derive(Clone, Debug)]
+pub struct BadgeLayer {
+    pub geom: crate::badge::BadgePaint,
+    pub rgb: Rgb,
+}
+
 /// 一帧的合成计划 (只依赖几何/皮肤 ⇒ 尺寸变化时重建一次, 逐帧复用)。
 #[derive(Clone, Debug)]
 pub struct Plan {
@@ -145,6 +152,9 @@ pub struct Plan {
     /// 内部填充净不透明度 (0..1; `skin::fill_alpha` = 1−(1−b)×0.55 = **0.945**, 同背景 A/B 实测)
     pub fill_alpha: f64,
     pub shadow: Shadow,
+    /// 搜索徽标 (2026-10-04; None = 不绘制)。绘制在**内容之上**、填充 alpha 之内
+    /// (徽标是查询区内部元素, 不改变面板净透明度)。
+    pub badge: Option<BadgeLayer>,
 }
 
 impl Plan {
@@ -163,6 +173,19 @@ impl Plan {
         let fr = mix(drawn_rgb[0], self.ring_rgb.0 as f64, ring_cov);
         let fg = mix(drawn_rgb[1], self.ring_rgb.1 as f64, ring_cov);
         let fb = mix(drawn_rgb[2], self.ring_rgb.2 as f64, ring_cov);
+        // 徽标: 画在内容之上 (先内容后徽标的 over 叠色), 不改 alpha —— 徽标是查询区
+        // 内部的描边元素, 净观感仍 = 填充 (α 不变); 包围盒外的像素零成本跳过。
+        let (mut fr, mut fg, mut fb) = (fr, fg, fb);
+        if let Some(b) = &self.badge {
+            if b.geom.hits(x, y) {
+                let cov = b.geom.coverage(fx, fy);
+                if cov > 0.0 {
+                    fr = mix(fr, b.rgb.0 as f64, cov);
+                    fg = mix(fg, b.rgb.1 as f64, cov);
+                    fb = mix(fb, b.rgb.2 as f64, cov);
+                }
+            }
+        }
         // 阴影: 只落在框外 (原版阴影视觉在**不透明底板**之下 ⇒ 框内不外溢;
         //   本条同时保证内部观感 = 纯填充, 与实测 239 (fill-only 模型 240) 一致)
         let a_sh = self.shadow.coverage(d) * (1.0 - cov) * self.shadow.opacity;
@@ -250,6 +273,7 @@ mod tests {
                 sigma: 5.0,
                 dy: 2.0,
             },
+            badge: None,
         }
     }
 
@@ -348,6 +372,36 @@ mod tests {
         assert!(outside[0] > outside[7], "阴影随距离衰减: {outside:?}");
         // 框内不受阴影影响 (与 fill-only 模型一致)
         assert!((p.pixel(50, 30, [255.0; 3]).0 * 255.0 - 241.0).abs() < 1.5);
+    }
+
+    /// 徽标: 描边处内容色被徽标色覆盖、alpha 不变; 包围盒外逐字节不变。
+    #[test]
+    fn badge_blends_color_keeps_alpha() {
+        let mut p = plan();
+        let geom = crate::badge::BadgePaint::magnifier(30.0, 12.0, 25.0, 2.0);
+        p.badge = Some(BadgeLayer {
+            geom,
+            rgb: Rgb(40, 40, 40),
+        });
+        // 手柄末端 (圆帽中心) 必在形内
+        let x = geom.hx2.floor() as i32;
+        let y = geom.hy2.floor() as i32;
+        let (a_badge, pm) = p.pixel(x, y, [243.0; 3]);
+        assert!(
+            pm[0] < 200.0,
+            "描边处内容色 (243) 必须被徽标色 (40) 拉深, 实际 {}",
+            pm[0]
+        );
+        // alpha 与无徽标时相同 (徽标不改面板净透明度)
+        let mut p0 = plan();
+        p0.badge = None;
+        let (a_plain, _) = p0.pixel(x, y, [243.0; 3]);
+        assert!((a_badge - a_plain).abs() < 1e-9);
+        // 包围盒外 (但仍在框内) 的像素与无徽标计划逐位相同
+        let with = p.pixel(70, 30, [243.0; 3]);
+        let without = p0.pixel(70, 30, [243.0; 3]);
+        assert_eq!(with.0, without.0);
+        assert_eq!(with.1, without.1);
     }
 
     /// 圆角: 框外 1px 的角落必须透明 (AA 不会让角变方)。

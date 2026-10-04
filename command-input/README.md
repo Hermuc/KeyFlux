@@ -34,9 +34,10 @@ cargo build --release --manifest-path D:\PortableApps\KeyFlux-main\command-input
 cargo test --manifest-path D:\PortableApps\KeyFlux-main\command-input\Cargo.toml
 ```
 
-纯逻辑模块(config/skin/textbuf/geometry/easing/protocol/sound/results/compose)不建窗口即可全量单测
+纯逻辑模块(config/skin/textbuf/geometry/easing/protocol/sound/results/badge/compose)不建窗口即可全量单测
 (几何闭环 925/200/497/300、网格反解 #F7F8FC、R17 语义矩阵、皮肤 18 键、结果列表窗口/滚动/
-0x406 载荷编解码、逐像素合成 (圆角 AA/白边不透明/填充半透明/阴影只落框外) 等 74 项)。
+0x406 载荷编解码、逐像素合成 (圆角 AA/白边不透明/填充半透明/阴影只落框外)、徽标 SDF 覆盖率
+与 0x40A/0x40B 会话语义 等 85 项)。
 
 ## 模块图(bin 薄壳 + lib)
 
@@ -51,7 +52,8 @@ src/
   easing.rs        R15 Accelerate-Decelerate 0.5/0.5
   protocol.rs      R14-R19/R22 事件分派状态机(AppEvent -> Command)
   results.rs       结果列表面板模型 + 0x406 载荷编解码(纯逻辑; 与 AHK 侧逐字节对齐)
-  compose.rs       逐像素合成(圆角矩形 SDF/覆盖率 AA/高斯阴影/预乘) —— 白边与填充各自 alpha
+  badge.rs         搜索徽标(2026-10-04): 字形注册表 + 放大镜 SDF(解析式 AA; 插件只传编号)
+  compose.rs       逐像素合成(圆角矩形 SDF/覆盖率 AA/高斯阴影/预乘/徽标叠色) —— 白边与填充各自 alpha
   sound.rs         R24 触发点枚举 + SoundBackend trait
   render.rs        RenderBackend trait(唯一渲染缝,零 Win32 类型)
   win/
@@ -62,7 +64,7 @@ src/
     error.rs           R29 原版格式错误弹窗 + 终止
     audio.rs           R24 winmm PlaySoundW 后端(SND_NODEFAULT 缺文件静默)
     backend_gdi.rs     v1.1 渲染后端(逐像素 alpha 自合成: UpdateLayeredWindow + compose, 见下)
-    wndproc.rs         唯一 Win32->core 翻译层(R19 阴性面 + 0x404/0x405/0x406-0x408 + 结果区鼠标)
+    wndproc.rs         唯一 Win32->core 翻译层(R19 阴性面 + 0x404/0x405/0x406-0x408 + 0x40A/0x40B 徽标 + 结果区鼠标)
 ```
 
 ## 活体冒烟

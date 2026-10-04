@@ -184,6 +184,7 @@ class EverythingSession {
       EverythingHost.BoxActivateForSearch()
       EverythingHost.BoxForeground()
       EverythingResults.Hide()   ; 清上一会话残留列表 (防"变大"残留)
+      EverythingHost.ShowBadge() ; 搜索徽标 (0x40A): 查询区右侧放大镜, 搜索模式的可视标识
       this.SeedFromSelection()
       SetTimer(ObjBindMethod(this, "_SyncQuery"), EverythingSession.QUERY_SYNC_MS)
       this.Refresh()
@@ -384,12 +385,16 @@ class EverythingSession {
       this.Close()
   }
 
-  /** 收尾: 收起结果列表 (可重复调用)。同时撤销 active —— 关闭后到达的重复 Enter 通知必须被拒。 */
+  /** 收尾: 收起结果列表 + 隐藏搜索徽标 (幂等 —— 已关闭时直接返回, 不重复发收尾消息)。
+   *  同时撤销 active —— 关闭后到达的重复 Enter 通知必须被拒。 */
   Close() {
+    if (this.closed)
+      return
     this.closed := true
     this.active := false
     try SetTimer(ObjBindMethod(this, "_SyncQuery"), 0)
     EverythingResults.Hide()
+    EverythingHost.HideBadge()   ; 0x40B: 徽标与搜索模式同生命周期 (命令框侧另有会话兜底)
   }
 
   ; ---- 查询轮询 (命令框内文本 = 检索词唯一真源, 经 WM_GETTEXT 读回) ----

@@ -265,6 +265,24 @@ impl GdiBackend {
                 sigma: geometry::shadow_sigma_px(s, dpi),
                 dy: geometry::shadow_dy_px(dpi),
             },
+            // 搜索徽标 (2026-10-04): 插件经 0x40A 指定字形, 命令框只认编号; 颜色由
+            // 既有皮肤键派生 (同网格内容色空间, 见 skin::badge_color)。
+            badge: state.badge.and_then(|glyph| {
+                if !crate::badge::is_known(glyph) {
+                    return None;
+                }
+                let size = geometry::badge_size_px(dpi) as f64;
+                let (l, t) = geometry::badge_origin_px(state.width_px, state.base_height_px, dpi);
+                Some(compose::BadgeLayer {
+                    geom: crate::badge::BadgePaint::magnifier(
+                        l as f64,
+                        t as f64,
+                        size,
+                        geometry::badge_stroke_px(dpi),
+                    ),
+                    rgb: skin::badge_color(s),
+                })
+            }),
         }
     }
 
@@ -434,6 +452,11 @@ impl GdiBackend {
         let inset = geometry::band_inset_px(dpi);
         // 查询区/结果区分界 = 白框内查询区下沿 (无列表时 == frame.bottom, 口径与旧实现等价)
         let query_bottom = geometry::query_bottom_px(state.base_height_px, dpi);
+        // 合成计划与状态同步 (徽标显隐不改尺寸/资源, 只需重算计划 —— 纯浮点几何, 逐帧可负担;
+        // 此前计划仅在 init/resize 重建, 徽标走 0x40A/0x40B 时不会触发 resize)
+        if let Some(res) = self.res.as_mut() {
+            res.plan = Self::build_plan(state);
+        }
         unsafe {
             let hdc = {
                 let Some(res) = self.res.as_ref() else {

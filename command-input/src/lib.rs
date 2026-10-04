@@ -23,6 +23,7 @@
 //! 见 `D:\PortableApps\cmdinput-re\design-C.md`; §K 读回通道 (R32-R36) 本轮不实现,
 //! 扩展点 = wndproc 的 WM_NCCREATE 锚点与 textbuf 容量语义。
 
+pub mod badge;
 pub mod compose;
 pub mod config;
 pub mod easing;

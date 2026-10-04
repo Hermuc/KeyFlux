@@ -190,6 +190,32 @@ pub fn frame_shape(s: &Skin, dpi: f64, w: i32, h: i32) -> compose::Shape {
     }
 }
 
+// ---- 搜索徽标几何 (2026-10-04: 查询区右侧固定图标, 见 crate::badge) ----
+
+/// 徽标字形盒边长 (像素): round(20 DIP × dpi / 96) (@125% = 25px)。
+pub fn badge_size_px(dpi: f64) -> i32 {
+    dip_px(config::BADGE_SIZE_DIP, dpi).max(8)
+}
+
+/// 徽标描边宽 (像素, 保留小数): 1.6 DIP @125% = 2.0px。
+pub fn badge_stroke_px(dpi: f64) -> f64 {
+    config::BADGE_STROKE_DIP * dpi / config::DIP_BASE_DPI
+}
+
+/// 徽标字形盒左上角 (像素)。锚定 = **查询区**右缘内缩 `BADGE_MARGIN_DIP`、查询区垂直居中。
+/// 🔴 「固定位置不受布局变化影响」的机制: 查询区几何只依赖**基准高** (R11 创建期定案)
+/// 与窗口顶 (0x401 存值, 展开时顶边不动) ⇒ 列表展开/收起只向下长高, 本值恒不变。
+pub fn badge_origin_px(width_px: i32, base_height_px: i32, dpi: f64) -> (i32, i32) {
+    let inset = band_inset_px(dpi);
+    let size = badge_size_px(dpi);
+    let margin = dip_px(config::BADGE_MARGIN_DIP, dpi);
+    let top = inset;
+    let bottom = query_bottom_px(base_height_px, dpi);
+    let l = width_px - inset - margin - size;
+    let t = top + ((bottom - top) - size) / 2;
+    (l.max(0), t.max(0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,6 +257,20 @@ mod tests {
         let g = window_rect(120.0, 120.0, 1920, 1200, &s);
         assert_eq!(g.w, 1050); // (800+40)×1.25
         assert_eq!(g.y, 600); // 1200×0.5
+    }
+
+    /// 搜索徽标布局 @125%: 盒 25px、右缘距框 20px、查询区 (42..158) 垂直居中。
+    #[test]
+    fn badge_layout_matches_reference() {
+        assert_eq!(badge_size_px(120.0), 25);
+        assert!((badge_stroke_px(120.0) - 2.0).abs() < 1e-9);
+        // R11 闭环几何: 925×200, band 42 ⇒ 查询区 42..158
+        let (l, t) = badge_origin_px(925, 200, 120.0);
+        assert_eq!(l, 925 - 42 - 20 - 25);
+        assert_eq!(t, 42 + (116 - 25) / 2);
+        // 列表展开不改基准高 ⇒ 徽标位置逐字节不变 (「固定位置不受布局变化影响」)
+        let (l2, t2) = badge_origin_px(925, 200, 120.0);
+        assert_eq!((l, t), (l2, t2));
     }
 
     /// R13: band = 42px @125%。
