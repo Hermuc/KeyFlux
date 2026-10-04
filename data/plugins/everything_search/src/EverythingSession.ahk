@@ -116,6 +116,12 @@ class EverythingSession {
   ; 在控件里), 轮询差分 → 检索词更新 → 重查。40ms 远小于人工输入节奏。
   static QUERY_SYNC_MS := 40
 
+
+  ; ESDEBUG 临时诊断
+  static Dbg(text) {
+    try FileAppend(FormatTime(A_Now, "HH:mm:ss") " " text "`n", A_Temp "\kf_es_debug.log", "UTF-8")
+  }
+
   ; 会话状态
   chars := 0              ; 本次会话已收到的普通字符数 (0 = 触发键仍处「前置」位置)
   active := false         ; 是否已触发 (检索中)
@@ -151,6 +157,7 @@ class EverythingSession {
     if (c = "" || (Ord(c) < 32 && c != " "))
       return false
 
+    EverythingSession.Dbg("OnChar [" c "] active=" this.active " q=[" this.query "]")
     if (!this.active) {
       ; 前置键语义: 必须是本次会话输入的第一个字符
       if (this.chars > 0)
@@ -168,7 +175,9 @@ class EverythingSession {
       EverythingHost.BoxActivateForSearch()
       EverythingHost.BoxForeground()
       EverythingDropdown.Hide()   ; 清上一会话残留浮层 (防"变大"残留)
+      EverythingSession.Dbg("trigger: unlock+activate+foreground done")
       this.SeedFromSelection()
+      EverythingSession.Dbg("trigger: seed=[" this.query "]")
       SetTimer(ObjBindMethod(this, "_SyncQuery"), EverythingSession.QUERY_SYNC_MS)
       this.Refresh()
       return true     ; 消费触发键本身 (空间不投递到命令框)
@@ -199,6 +208,7 @@ class EverythingSession {
       return true
     }
     if (vk = EverythingSession.VK_RETURN) {
+      EverythingSession.Dbg("OnKey RETURN composing=" EverythingHost.BoxQueryComposing())
       ; 🔴 IME 组合态判定 (0x405, 确定性非启发式): 组合中 = 该回车是「上屏提交」
       ;   (物理键经透传直达 IME, 提交文本随后进框) —— 消费, 不打开结果。
       if (EverythingHost.BoxQueryComposing())
@@ -276,6 +286,7 @@ class EverythingSession {
       return
     }
     this.index := 1
+    EverythingSession.Dbg("refresh: show " res.items.Length " items")
     EverythingDropdown.Show(res.items, this.index)
   }
 
@@ -377,9 +388,11 @@ class EverythingSession {
       return
     }
     t := EverythingHost.BoxGetText()
+    EverythingSession.Dbg("poll: box=[" t "] q=[" this.query "]")
     if (t = this.query)
       return
     this.query := t
+    EverythingSession.Dbg("poll: CHANGED → refresh")
     this.Refresh()
   }
 
