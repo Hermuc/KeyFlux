@@ -300,7 +300,8 @@ class NotifyRecorder {
 ; ============================================================
 ; 结果推送给命令框的观测助手 —— 全部经 EverythingResults → EverythingHost 端口,
 ; 断言只读 HostRecorder 的记录 (探针不建命令框窗口)。布局:
-;   ["ShowResults", lines, index] / ["SelectResult", index] / ["ClearResults"]
+;   ["ShowResults", entries, index] / ["SelectResult", index] / ["ClearResults"]
+;   (2026-10-04 二版: entries = [{t: 标题/文件名, s: 副标题/路径}], 载荷 'KFR2')
 ; ============================================================
 
 /** 列表被要求收起的次数 (EverythingResults.Hide → ClearResults)。 */
@@ -412,9 +413,9 @@ Verify(ExplorerRecorder.Calls.Length = 0,
     '2b path 为空: explorer 未被启动 (旧实现 explorer.exe "" 会打开「文档」)',
     "实际 " ExplorerRecorder.Calls.Length " 次")
 hint2 := LastLines()
-Verify(HintCount() = 1 && hint2.Length = 1 && hint2[1] = EverythingMessages.T("err_item_missing"),
+Verify(HintCount() = 1 && hint2.Length = 1 && hint2[1].t = EverythingMessages.T("err_item_missing"),
     "2c path 为空: 出一行提示文案 (err_item_missing)",
-    "实际 " ((HintCount() = 1) ? "'" hint2[1] "'" : "提示数 " HintCount()))
+    "实际 " ((HintCount() = 1) ? "'" hint2[1].t "'" : "提示数 " HintCount()))
 Verify(LastIndex() = 0,
     "2d 提示行: 推送的高亮行 = 0 (无高亮 —— 提示不可被回车打开)",
     "实际 index=" LastIndex())
@@ -428,9 +429,9 @@ Verify(ExplorerRecorder.Calls.Length = 0,
     "3b 路径不存在: explorer 未被启动",
     "实际 " ExplorerRecorder.Calls.Length " 次")
 hint3 := LastLines()
-Verify(HintCount() = 1 && hint3.Length = 1 && hint3[1] = EverythingMessages.T("err_item_missing"),
+Verify(HintCount() = 1 && hint3.Length = 1 && hint3[1].t = EverythingMessages.T("err_item_missing"),
     "3c 路径不存在: 出一行提示文案 (err_item_missing)",
-    "实际 " ((HintCount() = 1) ? "'" hint3[1] "'" : "提示数 " HintCount()))
+    "实际 " ((HintCount() = 1) ? "'" hint3[1].t "'" : "提示数 " HintCount()))
 
 ; --- 断言 4: 两种形态的命令串 + 绝对路径规范化 ---
 ResetObservers()
@@ -528,7 +529,7 @@ Verify(s11.closed = false && s11.active = true,
     "9d 路径失效: 会话保持打开, 可继续改检索词或按 Esc 退出",
     "实际 closed=" s11.closed " active=" s11.active)
 hint9 := LastLines()
-Verify(HintCount() = 1 && hint9.Length = 1 && hint9[1] = EverythingMessages.T("err_item_missing"),
+Verify(HintCount() = 1 && hint9.Length = 1 && hint9[1].t = EverythingMessages.T("err_item_missing"),
     "9e 路径失效: 提示文案 = err_item_missing",
     "实际提示数 " HintCount())
 ResetObservers()
@@ -562,7 +563,7 @@ s14 := NewSession([ItemFile(PATH_MISSING)], 1)
 s14.OnBoxNotify(1, 1)                                ; 点选一个已失效的结果
 hint14 := LastLines()
 Verify(ExplorerRecorder.Calls.Length = 0 && HintCount() = 1 && hint14.Length = 1
-    && hint14[1] = EverythingMessages.T("err_item_missing"),
+    && hint14[1].t = EverythingMessages.T("err_item_missing"),
     "11b 点选失效项: explorer 未启动, 出 err_item_missing 提示",
     "实际 Launch=" ExplorerRecorder.Calls.Length " 提示数 " HintCount())
 Verify(ResultsHideCount() = 0 && StubInputHook.StopCount = 0 && s14.closed = false && s14.active = true,
@@ -657,24 +658,26 @@ Verify(ResultsHideCount() >= 1,
 ;      唯一的字节级锁; 生产路径 (Impl 被替换时) 会跳过 1基→0基 换算, 故换算与编码
 ;      直接用 EverythingHost.BuildResultsPayload 断言)。
 ResetObservers()
-txt := EverythingResults.Lines([{path: "C:\kf\a.txt", name: "a.txt", isFolder: false}
+txt := EverythingResults.Entries([{path: "C:\kf\a.txt", name: "a.txt", isFolder: false}
     , {path: "", name: "仅名字", isFolder: true}])
-Verify(txt.Length = 2 && txt[1] = "C:\kf\a.txt" && txt[2] = "仅名字",
-    "15a 显示文本: 完整路径优先, 路径为空回落 name (长路径由命令框 DT_PATH_ELLIPSIS 收尾)",
-    "实际 " txt.Length " 行: '" txt[1] "' / '" txt[2] "'")
+Verify(txt.Length = 2 && txt[1].t = "a.txt" && txt[1].s = "C:\kf\a.txt"
+    && txt[2].t = "仅名字" && txt[2].s = "",
+    "15a 展示条目: 标题 = 文件名含后缀, 副标题 = 完整路径 (Flow 双行); 名字空回落路径",
+    "实际 " txt.Length " 项: '" txt[1].t "|" txt[1].s "' / '" txt[2].t "|" txt[2].s "'")
 
 ResetObservers()
 ok15 := EverythingResults.Show([{path: DIR_EXISTS, name: "x", isFolder: true}], 1)
 ll15 := LastLines()
-Verify(ok15 = true && ResultsPushCount() = 1 && ll15.Length = 1 && ll15[1] = DIR_EXISTS && LastIndex() = 1,
-    "15b Show: 整表经端口推送 (行文本 = 路径), 高亮 index 1 基直传",
+Verify(ok15 = true && ResultsPushCount() = 1 && ll15.Length = 1
+    && ll15[1].t = "x" && ll15[1].s = DIR_EXISTS && LastIndex() = 1,
+    "15b Show: 整表经端口推送 (标题 = name, 副标题 = 路径), 高亮 index 1 基直传",
     "实际 ok=" ok15 " Push=" ResultsPushCount() " index=" LastIndex())
 
 ResetObservers()
 EverythingResults.ShowHint("提示语")
 ll16 := LastLines()
-Verify(HintCount() = 1 && ll16.Length = 1 && ll16[1] = "提示语" && LastIndex() = 0,
-    "15c ShowHint: 推单行 + index 0 (命令框不画高亮, 该行不可被回车打开)",
+Verify(HintCount() = 1 && ll16.Length = 1 && ll16[1].t = "提示语" && ll16[1].s = "" && LastIndex() = 0,
+    "15c ShowHint: 推单条 (副标题空 = 命令框无图标整行居中) + index 0",
     "实际 提示数=" HintCount() " index=" LastIndex())
 
 ResetObservers()
@@ -699,23 +702,24 @@ Verify(r21 = 0 && NotifyRecorder.Rows.Length = 1 && NotifyRecorder.Rows[1] = 3 &
     "实际 r=" r21 " rows=" NotifyRecorder.Rows.Length)
 ; 注: InstallNotify 只安装一次 (幂等), 重载插件仅换目标 —— 故本组不需要 "重复安装" 断言。
 
-; 15g/h: 0x406 载荷 = 12B 头 (魔数 u32 / selected i32 / count u32) + 逐项 [len u32][UTF-8]
-;   —— 全小端; selected 在此处完成 1 基 → 0 基 换算 (0 = 无高亮 → -1);
-;   与 Rust 侧 decode_payload 的字段序、宽度、单位 (字节数) 必须逐项相同。
-bufG := EverythingHost.BuildResultsPayload(["ab", "c"], 2)
+; 15g/h: 0x406 载荷 (二版 'KFR2') = 12B 头 (魔数 u32 / selected i32 / count u32)
+;   + 逐项 [t_len u32][t UTF-8][s_len u32][s UTF-8] —— 全小端; selected 在此处完成
+;   1 基 → 0 基 换算 (0 = 无高亮 → -1); 与 Rust 侧 decode_payload 字段序/宽度逐项相同。
+bufG := EverythingHost.BuildResultsPayload([{t: "ab", s: "c"}], 2)
 okG := IsObject(bufG) && bufG.Size = 23
-    && NumGet(bufG, 0, "UInt") = 0x3152464B && NumGet(bufG, 4, "Int") = 1 && NumGet(bufG, 8, "UInt") = 2
+    && NumGet(bufG, 0, "UInt") = 0x3252464B && NumGet(bufG, 4, "Int") = 1 && NumGet(bufG, 8, "UInt") = 1
     && NumGet(bufG, 12, "UInt") = 2 && NumGet(bufG, 16, "UChar") = 0x61 && NumGet(bufG, 17, "UChar") = 0x62
     && NumGet(bufG, 18, "UInt") = 1 && NumGet(bufG, 22, "UChar") = 0x63
 Verify(okG,
-    "15g 0x406 载荷: 魔数 'KFR1' / selected(1基2→0基1) / count / 逐项 [len u32][UTF-8] 小端布局正确",
+    "15g 0x406 载荷 KFR2: 魔数 / selected(1基2→0基1) / count / [t_len][t][s_len][s] 小端布局正确",
     "实际 size=" (IsObject(bufG) ? bufG.Size : "非 Buffer"))
 
-bufH := EverythingHost.BuildResultsPayload(["中"], 0)
-okH := IsObject(bufH) && bufH.Size = 19 && NumGet(bufH, 4, "Int") = -1 && NumGet(bufH, 12, "UInt") = 3
+bufH := EverythingHost.BuildResultsPayload([{t: "中", s: ""}], 0)
+okH := IsObject(bufH) && bufH.Size = 23 && NumGet(bufH, 4, "Int") = -1 && NumGet(bufH, 12, "UInt") = 3
     && NumGet(bufH, 16, "UChar") = 0xE4 && NumGet(bufH, 17, "UChar") = 0xB8 && NumGet(bufH, 18, "UChar") = 0xAD
+    && NumGet(bufH, 20, "UChar") = 0 && NumGet(bufH, 21, "UChar") = 0
 Verify(okH,
-    "15h 0x406 载荷: 中文按 UTF-8 (3 字节/字) 编码, len = 字节数; index 0 → selected -1 (无高亮)",
+    "15h 0x406 载荷: 中文 UTF-8 (3 字节) + 空 s (len 0); index 0 → selected -1 (无高亮)",
     "实际 size=" (IsObject(bufH) ? bufH.Size : "非 Buffer") " selected=" (IsObject(bufH) ? NumGet(bufH, 4, "Int") : "n/a"))
 
 ; --- 断言 16: 搜索徽标与搜索模式同生命周期 (2026-10-04 新增: 0x40A/0x40B) ---

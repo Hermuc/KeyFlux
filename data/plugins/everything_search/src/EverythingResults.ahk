@@ -13,7 +13,9 @@
 ;   * 唯一出参 = 经 EverythingHost 端口把数据推给命令框;
 ;   * 不自建窗口、不查 Everything、不读配置、不发键、不做 hit-test —— 鼠标命中判断在
 ;     命令框侧 (它才知道行几何), 经 0x409 回推给会话层 (见 EverythingSession.OnBoxNotify);
-;   * 显示文本口径 = 完整路径 (命令框以 DT_PATH_ELLIPSIS 保留首尾, 长路径可读)。
+;   * 显示口径 = **Flow Launcher 双行版式** (2026-10-04): 标题 = 文件名含后缀 (上行, 黑),
+;     副标题 = 完整路径 (下行, 灰); 图标由命令框按路径自提系统图标 (数据源只给路径 ——
+;     与 Flow Launcher 的「UI 层自提图标」同架构, 本插件零图标职责)。
 ;
 ; 消息契约 (与引擎协议 0x401-0x405 同构, 只加不改):
 ;   0x406 WM_COPYDATA (dwData = 'KFR1')  ← 整表推送 (EverythingHost.ShowResults)
@@ -51,7 +53,7 @@ class EverythingResults {
    * @returns {Boolean} 是否成功推送给命令框
    */
   static Show(items, index) {
-    return EverythingHost.ShowResults(EverythingResults.Lines(items), index)
+    return EverythingHost.ShowResults(EverythingResults.Entries(items), index)
   }
 
   /** 只移动高亮 (命令框**不会**回推本消息, 单向 —— 防回声环)。@param index 1 基; 0 = 无 */
@@ -64,17 +66,22 @@ class EverythingResults {
     return EverythingHost.ClearResults()
   }
 
-  /** 单行提示 (无高亮): 打开失败等需要留在屏上的说明。 */
+  /** 单行提示 (无高亮): 打开失败等需要留在屏上的说明。副标题空 = 命令框整行居中、无图标。 */
   static ShowHint(text) {
-    return EverythingHost.ShowResults([text], 0)
+    return EverythingHost.ShowResults([{t: text, s: ""}], 0)
   }
 
-  /** 展示文本 = 完整路径; 路径为空时回落到名字 (口径与旧 ListView 列一致)。 */
-  static Lines(items) {
-    lines := []
-    for it in items
-      lines.Push((it.path != "") ? it.path : it.name)
-    return lines
+  /**
+   * 展示条目 (KFR2 双字段): 标题 = 文件名含后缀 (Flow Launcher Title), 副标题 = 完整路径
+   * (SubTitle, 兼作命令框的图标提取键)。名字为空回落路径 (口径与旧单行版一致)。
+   */
+  static Entries(items) {
+    es := []
+    for it in items {
+      t := (it.name != "") ? it.name : it.path
+      es.Push({t: t, s: it.path})
+    }
+    return es
   }
 }
 

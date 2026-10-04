@@ -365,6 +365,15 @@ pub fn list_scroll_color(s: &Skin) -> Rgb {
     themed(s, 0.22, 0.18)
 }
 
+/// 结果行**副标题** (路径) 色 —— Flow Launcher 的灰: 主文字色 (keyColor@keyOpacity
+/// 叠面板内容色) 再向面板内容色混 45% (0.55 叠加)。向内容色收敛保证任何皮肤下
+/// 都比标题弱一档、且与底色差恒 ≥ 可见 (标题色对底色差大 ⇒ 混 45% 后仍可见)。
+pub fn list_sub_color(s: &Skin) -> Rgb {
+    let base = panel_content_color(s);
+    let title = over(s.key_color, s.key_opacity, base);
+    over(title, 0.55, base)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

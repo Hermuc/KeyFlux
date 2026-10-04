@@ -42,8 +42,12 @@ pub enum AppEvent {
     CancelHide,
     /// WM_CHAR, 码元已按 wParam 低 16 位截取 (R17)
     Char(u16),
-    /// 0x406 (WM_COPYDATA): 结果列表整表替换; `selected` 0 基, `-1` = 无高亮
-    SetResults { items: Vec<String>, selected: i32 },
+    /// 0x406 (WM_COPYDATA): 结果列表整表替换; `selected` 0 基, `-1` = 无高亮。
+    /// 项 = {title 文件名, subtitle 路径} 双行 (KFR2, 2026-10-04 Flow Launcher 版式)。
+    SetResults {
+        items: Vec<crate::results::Item>,
+        selected: i32,
+    },
     /// 0x407: 移动高亮 (0 基; `-1` = 无高亮)
     SetSelection(i32),
     /// 0x408: 收起结果列表
@@ -362,8 +366,11 @@ mod tests {
 
     // ---- 2026-10-04 结果列表面板 (0x406/0x407/0x408) ----
 
-    fn results(items: &[&str]) -> Vec<String> {
-        items.iter().map(|s| (*s).to_string()).collect()
+    fn results(items: &[&str]) -> Vec<crate::results::Item> {
+        items
+            .iter()
+            .map(|t| crate::results::Item::new(*t, format!("C:\\dir\\{t}")))
+            .collect()
     }
 
     /// 0x406: 整表替换 + 重排窗口; 高亮为 0 基。

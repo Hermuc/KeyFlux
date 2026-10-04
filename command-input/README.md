@@ -51,7 +51,7 @@ src/
   geometry.rs      R11/R13/R28 几何公式(截断取整;125% 闭环)
   easing.rs        R15 Accelerate-Decelerate 0.5/0.5
   protocol.rs      R14-R19/R22 事件分派状态机(AppEvent -> Command)
-  results.rs       结果列表面板模型 + 0x406 载荷编解码(纯逻辑; 与 AHK 侧逐字节对齐)
+  results.rs       结果列表面板模型(Flow 双行 {title,subtitle}) + 0x406 'KFR2' 载荷编解码(纯逻辑; 与 AHK 侧逐字节对齐)
   badge.rs         搜索徽标(2026-10-04): 字形注册表 + 放大镜 SDF(解析式 AA; 插件只传编号)
   compose.rs       逐像素合成(圆角矩形 SDF/覆盖率 AA/高斯阴影/预乘/徽标叠色) —— 白边与填充各自 alpha
   sound.rs         R24 触发点枚举 + SoundBackend trait

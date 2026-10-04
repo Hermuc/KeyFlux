@@ -41,24 +41,24 @@ class EverythingHost {
   static MSG_BADGE_SHOW := 0x040A       ; 显示搜索徽标 (wParam = 字形编号)
   static MSG_BADGE_HIDE := 0x040B       ; 隐藏搜索徽标
   static BADGE_MAGNIFIER := 1           ; 放大镜字形 (与 command-input/src/badge.rs 注册表同值)
-  static PAYLOAD_MAGIC := 0x3152464B    ; 'K','F','R','1' 的小端 u32
+  static PAYLOAD_MAGIC := 0x3252464B    ; 'K','F','R','2' 的小端 u32 (二版: 双字段/项)
   static MAX_PAYLOAD_BYTES := 4194304   ; 4MiB (与 command-input 的 MAX_PAYLOAD_BYTES 同值)
   static NO_SELECTION := -1             ; 载荷/0x407 的「无高亮」(与 command-input results.rs 同值)
 
   /**
    * 推送结果列表 (0x406)。
-   * @param lines 展示文本数组 (顺序即列表顺序)
+   * @param entries 条目数组 (每项 {t: 标题/文件名, s: 副标题/路径}; 顺序即列表顺序)
    * @param index 高亮行 (1 基; 0 = 无高亮 —— 提示行)
    * @returns {Boolean} 是否已送达 (命令框未运行 / 载荷构造失败 = false)
    */
-  static ShowResults(lines, index) {
+  static ShowResults(entries, index) {
     impl := EverythingHost.Impl
     if (IsObject(impl))
-      return impl.ShowResults(lines, index)
+      return impl.ShowResults(entries, index)
     hwnd := this._FindBoxWindow()
     if (!hwnd)
       return false
-    buf := EverythingHost.BuildResultsPayload(lines, index)
+    buf := EverythingHost.BuildResultsPayload(entries, index)
     if (!IsObject(buf))
       return false
     ; COPYDATASTRUCT 布局 (x64 有对齐填充): dwData@0, cbData@A_PtrSize, lpData@(对齐后)。
@@ -140,20 +140,22 @@ class EverythingHost {
   }
 
   /**
-   * 构造 0x406 载荷 (Buffer)。格式 (全小端):
-   *   [0..4) 魔数 'KFR1' ; [4..8) selected i32 ; [8..12) count u32 ;
-   *   重复 count 次: [len u32][len 字节 UTF-8]
+   * 构造 0x406 载荷 (Buffer)。二版 'KFR2' (2026-10-04 Flow Launcher 双行版式), 全小端:
+   *   [0..4) 魔数 'KFR2' ; [4..8) selected i32 ; [8..12) count u32 ;
+   *   重复 count 次: [t_len u32][t UTF-8][s_len u32][s UTF-8]
+   *   (t = 标题/文件名, s = 副标题/路径 —— 兼作命令框的图标提取键)
    * @returns {Buffer|0} 0 = 构造失败 (超限 / 编码异常) —— 调用方据此拒绝发送
    */
-  static BuildResultsPayload(lines, index) {
+  static BuildResultsPayload(entries, index) {
     try {
-      n := lines.Length
-      lens := []
+      n := entries.Length
+      meta := []
       total := 12
-      for l in lines {
-        b := StrPut(l, "UTF-8") - 1     ; StrPut 返回含 NUL 的字节数
-        lens.Push(b)
-        total += 4 + b
+      for e in entries {
+        tb := StrPut(e.t, "UTF-8") - 1     ; StrPut 返回含 NUL 的字节数
+        sb := StrPut(e.s, "UTF-8") - 1
+        meta.Push([tb, sb])
+        total += 4 + tb + 4 + sb
       }
       if (total > EverythingHost.MAX_PAYLOAD_BYTES)
         return 0
@@ -163,12 +165,17 @@ class EverythingHost {
       NumPut("UInt", n, buf, 8)
       off := 12
       i := 1
-      for l in lines {
-        b := lens[i]
-        NumPut("UInt", b, buf, off)
-        if (b > 0)
-          StrPut(l, buf.Ptr + off + 4, "UTF-8")
-        off += 4 + b
+      for e in entries {
+        tb := meta[i][1]
+        sb := meta[i][2]
+        NumPut("UInt", tb, buf, off)
+        if (tb > 0)
+          StrPut(e.t, buf.Ptr + off + 4, "UTF-8")
+        off += 4 + tb
+        NumPut("UInt", sb, buf, off)
+        if (sb > 0)
+          StrPut(e.s, buf.Ptr + off + 4, "UTF-8")
+        off += 4 + sb
         i += 1
       }
       return buf

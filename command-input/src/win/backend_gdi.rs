@@ -46,16 +46,17 @@ use windows::Win32::Graphics::Gdi::{
     CreateSolidBrush, DeleteDC, DeleteObject, DrawTextW, FillRect, GdiFlush, GetDC, ReleaseDC,
     SelectClipRgn, SelectObject, SetBkMode, SetTextColor, SetWindowRgn, ValidateRect, AC_SRC_ALPHA,
     AC_SRC_OVER, ANTIALIASED_QUALITY, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION,
-    CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DIB_RGB_COLORS, DRAW_TEXT_FORMAT, DT_CENTER, DT_NOPREFIX,
-    DT_PATH_ELLIPSIS, DT_SINGLELINE, DT_VCENTER, FR_PRIVATE, FW_BOLD, HBITMAP, HBRUSH, HDC, HFONT,
-    HGDIOBJ, HRGN, OUT_DEFAULT_PRECIS, RGBQUAD, TRANSPARENT,
+    CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DIB_RGB_COLORS, DRAW_TEXT_FORMAT, DT_CENTER,
+    DT_END_ELLIPSIS, DT_NOPREFIX, DT_PATH_ELLIPSIS, DT_SINGLELINE, DT_VCENTER, FR_PRIVATE, FW_BOLD,
+    HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HRGN, OUT_DEFAULT_PRECIS, RGBQUAD, TRANSPARENT,
 };
 use windows::Win32::System::Threading::Sleep;
 use windows::Win32::UI::Controls::MARGINS;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CharUpperW, GetWindowRect, UpdateLayeredWindow, ULW_ALPHA,
+    CharUpperW, DrawIconEx, GetWindowRect, UpdateLayeredWindow, DI_NORMAL, ULW_ALPHA,
 };
 
+use super::shell_icon::IconCache;
 use crate::compose;
 use crate::config;
 use crate::easing::accelerate_decelerate;
@@ -67,6 +68,15 @@ use crate::win::resources;
 /// 结果行文本格式: 单行 + 垂直居中 + 路径省略 (保留首尾) + 不解析 & 前缀。
 /// `DT_LEFT` = 0, 无需显式或入。
 const LIST_TEXT_FORMAT: DRAW_TEXT_FORMAT =
+    DRAW_TEXT_FORMAT(DT_SINGLELINE.0 | DT_VCENTER.0 | DT_NOPREFIX.0 | DT_PATH_ELLIPSIS.0);
+
+/// 结果行**标题** (文件名) 格式: 尾部省略 (文件名不做路径省略 —— 首段丢了不可读)。
+const LIST_TITLE_FORMAT: DRAW_TEXT_FORMAT =
+    DRAW_TEXT_FORMAT(DT_SINGLELINE.0 | DT_VCENTER.0 | DT_NOPREFIX.0 | DT_END_ELLIPSIS.0);
+
+/// 结果行**副标题** (路径) 格式: 路径省略 (保留首尾, 同 Flow Launcher SubTitle 的
+/// `TextTrimming="CharacterEllipsis"` + 完整路径语义)。
+const LIST_SUB_FORMAT: DRAW_TEXT_FORMAT =
     DRAW_TEXT_FORMAT(DT_SINGLELINE.0 | DT_VCENTER.0 | DT_NOPREFIX.0 | DT_PATH_ELLIPSIS.0);
 
 /// 常规字重 (FW_NORMAL = 400; 查询区用 FW_BOLD 与其分层)。
@@ -165,8 +175,10 @@ impl Drop for Dib {
 /// 懒创建的 GDI 资源 (R23: 首次 WM_PAINT 才创建) + 自合成面与合成计划。
 struct Resources {
     font: HFONT,
-    /// 结果行字体 (常规字重, 小字号)
-    list_font: HFONT,
+    /// 结果行**标题**字体 (常规字重, Flow 版式上行)
+    list_title_font: HFONT,
+    /// 结果行**副标题**字体 (常规字重, 小一号灰)
+    list_sub_font: HFONT,
     bg_brush: HBRUSH,     // 背景刷 (backgroundColor)
     grid_brush: HBRUSH,   // 网格刷 (grid_content_color 反解色)
     shadow_brush: HBRUSH, // 框外带底色 = 阴影色 (预乘后只留 alpha)
@@ -184,7 +196,8 @@ impl Drop for Resources {
         unsafe {
             for h in [
                 HGDIOBJ(self.font.0),
-                HGDIOBJ(self.list_font.0),
+                HGDIOBJ(self.list_title_font.0),
+                HGDIOBJ(self.list_sub_font.0),
                 HGDIOBJ(self.bg_brush.0),
                 HGDIOBJ(self.grid_brush.0),
                 HGDIOBJ(self.shadow_brush.0),
@@ -209,6 +222,10 @@ pub struct GdiBackend {
     text_color: COLORREF,
     /// 结果行文字色 COLORREF (当前与查询区同色, 独立字段便于后续分层调优)
     list_text_color: COLORREF,
+    /// 结果行副标题 (路径) 色 COLORREF (主文字色向面板内容色混 45%, Flow 灰)
+    list_sub_color: COLORREF,
+    /// 系统文件图标缓存 (按路径; 见 `shell_icon` 模块解耦注)
+    icons: IconCache,
     res: Option<Resources>,
     /// 满不透明度时的**预乘**帧缓存 (淡出时逐帧缩放它, 避免重绘 GDI)
     frame_full: Vec<u8>,
@@ -221,6 +238,8 @@ impl GdiBackend {
             gain: 255,
             text_color: COLORREF(0),
             list_text_color: COLORREF(0),
+            list_sub_color: COLORREF(0),
+            icons: IconCache::new(),
             res: None,
             frame_full: Vec::new(),
         }
@@ -335,8 +354,10 @@ impl GdiBackend {
         };
         // 查询区: 粗体 44.0 DIP → -55px @125% (负值 = 字符高度; R23)
         let font = make_font(geometry::font_height_px(dpi), FW_BOLD.0 as i32)?;
-        // 结果行: 常规字重 17.0 DIP → -21px @125% (2026-10-04 列表)
-        let list_font = make_font(geometry::list_font_px(dpi), FW_NORMAL)?;
+        // 结果行标题: 常规字重 14.0 DIP → -18px @125% (Flow Launcher 标定)
+        let list_title_font = make_font(geometry::list_title_font_px(dpi), FW_NORMAL)?;
+        // 结果行副标题: 常规字重 11.0 DIP → -14px @125%
+        let list_sub_font = make_font(geometry::list_sub_font_px(dpi), FW_NORMAL)?;
 
         // 网格内容色 (反解) 与结果区派生色 (R28; 见 skin 模块注)
         let grid = skin::grid_content_color(s);
@@ -374,7 +395,8 @@ impl GdiBackend {
 
         Ok(Resources {
             font,
-            list_font,
+            list_title_font,
+            list_sub_font,
             bg_brush,
             grid_brush,
             shadow_brush,
@@ -639,7 +661,9 @@ impl GdiBackend {
         }
     }
 
-    /// 结果行绘制: 选中底色 + 左侧强调条 + 路径省略文本 + 超一屏时的滚动条。
+    /// 结果行绘制 (2026-10-04 Flow Launcher 版式): 选中底色 + 左侧强调条 +
+    /// [文件图标 | 标题(黑)/路径(灰) 双行] + 超一屏时的滚动条。
+    /// 单行提示 (subtitle 空) 退化为整行居中的旧观感。
     fn draw_results(
         &self,
         hdc: HDC,
@@ -661,11 +685,13 @@ impl GdiBackend {
         let vis = state.results.visible_rows();
         let has_bar = total > vis && vis > 0;
         let text_right = inner_r - pad - if has_bar { sb_w + sb_m } else { 0 };
+        let icon_sz = geometry::list_icon_px(dpi);
+        let icon_gap = geometry::list_icon_gap_px(dpi);
         let (start, end) = state.results.window();
         let sel = state.results.selected();
 
         unsafe {
-            let old_font = SelectObject(hdc, HGDIOBJ(res.list_font.0));
+            let old_font = SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, self.list_text_color);
             for (i, ri) in (start..end).enumerate() {
@@ -687,22 +713,65 @@ impl GdiBackend {
                     };
                     FillRect(hdc, &acc, res.accent_brush);
                 }
-                let Some(text) = state.results.item(ri) else {
+                let Some(item) = state.results.item(ri) else {
                     continue;
                 };
-                let mut u: Vec<u16> = text.encode_utf16().collect();
-                if u.is_empty() {
+
+                // ---- Flow Launcher 版式 (2026-10-04): [图标 | 标题(黑) / 路径(灰)] ----
+                if item.subtitle.is_empty() {
+                    // 单行提示 (ShowHint): 无图标, 整行垂直居中 (与旧观感连续)
+                    let mut u: Vec<u16> = item.title.encode_utf16().collect();
+                    if u.is_empty() {
+                        continue;
+                    }
+                    let mut tr = RECT {
+                        left: inner_l + pad,
+                        top,
+                        right: text_right.max(inner_l + pad + 1),
+                        bottom: top + row_h,
+                    };
+                    DrawTextW(hdc, &mut u, &mut tr, LIST_TEXT_FORMAT);
                     continue;
                 }
-                let mut tr = RECT {
-                    left: inner_l + pad,
-                    top,
-                    right: text_right.max(inner_l + pad + 1),
-                    bottom: top + row_h,
-                };
-                // 🔴 结果行**不**做显示层大写化 (那是查询区/原版观感的口径);
-                //    文件名大小写有语义, 不得改写。
-                DrawTextW(hdc, &mut u, &mut tr, LIST_TEXT_FORMAT);
+
+                // 文件图标: 左侧图标盒, 行内垂直居中 (提取失败 = 只有文字, 不带崩渲染)。
+                // 系统图标 RGB 经 DrawIconEx 落到 DIB, alpha 仍由 compose 按几何写入
+                // ⇒ 图标与文字同享面板净不透明度, 观感一致。
+                let icon_left = inner_l + pad;
+                if let Some(hicon) = self.icons.get(&item.subtitle) {
+                    let iy = top + (row_h - icon_sz) / 2;
+                    let _ = DrawIconEx(
+                        hdc, icon_left, iy, hicon, icon_sz, icon_sz, 0, None, DI_NORMAL,
+                    );
+                }
+                let text_left = icon_left + icon_sz + icon_gap;
+
+                // 标题 (上行, 主文字色): 文件名含后缀, 上半带垂直居中
+                let mut tu: Vec<u16> = item.title.encode_utf16().collect();
+                if !tu.is_empty() {
+                    let mut tr = RECT {
+                        left: text_left,
+                        top: top + 2,
+                        right: text_right.max(text_left + 1),
+                        bottom: top + row_h / 2 + 2,
+                    };
+                    DrawTextW(hdc, &mut tu, &mut tr, LIST_TITLE_FORMAT);
+                }
+                // 副标题 (下行, 灰): 完整路径, 下半带垂直居中, 路径省略保留首尾
+                let mut su: Vec<u16> = item.subtitle.encode_utf16().collect();
+                if !su.is_empty() {
+                    SelectObject(hdc, HGDIOBJ(res.list_sub_font.0));
+                    SetTextColor(hdc, self.list_sub_color);
+                    let mut sr = RECT {
+                        left: text_left,
+                        top: top + row_h / 2 - 2,
+                        right: text_right.max(text_left + 1),
+                        bottom: top + row_h - 2,
+                    };
+                    DrawTextW(hdc, &mut su, &mut sr, LIST_SUB_FORMAT);
+                    SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
+                    SetTextColor(hdc, self.list_text_color);
+                }
             }
             SelectObject(hdc, old_font);
 
@@ -776,6 +845,7 @@ impl RenderBackend for GdiBackend {
         .as_colorref();
         self.text_color = COLORREF(text_col);
         self.list_text_color = COLORREF(text_col);
+        self.list_sub_color = COLORREF(skin::list_sub_color(state.skin).as_colorref());
         let res = Self::create_resources(state)?;
         let plan = res.plan.clone();
         self.res = Some(res);

@@ -78,10 +78,20 @@ pub const BADGE_STROKE_DIP: f64 = 1.6;
 
 // ---- 结果列表面板几何 (DIP; 与皮肤 18 键解耦 —— 皮肤文件由生成端产出,
 //      新增列表键会牵动生成器与 parity 基线, 故 v1 走内建常数) ----
-/// 结果行高 (DIP)。
-pub const LIST_ROW_DIP: f64 = 30.0;
-/// 结果行字号 (DIP; 常规字重, 与查询区 44 DIP 粗体区分层)。
-pub const LIST_FONT_DIP: f64 = 17.0;
+/// 结果行高 (DIP)。Flow Launcher 标定: 行高 58px @1x (SettingsPaneThemeViewModel
+/// 默认 ItemHeightSize=58); @125% = 58px。
+pub const LIST_ROW_DIP: f64 = 46.0;
+/// 结果行**标题** (文件名含后缀) 字号 (DIP)。Flow Launcher 默认 ResultItemFontSize=16px
+/// @行高58 的比例折算 (@125% = 18px)。
+pub const LIST_TITLE_FONT_DIP: f64 = 14.0;
+/// 结果行**副标题** (路径) 字号 (DIP)。Flow Launcher ResultSubItemFontSize=13/16 比例
+/// (@125% = 14px)。
+pub const LIST_SUB_FONT_DIP: f64 = 11.0;
+/// 结果行左侧文件图标边长 (DIP)。Flow Launcher ImageIconStyle 32px/58px 行的比例
+/// (@125% = 35px)。
+pub const LIST_ICON_DIP: f64 = 28.0;
+/// 图标与文本的水平间距 (DIP)。
+pub const LIST_ICON_GAP_DIP: f64 = 10.0;
 /// 查询区/结果区分隔线高 (DIP)。
 pub const LIST_SEPARATOR_DIP: f64 = 1.0;
 /// 列表底部留白 (DIP): 末行不贴圆角。
@@ -231,7 +241,7 @@ mod tests {
         assert_eq!(APP_RESULTS_SELECT, 0x0407);
         assert_eq!(APP_RESULTS_CLEAR, 0x0408);
         assert_eq!(APP_RESULTS_NOTIFY, 0x0409);
-        assert_eq!(crate::results::PAYLOAD_MAGIC.to_le_bytes(), *b"KFR1");
+        assert_eq!(crate::results::PAYLOAD_MAGIC.to_le_bytes(), *b"KFR2");
     }
 
     /// R4/附录 C #11: GDI 后端实际 ex-style = 0x08080008 (design C §4 表)。
