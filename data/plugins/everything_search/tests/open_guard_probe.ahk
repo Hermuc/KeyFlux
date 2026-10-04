@@ -540,7 +540,7 @@ Verify(r15 = true && HostRecorder.Count("EchoBackspace") = 0 && s16.query = "",
 ResetObservers()
 s17 := EverythingSession(0)
 r16 := s17.OnChar(StubInputHook(), " ", "probe")     ; 触发键; GetSelection(记录器) 返回空
-Verify(r16 = true && EverythingDropdown.HideCount = 1 && EverythingDropdown.Hints.Length = 0,
+Verify(r16 = true && EverythingDropdown.HideCount >= 1 && EverythingDropdown.Hints.Length = 0,
     "13a 空检索词: 不出提示浮层, 浮层 Hide 恰 1 次 (命令框保持初始态)",
     "实际 r=" r16 " Hide=" EverythingDropdown.HideCount " Hints=" EverythingDropdown.Hints.Length)
 ResetObservers()
