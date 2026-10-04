@@ -75,9 +75,10 @@ class EverythingController {
     ; 重读 plugin-settings.json; 只有值真的变了才让通道探测缓存失效 (见 Load 的注释)。
     if (EverythingSettings.Load(this.api))
       EverythingProviders.Reset()
-    ; 上一会话残留 (正常流程 EndSession 已 Close; 兜底防 IME 轮询定时器跨会话泄漏)
+    ; 上一会话残留 (正常流程 EndSession 已 Close; 兜底防定时器/浮层跨会话泄漏)
     if (this.session != 0)
       this.session.Close()
+    EverythingDropdown.Hide()
     this.session := EverythingSession(this.api)
   }
 
@@ -166,6 +167,7 @@ class EverythingSession {
       EverythingHost.UnlockForSearch(ih)
       EverythingHost.BoxActivateForSearch()
       EverythingHost.BoxForeground()
+      EverythingDropdown.Hide()   ; 清上一会话残留浮层 (防"变大"残留)
       this.SeedFromSelection()
       SetTimer(ObjBindMethod(this, "_SyncQuery"), EverythingSession.QUERY_SYNC_MS)
       this.Refresh()
@@ -261,15 +263,16 @@ class EverythingSession {
 
     res := EverythingSearch.Run(this.query, EverythingSettings.Limit)
     if (!res.ok) {
+      ; 无结果/错误 → 收起浮层 (不出提示 — 提示浮层会盖住命令框文字区且残留)
       this.items := []
       this.index := 0
-      EverythingDropdown.ShowHint(EverythingMessages.T(this._ErrorKey(res.error)))
+      EverythingDropdown.Hide()
       return
     }
     this.items := res.items
     if (res.items.Length = 0) {
       this.index := 0
-      EverythingDropdown.ShowHint(EverythingMessages.T("hint_empty"))
+      EverythingDropdown.Hide()
       return
     }
     this.index := 1
