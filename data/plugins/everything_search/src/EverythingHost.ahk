@@ -92,6 +92,13 @@ class EverythingHost {
     hwnd := this._FindBoxWindow()
     if (!hwnd)
       return false
+    ; 🔴 前台锁豁免: 引擎的钩子收到了最近输入事件 → 引擎有权调 AllowSetForegroundWindow
+    ;   授予命令框进程前台设置权限 → 命令框 0x404 处理器里的 SetForegroundWindow 才能成功
+    ;   (2026-10-04 用户实测: 无此调用时框的自激活静默失败 → 无法输入)
+    pid := 0
+    DllCall("user32\GetWindowThreadProcessId", "ptr", hwnd, "uint*", &pid := 0)
+    if (pid)
+      DllCall("user32\AllowSetForegroundWindow", "uint", pid)
     r := 0
     try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", 0x0404
         , "ptr", 0, "ptr", 0, "uint", 0x0008, "uint", 300, "ptr*", &r := 0)
