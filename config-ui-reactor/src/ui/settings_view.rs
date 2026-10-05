@@ -169,6 +169,71 @@ pub fn button_row<C: IntoUnitCallback>(
     field_row(label, control)
 }
 
+/// 标签 + 控件 + 行尾按钮 (三列: 标签 100 | 控件 STAR | 按钮 Auto)。
+///
+/// 命令框字体卡 (2503) 用户定版 2026-10-05: 「浏览」「恢复默认」从各自下面的独立
+/// 按钮行移到对应控件 (路径框 / 字重下拉) 的右侧, 四行并两行; 随后用户再定版
+/// 「框向左延伸一点」—— 标签列按本卡短标签 (字体文件/字重, 最长 4 字 ≈64px) 收窄
+/// 到 100px, 控件随之左移加宽。🔴 本行族只适配 ≤5 字的短标签; 长标签用
+/// [`field_row`] (176) / [`text_field_wide_label`] (288)。
+pub fn field_row_with_end_button<B: IntoUnitCallback>(
+    label: impl Into<String>,
+    control: View,
+    button_text: impl Into<String>,
+    on_button: B,
+) -> View {
+    Grid::new()
+        .columns([GridLength::Pixel(100.0), GridLength::STAR, GridLength::Auto])
+        .children((
+            TextBlock::new()
+                .text(label.into())
+                .font_size(theme::FONT_BODY)
+                .foreground(theme::solid(theme::CHARCOAL))
+                .vertical_alignment(VerticalAlignment::Center),
+            Border::new().grid_column(1).content(control),
+            Button::new()
+                .grid_column(2)
+                .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                .on_click(on_button)
+                .content(TextBlock::new().text(button_text.into())),
+        ))
+}
+
+/// 文本框 + 行尾按钮。
+pub fn text_field_end_button<C: IntoPayloadCallback<String>, B: IntoUnitCallback>(
+    label: impl Into<String>,
+    value: &str,
+    on_change: C,
+    button_text: impl Into<String>,
+    on_button: B,
+) -> View {
+    let control: View = TextBox::new()
+        .text(value.to_string())
+        .min_width(200.0)
+        .on_text_changed(on_change)
+        .into();
+    field_row_with_end_button(label, control, button_text, on_button)
+}
+
+/// 下拉 + 行尾按钮 (ComboBox 显式 Stretch, 口径同 [`combo_row`])。
+pub fn combo_row_end_button<C: IntoPayloadCallback<Option<usize>>, B: IntoUnitCallback>(
+    label: impl Into<String>,
+    items: &[String],
+    selected: usize,
+    on_change: C,
+    button_text: impl Into<String>,
+    on_button: B,
+) -> View {
+    let control: View = ComboBox::new()
+        .items_source(items.to_vec())
+        .selected_index(selected)
+        .min_width(180.0)
+        .horizontal_alignment(HorizontalAlignment::Stretch)
+        .on_selection_changed(on_change)
+        .into();
+    field_row_with_end_button(label, control, button_text, on_button)
+}
+
 /// 说明文字（无绑定提示，如 763/911）。
 pub fn hint_row(text: impl Into<String>) -> View {
     TextBlock::new()

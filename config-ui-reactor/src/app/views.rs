@@ -954,7 +954,7 @@ impl Shell {
             }),
         ));
 
-        // 2503 命令框字体：路径 + 浏览 + 字重 + 恢复默认
+        // 2503 命令框字体：路径+[浏览] / 字重+[恢复默认] 两行 (按钮在对应控件右侧)
         sections.push((
             sections.len(),
             self.section(context, "font", "2503", |this, context| {
@@ -974,26 +974,20 @@ impl Shell {
                     .map(|w| i18n::t(settings::font_weight_label_key(w)))
                     .collect();
                 StackPanel::new().children((
-                    settings_view::text_field(
+                    settings_view::text_field_end_button(
                         i18n::t("2504"),
                         &source,
                         context.callback(|value: String| Message::Opt(OptEdit::FontSource(value))),
-                    ),
-                    settings_view::button_row(
-                        "",
                         i18n::t("2582"),
                         context.message(Message::FontBrowse),
                     ),
-                    settings_view::combo_row(
+                    settings_view::combo_row_end_button(
                         i18n::t("2508"),
                         &weights,
                         weight_index,
                         context.callback(|value: Option<usize>| {
                             Message::Opt(OptEdit::FontWeight(value.unwrap_or(2)))
                         }),
-                    ),
-                    settings_view::button_row(
-                        "",
                         i18n::t("2507"),
                         context.message(Message::Opt(OptEdit::FontReset)),
                     ),
