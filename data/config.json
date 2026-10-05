@@ -2198,7 +2198,7 @@
   ],
   "options": {
     "hideMatrix": false,
-    "keyfluxVersion": "2.0-beta33",
+    "keyfluxVersion": "1.0-beta1",
     "windowGroups": [
       {
         "id": -1,
@@ -2268,16 +2268,12 @@
     "language": "",
     "keyMapping": "",
     "keyboardLayout": "1 2 3 4 5 6 7 8 9 0\nq w e r t y u i o p\na s d f g h j k l ;\nz x c v b n m , . /\nspace enter backspace - [ ' singlePress",
-    "quickSwitch": {
-      "collectEnabled": true,
-      "autoShow": true,
-      "autoJumpOpen": true,
-      "autoJumpSave": false,
-      "pollIntervalMs": 800,
-      "maxHistory": 200,
-      "overlayRows": 8,
-      "overlayRowsCompact": 4,
-      "excludedPrefixes": []
+    "plugins": {
+      "disabled": null
+    },
+    "commandFont": {
+      "sourcePath": "",
+      "weight": ""
     }
   },
   "selectedAction": {
