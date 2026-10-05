@@ -24,42 +24,6 @@ pub fn read_site_text(deploy_root: &Path, rel: &str) -> Option<String> {
     std::fs::read_to_string(path).ok()
 }
 
-/// 快捷方式列表：`<deploy>/shortcuts/*.lnk`，返回**相对部署根**的路径。
-///
-/// 与 `GetShortcutsHandler` **逐字同口径**（2026-09-29 实测对账后修正两处易踩差异）：
-/// * 分隔符 —— Go 用 `filepath.Glob` 得到的是 `<root>\shortcuts\X.lnk`，再按
-///   `f[len(root)+1:]` 截取 ⇒ 结果是**反斜杠**（`shortcuts\X.lnk`）。此处用
-///   [`Path::join`] 生成同样的反斜杠形态；**不能手写 `shortcuts/{name}`**（正斜杠会
-///   与后端返回值不等，实测已复现）。
-/// * 条目类型 —— `filepath.Glob` 只按**名字**匹配，不 stat、因此**目录条目也算命中**。
-///   这里刻意不加 `is_file()` 过滤以保持同口径（多过滤一个 `foo.lnk` 目录即行为变更）。
-///
-/// 排序与 `filepath.Glob` 一致（字典序）。目录不存在 ⇒ `None`（回退后端）。
-pub fn list_shortcuts(deploy_root: &Path) -> Option<Vec<String>> {
-    let dir = deploy_root.join("shortcuts");
-    if !dir.is_dir() {
-        return None;
-    }
-    let mut names = std::fs::read_dir(&dir)
-        .ok()?
-        .filter_map(Result::ok)
-        .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| name.ends_with(".lnk"))
-        .collect::<Vec<_>>();
-    names.sort();
-    Some(
-        names
-            .into_iter()
-            .map(|name| {
-                Path::new("shortcuts")
-                    .join(name)
-                    .to_string_lossy()
-                    .into_owned()
-            })
-            .collect(),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,37 +73,5 @@ mod tests {
         );
         // 缺失 ⇒ None（调用方回退后端）。
         assert!(read_site_text(tree.root(), "/missing.md").is_none());
-    }
-
-    #[test]
-    fn list_shortcuts_returns_sorted_backslash_paths() {
-        let tree = TempDeploy::new("lnk");
-        let dir = tree.root().join("shortcuts");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("b.lnk"), b"x").unwrap();
-        std::fs::write(dir.join("a.lnk"), b"x").unwrap();
-        std::fs::write(dir.join("note.txt"), b"x").unwrap(); // 非 .lnk 忽略
-        std::fs::create_dir_all(dir.join("sub.lnk")).unwrap(); // 目录：与 Go `filepath.Glob` 同口径，**计入**
-
-        // 分隔符必须是 `\`（后端口径）；`sub.lnk` 目录也计入 ⇒ 三项目。
-        assert_eq!(
-            list_shortcuts(tree.root()).unwrap(),
-            vec![r"shortcuts\a.lnk", r"shortcuts\b.lnk", r"shortcuts\sub.lnk"]
-        );
-    }
-
-    #[test]
-    fn list_shortcuts_is_none_when_directory_absent() {
-        let tree = TempDeploy::new("none");
-        assert!(list_shortcuts(tree.root()).is_none());
-    }
-
-    #[test]
-    fn list_shortcuts_empty_directory_is_some_empty() {
-        // 目录存在但为空 ⇒ `Some(vec![])`（与后端返回 null 后 `unwrap_or_default()` 等价，
-        // 但**不**触发回退 —— 空目录是合法状态，不应再往返一次后端）。
-        let tree = TempDeploy::new("empty");
-        std::fs::create_dir_all(tree.root().join("shortcuts")).unwrap();
-        assert_eq!(list_shortcuts(tree.root()), Some(Vec::new()));
     }
 }

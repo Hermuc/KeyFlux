@@ -17,8 +17,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use serde::Deserialize;
 
 use super::api::{
-    ApiResponse, EmptyJson, MessageBody, SelectedActionTestResponse, SettingsApi, ShortcutInfo,
-    finish_response,
+    ApiResponse, EmptyJson, MessageBody, SelectedActionTestResponse, SettingsApi, finish_response,
 };
 use super::backend::settings_exe_candidates;
 use crate::models::{
@@ -133,10 +132,6 @@ impl SettingsApi for CliSettingsApi {
             Err(error) => return ApiResponse::transport_error(error.to_string()),
         };
         self.call("PUT", "/config", Some((&payload, "application/json")))
-    }
-
-    fn get_shortcuts(&self) -> ApiResponse<Vec<ShortcutInfo>> {
-        self.call("GET", "/shortcuts", None)
     }
 
     fn send_server_command(&self, id: i32) -> ApiResponse<EmptyJson> {
@@ -379,9 +374,9 @@ mod tests {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let api = api_with(stub(Arc::clone(&seen), Ok((200, b"[]".to_vec()))));
 
-        let _ = api.get_shortcuts();
+        let _ = api.get_config();
 
-        assert_eq!(seen.lock().unwrap().as_slice(), ["GET /shortcuts"]);
+        assert_eq!(seen.lock().unwrap().as_slice(), ["GET /config"]);
     }
 
     #[test]
@@ -391,7 +386,7 @@ mod tests {
             Ok((400, br#"{"message":"boom"}"#.to_vec())),
         ));
 
-        let response = api.get_shortcuts();
+        let response = api.get_config();
 
         assert!(!response.success);
         assert_eq!(response.status, 400);

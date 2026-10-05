@@ -11,6 +11,7 @@
 use windows_reactor::*;
 
 use crate::services::action_editor::RadioItem;
+use crate::services::i18n;
 use crate::theme;
 
 /// 面板外框（卡片）。
@@ -25,6 +26,98 @@ pub fn frame(body: View) -> View {
 }
 
 /// 字段：标签在上、控件在下（纵向），底部留 10px。
+/// 窗口拾取准星按钮 (移植自旧 Avalonia `WindowPickButton`, git `1f3dc9f^`)。
+///
+/// 点击 → 平台层 `platform::window_picker` 拾取会话 (准星光标 + 实时高亮 + 单击
+/// 提交 / Esc·右键取消); 结果经 `Message::WindowPicked` 写回「要激活的窗口」。
+/// 图标 = 旧版用户定版的矢量准星 1:1 复刻 (四臂圆头 + 中心点 + 两层同心环,
+/// 2048 画布实测等比), 冷色化后取主题令牌: 臂/点 = [`theme::ACCENT`],
+/// 环 = [`theme::RING_SOFT`] (旧 Cream 的对位; BORDER_FAINT 在浅底上不可见)。
+/// `enabled = false` 用于拾取会话进行中 (防重入, 与平台层 BUSY 双保险)。
+/// 窗口拾取准星按钮 (移植自旧 Avalonia `WindowPickButton`, git `1f3dc9f^`)。
+///
+/// 点击 → 平台层 `platform::window_picker` 拾取会话 (准星光标 + 实时高亮 + 单击
+/// 提交 / Esc·右键取消); 结果经 `Message::WindowPicked` 写回「要激活的窗口」。
+/// 图标 = 旧版用户定版的矢量准星 1:1 复刻 (四臂圆头 + 中心点 + 两层同心环,
+/// 2048 画布实测等比), 冷色化后取主题令牌: 臂/点 = [`theme::ACCENT`],
+/// 环 = [`theme::RING_SOFT`] (旧 Cream 的对位; BORDER_FAINT 在浅底上不可见)。
+/// `enabled = false` 用于拾取会话进行中 (防重入, 与平台层 BUSY 双保险)。
+/// 返回收尾后的 View; 需要网格定位/外边距时由调用方用 `Border` 包装挂
+/// (`grid_column` 等布局属性必须挂在**网格直接子级**上, 而 `.content()` 即收尾)。
+pub fn pick_button(on_click: impl IntoUnitCallback, enabled: bool) -> View {
+    // 旧 Canvas 200×200 几何 (等比): 臂宽 17 (圆帽端部 = 圆角矩形), 同心环
+    // r75/r54 描边 10, 中心点 Ø16.7。圆帽线段 100,8.4→100,79 等价圆角矩形:
+    // 起止各延伸 8.5 ⇒ y 0..87.5。
+    const HALF_W: f64 = 8.5;
+    let accent = theme::solid(theme::ACCENT);
+    let ring = theme::solid(theme::RING_SOFT);
+    let outer_ring = Ellipse::new()
+        .width(150.0)
+        .height(150.0)
+        .canvas_left(25.0)
+        .canvas_top(25.0)
+        .stroke(ring)
+        .stroke_thickness(10.0);
+    let inner_ring = Ellipse::new()
+        .width(108.0)
+        .height(108.0)
+        .canvas_left(46.0)
+        .canvas_top(46.0)
+        .stroke(ring)
+        .stroke_thickness(10.0);
+    let top_arm = Rectangle::new()
+        .width(ARM_W)
+        .height(87.5)
+        .canvas_left(100.0 - HALF_W)
+        .canvas_top(0.0)
+        .fill(accent)
+        .radius_x(HALF_W)
+        .radius_y(HALF_W);
+    let bottom_arm = Rectangle::new()
+        .width(ARM_W)
+        .height(87.5)
+        .canvas_left(100.0 - HALF_W)
+        .canvas_top(112.5)
+        .fill(accent)
+        .radius_x(HALF_W)
+        .radius_y(HALF_W);
+    let left_arm = Rectangle::new()
+        .width(87.5)
+        .height(ARM_W)
+        .canvas_left(0.0)
+        .canvas_top(100.0 - HALF_W)
+        .fill(accent)
+        .radius_x(HALF_W)
+        .radius_y(HALF_W);
+    let right_arm = Rectangle::new()
+        .width(87.5)
+        .height(ARM_W)
+        .canvas_left(112.5)
+        .canvas_top(100.0 - HALF_W)
+        .fill(accent)
+        .radius_x(HALF_W)
+        .radius_y(HALF_W);
+    let dot = Ellipse::new()
+        .width(16.7)
+        .height(16.7)
+        .canvas_left(91.65)
+        .canvas_top(91.65)
+        .fill(accent);
+    const ARM_W: f64 = 17.0;
+    let canvas = Canvas::new().width(200.0).height(200.0).children((
+        outer_ring, inner_ring, top_arm, bottom_arm, left_arm, right_arm, dot,
+    ));
+    let icon = Viewbox::new()
+        .width(20.0)
+        .height(20.0)
+        .slots([SlotView::new(ViewboxSlot::Child, canvas)]);
+    Button::new()
+        .on_click(on_click)
+        .is_enabled(enabled)
+        .content(icon)
+        .tooltip(i18n::t("1080"))
+}
+
 pub fn field(label: impl Into<String>, control: View) -> View {
     StackPanel::new()
         .spacing(4.0)

@@ -1,4 +1,4 @@
-//! `app` 的消息与界面枚举**类型定义**（自原 `app.rs` 拆分）。
+﻿//! `app` 的消息与界面枚举**类型定义**（自原 `app.rs` 拆分）。
 //!
 //! 本文件只放类型/枚举与 `build_nav`，不含行为逻辑。
 
@@ -145,6 +145,10 @@ pub enum Message {
     },
     /// 窗口侦探（`POST /server/command/2`）。
     WindowSpy,
+    /// 窗口拾取准星（动作编辑面板「要激活的窗口」行）：发起拾取会话。
+    PickWindow,
+    /// 拾取会话结束（成功文本 / 取消 / 失败码；平台层 `window_picker` 的唯一出口）。
+    WindowPicked(crate::platform::window_picker::PickOutcome),
     /// 非保存类命令的结果提示（与 `SaveFinished` 同处理）。
     Notice(Result<String, String>),
 
@@ -154,7 +158,6 @@ pub enum Message {
         config: Box<Config>,
         port: u16,
         doc_md: String,
-        shortcuts: Vec<String>,
         /// 部署根（`<deploy>`）；`None` = 未能解析（清空历史等运行期文件操作将不可用）。
         data_root: Option<std::path::PathBuf>,
     },

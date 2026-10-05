@@ -1,4 +1,4 @@
-//! `app` 的 views：页面装配方法（把 Shell 状态 + ViewContext 翻译成 View）。
+﻿//! `app` 的 views：页面装配方法（把 Shell 状态 + ViewContext 翻译成 View）。
 //!
 //! 自原 `app.rs` 的 `impl Shell` 拆分；纯代码搬移，行为不变。
 
@@ -1209,11 +1209,26 @@ impl Shell {
         action: &Action,
         context: &mut ViewContext<Self>,
     ) -> View {
-        let win_title = action_editor_view::text_box(
+        let win_title_box = action_editor_view::text_box(
             &action.win_title,
             false,
             context.callback(|value: String| Message::EditField(ActionField::WinTitle(value))),
         );
+        // 301 行 = 文本框 + 准星拾取按钮 (旧版 WindowPickButton 的回归, 用户报障
+        // 2026-10-05): 会话进行中按钮置灰; 结果经 Message::WindowPicked 写回同一字段。
+        let win_title: View = Grid::new()
+            .columns([GridLength::STAR, GridLength::Auto])
+            .children((
+                Border::new().grid_column(0).content(win_title_box),
+                Border::new()
+                    .grid_column(1)
+                    .margin(Thickness::new(6.0, 0.0, 0.0, 0.0))
+                    .vertical_alignment(VerticalAlignment::Center)
+                    .content(action_editor_view::pick_button(
+                        context.message(Message::PickWindow),
+                        !self.picking,
+                    )),
+            ));
         let args = action_editor_view::text_box(
             &action.args,
             false,
@@ -1230,28 +1245,12 @@ impl Shell {
             context.callback(|value: String| Message::EditField(ActionField::Comment(value))),
         );
 
-        // 目标：文本框 + 快捷方式下拉（选中即填入目标，复刻旧版的 shortcuts 下拉）
+        // 目标：纯文本框（2026-10-05 用户定版移除快捷方式下拉 —— 下拉恒空、价值低）
         let target = action_editor_view::text_box(
             &action.target,
             false,
             context.callback(|value: String| Message::EditField(ActionField::Target(value))),
         );
-        let shortcuts: View = if self.shortcuts.is_empty() {
-            View::empty()
-        } else {
-            let paths = self.shortcuts.clone();
-            action_editor_view::combo(
-                paths.clone(),
-                None,
-                true,
-                context.callback(move |index: Option<usize>| {
-                    match index.and_then(|i| paths.get(i).cloned()) {
-                        Some(path) => Message::EditField(ActionField::Target(path)),
-                        None => Message::Noop,
-                    }
-                }),
-            )
-        };
 
         let error: View = match action_editor::evaluate_win_title_error(&action.win_title) {
             Some(message) => action_editor_view::field_error(message),
@@ -1267,19 +1266,11 @@ impl Shell {
         let spy: View = Button::new()
             .on_click(context.message(Message::WindowSpy))
             .content(i18n::t("309"));
-        let target_rows: Vec<(usize, View)> = vec![(0, target), (1, shortcuts)];
-
         let rows: Vec<(usize, View)> = vec![
             (0, action_editor_view::field(i18n::t("301"), win_title)),
             (1, hint),
             (2, error),
-            (
-                3,
-                action_editor_view::field(
-                    i18n::t("302"),
-                    StackPanel::new().spacing(6.0).keyed_children(target_rows),
-                ),
-            ),
+            (3, action_editor_view::field(i18n::t("302"), target)),
             (4, action_editor_view::field(i18n::t("303"), args)),
             (5, action_editor_view::field(i18n::t("304"), working_dir)),
             (6, action_editor_view::field(i18n::t("305"), comment)),

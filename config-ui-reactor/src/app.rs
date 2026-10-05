@@ -1,4 +1,4 @@
-//! 根组件与外壳（迁移自 `MainWindow.axaml` + `MainViewModel`）。
+﻿//! 根组件与外壳（迁移自 `MainWindow.axaml` + `MainViewModel`）。
 //!
 //! 旧结构映射：
 //! * 无边框窗口 + 自绘标题栏 ⇒ `TitleBar` 控件（Fluent：标题栏可承载导航，三键系统原生）
@@ -56,6 +56,8 @@ pub struct Shell {
     loading: bool,
     error: Option<String>,
     notice: Option<String>,
+    /// 窗口拾取会话进行中（准星按钮防重入 + 置灰；会话经 spawn_background 阻塞线程）。
+    picking: bool,
     /// 提示条是否为**错误**（红）：保存失败不再踢出整页（对齐旧版「弹窗报错、现场保留」）。
     notice_error: bool,
     /// 上次页脚保存发起时刻（1 秒节流，复刻 `MainViewModel.SaveCommand` 的 `useThrottleFn`）。
@@ -167,8 +169,6 @@ pub struct Shell {
     sa_hotkey_conflict: bool,
     /// 当前窗口分组（复刻 `store.windowGroupID`）。
     window_group_id: i32,
-    /// 快捷方式下拉数据（`GET /shortcuts`，用于「启动程序或激活窗口」的目标选择）。
-    shortcuts: Vec<String>,
 }
 
 impl Component for Shell {
@@ -185,6 +185,7 @@ impl Component for Shell {
             loading: true,
             error: None,
             notice: None,
+            picking: false,
             notice_error: false,
             last_save: None,
             session,
@@ -242,7 +243,6 @@ impl Component for Shell {
             hotkey_pending_save: false,
             sa_hotkey_conflict: false,
             window_group_id: 0,
-            shortcuts: Vec::new(),
         }
     }
 
@@ -386,7 +386,6 @@ impl Component for Shell {
                 config,
                 port,
                 doc_md,
-                shortcuts,
                 data_root,
                 ui_prefs,
             } => {
@@ -395,7 +394,6 @@ impl Component for Shell {
                 self.config = Some(*config);
                 self.port = Some(port);
                 self.doc_md = doc_md;
-                self.shortcuts = shortcuts;
                 self.data_root = data_root;
                 // CLI 传输没有端口 ⇒ 登记本地静态站目录：指南图片走直读 + `source_data`、
                 // 内部链接走 `file:///`。HTTP 模式**不登记** ⇒ 行为与改动前完全一致。
@@ -468,6 +466,38 @@ impl Component for Shell {
                     self.pending.restore(failure.remaining);
                 }
             },
+            // 窗口拾取准星 (动作编辑面板 301 行): 会话跑在后台线程, 阻塞至
+            // Esc/右键/左键提交; 防重入由 picking 标志 (按钮置灰) + 平台层 BUSY 双保险。
+            Message::PickWindow => {
+                if self.picking {
+                    return;
+                }
+                self.picking = true;
+                // 高亮框颜色 = 品牌强调色 (theme 令牌直取, 与 UI 同源)。
+                let accent = theme::ACCENT;
+                let highlight = crate::platform::window_picker::Rgb(accent.r, accent.g, accent.b);
+                let _ = context.spawn_background(move |_token| {
+                    Message::WindowPicked(crate::platform::window_picker::pick(highlight))
+                });
+            }
+            Message::WindowPicked(outcome) => {
+                self.picking = false;
+                match outcome.status {
+                    crate::platform::window_picker::PickStatus::Success => {
+                        // 写回与手工输入同一条 apply_field 通路 (空值联动等语义一致)。
+                        self.apply_field(ActionField::WinTitle(outcome.text));
+                    }
+                    crate::platform::window_picker::PickStatus::AccessDenied => {
+                        self.notice_error = true;
+                        self.notice = Some(i18n::t("1081"));
+                    }
+                    crate::platform::window_picker::PickStatus::NoWindow => {
+                        self.notice_error = true;
+                        self.notice = Some(i18n::t("1082"));
+                    }
+                    crate::platform::window_picker::PickStatus::Cancelled => {}
+                }
+            }
             Message::Notice(result) => match result {
                 Ok(text) => {
                     self.notice_error = false;

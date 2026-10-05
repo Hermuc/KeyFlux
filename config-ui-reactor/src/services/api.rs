@@ -1,4 +1,4 @@
-//! settings.exe（Go）HTTP 客户端 —— 严格对齐 `config-ui-avalonia/Services/SettingsApiClient.cs`。
+﻿//! settings.exe（Go）HTTP 客户端 —— 严格对齐 `config-ui-avalonia/Services/SettingsApiClient.cs`。
 //!
 //! **契约铁律**：
 //! * 只作 `http://127.0.0.1:{KEYFLUX_PORT}` 的客户端；**永不因网络异常 panic**，
@@ -89,14 +89,6 @@ pub struct MessageBody {
     pub restart_failed: Option<bool>,
 }
 
-/// `GET /shortcuts` 的列表项。
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct ShortcutInfo {
-    /// 相对部署根的路径，如 `shortcuts\微信.lnk`。
-    #[serde(default)]
-    pub path: String,
-}
-
 /// 形如 `{}` 的空对象响应体（`POST /server/command/:id`）。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct EmptyJson {}
@@ -133,7 +125,6 @@ pub trait SettingsApi: Send + Sync {
     fn health_check(&self) -> bool;
     fn get_config(&self) -> ApiResponse<Config>;
     fn save_config(&self, config: &Config) -> ApiResponse<MessageBody>;
-    fn get_shortcuts(&self) -> ApiResponse<Vec<ShortcutInfo>>;
     fn send_server_command(&self, id: i32) -> ApiResponse<EmptyJson>;
     /// `GET /api/behaviors`：行为目录快照（内置 + 用户两组）。
     fn get_behaviors(&self) -> ApiResponse<BehaviorCatalogResponse>;
@@ -350,10 +341,6 @@ impl SettingsApi for HttpSettingsApi {
         self.put_json("config", config)
     }
 
-    fn get_shortcuts(&self) -> ApiResponse<Vec<ShortcutInfo>> {
-        self.get("shortcuts")
-    }
-
     fn send_server_command(&self, id: i32) -> ApiResponse<EmptyJson> {
         self.post_empty(&format!("server/command/{id}"))
     }
@@ -510,14 +497,6 @@ mod tests {
         let new: MessageBody =
             serde_json::from_str(r#"{"message":"ok","restartFailed":true}"#).unwrap();
         assert_eq!(new.restart_failed, Some(true));
-    }
-
-    #[test]
-    fn shortcut_info_reads_path() {
-        let list: Vec<ShortcutInfo> =
-            serde_json::from_str(r#"[{"path":"shortcuts\\微信.lnk"}]"#).unwrap();
-        assert_eq!(list.len(), 1);
-        assert_eq!(list[0].path, "shortcuts\\微信.lnk");
     }
 
     #[test]

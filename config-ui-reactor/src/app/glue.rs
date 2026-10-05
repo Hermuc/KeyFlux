@@ -1,4 +1,4 @@
-//! `app` 的后台连接/保存**自由函数**（自原 `app.rs` 拆分）。
+﻿//! `app` 的后台连接/保存**自由函数**（自原 `app.rs` 拆分）。
 //!
 //! 非 UI 线程侧：连接后端（直连或子进程）、拉配置。保存统一走
 //! `services::save_pipeline`（保存策略唯一实现处）。
@@ -61,19 +61,6 @@ fn assemble(api: &dyn SettingsApi, port: u16, options: &BackendSessionOptions) -
             .unwrap_or_default();
     }
 
-    // 快捷方式列表：同为纯目录 glob（`GET /shortcuts` 无任何变换）⇒ 本机直读优先；
-    // 目录缺失时回退后端（后端空目录返回 null ⇒ 容忍为空）。
-    let shortcuts = root
-        .and_then(crate::services::local_fs::list_shortcuts)
-        .unwrap_or_else(|| {
-            api.get_shortcuts()
-                .value
-                .unwrap_or_default()
-                .into_iter()
-                .map(|item| item.path)
-                .collect()
-        });
-
     // 面板私有 UI 偏好：部署根可得时读取（缺失/损坏 ⇒ 默认值，不影响装载）。
     let ui_prefs = data_root
         .as_deref()
@@ -84,7 +71,6 @@ fn assemble(api: &dyn SettingsApi, port: u16, options: &BackendSessionOptions) -
         config: Box::new(config),
         port,
         doc_md,
-        shortcuts,
         data_root,
         ui_prefs,
     }
