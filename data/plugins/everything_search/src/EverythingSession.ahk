@@ -278,7 +278,7 @@ class EverythingSession {
       return
     }
 
-    res := EverythingSearch.Run(this.query, EverythingSettings.Limit)
+    res := EverythingSearch.Run(this.query)
     if (!res.ok) {
       ; 无结果/错误 → 收起列表 (不出提示 — 提示会盖住命令框文字区且残留)
       this.items := []

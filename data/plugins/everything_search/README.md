@@ -88,7 +88,7 @@ everything.exe -startup
 进程数与 IPC 退出码 —— 两者**完全等价**，唯一差异就是窗口是否出现。
 另有 `es_silent_launch_test.ahk` 双场景断言 9/9 通过（未运行 → 静默拉起且不抢焦点；
 已运行 → 不重启且 PID 不变）。（两个探针均为开发期临时脚本，**未入库** ——
-入库的回归探针只有 `tests/open_guard_probe.ahk`，其余证据见 §4.3 的开发期约定。）
+（`open_guard_probe.ahk` 与 `max_results_probe.ahk` 为入库的回归探针；其余证据见 §4.3 的开发期约定。）
 
 ---
 
@@ -157,6 +157,7 @@ everything.exe -startup
 | `src/EverythingResults.ahk` | 结果列表**视图端口**：只把行文本推给命令框（渲染/几何在命令框内），并接收 0x409 回推 |
 | `src/EverythingSession.ahk` | 命令框会话状态机 + 控制器（`CommandInputHooks` provider） |
 | `tests/open_guard_probe.ahk` | 守卫链 + 结果推送契约回归探针（51 项；stub 引擎端口，不建窗口） |
+| `tests/max_results_probe.ahk` | 结果条数上限回归探针（14 项；真集成：直连插件 es.exe 查真实 Everything，上限生效/保序/条目契约） |
 
 依赖引擎侧接口：`CommandInputHooks`（`bin/lib/core/CommandInputHooks.ahk`）、
 `CommandDisplay`（回显收口：`EchoChar` / `EchoBackspace` / `ActivateCommandWindow`，
@@ -258,14 +259,23 @@ es.exe 查询会读取 Everything.ini 的 `sort=` / `sort_ascending=`（便携�
 
 设置存 `data/plugin-settings.json`（契约 `docs/CONTRACTS.md` §3.8），键空间按
 `"<pluginId>:<key>"` 隔离，由**设置界面经后端 `PUT /api/plugins/:id/settings` 写入**
-（后端是唯一写入者，AHK 侧只读）。四个键：
+（后端是唯一写入者，AHK 侧只读）。三个键：
 
 | key | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `triggerKey` | char | `" "` | 前置触发键，单个可打印字符 |
 | `everythingPath` | file | 空 | `everything.exe` 完整路径，未运行时用它**静默**拉起 |
 | `esPath` | file | 空 | `es.exe` 路径（可选，留空走 §1 的探测链） |
-| `limit` | number | `20` | 下拉条数上限（1–300，与 `plugin.json` 的 min/max 及 `EverythingSettings.NormLimit` 同口径） |
+
+结果条数上限 **1000**（`EverythingSearch.MAX_RESULTS`，通道层经 `es.exe -n` 落实；实测
+`-n` 在**排序之后**截断，不破坏 GUI 同序）。
+
+> 🔴 2026-10-05 修订 2026-10-04 的「不设上限」：英文短词会同时引爆三条管线约束 ——
+> 实测本机查询 `ge` 返回 **72,870 条 / 导出 9.4MB**（中文如「是」仅 11 条，故当时未暴露）：
+> ① 逐行 `FileExist` 复核 7 万+ 次 ⇒ 引擎线程阻塞数秒（用户视角即「命令框卡死」）；
+> ② 0x406 载荷 9-11MB 超过两侧同值的 `MAX_PAYLOAD_BYTES`（4 MiB）⇒ 构造失败被
+> `BuildResultsPayload` **静默拒绝** ⇒ 不出列表；③ 数万条目的跨进程编组本身也是无谓开销。
+> 1000 条载荷 ≈ 150KB，通道导出与解析均在几十毫秒级；可视区不足仍由命令框侧滚动跟随。
 
 **热重载**：`EverythingSettings.Load()` 在**每次命令框会话开始时**重读该文件，故设置面板保存后
 **无需重启引擎**即刻生效。`Load` 只在值真的变了才返回 `true`，调用方据此决定是否让
@@ -305,8 +315,9 @@ es.exe 查询会读取 Everything.ini 的 `sort=` / `sort_ascending=`（便携�
   命令框的 DPI / 皮肤 / 圆角 / 阴影，折叠时回落基准几何（不残留、不「留下一个空盒子」）。
 - 列表**可见行数上限 12 行**（`command-input/src/config.rs` 的 `LIST_MAX_ROWS`，并按屏幕高度收敛）；
   超出部分靠 `↑`/`↓`、鼠标悬停或滚轮移动高亮**自动滚动跟随**（滚轮步长 3 行），右侧画细滚动条。
-  `limit` 默认 20 时结果全部落在可视区内；`limit` 上限 300 > 12 ⇒ 配大上限后仍会有结果在可视区
-  之外 —— 高亮行始终保持在可视窗口内，且 `limit` 只影响检索条数，不改变窗口最大高度。
+  结果条数按 `EverythingSearch.MAX_RESULTS`（1000）封顶（2026-10-05 修订，理由见 §设置）
+  ⇒ 命中很多时列表仍完整可滚，超出可见 12 行的部分靠滚动跟随 —— 高亮行始终保持在可视
+  窗口内；可见行数只决定窗口高度，不改变结果条数。
 - 鼠标交互（点选 / 悬停 / 滚轮）在命令框侧命中判定后经 0x409 回推；**点选**与回车走同一条守卫链
   （失败时列表不收、提示留在屏上，见 §1 与探针第 11 组）。
 
@@ -326,11 +337,11 @@ es.exe 查询会读取 Everything.ini 的 `sort=` / `sort_ascending=`（便携�
 
 | 功能点 | 落实情况 |
 |---|---|
-| **触发键配置** | ✅ 代码与文档一致：`plugin.json` 声明与 `EverythingSettings.NormKey`（可打印 ASCII 单字符，否则回落空格）与 `EverythingSession.OnChar` 的前置键判定逐条对账通过；`limit` 范围文档漂移（1–100 → 1–300）已订正（§6、§8 与 `plugin.json` min/max 及 `NormLimit` 三处同口径） |
+| **触发键配置** | ✅ 代码与文档一致：`plugin.json` 声明与 `EverythingSettings.NormKey`（可打印 ASCII 单字符，否则回落空格）与 `EverythingSession.OnChar` 的前置键判定逐条对账通过 |
 | **选中文字获取** | ✅ 一致：`SeedFromSelection` → `SelectionContext.Get(true)`（引擎真身返回 `{type, content}`，已只读核对 `bin/lib/context/SelectionContext.ahk`）、`capturing` 捕获锁、文件取首文件主名（去扩展名）均与 §1/§4.1 描述相符 |
 | **结果下拉展示** | ✅ 一致（本次修一处缺口）：`-Caption +ToolWindow +E0x08000000` + `Show("NA")`、命令框锚定（可见白框对齐 + 隐藏窗口二次探测）与文档相符；**发现并修复**：鼠标点选路径 `OnPick` 在 `OpenSelected` 失败时仍无条件 `Close()`，失效提示被立刻收起 —— 与 2026-09-30 Enter 分支修的是同一症状，已对齐为「仅成功才收浮层」并补探针第 11 组；`ED_ROWS` 文档漂移（10 → 30）已订正 |
 | **未启动时静默拉起** | ✅ 代码与文档一致：`ProcessExist` 探活 → `-startup` 拉起 → 250ms × 6s 轮询 → `HideMainWindowIfAny` 兜底（类名黑名单）；「没配路径 vs 配了拉不起来」双提示在 `EverythingSearch.Run` + `_ErrorKey` 落实 |
-| **路径配置** | ✅ 一致：四键声明（`Settings []Setting` 数组形，已对 `internal/plugins/plugins.go:126` 核对）、`ResolveEs` 四级探测链与 `es.exe -version` 实测、GUI 降级通道及 `err_launched_gui` 提示均在；§2 依赖清单已补 `CommandDisplay` / `CommandImeGuard`（引擎侧文件均已只读核对存在）并订正 APIBridge 实际消费面（仅 `settings`） |
+| **路径配置** | ✅ 一致：三键声明（`Settings []Setting` 数组形，已对 `internal/plugins/plugins.go:126` 核对）、`ResolveEs` 四级探测链与 `es.exe -version` 实测、GUI 降级通道及 `err_launched_gui` 提示均在；§2 依赖清单已补 `CommandDisplay` / `CommandImeGuard`（引擎侧文件均已只读核对存在）并订正 APIBridge 实际消费面（仅 `settings`） |
 
 ### 遗留项
 
