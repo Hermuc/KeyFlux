@@ -1,7 +1,7 @@
 {
   "schema": "api-parity-manifest/2",
   "transport": "Call",
-  "sourceExeSha256": "37ae2061d5a23959614c50342e3958d6dc0eecd5165804a58aef97133221ee56",
+  "sourceExeSha256": "95a76233290b25e95ea3e19c62f683589fc61d4502abae2bf1f65fe70a74c8cd",
   "items": [
     { "step": 1, "method": "GET", "path": "/health", "corpus": null, "multipart": false, "bodyFrom": null, "stateful": false, "ref": "GET_health.json" },
     { "step": 2, "method": "GET", "path": "/config", "corpus": null, "multipart": false, "bodyFrom": null, "stateful": false, "ref": "GET_config.json" },

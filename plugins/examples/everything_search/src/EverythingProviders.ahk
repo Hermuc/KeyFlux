@@ -26,25 +26,32 @@ global ES_ERR_LAUNCH_FAILED := "launch-failed"    ; 降级也失败
 global ES_ERR_EMPTY := "empty-query"
 global ES_ERR_NO_PATH := "no-everything-path"     ; 未配置 everything.exe 路径
 
-/** 查询通道基类 (接口契约, 见文件头)。 */
+/**
+ * 查询通道基类 (接口契约, 见文件头)。
+ *
+ * Search 契约 (2026-10-05): `maxResults` = 结果条数上限, `0` = 不限制。
+ * 上限数值是**编排层的策略** (EverythingSearch.MAX_RESULTS), 通道只落机制 ——
+ * 通道实现不得自定数值, 保证换通道时策略仍单点可控。
+ */
 class EverythingProvider {
   Name := "base"
 
   /**
    * @param query 检索词 (已归一)
-   * @param limit 结果条数上限
+   * @param maxResults 结果条数上限 (0 = 不限制)
    * @returns {{ok:Boolean, error:String, items:Array}}
    */
-  Search(query, limit) {
+  Search(query, maxResults := 0) {
     return {ok: false, error: ES_ERR_QUERY, items: []}
   }
 }
 
 /**
  * ES 通道 —— 官方命令行 es.exe。
- * 调用形态: es.exe -timeout 4000 -n <limit> -export-txt "<out>" "<query>"
+ * 调用形态: es.exe -timeout 4000 [-n N] [-sort …] -export-txt "<out>" "<query>"
  *   -timeout   : 等 Everything 数据库加载完成 (冷启动/刚拉起时必需, 否则静默返回空)
- *   -n         : 结果条数上限
+ *   -n         : 结果条数上限 (maxResults > 0 时才传)。实测截断发生在**排序之后**
+ *                (-sort date-modified 下 -n 10 = 最近修改的前 10 条), 不破坏 GUI 同序口径
  *   -export-txt: 结果按行落文件 (AHK 无法直接读子进程 stdout, 这是最稳的一条; 官方选项)
  * 退出码 (官方文档): 0 成功 / 5 无法创建导出文件 / 7 IPC 查询失败 / 8 找不到 IPC 窗口
  * (即 Everything 未运行)。
@@ -59,9 +66,10 @@ class EverythingEsProvider extends EverythingProvider {
     this.exe := exe
   }
 
-  Search(query, limit) {
+  Search(query, maxResults := 0) {
     out := this._OutFile()
-    cmd := '"' this.exe '" -timeout 4000 -n ' limit this._SortArgs() ' -export-txt "' out '"' this._QuerySuffix(query)
+    cmd := '"' this.exe '" -timeout 4000' this._MaxResultsArgs(maxResults) this._SortArgs()
+         . ' -export-txt "' out '"' this._QuerySuffix(query)
     code := 0
     try {
       code := RunWait(cmd, , "Hide")
@@ -84,7 +92,7 @@ class EverythingEsProvider extends EverythingProvider {
       return {ok: false, error: ES_ERR_EXPORT, items: []}
     }
     try FileDelete(out)   ; 结果已读入内存; 删除失败不影响功能 (临时目录可回收)
-    return {ok: true, error: "", items: this.ParseExport(text, limit)}
+    return {ok: true, error: "", items: this.ParseExport(text)}
   }
 
   /**
@@ -93,7 +101,7 @@ class EverythingEsProvider extends EverythingProvider {
    * 同时用 FileExist 复核 (路径可能已不存在而目录标志仍在)。
    * @returns {Array<{path, name, isFolder}>}
    */
-  ParseExport(text, limit) {
+  ParseExport(text) {
     items := []
     if (text = "")
       return items
@@ -109,13 +117,20 @@ class EverythingEsProvider extends EverythingProvider {
       if (p = "")
         continue
       items.Push({path: p, name: this._BaseName(p), isFolder: isFolder})
-      if (items.Length >= limit)
-        break
     }
     return items
   }
 
   ; ---- 内部 ----
+
+  /**
+   * 结果条数上限参数: maxResults > 0 时返回 " -n N", 否则空串 (0 = 不限制, es 返回全部匹配)。
+   * 上限**必须**由编排层传入 (Search 的 maxResults 参数), 本通道不内置任何数值 ——
+   * 通道层只做机制, 条数策略归 EverythingSearch.MAX_RESULTS。
+   */
+  _MaxResultsArgs(maxResults) {
+    return (maxResults > 0) ? " -n " maxResults : ""
+  }
 
   ; ---- 排序对齐 (2026-09-25 用户报障: 命令框结果与 Everything GUI 不一致) ----
   ; GUI 的结果列表按其当前排序展示 (本机实测 Everything.ini: sort=Date Modified +
@@ -215,17 +230,27 @@ class EverythingEsProvider extends EverythingProvider {
 /**
  * 降级通道 —— 用 everything.exe 直接把界面打开到搜索结果。
  * 触发条件: es.exe 缺失 (用户未装 CLI)。结果不在本插件下拉列表里, 浮层会明确说明。
+ *
+ * 🔴 每会话只允许启动一次 (2026-10-03 用户报障「进入搜索模式后每打一个字都调出
+ *   Everything 主窗口」): 本通道由**每次击键的 Refresh** 触发, 无节制时逐键
+ *   `Run everything.exe -search`, 主窗口反复抢前台。AllowLaunch 由会话层
+ *   (EverythingSession.__New) 复位为 true, 首次成功启动后置 false —— 同一会话内
+ *   后续击键只出降级提示, 不再启动。
  */
 class EverythingGuiProvider extends EverythingProvider {
   Name := "gui-launch"
+  static AllowLaunch := true
 
   __New(exe) {
     this.exe := exe
   }
 
-  Search(query, limit) {
+  Search(query, maxResults := 0) {
+    ; 降级通道无结果列表, maxResults 无意义 (签名对齐基类契约)
     if (this.exe = "" || !FileExist(this.exe))
       return {ok: false, error: ES_ERR_NOT_FOUND, items: []}
+    if (!EverythingGuiProvider.AllowLaunch)
+      return {ok: false, error: ES_ERR_NO_ES_LAUNCHED, items: []}
     q := Trim(RegExReplace(query, "\s+", " "), " ")
     q := StrReplace(q, '"', " ")
     try {
@@ -233,6 +258,7 @@ class EverythingGuiProvider extends EverythingProvider {
     } catch {
       return {ok: false, error: ES_ERR_LAUNCH_FAILED, items: []}
     }
+    EverythingGuiProvider.AllowLaunch := false    ; 本会话已弹过, 后续击键不再启动
     return {ok: false, error: ES_ERR_NO_ES_LAUNCHED, items: []}
   }
 }

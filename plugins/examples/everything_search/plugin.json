@@ -6,8 +6,16 @@
   "specVersion": 1,
   "description": "在命令框里按下前置键 (默认空格), 用 Everything 搜索当前选中的文字; 搜索结果在命令框正下方以下拉列表展示, 可用 ↑↓ 选择、回车打开。Everything 未运行时自动拉起。",
   "author": "KeyFlux",
-  "entry": {"kind": "script", "file": "main.ahk", "func": "EverythingSearchMain"},
-  "permissions": ["selection", "run", "settings"],
+  "entry": {
+    "kind": "script",
+    "file": "main.ahk",
+    "func": "EverythingSearchMain"
+  },
+  "permissions": [
+    "selection",
+    "run",
+    "settings"
+  ],
   "bundled": true,
   "settings": [
     {
@@ -38,17 +46,6 @@
       "filter": "es.exe",
       "hint": "Everything 官方命令行 es.exe。留空则自动依次尝试: everything.exe 同目录 → 插件 bin/ → 系统 PATH。",
       "hintEn": "Official Everything CLI. When empty, tries: folder of everything.exe → plugin bin/ → system PATH."
-    },
-    {
-      "key": "limit",
-      "type": "number",
-      "label": "结果条数上限",
-      "labelEn": "Max results",
-      "default": "20",
-      "min": 1,
-      "max": 300,
-      "hint": "下拉列表最多展示多少条 (1-300, 列表可滚动)。",
-      "hintEn": "Maximum number of rows shown in the dropdown (1-300, scrollable)."
     }
   ]
 }
