@@ -69,8 +69,9 @@ pub const APP_BADGE_SHOW: u32 = 0x040A;
 pub const APP_BADGE_HIDE: u32 = 0x040B;
 
 // ---- 搜索徽标几何 (DIP; 与皮肤 18 键解耦, 同 LIST_* 口径) ----
-/// 字形盒边长 (DIP): @125% = 25px (对照参照图中的放大镜占位)。
-pub const BADGE_SIZE_DIP: f64 = 20.0;
+/// 字形盒边长 (DIP): @125% = 35px (2026-10-04 用户定版「放大一点点」→「再大一点」,
+/// 由 20 DIP 两次上调; 字形几何按此比例整体缩放, 描边宽独立见下)。
+pub const BADGE_SIZE_DIP: f64 = 28.0;
 /// 字形盒右缘距白框右缘的距离 (DIP): @125% = 20px。
 pub const BADGE_MARGIN_DIP: f64 = 16.0;
 /// 描边宽 (DIP): @125% = 2px (与查询区 1px 网格线区分层, 与列表 3px 强调条之间)。

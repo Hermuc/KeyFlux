@@ -207,7 +207,7 @@ pub fn frame_shape(s: &Skin, dpi: f64, w: i32, h: i32) -> compose::Shape {
 
 // ---- 搜索徽标几何 (2026-10-04: 查询区右侧固定图标, 见 crate::badge) ----
 
-/// 徽标字形盒边长 (像素): round(20 DIP × dpi / 96) (@125% = 25px)。
+/// 徽标字形盒边长 (像素): round(28 DIP × dpi / 96) (@125% = 35px)。
 pub fn badge_size_px(dpi: f64) -> i32 {
     dip_px(config::BADGE_SIZE_DIP, dpi).max(8)
 }
@@ -274,15 +274,15 @@ mod tests {
         assert_eq!(g.y, 600); // 1200×0.5
     }
 
-    /// 搜索徽标布局 @125%: 盒 25px、右缘距框 20px、查询区 (42..158) 垂直居中。
+    /// 搜索徽标布局 @125%: 盒 35px、右缘距框 20px、查询区 (42..158) 垂直居中。
     #[test]
     fn badge_layout_matches_reference() {
-        assert_eq!(badge_size_px(120.0), 25);
+        assert_eq!(badge_size_px(120.0), 35);
         assert!((badge_stroke_px(120.0) - 2.0).abs() < 1e-9);
         // R11 闭环几何: 925×200, band 42 ⇒ 查询区 42..158
         let (l, t) = badge_origin_px(925, 200, 120.0);
-        assert_eq!(l, 925 - 42 - 20 - 25);
-        assert_eq!(t, 42 + (116 - 25) / 2);
+        assert_eq!(l, 925 - 42 - 20 - 35);
+        assert_eq!(t, 42 + (116 - 35) / 2);
         // 列表展开不改基准高 ⇒ 徽标位置逐字节不变 (「固定位置不受布局变化影响」)
         let (l2, t2) = badge_origin_px(925, 200, 120.0);
         assert_eq!((l, t), (l2, t2));
