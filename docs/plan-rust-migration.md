@@ -61,7 +61,7 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 |---|---|---|---|
 | **P0 护栏** | ✅ `tools/parity/`：3 条语料（`factory` / `factory-plugins` / `synthetic`）× 3 类产物（`plan` / `ahk` / `skin`）共 **9 份基线**，SHA-256 逐字节比对；`Makefile` 加 `parity`；CI 加 `parity-gate` | harness 能抓假等价（反证：篡改任一基线 ⇒ `MISMATCH [...]` + exit 1）；`-Capture` 跑两遍拒录非确定语料 | 纯新增 |
 | **P1 面板去 HTTP** | ✅ 已就绪（**默认值保持 `http`，且据 §4 ROI 复核决定不再翻**）：Go 进程内桥 `server.Call` + `CliSettingsApi`（18 方法全覆盖）+ `new_settings_api` 统一工厂 + `--api=cli`／`KEYFLUX_API` 阀 + 静态资源直读（§5 #12）+ **探测失败自动回退 HTTP**。未做（需真机且收益不足）：CLI 下「保存→重启引擎」走 Go 的 breakaway 降级分支 | 两传输同源（**共用同一套 gin handler**）；cargo 189 全绿；Go `Call` 冒烟实测 | `--api=http` / `KEYFLUX_API=http`（免重建） |
-| **P2 Rust 接管外围** | ✅ 仅保留**零变换**项：「使用指南文档 + 快捷方式列表」改**本机直读**（`services/local_fs.rs`，读不到回退后端）。❌ `GET /config` **不可**直读替代（§5 #13）。❌ plugins / behaviors **主动不做** —— 按 §4「ROI 复核」，复刻 965 行解析逻辑换 150 ms/次不值得 | `config_doc.md` 7522B 与后端逐字节相同；`shortcuts` 146 项与后端完全相同；cargo 189 全绿 | 直读返回 `None` 即自动回退后端（等于改动前行为） |
+| **P2 Rust 接管外围** | ✅ 仅保留**零变换**项：「使用指南文档 + 快捷方式列表」改**本机直读**（`services/local_fs.rs`，读不到回退后端）。❌ `GET /config` **不可**直读替代（§5 #13）。❌ plugins / behaviors **主动不做** —— 按 §4「ROI 复核」，复刻 965 行解析逻辑换 150 ms/次不值得 | `config_doc.md` 7522B 与后端逐字节相同；`shortcuts` 146 项与后端完全相同；cargo 189 全绿 | 直读返回 `None` 即自动回退后端（等于改动前行为）。**2026-10-05 注**：shortcuts 直读已随面板「快捷方式下拉」移除而删除（`list_shortcuts` 及其单测），仅 `config_doc.md` 直读保留；`GET /shortcuts` 服务端路由不受影响 |
 | **P3 Rust 重写生成器 + drop-in** | 🚧 进行中（**已跑通首个端到端对账**）：Rust `settings.exe` 已实现 `DumpPlan`，对 3 条语料的 `plan.json` **逐字节等于 Go 基线**（`-Kinds plan` → 3/3 PASS）。已迁：文本层 / 配置模型（`model`）/ 行为目录最薄加载 / `ParseConfig`+`Preprocess` / `plan`。⏳ 待迁：两个模板改写为 Rust 生成 + `type1..type9` 渲染器 ⇒ `GenerateAHK`；随后才是 drop-in 切换 | **全语料 parity 100%**（当前 plan 段 100%）+ golden + Oracle diff | 换回 Go 二进制（开关） |
 | **P4 Go 退役** | 消费方全指向 Rust；golden/CONTRACTS/Oracle 随迁；CI 由 `go test` → cargo + parity | 三闸门 + parity 全绿 | git 历史 |
 
@@ -103,7 +103,7 @@ config-ui-reactor/            ← crate = lib + 2 bin（cargo 原生布局，不
 | 11 | 并发写 / 半写文件（面板被杀留 `*.tmp`） | `*.tmp` + 原子 rename；读侧容忍半写 |
 | 12 | ~~静态资源（指南 4 图 + 内部链接）依赖 `127.0.0.1:<port>`~~ | ✅ **已解**：vendor reactor **内建** `Image::source_data(EncodedImage)`（WinRT `SetSourceAsync` **流式**加载，不依赖 URI 方案）与 `source_file`。CLI 模式登记 `<deploy>/bin/site` 后：图片直读 + `source_data`、内部链接走 `file:///`（`ui/doc_assets.rs`）。**未登记时（HTTP 模式）行为逐字不变** |
 | 13 | **`GET /config` 的响应是 `config.json` 的严格超集** ⇒ 面板直读 `config.json` 会**静默丢字段**。2026-09-29 实测（出厂 config）：DTO 多出顶层 `fileGroups` / `matchTypes`、`options.commandFont` / `options.plugins`（`ConfigToDTO` 补），且 `options.startup` 被 `schtasks` 回填（`cfg.startup=false` 而 `dto.startup=true`） | **config 一律走后端**；若将来要直读，必须先让 `ConfigToDTO` 的派生集合成为**受测契约**（多一个派生字段即测试变红），并在 Rust 侧复刻 5 个派生项 —— 代价高，暂不做 |
-| 14 | **纯目录 glob 的两个隐性口径**（`GET /shortcuts`）：① 分隔符 —— Go 的 `filepath.Glob` 产出 `<root>\shortcuts\X.lnk` 后按前缀截取 ⇒ 结果是**反斜杠**，Rust 手写 `shortcuts/{name}` 会与后端不等（已实测复现）；② `filepath.Glob` **只按名字匹配、不 stat** ⇒ **目录条目也算命中**，加 `is_file()` 过滤即行为变更 | 复制 Go 口径（`Path::join` 生成反斜杠；不过滤目录），并以单测 + 与后端的逐项对账锁定（`services/local_fs.rs`） |
+| 14 | **纯目录 glob 的两个隐性口径**（`GET /shortcuts`）：① 分隔符 —— Go 的 `filepath.Glob` 产出 `<root>\shortcuts\X.lnk` 后按前缀截取 ⇒ 结果是**反斜杠**，Rust 手写 `shortcuts/{name}` 会与后端不等（已实测复现）；② `filepath.Glob` **只按名字匹配、不 stat** ⇒ **目录条目也算命中**，加 `is_file()` 过滤即行为变更 | 复制 Go 口径（`Path::join` 生成反斜杠；不过滤目录），并以单测 + 与后端的逐项对账锁定（`services/local_fs.rs`）。**2026-10-05 注**：该锁定实现已随面板「快捷方式下拉」移除而删除（见 §P2 注）；口径记录保留，若将来恢复直读须照此复刻 |
 
 ## 6. 安全机制（四点保证）
 
