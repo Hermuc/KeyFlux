@@ -720,7 +720,15 @@ mod tests {
         assert_eq!(plugin.entry.file, "main.ahk");
         assert_eq!(plugin.entry.func, "EverythingSearchMain");
         assert!(plugin.has_permission("settings"));
-        assert_eq!(plugin.settings.len(), 4);
+        // 2026-10-05: limit 设置随「结果条数固定上限 1000」移除 (管线策略, 非用户设置);
+        // examples 副本由 data/plugins 镜像同步, 两边清单恒一致。
+        assert_eq!(plugin.settings.len(), 3);
+        let keys: Vec<&str> = plugin
+            .settings
+            .iter()
+            .map(|setting| setting.key.as_str())
+            .collect();
+        assert_eq!(keys, ["triggerKey", "everythingPath", "esPath"]);
         // 内置 ID 经目录加载放行（导入路径仍拒绝冒名，见 validate_manifest 拆分）
         let builtin = &catalog.plugins[1];
         assert_eq!(builtin.id, "quick_switch");
