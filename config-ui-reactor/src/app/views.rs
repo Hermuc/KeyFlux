@@ -816,19 +816,19 @@ impl Shell {
                     .map(|config| config.options.scroll.clone())
                     .unwrap_or_default();
                 StackPanel::new().children((
-                    settings_view::text_field(
+                    settings_view::text_field_wide_label(
                         i18n::t("713"),
                         &scroll.delay1,
                         context
                             .callback(|value: String| Message::Opt(OptEdit::ScrollDelay1(value))),
                     ),
-                    settings_view::text_field(
+                    settings_view::text_field_wide_label(
                         i18n::t("714"),
                         &scroll.delay2,
                         context
                             .callback(|value: String| Message::Opt(OptEdit::ScrollDelay2(value))),
                     ),
-                    settings_view::text_field(
+                    settings_view::text_field_wide_label(
                         i18n::t("715"),
                         &scroll.once_line_count,
                         context
