@@ -2216,12 +2216,6 @@
         "conditionType": 1
       },
       {
-        "id": 2,
-        "name": "📂 文件对话框",
-        "value": "ahk_class #32770",
-        "conditionType": 1
-      },
-      {
         "id": 3,
         "name": "📁 File Explorer",
         "value": "ahk_exe explorer.exe",
