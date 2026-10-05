@@ -84,6 +84,36 @@ pub fn text_field<C: IntoPayloadCallback<String>>(
     field_row(label, control)
 }
 
+/// 宽标签 + 定宽窄框的文本框行。
+///
+/// 供标签超长且值很短的卡片使用 (首用 = 滚轮参数卡 713-715): 714 标签 19 字在
+/// [`field_row`] 的 176px 标签列被截断, 且数值框 ("0.2"/"0.03"/"1") 撑满 STAR 列
+/// 过宽 —— 双症状同一张卡 (用户报障 2026-10-05)。定宽口径与快捷键方案名称框同款
+/// (180 + Left, 见 [`SCHEME_COL_NAME`] 注): 定宽比 max_width 好 —— 不会随内容自适应参差。
+/// 288px 容下最长标签 (实测 ≈260); 150px 对数值绰绰有余, 更长输入框内滚动。
+pub fn text_field_wide_label<C: IntoPayloadCallback<String>>(
+    label: impl Into<String>,
+    value: &str,
+    on_change: C,
+) -> View {
+    let control: View = TextBox::new()
+        .text(value.to_string())
+        .width(150.0)
+        .horizontal_alignment(HorizontalAlignment::Left)
+        .on_text_changed(on_change)
+        .into();
+    Grid::new()
+        .columns([GridLength::Pixel(288.0), GridLength::STAR])
+        .children((
+            TextBlock::new()
+                .text(label.into())
+                .font_size(theme::FONT_BODY)
+                .foreground(theme::solid(theme::CHARCOAL))
+                .vertical_alignment(VerticalAlignment::Center),
+            Border::new().grid_column(1).content(control),
+        ))
+}
+
 /// 开关行。
 pub fn toggle_row<C: IntoPayloadCallback<bool>>(
     label: impl Into<String>,
