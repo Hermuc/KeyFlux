@@ -16,6 +16,8 @@ pub mod file_dialog;
 /// 随包字体（MiSans）进程内私有加载。
 pub mod fonts;
 pub mod job;
+/// 窗口拾取「准星」会话（WH_MOUSE_LL/WH_KEYBOARD_LL + 高亮框 + 十字光标；移植自旧 Avalonia）。
+pub mod window_picker;
 
 /// 一个窗口的声明式描述。所有开窗点都应经由它，避免逐处硬编码。
 pub struct WindowSpec {
