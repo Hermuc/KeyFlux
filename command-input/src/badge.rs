@@ -115,7 +115,7 @@ impl BadgePaint {
 mod tests {
     use super::*;
 
-    /// 25px 盒 (20 DIP @125%), 2px 描边 —— 与生产布局同参数。
+    /// 25px 盒、2px 描边的**固定夹具** (只验证字形数学, 与生产布局尺寸解耦)。
     fn paint() -> BadgePaint {
         BadgePaint::magnifier(100.0, 50.0, 25.0, 2.0)
     }
