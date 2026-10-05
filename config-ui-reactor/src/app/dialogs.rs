@@ -51,7 +51,6 @@ impl Shell {
                     context.callback(move |on: bool| {
                         Message::PsValue(index, if on { "true" } else { "false" }.to_string())
                     }),
-                    context.message(Message::PsPickFile(index)),
                 ),
             ));
         }
