@@ -159,7 +159,9 @@ pub struct Plan {
 
 impl Plan {
     /// 单像素合成结果: `(alpha 0..1, 预乘 RGB 0..255)`。
-    /// `drawn_rgb` = GDI 画出的内容色 (背景/网格/文字/结果行; 越界时传任意值)。
+    /// `drawn_rgb` = GDI 画出的内容色 (背景/网格/文字/图标/结果行), 语义 = **[R,G,B]**
+    /// (调用方负责从 DIB 的 B,G,R 内存序转序, 见 [`composite`]; 越界时传任意值)。
+    /// 返回的预乘 RGB 同为 [R,G,B] 序。
     pub fn pixel(&self, x: i32, y: i32, drawn_rgb: [f64; 3]) -> (f64, [f64; 3]) {
         let fx = x as f64 + 0.5;
         let fy = y as f64 + 0.5;
@@ -217,9 +219,15 @@ fn to_u8(v: f64) -> u8 {
     v.round().clamp(0.0, 255.0) as u8
 }
 
-/// 就地合成: 读 GDI 画好的 RGB (BGRA 序, 与 `BITMAPINFOHEADER` 的 32bpp DIB 一致),
-/// 写入**预乘** RGBA (UpdateLayeredWindow + `AC_SRC_ALPHA` 的要求)。
+/// 就地合成: 读 GDI 画好的内容色, 写入**预乘**色 (`UpdateLayeredWindow` + `AC_SRC_ALPHA` 的要求)。
 /// `gain` = 整体不透明度增益 (0..1; 淡出动效用), `dib` 必须与 `plan.w×plan.h` 同尺寸。
+/// 通道口径 (🔴 唯一真源, 两端都必须遵守):
+///   * DIB 内存序 = **B,G,R,A** (32bpp `BI_RGB` 的小端像素布局, GDI/`DrawIconEx` 同此);
+///   * [`Plan::pixel`] 的 `drawn_rgb` 语义 = **[R,G,B]** (与其 `Rgb(R,G,B)` 字段序一致),
+///     返回的预乘 RGB 同为 [R,G,B]。
+///   ⇒ 读入时首尾交换一次, 写回时 `pm[0]→R 槽 / pm[2]→B 槽`。历史上两端各错半边
+///     (读入当 [R,G,B] + 写回按 B 槽←pm[2]), 抵消成「非灰内容色 R/B 互换」—— 文件
+///     图标变互补色、选中行/强调条变暖色 (2026-10-05 用户报障修复)。
 pub fn composite(dib: &mut [u8], plan: &Plan, gain: f64) {
     let g = gain.clamp(0.0, 1.0);
     for y in 0..plan.h {
@@ -228,9 +236,11 @@ pub fn composite(dib: &mut [u8], plan: &Plan, gain: f64) {
             if i + 3 >= dib.len() {
                 return;
             }
-            let drawn = [dib[i] as f64, dib[i + 1] as f64, dib[i + 2] as f64];
+            // DIB 内存序 B,G,R → pixel 语义 [R,G,B]
+            let drawn = [dib[i + 2] as f64, dib[i + 1] as f64, dib[i] as f64];
             let (a, pm) = plan.pixel(x, y, drawn);
             // pm 已是**预乘**值 (含各自的 alpha) ⇒ 这里只再叠整体增益 g, 不能再乘一次 a。
+            // 写回按 DIB 内存序: B 槽 ← pm[2](B), G 槽 ← pm[1], R 槽 ← pm[0](R)。
             dib[i] = to_u8(pm[2] * g); // B
             dib[i + 1] = to_u8(pm[1] * g); // G
             dib[i + 2] = to_u8(pm[0] * g); // R
@@ -446,5 +456,39 @@ mod tests {
         let band = ((30 * p.w + 6) * 4) as usize;
         assert!(dib[band + 3] > 0, "带内应有阴影 alpha");
         assert!(dib[band] < 4, "阴影 RGB 必须是黑 (预乘后 B={})", dib[band]);
+    }
+
+    /// 回归 (2026-10-05 用户报障「文件图标颜色和实际不同」): 非**灰**内容色不得被
+    /// R/B 互换。旧实现读入把 DIB 的 B,G,R 内存序当 [R,G,B] 喂给 `Plan::pixel`,
+    /// 视觉上 = 所有 GDI/DrawIconEx 落盘的彩色像素红蓝互换 (蓝青图标变橙绿)。
+    /// 本测试用框内的非灰内容色锁定通道序: R/G/B 的相对大小必须原样保留。
+    #[test]
+    fn composite_keeps_channel_order() {
+        let p = plan();
+        let n = (p.w * p.h * 4) as usize;
+        let mut dib = vec![255u8; n];
+        // 模拟 GDI 落盘的靛蓝内容 (皮肤 gridlineColor #2843AD) —— BGRA 内存序
+        for px in dib.chunks_exact_mut(4) {
+            px[0] = 0xAD; // B
+            px[1] = 0x43; // G
+            px[2] = 0x28; // R
+            px[3] = 0; // GDI 不写 alpha
+        }
+        composite(&mut dib, &p, 1.0);
+        // 框内深处 (50,30): 无白边/徽标/阴影 ⇒ 各通道只按 fill_alpha 等比预乘
+        let inner = ((30 * p.w + 50) * 4) as usize;
+        let (b, g, r) = (
+            dib[inner] as f64,
+            dib[inner + 1] as f64,
+            dib[inner + 2] as f64,
+        );
+        assert!(
+            r < g && g < b,
+            "R<G<B 的相对大小必须保留 (旧 bug 会变成 B<G<R): R={r} G={g} B={b}"
+        );
+        // 预乘比: r/0x28 ≈ b/0xAD ≈ fill_alpha (同倍率 ⇒ 无逐通道畸变)
+        let rb = r / 0x28 as f64;
+        let bb = b / 0xAD as f64;
+        assert!((rb - bb).abs() < 0.02, "各通道须同倍率预乘: {rb} vs {bb}");
     }
 }
