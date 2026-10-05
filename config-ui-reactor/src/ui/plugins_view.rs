@@ -397,19 +397,14 @@ pub fn market_entry<C: IntoUnitCallback>(
         .content(StackPanel::new().spacing(0.0).keyed_children(rows))
 }
 
-/// 声明式设置行：标签 + 提示 + 编辑器（`char`/`text`/`number` 用文本框，`file` 加「选择文件」；
+/// 声明式设置行：标签 + 提示 + 编辑器（`char`/`text`/`number`/`file` 用文本框；
 /// `bool` 用开关且并入标签行右侧，无标签时独立成行）。
-pub fn setting_row<
-    C: IntoPayloadCallback<String>,
-    T: IntoPayloadCallback<bool>,
-    F: IntoUnitCallback,
->(
+pub fn setting_row<C: IntoPayloadCallback<String>, T: IntoPayloadCallback<bool>>(
     setting: &crate::models::PluginSetting,
     value: &str,
     english: bool,
     on_change: C,
     on_toggle: T,
-    on_pick_file: F,
 ) -> View {
     let mut children: Vec<(usize, View)> = Vec::new();
 
@@ -488,9 +483,7 @@ pub fn setting_row<
         // ⚠️ 0.100.0 的 TextBox 无 `MaxLength`（长度上限由保存前的校验兜底，口径同后端）
         let mut editor = TextBox::new()
             .text(value.to_string())
-            // file 类型有「浏览」按钮同行: min_width 降低防按钮被推出弹窗可视宽
-            // (2026-10-04 用户报障; 非 file 类型维持 280)
-            .min_width(if crate::services::plugins::is_file(setting) { 180.0 } else { 280.0 })
+            .min_width(280.0)
             .on_text_changed(on_change);
         // `text` 且声明 `multiline`（2026-10-02 P5）：接受回车 + 换行分隔值
         // （首个消费方 = quick_switch.excludedPrefixes），复用 action_editor 的形态。
@@ -502,22 +495,9 @@ pub fn setting_row<
         }
         let editor: View = editor.into();
 
-        // `file` 类型：文本框 + 「浏览」按钮（旧 `PluginSettingsDialogWindow.axaml:91` 用 2582；
-        // 2583 是文件对话框标题，此前误用）
-        if crate::services::plugins::is_file(setting) {
-            let pick: View = Button::new()
-                .on_click(on_pick_file)
-                .content(TextBlock::new().text(i18n::t("2582")));
-            children.push((
-                children.len(),
-                StackPanel::new()
-                    .orientation(Orientation::Horizontal)
-                    .spacing(8.0)
-                    .children((editor, pick)),
-            ));
-        } else {
-            children.push((children.len(), editor));
-        }
+        // `file` 类型不再配「浏览」按钮（2026-10-04 用户定版：长路径下按钮被截断，
+        // 且可直接手输路径）⇒ 所有非 bool 类型统一只渲染文本框。
+        children.push((children.len(), editor));
     }
 
     // `char` 且为空/空格：单字符输入框放不下视觉线索，补一行可读回显（复刻 ShowSpaceToken）
