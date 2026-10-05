@@ -10,7 +10,6 @@ class EverythingSettings {
   static TriggerKey := " "    ; 前置触发键 (单字符)
   static EverythingPath := ""
   static EsPath := ""
-  static Limit := 20
 
   ; 插件自身目录下的 es.exe 落点 (插件包自带二进制时优先可用)
   static SelfEsPath := ""
@@ -20,7 +19,7 @@ class EverythingSettings {
    *
    * 可反复调用 (设置热重载): 入口加载一次给引擎启动后的首会话用, 之后每次命令框会话
    * 开始时再调一次, 于是设置面板里改完的值**无需重启引擎**即刻生效 ——
-   * plugin-settings.json 只是一个几行的扁平文件, 4 次 Get 的代价可忽略。
+   * plugin-settings.json 只是一个几行的扁平文件, 3 次 Get 的代价可忽略。
    *
    * @param api 按 permissions 裁剪的 API 视图 (需 settings 权限)
    * @returns {Boolean} 是否有值发生变化 (调用方据此决定要不要让通道探测缓存失效 ——
@@ -31,14 +30,12 @@ class EverythingSettings {
     key := this.NormKey(api.GetSetting("triggerKey"))
     ep := this.NormPath(api.GetSetting("everythingPath"))
     esp := this.NormPath(api.GetSetting("esPath"))
-    lim := this.NormLimit(api.GetSetting("limit"))
     changed := (key != this.TriggerKey) || (ep != this.EverythingPath)
-            || (esp != this.EsPath) || (lim != this.Limit)
+            || (esp != this.EsPath)
 
     this.TriggerKey := key
     this.EverythingPath := ep
     this.EsPath := esp
-    this.Limit := lim
     this.SelfEsPath := A_ScriptDir "\..\data\plugins\everything_search\bin\es.exe"
     return changed
   }
@@ -60,15 +57,5 @@ class EverythingSettings {
   /** 路径归一: 去首尾空白与可能被粘贴进来的双引号。 */
   static NormPath(v) {
     return Trim(StrReplace(v, '"'), " `t`r`n")
-  }
-
-  /** 结果条数归一: 1-300, 非法值回落 20 (非数字输入不能让算术抛异常)。 */
-  static NormLimit(v) {
-    if (v = "" || !IsNumber(v))
-      return 20
-    n := Integer(v)
-    if (n < 1 || n > 300)
-      return 20
-    return n
   }
 }

@@ -1,7 +1,8 @@
 ; ============================================================
 ; EverythingMessages —— 插件自带文案 (中/英)。
 ; 刻意不塞进引擎的 translation.ahk: 引擎文案是「引擎 UI」的词表, 插件文案属于插件自身,
-; 混入会让引擎词表被第三方插件污染。语言判定复用引擎已公开的 SysLangIsChinese()。
+; 混入会让引擎词表被第三方插件污染。语言判定经 EverythingHost.IsChinese()
+; (引擎的 SysLangIsChinese, 引擎依赖一律走 Host 端口)。
 ;
 ; 词表纪律: **只保留有实调用点的键** —— 每个键都必须能在本插件内 grep 到
 ; `EverythingMessages.T("<键>")` (或经 `_ErrorKey` 的返回值间接命中)。2026-09-19 清理过
@@ -18,7 +19,7 @@ class EverythingMessages {
       return
     this._ready := true
     try
-      this.En := !SysLangIsChinese()
+      this.En := !EverythingHost.IsChinese()
     catch
       this.En := false
   }
