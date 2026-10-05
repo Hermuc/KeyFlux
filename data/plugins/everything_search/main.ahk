@@ -30,9 +30,11 @@
 ;   triggerKey     前置触发键 (默认空格), 在命令框里按它触发搜索
 ;   everythingPath everything.exe 路径, 未运行时插件用它静默拉起 (-startup)
 ;   esPath         es.exe 路径 (可选), 留空则按 everything.exe 同目录/插件 bin/PATH 依次探测
-;   limit          下拉列表条数上限 (1-100, 默认 20)
-;   ↑ 四个值存 data/plugin-settings.json, **每次命令框会话开始时重读**, 故设置面板保存后
+;   ↑ 三个值存 data/plugin-settings.json, **每次命令框会话开始时重读**, 故设置面板保存后
 ;     无需重启引擎即刻生效 (若改为只在入口读一次, 用户每次改设置都得重启 KeyFlux)。
+;   结果条数上限 1000 (EverythingSearch.MAX_RESULTS, 经 es.exe -n 落实): 2026-10-05 修订
+;     2026-10-04 的「不设上限」—— 英文短词会导出数万条 (实测 "ge" = 72,870 条/9.4MB),
+;     逐行 FileExist 拖死引擎线程 (卡死) 且 0x406 载荷超 4MiB 被静默拒绝 (不出列表)。
 ;
 ; 依赖引擎侧接口: 经 src/EverythingHost.ahk 端口访问 —— CommandInputHooks (命令框输入
 ;   拦截点, bin/lib/core/CommandInputHooks.ahk), CommandDisplay / CommandImeGuard /

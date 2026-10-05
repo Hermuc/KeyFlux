@@ -87,7 +87,6 @@ Verify(cond, label, detail := "") {
 
 class EverythingSettings {
     static TriggerKey := " "
-    static Limit := 20
     static Load(api) {
         return false
     }
@@ -95,7 +94,7 @@ class EverythingSettings {
 
 class EverythingSearch {
     static RunCount := 0
-    static Run(query, limit) {
+    static Run(query) {
         EverythingSearch.RunCount += 1
         return {ok: false, error: 0, items: []}
     }

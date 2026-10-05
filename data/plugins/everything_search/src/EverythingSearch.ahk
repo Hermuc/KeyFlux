@@ -12,6 +12,21 @@ class EverythingSearch {
   static LaunchPollMs := 250
   static RetryDelayMs := 400      ; 首次查询失败后的重试间隔 (数据库加载竞态)
 
+  ; 检索词的结果条数上限 (通道层经 es.exe -n 落实; 实测 -n 在**排序之后**截断, 不破坏同序)。
+  ;
+  ; 🔴 为什么必须设上限 (2026-10-05 用户报障「英文检索不出列表 + 命令框有概率卡死」):
+  ;   2026-10-04 的「结果不设条数上限」在英文短词上会同时引爆三条管线约束 —— 实测本机
+  ;   查询 "ge" 返回 **72,870 条 / 导出 9.4MB** (中文如「是」仅 11 条, 故此前未暴露):
+  ;     ① 通道层导出全部匹配 + ParseExport 逐行 FileExist (文件系统 stat × 7 万+) ⇒
+  ;        引擎线程阻塞数秒, 输入钩子/轮询全部停摆 —— 用户视角即「命令框卡死」;
+  ;     ② 0x406 载荷 = 条目×(标题+路径+长度头), 7 万条约 9-11MB > MAX_PAYLOAD_BYTES (4MiB,
+  ;        插件与命令框两侧同值) ⇒ BuildResultsPayload 构造失败**静默拒绝** ⇒ 不出列表;
+  ;     ③ 即使载荷侥幸 < 4MiB, 数万条目的编组/解码也是无谓开销。
+  ;   取值 1000: 列表可滚动 (命令框按总数画滚动条), 1000 条远超人工浏览范围; 载荷 ≈
+  ;   150KB, 通道导出 + 解析 (1000 次 FileExist) 均在几十毫秒级。真要找「第 1000 条以后」,
+  ;   正确动作是细化检索词, 而不是滚动千行列表。
+  static MAX_RESULTS := 1000
+
   ; 静默启动开关: 官方文档 "Run Everything in the background without showing any search windows"。
   ; 必须带它 —— 裸跑 everything.exe 会弹出主窗口并抢走前台焦点, 打断命令框里正在进行的输入。
   ; 见 README 「未启动时静默拉起」与 docs/CONTRACTS 的插件章节。
@@ -123,11 +138,11 @@ class EverythingSearch {
    * 执行一次搜索 (同步; 调用方在命令框输入期, 每次追加/退格都会重跑本方法)。
    * 耗时: 单次 es 调用本机实测约 141ms (含 -timeout 4000 与导出落盘, 见 README §8) ——
    * 输入期同步执行是有意为之 (简化状态机), 不做增量/防抖。
+   * 结果条数按 MAX_RESULTS 封顶 (见其注释; 2026-10-05 修订 2026-10-04 的「不设上限」)。
    * @param query 检索词
-   * @param limit 结果条数上限
    * @returns {{ok:Boolean, error:String, items:Array<{path,name,isFolder}>}}
    */
-  static Run(query, limit) {
+  static Run(query) {
     if (Trim(query, " `t`r`n") = "")
       return {ok: false, error: ES_ERR_EMPTY, items: []}
 
@@ -138,12 +153,12 @@ class EverythingSearch {
     }
 
     provider := EverythingProviders.Create()
-    res := provider.Search(query, limit)
+    res := provider.Search(query, this.MAX_RESULTS)
 
     ; 冷启动竞态: Everything 进程已在但数据库仍在加载, es 可能返回空/失败 —— 重试一次
     if (!res.ok && (res.error = ES_ERR_NOT_RUNNING || res.error = ES_ERR_QUERY)) {
       Sleep this.RetryDelayMs
-      res := provider.Search(query, limit)
+      res := provider.Search(query, this.MAX_RESULTS)
     }
     return res
   }
