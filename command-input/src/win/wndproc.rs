@@ -24,10 +24,11 @@ use windows::Win32::Graphics::Gdi::InvalidateRect;
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
-    DefWindowProcW, GetSystemMetrics, GetWindowLongPtrW, PostMessageW, PostQuitMessage,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow, CREATESTRUCTW, GWLP_USERDATA,
-    HWND_TOPMOST, SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SW_HIDE, WM_CREATE, WM_DESTROY,
-    WM_LBUTTONDOWN, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCCREATE, WM_PAINT,
+    DefWindowProcW, GetSystemMetrics, GetWindowLongPtrW, PeekMessageW, PostMessageW,
+    PostQuitMessage, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow,
+    CREATESTRUCTW, GWLP_USERDATA, HWND_TOPMOST, MSG, PEEK_MESSAGE_REMOVE_TYPE, PM_REMOVE,
+    SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SW_HIDE, WM_CREATE, WM_DESTROY, WM_LBUTTONDOWN,
+    WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCCREATE, WM_PAINT,
 };
 
 use crate::config;
@@ -302,6 +303,32 @@ fn move_selection(shell: &mut Shell, hwnd: HWND, row: usize) {
     notify_engine(shell, row + 1, 2);
 }
 
+/// 合并排队的 WM_MOUSEMOVE (2026-10-06 悬停高亮「不跟手」修复):
+/// 一次快速划过 N 行会排队 N 条 WM_MOUSEMOVE, 若逐条消费, 每条都走一遍
+/// 「全帧 GDI 重画 → 逐像素合成 → UpdateLayeredWindow」管线, 高亮永远追着
+/// 光标跑 (中文搜索词的 DrawTextW 变形更贵, 放大延迟)。标准 Win32 手法:
+/// 取消息前先用 PeekMessage(PM_REMOVE) 排干队列里**其余**的 WM_MOUSEMOVE、
+/// 只处理最后一条 —— 高亮直接跳到光标最新位置, 中间帧零渲染。只取不改任何
+/// 既有语义: 被排干的移动本就只会落在光标途经的行上, 终态一致。
+fn coalesce_mousemove(hwnd: HWND, lparam: LPARAM) -> LPARAM {
+    let mut last = lparam;
+    let mut msg = MSG::default();
+    unsafe {
+        while PeekMessageW(
+            &mut msg,
+            Some(hwnd),
+            WM_MOUSEMOVE,
+            WM_MOUSEMOVE,
+            PEEK_MESSAGE_REMOVE_TYPE(PM_REMOVE.0),
+        )
+        .as_bool()
+        {
+            last = msg.lParam;
+        }
+    }
+    last
+}
+
 /// 窗口过程 (R3: 类注册的 lpfnWndProc)。
 pub(crate) unsafe extern "system" fn wndproc(
     hwnd: HWND,
@@ -469,7 +496,7 @@ pub(crate) unsafe extern "system" fn wndproc(
             }
         }
         WM_MOUSEMOVE => {
-            let (x, y) = client_xy(lparam);
+            let (x, y) = client_xy(coalesce_mousemove(hwnd, lparam));
             if let Some(row) = hit_row(shell, x, y) {
                 move_selection(shell, hwnd, row);
             }

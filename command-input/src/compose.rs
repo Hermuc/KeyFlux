@@ -209,6 +209,36 @@ impl Plan {
     pub fn shadow_extent_px(&self) -> i32 {
         (self.shadow.sigma * crate::config::SHADOW_REGION_SIGMA + self.shadow.dy).ceil() as i32 + 1
     }
+
+    /// **内部快速区** (左闭右开像素矩形): 区内每个像素中心必然满足
+    /// `d ≤ −(ring_px + 0.5)` ⇒ 在 [`Plan::pixel`] 里 `cov = 1`、`ring_cov = 0`、
+    /// 阴影项乘 0 —— 输出精确退化为「内容色 × fill_alpha」的常数乘, 无需逐像素
+    /// SDF (sqrt) 与阴影 erfc (exp)。几何依据: 点落在圆角矩形**各边内缩
+    /// (radius + ring_px + 0.5)** 的矩形内时, 到四边的距离 ≥ 内缩量, 且圆角弧只
+    /// 存在于四个角方 (边长 = 圆角半径, 已被内缩量整个避开) —— `radius` 取未钳制
+    /// 原值只会更保守 (钳制只会让实际弧更小)。徽标包围盒 (若有) 从快速区**剔除**:
+    /// 徽标覆盖须逐像素算, 不能走常数乘。
+    ///
+    /// 返回 `None` = 无有效快速区 (框体太小)。返回值仅供 [`composite`] 使用 ——
+    /// 快速路径与 [`Plan::pixel`] **逐位一致** (乘法结合序对齐, 见 composite 注),
+    /// 由 `composite_fast_path_matches_pixel` 测试锁定。
+    pub fn fast_zone(&self) -> Option<(i32, i32, i32, i32)> {
+        let m = self.frame.radius + self.ring_px + 0.5;
+        // 像素中心 = 整数坐标 + 0.5: x+0.5 ≥ l+m ⇒ x ≥ l+m−0.5 (ceil 收窄);
+        // x+0.5 ≤ r−m ⇒ x ≤ r−m−0.5 (floor 收窄)。左右闭开: [x0, x1)。
+        let x0 = (self.frame.l + m - 0.5).ceil() as i32;
+        let y0 = (self.frame.t + m - 0.5).ceil() as i32;
+        let x1 = (self.frame.r - m - 0.5).floor() as i32 + 1;
+        let y1 = (self.frame.b - m - 0.5).floor() as i32 + 1;
+        // 剔除徽标包围盒 (徽标是内部元素, 包围盒通常整体含于快速区; 含于才需要挖):
+        // 挖洞会把矩形撕成四块 ⇒ 交由调用方逐像素排除更简单 —— 这里返回「含徽标区」
+        // 的矩形, composite 里对徽标包围盒内的像素回落慢路径。
+        if x1 > x0 && y1 > y0 {
+            Some((x0, y0, x1, y1))
+        } else {
+            None
+        }
+    }
 }
 
 fn mix(a: f64, b: f64, t: f64) -> f64 {
@@ -228,8 +258,25 @@ fn to_u8(v: f64) -> u8 {
 ///   ⇒ 读入时首尾交换一次, 写回时 `pm[0]→R 槽 / pm[2]→B 槽`。历史上两端各错半边
 ///     (读入当 [R,G,B] + 写回按 B 槽←pm[2]), 抵消成「非灰内容色 R/B 互换」—— 文件
 ///     图标变互补色、选中行/强调条变暖色 (2026-10-05 用户报障修复)。
+///
+/// ## 性能: 内部快速路径 (2026-10-06, 悬停高亮卡顿修复的一半)
+///
+/// 全帧逐像素 `Plan::pixel` 含 SDF (sqrt) 与阴影 erfc (exp) —— 每帧 ~百万像素两次
+/// 超越函数, 是悬停重绘管线的大头。而框体内部 (`fast_zone`) 的合成结果数学上恒等于
+/// 「内容色 × fill_alpha」: `cov=1`、`ring_cov=0`、阴影项乘 `(1−cov)=0` 归零。
+/// 快速路径的 f64 运算**顺序与 `Plan::pixel` 完全对齐** (`(drawn×a)×g` 与
+/// `pm[0]×g` 同构; alpha `fill_alpha + 0.0` 恒等) ⇒ **逐位一致**, 由测试
+/// `composite_fast_path_matches_pixel` 全帧锁定。快速区外 (边缘带 / 圆角 / 徽标
+/// 包围盒) 仍走 [`Plan::pixel`] —— 那部分只占周长一圈, 面积占比可忽略。
 pub fn composite(dib: &mut [u8], plan: &Plan, gain: f64) {
     let g = gain.clamp(0.0, 1.0);
+    let fast = plan.fast_zone();
+    // 徽标包围盒 (整数, 左闭右开): 区内像素回落慢路径 (覆盖须逐像素算)。
+    let badge_box = plan
+        .badge
+        .as_ref()
+        .map(|b| (b.geom.bx0, b.geom.by0, b.geom.bx1, b.geom.by1));
+    let fill_alpha = plan.fill_alpha;
     for y in 0..plan.h {
         for x in 0..plan.w {
             let i = ((y * plan.w + x) * 4) as usize;
@@ -238,13 +285,34 @@ pub fn composite(dib: &mut [u8], plan: &Plan, gain: f64) {
             }
             // DIB 内存序 B,G,R → pixel 语义 [R,G,B]
             let drawn = [dib[i + 2] as f64, dib[i + 1] as f64, dib[i] as f64];
-            let (a, pm) = plan.pixel(x, y, drawn);
-            // pm 已是**预乘**值 (含各自的 alpha) ⇒ 这里只再叠整体增益 g, 不能再乘一次 a。
-            // 写回按 DIB 内存序: B 槽 ← pm[2](B), G 槽 ← pm[1], R 槽 ← pm[0](R)。
-            dib[i] = to_u8(pm[2] * g); // B
-            dib[i + 1] = to_u8(pm[1] * g); // G
-            dib[i + 2] = to_u8(pm[0] * g); // R
-            dib[i + 3] = to_u8(a * 255.0 * g); // A
+            let in_fast = match fast {
+                Some((x0, y0, x1, y1)) => {
+                    x >= x0
+                        && x < x1
+                        && y >= y0
+                        && y < y1
+                        && !badge_box.is_some_and(|(bx0, by0, bx1, by1)| {
+                            x >= bx0 && x < bx1 && y >= by0 && y < by1
+                        })
+                }
+                None => false,
+            };
+            if in_fast {
+                // 快速路径: 与 Plan::pixel 逐位一致 (见模块级「性能」注) ——
+                // a_out = fill_alpha, pm = drawn × fill_alpha (乘法结合序对齐)。
+                dib[i] = to_u8(drawn[2] * fill_alpha * g); // B
+                dib[i + 1] = to_u8(drawn[1] * fill_alpha * g); // G
+                dib[i + 2] = to_u8(drawn[0] * fill_alpha * g); // R
+                dib[i + 3] = to_u8(fill_alpha * 255.0 * g); // A
+            } else {
+                let (a, pm) = plan.pixel(x, y, drawn);
+                // pm 已是**预乘**值 (含各自的 alpha) ⇒ 这里只再叠整体增益 g, 不能再乘一次 a。
+                // 写回按 DIB 内存序: B 槽 ← pm[2](B), G 槽 ← pm[1], R 槽 ← pm[0](R)。
+                dib[i] = to_u8(pm[2] * g); // B
+                dib[i + 1] = to_u8(pm[1] * g); // G
+                dib[i + 2] = to_u8(pm[0] * g); // R
+                dib[i + 3] = to_u8(a * 255.0 * g); // A
+            }
         }
     }
 }
@@ -490,5 +558,64 @@ mod tests {
         let rb = r / 0x28 as f64;
         let bb = b / 0xAD as f64;
         assert!((rb - bb).abs() < 0.02, "各通道须同倍率预乘: {rb} vs {bb}");
+    }
+
+    /// 快速路径锁定 (2026-10-06 悬停卡顿修复): `composite` 的内部快速路径必须与
+    /// 逐像素 `Plan::pixel` **全帧逐位一致** —— 含徽标与不含徽标两种计划都要过。
+    /// 这条测试是「快速区几何推导」的唯一护栏: 推导有误 (比如圆角内缩不足) 时,
+    /// 边缘/角/徽标带内会出现逐位偏差。
+    #[test]
+    fn composite_fast_path_matches_pixel() {
+        let mut p = plan();
+        let n = (p.w * p.h * 4) as usize;
+        let mut source = vec![0u8; n];
+        // 位置相关伪随机内容 (含非灰彩色), 覆盖内部/边缘/角全部区域
+        for (k, px) in source.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            px[0] = (k * 37 % 251) as u8;
+            px[1] = (k * 91 % 249) as u8;
+            px[2] = (k * 53 % 253) as u8;
+        }
+        for with_badge in [false, true] {
+            p.badge = with_badge.then(|| BadgeLayer {
+                geom: crate::badge::BadgePaint::magnifier(30.0, 12.0, 25.0, 2.0),
+                rgb: Rgb(40, 40, 40),
+            });
+            let mut fast = source.clone();
+            composite(&mut fast, &p, 1.0);
+            // 慢参考: 逐像素 Plan::pixel 直算 (原始内容另存一份, 因为 composite 就地写)
+            let mut slow = source.clone();
+            for y in 0..p.h {
+                for x in 0..p.w {
+                    let i = ((y * p.w + x) * 4) as usize;
+                    let drawn = [slow[i + 2] as f64, slow[i + 1] as f64, slow[i] as f64];
+                    let (a, pm) = p.pixel(x, y, drawn);
+                    slow[i] = to_u8(pm[2]);
+                    slow[i + 1] = to_u8(pm[1]);
+                    slow[i + 2] = to_u8(pm[0]);
+                    slow[i + 3] = to_u8(a * 255.0);
+                }
+            }
+            assert_eq!(fast, slow, "with_badge={with_badge}");
+        }
+    }
+
+    /// 快速区必须严格内缩: 区内任意像素中心到框边的有符号距离满足
+    /// `d ≤ −(ring_px + 0.5)` (即 `cov=1` 且 `ring_cov=0` 的充分条件)。
+    #[test]
+    fn fast_zone_is_conservative() {
+        let p = plan();
+        let Some((x0, y0, x1, y1)) = p.fast_zone() else {
+            panic!("测试计划应存在有效快速区");
+        };
+        let m = p.frame.radius + p.ring_px + 0.5;
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let d = p.frame.sdf(x as f64 + 0.5, y as f64 + 0.5);
+                assert!(
+                    d <= -(p.ring_px + 0.5) + 1e-9,
+                    "快速区像素 ({x},{y}) d={d} 不满足内缩量 {m}"
+                );
+            }
+        }
     }
 }
