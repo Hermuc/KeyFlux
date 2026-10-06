@@ -133,6 +133,13 @@ fn execute(shell: &mut Shell, hwnd: HWND, cmds: Vec<Command>) {
                     error::fatal(file!(), line!(), &format!("render failed: {e}"), e.hresult);
                 }
             }
+            Command::RedrawRows { prev } => {
+                // 选择变化增量路径 (2026-10-06): 行集未变 (协议层守卫), 只重绘旧/新两行。
+                // 后端不支持/内容面失效时自动回落全量重绘 —— 两态视觉等价。
+                if let Err(e) = repaint_rows(shell, hwnd, prev) {
+                    error::fatal(file!(), line!(), &format!("render failed: {e}"), e.hresult);
+                }
+            }
             Command::Relayout => {
                 if let Err(e) = relayout(shell, hwnd) {
                     error::fatal(
@@ -231,6 +238,24 @@ fn on_paint(shell: &mut Shell, hwnd: HWND) -> Result<(), BackendError> {
     }
     let st = frame_state!(shell);
     shell.backend.paint(&st)
+}
+
+/// 选择变化的增量重绘 (Command::RedrawRows): 行集 = 旧行 + 新高亮行 (各自可能
+/// 为「无高亮」而缺席)。未初始化时先懒创建 (与 redraw 同款前置)。
+fn repaint_rows(shell: &mut Shell, hwnd: HWND, prev: i32) -> Result<(), BackendError> {
+    if !shell.inited {
+        init_backend(shell, hwnd)?;
+    }
+    let sel = shell.state.results.selected();
+    let mut rows: Vec<usize> = Vec::with_capacity(2);
+    if prev >= 0 {
+        rows.push(prev as usize);
+    }
+    if sel >= 0 && rows.last() != Some(&(sel as usize)) {
+        rows.push(sel as usize);
+    }
+    let st = frame_state!(shell);
+    shell.backend.repaint_rows(&st, &rows)
 }
 
 /// R23: 渲染资源懒创建 (首个 WM_PAINT / 0x401 预绘时); 失败 → R29。

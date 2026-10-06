@@ -68,6 +68,10 @@ pub enum Command {
     /// R14④/R17: 重绘。`pre_show = true` 时壳做 0x401 的同步预绘 (design C §2.8,
     /// = R14 ③重建布局+④重绘 的等价合并), 否则仅 InvalidateRect 走下一绘制周期。
     Redraw { pre_show: bool },
+    /// 选择变化的增量重绘 (2026-10-06): 行集未变, 只重绘旧/新两行并呈现。
+    /// `prev` = 变化前的高亮 (0 基; `-1` = 原本无高亮)。协议层守卫: 只有可视
+    /// 窗口未变 (无滚动) 时才发出 —— 滚动换页走 `Redraw` 全量。
+    RedrawRows { prev: i32 },
     /// 结果列表结构变化 (项集/展开/收起): 壳重算窗口高度, 需要时
     /// SetWindowPos + 后端区域重建, 然后重绘。高度不变时等价于一次重绘。
     Relayout,
@@ -153,9 +157,16 @@ pub fn on_event(ev: AppEvent, st: &mut AppState) -> Vec<Command> {
             vec![Command::Relayout]
         }
         AppEvent::SetSelection(index) => {
+            let prev = st.results.selected();
+            let prev_window = st.results.window();
             if st.results.select(index) {
-                // 列表高度不变 ⇒ 无需重排窗口, 一次重绘即可
-                vec![Command::Redraw { pre_show: false }]
+                // 可视窗口未变 (无滚动) ⇒ 行集相同, 只需重绘旧/新两行 (增量路径);
+                // 高亮触发滚动 ⇒ 可见行集变化, 全量重绘
+                if st.results.window() == prev_window {
+                    vec![Command::RedrawRows { prev }]
+                } else {
+                    vec![Command::Redraw { pre_show: false }]
+                }
             } else {
                 vec![]
             }
@@ -389,7 +400,8 @@ mod tests {
         assert_eq!(st.results.selected(), 1);
     }
 
-    /// 0x407: 高亮变化才重绘 (同值零指令 —— 避免无谓重绘)。
+    /// 0x407: 高亮变化才重绘 (同值零指令 —— 避免无谓重绘); 行集未变时走增量
+    /// 指令 (`RedrawRows`), 触发滚动 (窗口移动) 时回退全量 `Redraw`。
     #[test]
     fn set_selection_only_redraws_on_change() {
         let mut st = state();
@@ -403,9 +415,31 @@ mod tests {
         assert_eq!(on_event(AppEvent::SetSelection(0), &mut st), vec![]);
         assert_eq!(
             on_event(AppEvent::SetSelection(1), &mut st),
-            vec![Command::Redraw { pre_show: false }]
+            vec![Command::RedrawRows { prev: 0 }]
         );
         assert_eq!(st.results.selected(), 1);
+    }
+
+    /// 0x407 + 滚动: 高亮移出可视窗口 ⇒ 窗口移动 ⇒ 行集变化 ⇒ 全量 Redraw
+    /// (增量路径只保证行集不变时的正确性)。
+    #[test]
+    fn set_selection_with_scroll_falls_back_to_full_redraw() {
+        let mut st = state();
+        on_event(
+            AppEvent::SetResults {
+                items: results(&["a", "b", "c", "d"]),
+                selected: 0,
+            },
+            &mut st,
+        );
+        st.results.set_visible_max(2); // 可视 2 行, 共 4 项
+        assert_eq!(
+            on_event(AppEvent::SetSelection(1), &mut st),
+            vec![Command::RedrawRows { prev: 0 }]
+        );
+        let cmds = on_event(AppEvent::SetSelection(2), &mut st); // 越出窗口 → 下滚
+        assert_eq!(cmds, vec![Command::Redraw { pre_show: false }]);
+        assert_eq!(st.results.window(), (1, 3));
     }
 
     /// 0x408: 有列表才重排; 空表时零指令 (幂等)。

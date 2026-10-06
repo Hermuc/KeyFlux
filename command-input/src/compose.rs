@@ -190,7 +190,15 @@ impl Plan {
         }
         // 阴影: 只落在框外 (原版阴影视觉在**不透明底板**之下 ⇒ 框内不外溢;
         //   本条同时保证内部观感 = 纯填充, 与实测 239 (fill-only 模型 240) 一致)
-        let a_sh = self.shadow.coverage(d) * (1.0 - cov) * self.shadow.opacity;
+        //   ⚠ 性能 (2026-10-06): cov=1 (形内) 时阴影项恒为 0 —— 有限值 × 0.0 = +0.0
+        //   精确无噪 ⇒ 跳过 erfc (exp) 直接置 0, 逐位一致 (由
+        //   `composite_fast_path_matches_pixel` 全帧锁定)。框内周长带是
+        //   erfc 调用的大头, 跳过后全帧只剩框外带真正需要它。
+        let a_sh = if cov < 1.0 {
+            self.shadow.coverage(d) * (1.0 - cov) * self.shadow.opacity
+        } else {
+            0.0
+        };
         let a_out = a_frame + a_sh * (1.0 - a_frame);
         let sr = self.shadow.color.0 as f64;
         let sg = self.shadow.color.1 as f64;
@@ -268,6 +276,15 @@ fn to_u8(v: f64) -> u8 {
 /// `pm[0]×g` 同构; alpha `fill_alpha + 0.0` 恒等) ⇒ **逐位一致**, 由测试
 /// `composite_fast_path_matches_pixel` 全帧锁定。快速区外 (边缘带 / 圆角 / 徽标
 /// 包围盒) 仍走 [`Plan::pixel`] —— 那部分只占周长一圈, 面积占比可忽略。
+///
+/// ## 性能: 快速路径查表化 (2026-10-06 第二轮, 实测 926×880 单帧 7.7ms → 亚毫秒)
+///
+/// 快速路径落地后基准 (`bench_compose.rs`) 仍测得单帧 7.7ms —— 每像素 3 次
+/// f64 乘 + 4 次 round/clamp 在百万像素量级依旧可观。`gain = 1` (正常绘制,
+/// 非淡出) 时每通道输出只依赖**输入字节** (256 种取值) ⇒ 预展开成 256 项查找表,
+/// 内部像素退化为 3 次查表 + 4 次写。查表项的 f64 表达式与逐像素路径**逐字符相同**
+/// (`to_u8(v × fill_alpha × g)`, g=1) ⇒ 仍逐位一致, 同一测试锁定。
+/// `gain ≠ 1` (淡出中) 回落逐像素 f64 —— 淡出一秒数次且无交互, 不需要快。
 pub fn composite(dib: &mut [u8], plan: &Plan, gain: f64) {
     let g = gain.clamp(0.0, 1.0);
     let fast = plan.fast_zone();
@@ -276,35 +293,37 @@ pub fn composite(dib: &mut [u8], plan: &Plan, gain: f64) {
         .badge
         .as_ref()
         .map(|b| (b.geom.bx0, b.geom.by0, b.geom.bx1, b.geom.by1));
-    let fill_alpha = plan.fill_alpha;
+    let (lut, alpha_fast) = match fast_tables(plan, g) {
+        Some(t) => (Some(t.0), Some(t.1)),
+        None => (None, None),
+    };
     for y in 0..plan.h {
+        // 本行的快速段 [fx0, fx1): 行在快速区内且 LUT 就绪时 = 快速区 x 范围
+        // (⚠ 快速区是矩形不是整行 —— 行首尾仍在边缘带, 必须逐像素落慢路径)
+        let row_fast = match (&fast, &lut) {
+            (Some((fx0, fy0, fx1, fy1)), Some(l)) if y >= *fy0 && y < *fy1 => Some((*fx0, *fx1, l)),
+            _ => None,
+        };
         for x in 0..plan.w {
             let i = ((y * plan.w + x) * 4) as usize;
             if i + 3 >= dib.len() {
                 return;
             }
-            // DIB 内存序 B,G,R → pixel 语义 [R,G,B]
-            let drawn = [dib[i + 2] as f64, dib[i + 1] as f64, dib[i] as f64];
-            let in_fast = match fast {
-                Some((x0, y0, x1, y1)) => {
-                    x >= x0
-                        && x < x1
-                        && y >= y0
-                        && y < y1
-                        && !badge_box.is_some_and(|(bx0, by0, bx1, by1)| {
-                            x >= bx0 && x < bx1 && y >= by0 && y < by1
-                        })
-                }
-                None => false,
-            };
-            if in_fast {
-                // 快速路径: 与 Plan::pixel 逐位一致 (见模块级「性能」注) ——
-                // a_out = fill_alpha, pm = drawn × fill_alpha (乘法结合序对齐)。
-                dib[i] = to_u8(drawn[2] * fill_alpha * g); // B
-                dib[i + 1] = to_u8(drawn[1] * fill_alpha * g); // G
-                dib[i + 2] = to_u8(drawn[0] * fill_alpha * g); // R
-                dib[i + 3] = to_u8(fill_alpha * 255.0 * g); // A
+            let in_badge = badge_box
+                .is_some_and(|(bx0, by0, bx1, by1)| x >= bx0 && x < bx1 && y >= by0 && y < by1);
+            let in_fast_x = row_fast.is_some_and(|(fx0, fx1, _)| x >= fx0 && x < fx1);
+            if let (Some((_, _, l)), Some(a_fast), true, false) =
+                (row_fast, alpha_fast, in_fast_x, in_badge)
+            {
+                // 快速路径 (LUT): 与 Plan::pixel 逐位一致 (见模块级「性能」注) ——
+                // a_out = fill_alpha, 每通道 = lut[内容字节]。
+                dib[i] = l[dib[i] as usize]; // B
+                dib[i + 1] = l[dib[i + 1] as usize]; // G
+                dib[i + 2] = l[dib[i + 2] as usize]; // R
+                dib[i + 3] = a_fast; // A
             } else {
+                // DIB 内存序 B,G,R → pixel 语义 [R,G,B]
+                let drawn = [dib[i + 2] as f64, dib[i + 1] as f64, dib[i] as f64];
                 let (a, pm) = plan.pixel(x, y, drawn);
                 // pm 已是**预乘**值 (含各自的 alpha) ⇒ 这里只再叠整体增益 g, 不能再乘一次 a。
                 // 写回按 DIB 内存序: B 槽 ← pm[2](B), G 槽 ← pm[1], R 槽 ← pm[0](R)。
@@ -323,6 +342,85 @@ pub fn scale_frame(src: &[u8], dst: &mut [u8], gain: f64) {
     let n = src.len().min(dst.len());
     for i in 0..n {
         dst[i] = to_u8(src[i] as f64 * g);
+    }
+}
+
+/// 快速路径的预展开表 (2026-10-06 第二轮): `gain = 1` 时内部像素每通道输出只依赖
+/// **输入字节** (256 种取值) ⇒ 3 次查表替代逐像素 f64 乘 + 舍入。查表项的 f64
+/// 表达式与 [`Plan::pixel`] 逐字符相同 (`to_u8(v × fill_alpha × g)`) ⇒ 逐位一致;
+/// α 字节为常数一并预展开。`gain ≠ 1` (淡出中) 返回 None → 回落逐像素 f64
+/// (淡出一秒数次且无交互, 不需要快)。
+fn fast_tables(plan: &Plan, g: f64) -> Option<([u8; 256], u8)> {
+    if g != 1.0 || plan.fast_zone().is_none() {
+        return None;
+    }
+    let fill_alpha = plan.fill_alpha;
+    let lut = core::array::from_fn(|v| to_u8(v as f64 * fill_alpha * g));
+    Some((lut, to_u8(fill_alpha * 255.0 * g)))
+}
+
+/// 把 `src` 的指定矩形合成进 `dst` 同坐标区域 (2026-10-06, 增量行重绘用)。
+///
+/// 与 [`composite`] 的唯一差别: 读写分离 (`src` = 内容面, 未合成; `dst` = 呈现面,
+/// 已合成) 且只处理 `rect = (x0, y0, x1, y1)` (左闭右开) 内的像素 —— 命中测试/
+/// 滚动条之外的整帧不变。矩形外的 `dst` 内容**保持原样** (调用方保证其余部分
+/// 已是当前帧)。快速区判定 / 通道口径 / 逐位一致性均与 [`composite`] 相同
+/// (`composite_fast_path_matches_pixel` 同批锁定 `composite_rect`)。
+pub fn composite_rect(
+    src: &[u8],
+    dst: &mut [u8],
+    plan: &Plan,
+    rect: (i32, i32, i32, i32),
+    gain: f64,
+) {
+    let g = gain.clamp(0.0, 1.0);
+    let (rx0, ry0, rx1, ry1) = rect;
+    let x0 = rx0.clamp(0, plan.w);
+    let y0 = ry0.clamp(0, plan.h);
+    let x1 = rx1.clamp(0, plan.w);
+    let y1 = ry1.clamp(0, plan.h);
+    if x1 <= x0 || y1 <= y0 {
+        return;
+    }
+    let fast = plan.fast_zone();
+    let tables = fast_tables(plan, g);
+    let badge_box = plan
+        .badge
+        .as_ref()
+        .map(|b| (b.geom.bx0, b.geom.by0, b.geom.bx1, b.geom.by1));
+    let alpha_fast = tables.as_ref().map(|(_, a)| *a);
+    for y in y0..y1 {
+        // 行内快速段 = 快速区 ∩ 请求矩形 (⚠ 快速区是矩形, 行首尾仍在边缘带)
+        let row_fast = match (&fast, &tables) {
+            (Some((fx0, fy0, fx1, fy1)), Some((l, _))) if y >= *fy0 && y < *fy1 => {
+                Some(((*fx0).max(x0), (*fx1).min(x1), l))
+            }
+            _ => None,
+        };
+        for x in x0..x1 {
+            let i = ((y * plan.w + x) * 4) as usize;
+            if i + 3 >= dst.len() || i + 3 >= src.len() {
+                return;
+            }
+            let in_badge = badge_box
+                .is_some_and(|(bx0, by0, bx1, by1)| x >= bx0 && x < bx1 && y >= by0 && y < by1);
+            let in_fast_x = row_fast.is_some_and(|(fx0, fx1, _)| x >= fx0 && x < fx1);
+            if let (Some((_, _, l)), Some(a_fast), true, false) =
+                (row_fast, alpha_fast, in_fast_x, in_badge)
+            {
+                dst[i] = l[src[i] as usize];
+                dst[i + 1] = l[src[i + 1] as usize];
+                dst[i + 2] = l[src[i + 2] as usize];
+                dst[i + 3] = a_fast;
+            } else {
+                let drawn = [src[i + 2] as f64, src[i + 1] as f64, src[i] as f64];
+                let (a, pm) = plan.pixel(x, y, drawn);
+                dst[i] = to_u8(pm[2] * g);
+                dst[i + 1] = to_u8(pm[1] * g);
+                dst[i + 2] = to_u8(pm[0] * g);
+                dst[i + 3] = to_u8(a * 255.0 * g);
+            }
+        }
     }
 }
 
@@ -615,6 +713,54 @@ mod tests {
                     d <= -(p.ring_px + 0.5) + 1e-9,
                     "快速区像素 ({x},{y}) d={d} 不满足内缩量 {m}"
                 );
+            }
+        }
+    }
+
+    /// composite_rect 增量路径锁定: 对同一内容面, 「矩形合成进白底呈现面」的矩形区
+    /// 必须与全帧合成的对应区域**逐位一致** —— 含徽标与不含徽标都要过。矩形刻意
+    /// 横跨内部/边缘/角/徽标全部区域。
+    #[test]
+    fn composite_rect_matches_full_composite() {
+        let mut p = plan();
+        let n = (p.w * p.h * 4) as usize;
+        let mut content = vec![0u8; n];
+        for (k, px) in content.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            px[0] = (k * 37 % 251) as u8;
+            px[1] = (k * 91 % 249) as u8;
+            px[2] = (k * 53 % 253) as u8;
+        }
+        for with_badge in [false, true] {
+            p.badge = with_badge.then(|| BadgeLayer {
+                geom: crate::badge::BadgePaint::magnifier(30.0, 12.0, 25.0, 2.0),
+                rgb: Rgb(40, 40, 40),
+            });
+            // 全帧参考
+            let mut full = content.clone();
+            composite(&mut full, &p, 1.0);
+            // 增量: 呈现面初始化为 0, 只合成一个横跨框体中部的矩形
+            let rect = (5, 10, 95, 45);
+            let mut present = vec![0u8; n];
+            composite_rect(&content, &mut present, &p, rect, 1.0);
+            for y in rect.1..rect.3 {
+                for x in rect.0..rect.2 {
+                    let i = ((y * p.w + x) * 4) as usize;
+                    assert_eq!(
+                        &present[i..i + 4],
+                        &full[i..i + 4],
+                        "with_badge={with_badge} 像素 ({x},{y})"
+                    );
+                }
+            }
+            // 矩形外必须原样未动 (全 0)
+            for y in 0..p.h {
+                for x in 0..p.w {
+                    if x >= rect.0 && x < rect.2 && y >= rect.1 && y < rect.3 {
+                        continue;
+                    }
+                    let i = ((y * p.w + x) * 4) as usize;
+                    assert!(present[i..i + 4].iter().all(|&b| b == 0));
+                }
             }
         }
     }
