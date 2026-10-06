@@ -1,12 +1,13 @@
 //! 文档静态资源基址（**进程级、只写一次**，与 [`crate::services::transport`] 同为进程级配置）。
 //!
 //! 背景：使用指南的图片与内部链接原本一律指向后端静态站 `http://127.0.0.1:<port>/…`。
-//! CLI 传输（`--api=cli`）**没有端口** ⇒ 登记 `<deploy>/bin/site` 后：
+//! 实测该静态站当前整体 404（Vue UI 退役后无人验证的旧账，2026-10-05）⇒ **装载时
+//! 一律登记** `<deploy>/bin/site`（glue::assemble，两种传输统一）：
 //! * 图片改为**直读文件 + `Image::source_data`**（reactor 内建的 WinRT 流式加载，
 //!   最稳，不依赖 `BitmapImage` 接受哪种 URI 方案）；
 //! * 内部链接改为 `file:///` URI（交系统默认程序打开）。
 //!
-//! **未登记时（HTTP 模式）保持原行为** —— 由后端静态站提供，零行为变更。
+//! 未登记时保持旧行为（走后端静态站）—— 保留该回退分支作机制完整性。
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
