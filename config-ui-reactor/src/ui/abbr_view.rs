@@ -97,7 +97,6 @@ pub fn command_box<C: IntoPayloadCallback<String>>(
         .text(value.to_string())
         .placeholder_text(watermark.to_string())
         .accepts_return(true)
-        .min_height(36.0)
         .margin(Thickness::new(2.0, 16.0, 0.0, 0.0))
         .on_text_changed(on_text_changed)
         .into()

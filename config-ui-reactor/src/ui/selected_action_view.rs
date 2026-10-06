@@ -115,7 +115,6 @@ where
             Border::new().grid_column(1).content(
                 TextBox::new()
                     .text(hotkey.to_string())
-                    .min_height(40.0)
                     .border_brush(theme::solid(INPUT_STROKE))
                     .on_text_changed(on_hotkey),
             ),
@@ -479,7 +478,6 @@ where
                 Border::new().grid_column(1).content(
                     TextBox::new()
                         .text(value.to_string())
-                        .min_height(34.0)
                         .border_brush(theme::solid(INPUT_STROKE))
                         .on_text_changed(on_value),
                 ),
@@ -490,7 +488,6 @@ where
     let working: View = TextBox::new()
         .text(working_dir.to_string())
         .placeholder_text(i18n::t("1015"))
-        .min_height(34.0)
         .border_brush(theme::solid(INPUT_STROKE))
         .on_text_changed(on_working_dir)
         .into();
@@ -577,7 +574,6 @@ pub fn exts_editor(
     let _ = draft; // 草稿状态由 Shell 持有；此处只按 display_text 渲染
     TextBox::new()
         .text(display_text)
-        .min_height(34.0)
         .border_brush(theme::solid(INPUT_STROKE))
         .on_text_changed(move |value: String| {
             // 返回值 = 消息是否被接受（false = 队列关闭）；此处无需处理
