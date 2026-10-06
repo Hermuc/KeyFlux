@@ -311,9 +311,6 @@ impl Component for Shell {
                     self.cmd_text = text;
                 }
             }
-            Message::RunCmd => {
-                self.run_abbr_command();
-            }
             Message::Noop => {}
             Message::SelectWindowGroup(id) => {
                 self.window_group_id = id;

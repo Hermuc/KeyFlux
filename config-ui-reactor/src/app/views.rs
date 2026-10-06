@@ -1634,22 +1634,11 @@ impl Shell {
                 context.message(Message::SelectKey(chip.hotkey))
             })
         };
-        let command: View = StackPanel::new()
-            .orientation(Orientation::Horizontal)
-            .keyed_children(vec![
-                (
-                    0usize,
-                    abbr_view::command_box(
-                        &self.cmd_text,
-                        &i18n::t("406"),
-                        context.callback(|value: String| Message::CmdText(value)),
-                    ),
-                ),
-                (
-                    1usize,
-                    abbr_view::run_button(i18n::t("920"), context.message(Message::RunCmd)),
-                ),
-            ]);
+        let command: View = abbr_view::command_box(
+            &self.cmd_text,
+            &i18n::t("406"),
+            context.callback(|value: String| Message::CmdText(value)),
+        );
 
         let header: View = keymap_view::page_header(
             &keymap::header_title(keymap),

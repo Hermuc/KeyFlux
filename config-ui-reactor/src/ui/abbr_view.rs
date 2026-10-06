@@ -103,14 +103,6 @@ pub fn command_box<C: IntoPayloadCallback<String>>(
         .into()
 }
 
-/// 命令框旁的显式执行按钮（回车之外的兜底入口，Fluent 友好）。
-pub fn run_button<C: IntoUnitCallback>(label: impl Into<String>, on_click: C) -> View {
-    Button::new()
-        .margin(Thickness::new(8.0, 16.0, 0.0, 0.0))
-        .on_click(on_click)
-        .content(TextBlock::new().text(label.into()))
-}
-
 /// 无缩写条目时的占位提示。
 pub fn empty_hint(message: impl Into<String>) -> View {
     TextBlock::new()
