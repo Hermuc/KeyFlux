@@ -124,8 +124,6 @@ pub enum Message {
     AcrylicToggle(bool),
     /// 缩写页命令框输入。
     CmdText(String),
-    /// 缩写页命令框回车执行（`del <缩写>` / `rn <新名>` / 其余视为选中）。
-    RunCmd,
     /// 空操作（单选取消选中、下拉未命中索引等场景）。
     Noop,
     /// 切换窗口分组（复刻 `windowGroupID` 联动）。
