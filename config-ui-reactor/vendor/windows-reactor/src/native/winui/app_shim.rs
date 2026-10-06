@@ -200,6 +200,9 @@ pub fn install_dialog_layer_overrides(application: &Application) -> Result<()> {
 ///   `{ThemeResource ControlStrongFillColorDefaultBrush}`），运行时按激活主题解析，
 ///   浅色 / 深色跟随系统；HighContrast 的 ScrollBar 专用重定向丢失（回落标准
 ///   Fluent 刷子）——面板本身是固定浅色玻璃设计，可接受；
+/// - **轨道有意透明**（2026-10-06 用户报障）：展开态的白底轨道（`TrackRect` 的
+///   Fill/Stroke，原指向 `AcrylicInAppFillColorDefaultBrush`）统一改指
+///   `SubtleFillColorTransparentBrush`，只留灰色滑块与箭头——重转模板时勿回填。
 /// - 无任何指向字典外的 `{StaticResource}` 残留（转换自检通过）。
 ///
 /// 模板来源：microsoft-ui-xaml `controls/dev/CommonStyles/ScrollBar_themeresources.xaml`
@@ -451,10 +454,10 @@ pub fn install_scroll_bar_overrides(application: &Application) -> Result<()> {
                     <Setter Target="Root.Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
                     <Setter Target="Root.BorderBrush" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
                     <Setter Target="Root.Opacity" Value="0.5" />
-                    <Setter Target="HorizontalTrackRect.Stroke" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
-                    <Setter Target="VerticalTrackRect.Stroke" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
-                    <Setter Target="HorizontalTrackRect.Fill" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
-                    <Setter Target="VerticalTrackRect.Fill" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
+                    <Setter Target="HorizontalTrackRect.Stroke" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+                    <Setter Target="VerticalTrackRect.Stroke" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+                    <Setter Target="HorizontalTrackRect.Fill" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+                    <Setter Target="VerticalTrackRect.Fill" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
                     <Setter Target="HorizontalPanningThumb.Background" Value="{ThemeResource ControlStrongFillColorDisabledBrush}" />
                     <Setter Target="VerticalPanningThumb.Background" Value="{ThemeResource ControlStrongFillColorDisabledBrush}" />
                   </VisualState.Setters>
@@ -581,10 +584,10 @@ pub fn install_scroll_bar_overrides(application: &Application) -> Result<()> {
                   <VisualState.Setters>
                     <Setter Target="Root.Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
                     <Setter Target="Root.BorderBrush" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
-                    <Setter Target="HorizontalTrackRect.Stroke" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
-                    <Setter Target="VerticalTrackRect.Stroke" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
-                    <Setter Target="HorizontalTrackRect.Fill" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
-                    <Setter Target="VerticalTrackRect.Fill" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
+                    <Setter Target="HorizontalTrackRect.Stroke" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+                    <Setter Target="VerticalTrackRect.Stroke" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+                    <Setter Target="HorizontalTrackRect.Fill" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+                    <Setter Target="VerticalTrackRect.Fill" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
                     <Setter Target="HorizontalThumb.Background" Value="{ThemeResource ControlStrongFillColorDefaultBrush}" />
                     <Setter Target="VerticalThumb.Background" Value="{ThemeResource ControlStrongFillColorDefaultBrush}" />
                   </VisualState.Setters>
@@ -618,10 +621,10 @@ pub fn install_scroll_bar_overrides(application: &Application) -> Result<()> {
                   <VisualState.Setters>
                     <Setter Target="Root.Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
                     <Setter Target="Root.BorderBrush" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
-                    <Setter Target="HorizontalTrackRect.Stroke" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
-                    <Setter Target="VerticalTrackRect.Stroke" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
-                    <Setter Target="HorizontalTrackRect.Fill" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
-                    <Setter Target="VerticalTrackRect.Fill" Value="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
+                    <Setter Target="HorizontalTrackRect.Stroke" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+                    <Setter Target="VerticalTrackRect.Stroke" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+                    <Setter Target="HorizontalTrackRect.Fill" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+                    <Setter Target="VerticalTrackRect.Fill" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
                     <Setter Target="HorizontalThumb.Background" Value="{ThemeResource ControlStrongFillColorDefaultBrush}" />
                     <Setter Target="VerticalThumb.Background" Value="{ThemeResource ControlStrongFillColorDefaultBrush}" />
                   </VisualState.Setters>
@@ -694,7 +697,7 @@ pub fn install_scroll_bar_overrides(application: &Application) -> Result<()> {
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
-              <Rectangle x:Name="HorizontalTrackRect" RadiusX="{Binding CornerRadius, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource TopLeftCornerRadiusDoubleValueConverter2x}}" RadiusY="{Binding CornerRadius, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BottomRightCornerRadiusDoubleValueConverter2x}}" Opacity="0" Grid.ColumnSpan="5" Margin="0" StrokeThickness="0" Fill="{ThemeResource AcrylicInAppFillColorDefaultBrush}" Stroke="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
+              <Rectangle x:Name="HorizontalTrackRect" RadiusX="{Binding CornerRadius, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource TopLeftCornerRadiusDoubleValueConverter2x}}" RadiusY="{Binding CornerRadius, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BottomRightCornerRadiusDoubleValueConverter2x}}" Opacity="0" Grid.ColumnSpan="5" Margin="0" StrokeThickness="0" Fill="{ThemeResource SubtleFillColorTransparentBrush}" Stroke="{ThemeResource SubtleFillColorTransparentBrush}" />
               <RepeatButton x:Name="HorizontalSmallDecrease" Grid.Column="0" Opacity="0" MinHeight="12" IsTabStop="False" Interval="50" Padding="4,0,0,0" Template="{StaticResource HorizontalDecrementTemplate}" Width="12" AllowFocusOnInteraction="False" VerticalAlignment="Center" />
               <RepeatButton x:Name="HorizontalLargeDecrease" Opacity="0" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsTabStop="False" Interval="50" Template="{StaticResource RepeatButtonTemplate}" Width="0" AllowFocusOnInteraction="False" />
               <Thumb x:Name="HorizontalThumb" Opacity="0" Grid.Column="2" Background="{ThemeResource ControlStrongFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlFillColorTransparentBrush}" Template="{StaticResource HorizontalThumbTemplate}" Height="8" MinWidth="30" AutomationProperties.AccessibilityView="Raw" RenderTransformOrigin="0.5,1" CornerRadius="{TemplateBinding CornerRadius}">
@@ -716,7 +719,7 @@ pub fn install_scroll_bar_overrides(application: &Application) -> Result<()> {
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
-              <Rectangle x:Name="VerticalTrackRect" RadiusX="{Binding CornerRadius, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource TopLeftCornerRadiusDoubleValueConverter2x}}" RadiusY="{Binding CornerRadius, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BottomRightCornerRadiusDoubleValueConverter2x}}" Opacity="0" Grid.RowSpan="5" Margin="0" StrokeThickness="0" Fill="{ThemeResource AcrylicInAppFillColorDefaultBrush}" Stroke="{ThemeResource AcrylicInAppFillColorDefaultBrush}" />
+              <Rectangle x:Name="VerticalTrackRect" RadiusX="{Binding CornerRadius, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource TopLeftCornerRadiusDoubleValueConverter2x}}" RadiusY="{Binding CornerRadius, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BottomRightCornerRadiusDoubleValueConverter2x}}" Opacity="0" Grid.RowSpan="5" Margin="0" StrokeThickness="0" Fill="{ThemeResource SubtleFillColorTransparentBrush}" Stroke="{ThemeResource SubtleFillColorTransparentBrush}" />
               <RepeatButton x:Name="VerticalSmallDecrease" Grid.Row="0" Opacity="0" Height="12" MinWidth="12" IsTabStop="False" Interval="50" Padding="0,4,0,0" Template="{StaticResource VerticalDecrementTemplate}" HorizontalAlignment="Center" />
               <RepeatButton x:Name="VerticalLargeDecrease" Opacity="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Height="0" IsTabStop="False" Interval="50" Grid.Row="1" AllowFocusOnInteraction="False" Template="{StaticResource RepeatButtonTemplate}" />
               <Thumb x:Name="VerticalThumb" Opacity="0" Grid.Row="2" Background="{ThemeResource ControlStrongFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlFillColorTransparentBrush}" Template="{StaticResource VerticalThumbTemplate}" Width="8" MinHeight="30" AutomationProperties.AccessibilityView="Raw" RenderTransformOrigin="1,0.5" CornerRadius="{TemplateBinding CornerRadius}">
