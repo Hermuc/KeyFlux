@@ -7,7 +7,8 @@
 //! * 命令框「回车执行」：旧在 code-behind 挂 `KeyDown`。
 //!   ⚠️ **0.100.0 无键盘事件 API**（`on_preview_key_down` / `RoutedCallback` 是 master-only，
 //!   实测本机 `generated.rs` 中不存在）⇒ 采用 `accepts_return(true)` 让回车**插入换行**，
-//!   再由 `on_text_changed` 检测尾部换行触发执行，并额外提供显式「执行」按钮兜底。
+//!   再由 `on_text_changed` 检测尾部换行触发执行（回车是唯一执行入口；
+//!   2026-10-05 曾有显式「执行」按钮兜底，已按用户定版移除）。
 
 use windows_reactor::*;
 
