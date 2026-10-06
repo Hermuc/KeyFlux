@@ -174,7 +174,7 @@ fn image_view(src: &str, alt: &str, port: u16) -> View {
         .horizontal_alignment(HorizontalAlignment::Left)
         .margin(Thickness::new(0.0, 8.0, 0.0, 12.0));
 
-    // CLI 传输（已登记本地静态站）：无端口 ⇒ 直读文件 + `source_data`
+    // 已登记本地静态站（glue::assemble，两种传输统一）：直读文件 + `source_data`
     // （reactor 内建的 WinRT 流式加载，不依赖 `BitmapImage` 接受哪种 URI 方案）。
     if let Some(path) = crate::ui::doc_assets::asset_path(src) {
         return match std::fs::read(&path) {

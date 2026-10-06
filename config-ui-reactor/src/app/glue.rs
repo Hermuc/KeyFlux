@@ -51,6 +51,14 @@ fn assemble(api: &dyn SettingsApi, port: u16, options: &BackendSessionOptions) -
     let data_root = resolve_deployment_root(options);
     let root = data_root.as_deref();
 
+    // 登记本地静态站目录（进程级一次）：指南图片/内部链接改为**本地直读**，
+    // 不再依赖后端静态站 —— 实测 `GET /shortcuts`·`/config_doc.md`·`/img/*` 的
+    // NoRoute 静态服务当前整体 404（Vue UI 退役后无人验证的旧账），依赖它图片
+    // 恒不显示（2026-10-05 用户报障）。两种传输统一登记（OnceLock 重复 set 是 no-op）。
+    if let Some(deploy) = data_root.as_deref() {
+        crate::ui::doc_assets::set_site_dir(Some(deploy.join("bin").join("site")));
+    }
+
     // 使用指南文档：自定义内容优先；为空时**本机直读**静态站（纯文件、零变换），
     // 读不到再回退后端（语义对齐旧 `HomePageViewModel.LoadAsync`）。
     let mut doc_md = config.overview_doc_md.clone();
