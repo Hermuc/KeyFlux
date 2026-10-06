@@ -101,4 +101,17 @@ pub trait RenderBackend {
         let _ = state;
         Ok(())
     }
+
+    /// 选择变化的**增量重绘** (2026-10-06 悬停卡顿第二轮): 只重绘 `rows` 里的
+    /// 结果行 (0 基绝对下标) 并呈现, 其余像素不动 —— 悬停高亮是全应用最高频的
+    /// 重绘, 全帧重画 (含全部行的 DrawTextW) 在此是纯浪费。默认实现 = 全量
+    /// [`Self::paint`] (语义等价; 支持增量的后端自行覆写, 不支持的原样正确)。
+    ///
+    /// 契约: 调用前**行集未变** (可视窗口与上一帧相同 —— 由协议层守卫, 见
+    /// `protocol::AppEvent::SetSelection`); 后端自行跳过不在可视窗口内的行。
+    /// 行集/文本/徽标/几何任一变化都必须走 [`Self::paint`], 不经此路径。
+    fn repaint_rows(&mut self, state: &FrameState, rows: &[usize]) -> Result<(), BackendError> {
+        let _ = rows;
+        self.paint(state)
+    }
 }

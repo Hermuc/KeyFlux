@@ -155,6 +155,11 @@ impl Dib {
         unsafe { core::slice::from_raw_parts_mut(self.bits, self.len) }
     }
 
+    /// 只读字节切片 (合成器从内容面读、写呈现面时用; 同样先 `flush`)。
+    fn bytes(&self) -> &[u8] {
+        unsafe { core::slice::from_raw_parts(self.bits, self.len) }
+    }
+
     fn flush(&self) {
         unsafe {
             let _ = GdiFlush();
@@ -187,7 +192,8 @@ struct Resources {
     accent_brush: HBRUSH, // 选中行左侧强调条 (skin::list_accent_color)
     scroll_brush: HBRUSH, // 滚动条滑块 (skin::list_scroll_color)
     clip: HRGN,           // 白框圆角区域 (GDI 绘制裁剪; 与窗口区域分开, 见 hit_region)
-    dib: Dib,             // 自合成面 (UpdateLayeredWindow 源)
+    content: Dib,         // 内容面 (GDI 画原始内容色; 持久保留, 不被合成破坏)
+    layer: Dib,           // 呈现面 (合成后的预乘帧 = UpdateLayeredWindow 源)
     plan: compose::Plan,  // 逐像素合成计划 (几何决定, 尺寸/皮肤变化时重建)
 }
 
@@ -229,6 +235,10 @@ pub struct GdiBackend {
     res: Option<Resources>,
     /// 满不透明度时的**预乘**帧缓存 (淡出时逐帧缩放它, 避免重绘 GDI)
     frame_full: Vec<u8>,
+    /// 内容面是否持有当前帧的内容色 (2026-10-06 双面化): 全量 draw 置真,
+    /// resize (DIB 重建) 置假 —— 增量行重绘 (`repaint_rows`) 的前置守卫,
+    /// 假时回退全量重绘 (语义等价, 只慢不错)。
+    content_valid: bool,
 }
 
 impl GdiBackend {
@@ -242,6 +252,7 @@ impl GdiBackend {
             icons: IconCache::new(),
             res: None,
             frame_full: Vec::new(),
+            content_valid: false,
         }
     }
 
@@ -381,7 +392,8 @@ impl GdiBackend {
         let scroll_brush = brush(skin::list_scroll_color(s))?;
 
         // 自合成面 + 计划
-        let dib = Dib::new(state.width_px, state.height_px)?;
+        let content = Dib::new(state.width_px, state.height_px)?;
+        let layer = Dib::new(state.width_px, state.height_px)?;
         let plan = Self::build_plan(state);
         let clip = Self::frame_region(
             state.width_px,
@@ -405,7 +417,8 @@ impl GdiBackend {
             accent_brush,
             scroll_brush,
             clip,
-            dib,
+            content,
+            layer,
             plan,
         })
     }
@@ -442,7 +455,7 @@ impl GdiBackend {
                 None,
                 Some(&dst),
                 Some(&size),
-                Some(res.dib.dc),
+                Some(res.layer.dc),
                 Some(&POINT { x: 0, y: 0 }), // pptSrc: 层的原点
                 COLORREF(0),
                 Some(&blend),
@@ -452,16 +465,26 @@ impl GdiBackend {
         r.map_err(|e| BackendError::with_hresult("UpdateLayeredWindow failed", e.code().0 as u32))
     }
 
-    /// 合成 + 缓存满帧 + 呈现 (`gain` = 1.0 时同时刷新 `frame_full`)。
-    fn compose_and_present(&mut self, keep_full: bool) -> Result<(), BackendError> {
-        let Some(res) = self.res.as_mut() else {
-            return Err(BackendError::new("GDI backend not initialized"));
-        };
-        res.dib.flush(); // GDI 批次必须落到位内存后才能被合成器读
-        let plan = res.plan.clone();
-        compose::composite(res.dib.bytes_mut(), &plan, 1.0);
-        if keep_full {
-            self.frame_full = res.dib.bytes_mut().to_vec();
+    /// 全帧合成 + 缓存满帧 + 呈现 (2026-10-06 双面化): 内容面 (GDI 原始内容色,
+    /// **持久保留**) → 拷入呈现面 → 就地合成 → `UpdateLayeredWindow`。
+    /// 内容面不再被合成破坏是增量行重绘 (`repaint_rows`) 的机制前提。
+    fn compose_and_present(&mut self) -> Result<(), BackendError> {
+        {
+            let Some(res) = self.res.as_mut() else {
+                return Err(BackendError::new("GDI backend not initialized"));
+            };
+            res.content.flush(); // GDI 批次必须落到位内存后才能被合成器读
+            let plan = res.plan.clone();
+            let layer = res.layer.bytes_mut();
+            layer.copy_from_slice(res.content.bytes());
+            compose::composite(layer, &plan, 1.0);
+            // 满不透明度帧缓存 (淡出/复原的源) 跟随本次呈现 (合成是纯内存写,
+            // 读回无需 GdiFlush —— flush 留给 present 前的最后一次保险)
+            self.frame_full.clear();
+            self.frame_full.extend_from_slice(layer);
+        }
+        if let Some(res) = self.res.as_ref() {
+            res.layer.flush();
         }
         self.gain = 255;
         self.present()
@@ -484,7 +507,7 @@ impl GdiBackend {
                 let Some(res) = self.res.as_ref() else {
                     return Err(BackendError::new("GDI backend not initialized"));
                 };
-                res.dib.dc
+                res.content.dc
             };
             // 1) 全客户区先铺**阴影色** (框外带的底色 = 阴影色; 合成器按阴影 alpha 预乘后,
             //    带内只剩黑 + alpha ⇒ 桌面被压暗 = 阴影)
@@ -597,7 +620,9 @@ impl GdiBackend {
         }
 
         // 7) 逐像素合成 (alpha 掩码 + 预乘) → 呈现
-        self.compose_and_present(true)?;
+        self.compose_and_present()?;
+        // 全量重绘后内容面与当前帧一致 ⇒ 增量行重绘可用
+        self.content_valid = true;
 
         if validate {
             unsafe {
@@ -672,6 +697,259 @@ impl GdiBackend {
         inset: i32,
         list_top: i32,
     ) {
+        let lay = ListLayout::of(state, inset, list_top);
+        unsafe {
+            let old_font = SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, self.list_text_color);
+            let (start, end) = state.results.window();
+            for (i, ri) in (start..end).enumerate() {
+                let top = list_top + i as i32 * lay.row_h;
+                self.paint_result_row(hdc, state, res, &lay, ri, top);
+            }
+            SelectObject(hdc, old_font);
+            self.draw_scrollbar(hdc, state, res, &lay);
+        }
+    }
+
+    /// 增量行重绘 (2026-10-06 悬停卡顿第二轮): 只重画 `rows` 里的结果行 + 滚动条,
+    /// 内容面其余像素**原样保留** (它是持久面, 不被合成破坏 —— `compose_and_present`
+    /// 的双面化正是本方法的前提), 再把这些条带从内容面合成进呈现面并呈现。
+    /// 悬停高亮从「全帧 GDI 重画 + 全帧合成」降到「两行 GDI + 两段条带合成」。
+    ///
+    /// 守卫链: `content_valid` 为假 (resize 后未全量重绘) 时回退全量 [`Self::paint`];
+    /// 行号落在可视窗口外的静默跳过 (协议层已保证行集未变, 这里只兜底)。
+    fn repaint_rows_impl(
+        &mut self,
+        state: &FrameState,
+        rows: &[usize],
+    ) -> Result<(), BackendError> {
+        if !self.content_valid {
+            return self.paint(state);
+        }
+        let Some(res) = self.res.as_ref() else {
+            return Err(BackendError::new("GDI backend not initialized"));
+        };
+        let dpi = state.dpi;
+        let inset = geometry::band_inset_px(dpi);
+        let list_top =
+            geometry::query_bottom_px(state.base_height_px, dpi) + geometry::list_separator_px(dpi);
+        let lay = ListLayout::of(state, inset, list_top);
+        let (start, end) = state.results.window();
+        // 条带几何 (窗口坐标): 行条带 + 滚动条列 (行重画会擦掉与行重叠的滑块段)
+        let mut strips: Vec<(i32, i32, i32, i32)> = Vec::with_capacity(rows.len() + 1);
+        unsafe {
+            let hdc = res.content.dc;
+            let old_font = SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, self.list_text_color);
+            for &row in rows {
+                if (row as i32) < start as i32 || row >= end {
+                    continue; // 不可见 (理论不可达; 兜底)
+                }
+                let top = list_top + (row - start) as i32 * lay.row_h;
+                // 行条带整体回铺框底色 (旧行的选中底/强调条一并擦除), 再按新状态画行
+                let strip = RECT {
+                    left: lay.inner_l,
+                    top,
+                    right: lay.inner_r.max(lay.inner_l),
+                    bottom: top + lay.row_h,
+                };
+                FillRect(hdc, &strip, res.bg_brush);
+                self.paint_result_row(hdc, state, res, &lay, row, top);
+                strips.push((strip.left, strip.top, strip.right, strip.bottom));
+            }
+            SelectObject(hdc, old_font);
+            // 滑块与行条带同列: 行内区域被擦过 ⇒ 无条件整列重画 + 整列入合成清单
+            if lay.has_bar {
+                self.draw_scrollbar(hdc, state, res, &lay);
+                let track_top = list_top + 4;
+                let track_bot = (state.height_px - inset - 4).max(track_top + 1);
+                strips.push((
+                    (lay.inner_r - lay.sb_m - lay.sb_w - 2).max(lay.inner_l),
+                    track_top,
+                    lay.inner_r,
+                    track_bot,
+                ));
+            }
+        }
+        res.content.flush();
+        // 条带合成: 内容面 → 呈现面 (条带互不重叠, 逐段处理)
+        {
+            let res = self.res.as_mut().unwrap();
+            let plan = res.plan.clone();
+            let content = res.content.bytes();
+            let layer = res.layer.bytes_mut();
+            for strip in &strips {
+                compose::composite_rect(content, layer, &plan, *strip, 1.0);
+            }
+            // 满不透明度帧缓存跟随呈现 (淡出/复原语义与全量路径一致)
+            self.frame_full.clear();
+            self.frame_full.extend_from_slice(layer);
+        }
+        if let Some(res) = self.res.as_ref() {
+            res.layer.flush();
+        }
+        self.gain = 255;
+        self.present()
+    }
+
+    /// 滚动条: 细滑块, 位置 = scroll / (total − vis) 比例 (draw_results /
+    /// repaint_rows 共用; 只画滑块不画轨道 —— 轨道即行底色, 2026-10-04 口径)。
+    fn draw_scrollbar(&self, hdc: HDC, state: &FrameState, res: &Resources, lay: &ListLayout) {
+        if !lay.has_bar {
+            return;
+        }
+        let total = state.results.len();
+        let vis = state.results.visible_rows();
+        unsafe {
+            let track_top = lay.list_top + 4;
+            let track_bot = (state.height_px - lay.inset - 4).max(track_top + 1);
+            let track_h = track_bot - track_top;
+            let thumb_h = (((track_h as f64) * (vis as f64) / (total as f64)).round() as i32)
+                .clamp(16, track_h);
+            let denom = (total - vis).max(1) as f64;
+            let off = (((track_h - thumb_h) as f64) * (state.results.scroll() as f64 / denom))
+                .round() as i32;
+            let right = lay.inner_r - lay.sb_m;
+            let bar = RECT {
+                left: (right - lay.sb_w).max(lay.inner_l),
+                top: track_top + off,
+                right: right.max(lay.inner_l + 1),
+                bottom: track_top + off + thumb_h,
+            };
+            FillRect(hdc, &bar, res.scroll_brush);
+        }
+    }
+
+    /// 单行内容 (draw_results / repaint_rows 共用): 选中底 + 强调条 + 图标 +
+    /// 标题/副标题双行 (或无路径时的单行提示)。调用方保证字体/文字色已选入。
+    unsafe fn paint_result_row(
+        &self,
+        hdc: HDC,
+        state: &FrameState,
+        res: &Resources,
+        lay: &ListLayout,
+        ri: usize,
+        top: i32,
+    ) {
+        let row_h = lay.row_h;
+        let inner_l = lay.inner_l;
+        if ri as i32 == state.results.selected() {
+            let row = RECT {
+                left: inner_l,
+                top,
+                right: lay.inner_r.max(inner_l),
+                bottom: top + row_h,
+            };
+            FillRect(hdc, &row, res.select_brush);
+            // 强调条上下各留 4px 呼吸 (贴满整行会显得笨重)
+            let acc = RECT {
+                left: inner_l,
+                top: top + 4,
+                right: inner_l + lay.accent_w,
+                bottom: (top + row_h - 4).max(top + 5),
+            };
+            FillRect(hdc, &acc, res.accent_brush);
+        }
+        let Some(item) = state.results.item(ri) else {
+            return;
+        };
+
+        // ---- Flow Launcher 版式 (2026-10-04): [图标 | 标题(黑) / 路径(灰)] ----
+        if item.subtitle.is_empty() {
+            // 单行提示 (ShowHint): 无图标, 整行垂直居中 (与旧观感连续)
+            let mut u: Vec<u16> = item.title.encode_utf16().collect();
+            if u.is_empty() {
+                return;
+            }
+            let mut tr = RECT {
+                left: inner_l + lay.pad,
+                top,
+                right: lay.text_right.max(inner_l + lay.pad + 1),
+                bottom: top + row_h,
+            };
+            DrawTextW(hdc, &mut u, &mut tr, LIST_TEXT_FORMAT);
+            return;
+        }
+
+        // 文件图标: 左侧图标盒, 行内垂直居中 (提取失败 = 只有文字, 不带崩渲染)。
+        // 系统图标 RGB 经 DrawIconEx 落到 DIB, alpha 仍由 compose 按几何写入
+        // ⇒ 图标与文字同享面板净不透明度, 观感一致。
+        let icon_left = inner_l + lay.pad;
+        if let Some(hicon) = self.icons.get(&item.subtitle) {
+            let iy = top + (row_h - lay.icon_sz) / 2;
+            let _ = DrawIconEx(
+                hdc,
+                icon_left,
+                iy,
+                hicon,
+                lay.icon_sz,
+                lay.icon_sz,
+                0,
+                None,
+                DI_NORMAL,
+            );
+        }
+        let text_left = icon_left + lay.icon_sz + lay.icon_gap;
+
+        // 标题 (上行, 主文字色): 文件名含后缀, 上半带垂直居中
+        let mut tu: Vec<u16> = item.title.encode_utf16().collect();
+        if !tu.is_empty() {
+            let mut tr = RECT {
+                left: text_left,
+                top: top + 2,
+                right: lay.text_right.max(text_left + 1),
+                bottom: top + row_h / 2 + 2,
+            };
+            DrawTextW(hdc, &mut tu, &mut tr, LIST_TITLE_FORMAT);
+        }
+        // 副标题 (下行, 灰): 完整路径, 下半带垂直居中, 路径省略保留首尾
+        let mut su: Vec<u16> = item.subtitle.encode_utf16().collect();
+        if !su.is_empty() {
+            SelectObject(hdc, HGDIOBJ(res.list_sub_font.0));
+            SetTextColor(hdc, self.list_sub_color);
+            let mut sr = RECT {
+                left: text_left,
+                top: top + row_h / 2 - 2,
+                right: lay.text_right.max(text_left + 1),
+                bottom: top + row_h - 2,
+            };
+            DrawTextW(hdc, &mut su, &mut sr, LIST_SUB_FORMAT);
+            SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
+            SetTextColor(hdc, self.list_text_color);
+        }
+    }
+}
+
+/// 结果区一次性推导的布局常量 (`draw_results` 与 `repaint_rows` 共用 ——
+/// 两处各推一遍迟早漂移, 2026-10-06 抽取)。
+struct ListLayout {
+    /// 行高 (物理像素)
+    row_h: i32,
+    /// 内容区左右缘 (含环形内边距)
+    inner_l: i32,
+    inner_r: i32,
+    /// 文字右缘 (有滚动条时让出滑块列)
+    text_right: i32,
+    /// 文字内边距 / 强调条宽 / 图标盒尺寸与间距
+    pad: i32,
+    accent_w: i32,
+    icon_sz: i32,
+    icon_gap: i32,
+    /// 滚动条宽 / 右缘留白
+    sb_w: i32,
+    sb_m: i32,
+    /// 是否有滚动条 (项数 > 可视行数)
+    has_bar: bool,
+    /// 列表顶 (窗口坐标)
+    list_top: i32,
+    /// 框外带内缩 (repaint_rows 的滚动条轨道推导用)
+    inset: i32,
+}
+
+impl ListLayout {
+    fn of(state: &FrameState, inset: i32, list_top: i32) -> Self {
         let dpi = state.dpi;
         let row_h = geometry::list_row_h_px(dpi);
         let pad = geometry::list_text_pad_px(dpi);
@@ -687,113 +965,20 @@ impl GdiBackend {
         let text_right = inner_r - pad - if has_bar { sb_w + sb_m } else { 0 };
         let icon_sz = geometry::list_icon_px(dpi);
         let icon_gap = geometry::list_icon_gap_px(dpi);
-        let (start, end) = state.results.window();
-        let sel = state.results.selected();
-
-        unsafe {
-            let old_font = SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
-            SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, self.list_text_color);
-            for (i, ri) in (start..end).enumerate() {
-                let top = list_top + i as i32 * row_h;
-                let row = RECT {
-                    left: inner_l,
-                    top,
-                    right: inner_r.max(inner_l),
-                    bottom: top + row_h,
-                };
-                if ri as i32 == sel {
-                    FillRect(hdc, &row, res.select_brush);
-                    // 强调条上下各留 4px 呼吸 (贴满整行会显得笨重)
-                    let acc = RECT {
-                        left: inner_l,
-                        top: top + 4,
-                        right: inner_l + accent_w,
-                        bottom: (top + row_h - 4).max(top + 5),
-                    };
-                    FillRect(hdc, &acc, res.accent_brush);
-                }
-                let Some(item) = state.results.item(ri) else {
-                    continue;
-                };
-
-                // ---- Flow Launcher 版式 (2026-10-04): [图标 | 标题(黑) / 路径(灰)] ----
-                if item.subtitle.is_empty() {
-                    // 单行提示 (ShowHint): 无图标, 整行垂直居中 (与旧观感连续)
-                    let mut u: Vec<u16> = item.title.encode_utf16().collect();
-                    if u.is_empty() {
-                        continue;
-                    }
-                    let mut tr = RECT {
-                        left: inner_l + pad,
-                        top,
-                        right: text_right.max(inner_l + pad + 1),
-                        bottom: top + row_h,
-                    };
-                    DrawTextW(hdc, &mut u, &mut tr, LIST_TEXT_FORMAT);
-                    continue;
-                }
-
-                // 文件图标: 左侧图标盒, 行内垂直居中 (提取失败 = 只有文字, 不带崩渲染)。
-                // 系统图标 RGB 经 DrawIconEx 落到 DIB, alpha 仍由 compose 按几何写入
-                // ⇒ 图标与文字同享面板净不透明度, 观感一致。
-                let icon_left = inner_l + pad;
-                if let Some(hicon) = self.icons.get(&item.subtitle) {
-                    let iy = top + (row_h - icon_sz) / 2;
-                    let _ = DrawIconEx(
-                        hdc, icon_left, iy, hicon, icon_sz, icon_sz, 0, None, DI_NORMAL,
-                    );
-                }
-                let text_left = icon_left + icon_sz + icon_gap;
-
-                // 标题 (上行, 主文字色): 文件名含后缀, 上半带垂直居中
-                let mut tu: Vec<u16> = item.title.encode_utf16().collect();
-                if !tu.is_empty() {
-                    let mut tr = RECT {
-                        left: text_left,
-                        top: top + 2,
-                        right: text_right.max(text_left + 1),
-                        bottom: top + row_h / 2 + 2,
-                    };
-                    DrawTextW(hdc, &mut tu, &mut tr, LIST_TITLE_FORMAT);
-                }
-                // 副标题 (下行, 灰): 完整路径, 下半带垂直居中, 路径省略保留首尾
-                let mut su: Vec<u16> = item.subtitle.encode_utf16().collect();
-                if !su.is_empty() {
-                    SelectObject(hdc, HGDIOBJ(res.list_sub_font.0));
-                    SetTextColor(hdc, self.list_sub_color);
-                    let mut sr = RECT {
-                        left: text_left,
-                        top: top + row_h / 2 - 2,
-                        right: text_right.max(text_left + 1),
-                        bottom: top + row_h - 2,
-                    };
-                    DrawTextW(hdc, &mut su, &mut sr, LIST_SUB_FORMAT);
-                    SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
-                    SetTextColor(hdc, self.list_text_color);
-                }
-            }
-            SelectObject(hdc, old_font);
-
-            // 滚动条: 细滑块, 位置 = scroll / (total − vis) 比例。
-            if has_bar {
-                let track_top = list_top + 4;
-                let track_bot = (state.height_px - inset - 4).max(track_top + 1);
-                let track_h = track_bot - track_top;
-                let thumb_h = (((track_h as f64) * (vis as f64) / (total as f64)).round() as i32)
-                    .clamp(16, track_h);
-                let denom = (total - vis).max(1) as f64;
-                let off = (((track_h - thumb_h) as f64) * (state.results.scroll() as f64 / denom))
-                    .round() as i32;
-                let right = inner_r - sb_m;
-                let bar = RECT {
-                    left: (right - sb_w).max(inner_l),
-                    top: track_top + off,
-                    right: right.max(inner_l + 1),
-                    bottom: track_top + off + thumb_h,
-                };
-                FillRect(hdc, &bar, res.scroll_brush);
-            }
+        Self {
+            row_h,
+            inner_l,
+            inner_r,
+            text_right,
+            pad,
+            accent_w,
+            icon_sz,
+            icon_gap,
+            sb_w,
+            sb_m,
+            has_bar,
+            list_top,
+            inset,
         }
     }
 }
@@ -865,15 +1050,18 @@ impl RenderBackend for GdiBackend {
         self.draw(state, false)
     }
 
-    /// 结果列表展开/收起: 尺寸变了 ⇒ DIB / 合成计划 / 区域全部重建
+    /// 结果列表展开/收起: 尺寸变了 ⇒ 内容面/呈现面/合成计划/区域全部重建
     /// (区域与自合成面都是**窗口坐标**, 不重建则新增的下半部分被裁掉或未绘制)。
+    /// 重建后内容面失效 ⇒ `content_valid = false`, 增量行重绘回退全量。
     fn resize(&mut self, state: &FrameState) -> Result<(), BackendError> {
         let dpi = state.dpi;
         let s = state.skin;
         let plan = Self::build_plan(state);
         if let Some(res) = self.res.as_mut() {
             // 新面 (旧 Dib 在赋值时 Drop: 解绑 + 删对象)
-            res.dib = Dib::new(state.width_px, state.height_px)?;
+            res.content = Dib::new(state.width_px, state.height_px)?;
+            res.layer = Dib::new(state.width_px, state.height_px)?;
+            self.content_valid = false;
             res.plan = plan.clone();
             let old = res.clip;
             let new = Self::frame_region(
@@ -895,6 +1083,11 @@ impl RenderBackend for GdiBackend {
         // 背景层不必重抓: 会话初抓的那张已按「基准高 + 全展开」一次抓够, 顶部不动 ⇒ 裁剪复用
         self.apply_hit_region(&plan);
         Ok(())
+    }
+
+    /// 选择变化增量重绘 (2026-10-06): 双面化后内容面持久有效, 只重画新旧两行。
+    fn repaint_rows(&mut self, state: &FrameState, rows: &[usize]) -> Result<(), BackendError> {
+        self.repaint_rows_impl(state, rows)
     }
 
     /// 0x402 阻塞式淡出 (R15): 增益 255→0 步进, 曲线 = Accelerate-Decelerate 0.5/0.5
@@ -941,11 +1134,11 @@ impl GdiBackend {
         let Some(res) = self.res.as_mut() else {
             return;
         };
-        if self.frame_full.len() != res.dib.len {
+        if self.frame_full.len() != res.layer.len {
             return;
         }
         let full = self.frame_full.clone();
-        compose::scale_frame(&full, res.dib.bytes_mut(), gain01);
+        compose::scale_frame(&full, res.layer.bytes_mut(), gain01);
         self.gain = (gain01 * 255.0).round().clamp(0.0, 255.0) as u8;
         let _ = self.present();
     }
