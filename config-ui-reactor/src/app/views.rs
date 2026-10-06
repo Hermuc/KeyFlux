@@ -1042,8 +1042,12 @@ impl Shell {
                 .keyed_children(sections),
         );
 
+        // 右边距必须为 0：纵向滚动条贴在右列 ScrollViewer 的右缘，若这里再留 24，
+        // 滚动条会悬在离窗口右缘 ~35px 处（使用指南页 ScrollViewer 是页面根、贴边，
+        // 两页并排看滚动条位置不一致——2026-10-06 用户报障）。右列内容是 Left 对齐
+        // 的定宽 460 卡片列，右缘外扩不挪卡片；左列 560 定宽亦不受影响。
         Grid::new()
-            .margin(Thickness::new(24.0, 20.0, 24.0, 28.0))
+            .margin(Thickness::new(24.0, 20.0, 0.0, 28.0))
             .columns([GridLength::Pixel(560.0), GridLength::STAR])
             .children((left, Border::new().grid_column(1).content(right)))
     }
