@@ -49,6 +49,7 @@ tar -xzf wr.crate
 | P3 | **ContentDialog 跟随宿主窗口主题** | `native/winui/content_dialog.rs`（7 / +31）· `native/winui/mod.rs`（2 / +8）| `6da66d1` | 弹窗 `show` 路径内部 |
 | P4 | **`Element::resource_overrides` builder** | `src/generated.rs`（8 / +26）| `d8ffebd` | 面板 `src/app.rs:1827`、`ui/abbr_view.rs:55`、`ui/keymap_view.rs:135`、`ui/selected_action_view.rs`（7 处）|
 | P5 | **ContentDialog 遮罩层覆盖** | `native/winui/app_shim.rs`（同上 hunk）· `src/app.rs`（1 / +2 中的 1 行）| `10eee9a` | vendor `src/app.rs:808` |
+| P6 | **TextBox 挂载顺序：AcceptsReturn 先于 Text** | `src/generated.rs`（1 / 移动 7 行，零增删）| `eff21fd+`（本次）| 指南编辑弹窗等一切**程序化灌入多行文本**的 TextBox |
 
 - `native/winui/app_shim.rs`：**一个 hunk 共 `+101 −0`，P1 与 P5 都落在这里** ——
   升级上游时这是最容易冲突的文件。
