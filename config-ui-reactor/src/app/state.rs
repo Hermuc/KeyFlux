@@ -594,6 +594,21 @@ impl Shell {
         });
     }
 
+    /// 出厂默认使用指南文档：经 glue 的单一真源（本机直读 → 回退后端）加载。
+    /// 「恢复默认 / 保存空文本」的回落出口 —— 不得用「清空渲染态」代替（那会让
+    /// 指南页落进「暂不可用」降级态，2026-10-05 用户报障）。
+    pub(super) fn load_default_doc(&self) -> String {
+        let api = self
+            .session
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().map(|session| session.api()));
+        match api {
+            Some(api) => super::glue::load_default_doc(self.data_root.as_deref(), api.as_ref()),
+            None => String::new(),
+        }
+    }
+
     /// 缩写页命令框执行（复刻 `AbbrPageViewModel.RunCmd`）：
     /// `del <缩写>` 删除 · `rn <新名>` 重命名当前选中 · 其余**添加/切换**到该缩写。
     pub(super) fn run_abbr_command(&mut self) {
