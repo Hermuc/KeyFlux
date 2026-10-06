@@ -50,11 +50,13 @@ tar -xzf wr.crate
 | P4 | **`Element::resource_overrides` builder** | `src/generated.rs`（8 / +26）| `d8ffebd` | 面板 `src/app.rs:1827`、`ui/abbr_view.rs:55`、`ui/keymap_view.rs:135`、`ui/selected_action_view.rs`（7 处）|
 | P5 | **ContentDialog 遮罩层覆盖** | `native/winui/app_shim.rs`（同上 hunk）· `src/app.rs`（1 / +2 中的 1 行）| `10eee9a` | vendor `src/app.rs:808` |
 | P6 | **TextBox 挂载顺序：AcceptsReturn 先于 Text** | `src/generated.rs`（1 / 移动 7 行，零增删）| `eff21fd+`（本次）| 指南编辑弹窗等一切**程序化灌入多行文本**的 TextBox |
+| P7 | **滚动条响应计时覆盖（隐式 ScrollBar 样式）** | `native/winui/app_shim.rs`（同上 hunk 续扩）· `src/app.rs`（1 / +3 中的 1 行）| 本次 | vendor `src/app.rs:809` |
 
-- `native/winui/app_shim.rs`：**一个 hunk 共 `+101 −0`，P1 与 P5 都落在这里** ——
+- `native/winui/app_shim.rs`：**一个 hunk，P1 / P5 / P7 都落在这里**（P7 引入后共
+  约 `+740 −0`，其中约 530 行是 P7 的整段 XAML 字面量）——
   升级上游时这是最容易冲突的文件。
-- vendor `src/app.rs` 的 `+2` = `install_global_ui_font`(P1) 与
-  `install_dialog_layer_overrides`(P5) 两行调用。
+- vendor `src/app.rs` 的 `+3` = `install_global_ui_font`(P1)、
+  `install_dialog_layer_overrides`(P5)、`install_scroll_bar_overrides`(P7) 三行调用。
 
 ### 各补丁动机（各一句话）
 
@@ -73,12 +75,22 @@ tar -xzf wr.crate
   只能按主题资源键覆盖：`ContentDialogSmokeFill`（真正的键名，从
   `Microsoft.UI.Xaml.Controls.pri` 里查到）、`ContentDialogTopOverlay`、
   `ContentDialogDimmingThemeBrush` ⇒ 三者置 `Transparent`。
+- **P7** —— Fluent `ScrollBar` 模板把悬停展开 / 移出收起动画的 `BeginTime` 硬编码为
+  400ms / 500ms 起手延迟（`ScrollBarExpandBeginTime` / `ScrollBarContractBeginTime`），
+  滚动条状态切换永远慢半拍；而这两个键在模板里是 `{StaticResource}` 引用——XBF 编译期
+  绑定，App 级资源覆盖（顶层条目 + ThemeDictionaries 双写）**实测无效**（只有
+  `{ThemeResource}` 可被 App 级主题字典覆盖，见 P1 教训）⇒ 整段模板转为 **App 级隐式
+  样式**：标量全部内联为字面量、BeginTime 归零、别名刷子解析到底层主题刷子键
+  （保留浅色/深色运行时跟随；HighContrast 的 ScrollBar 专用重定向回落标准刷子）。
+  模板来源与转换规则见 `app_shim.rs::install_scroll_bar_overrides` 文档注释。
 
 ## 四、升级上游时怎么做
 
 1. 取新版原包（`static.crates.io/crates/windows-reactor/windows-reactor-<ver>.crate`）解包；
 2. 跑第五节的脚本，得到**当前**补丁面，与第三节对照 —— 有出入先查清是谁多改的；
-3. 把 P1–P5 按文件重放到新版（`app_shim.rs` 的 P1+P5 最容易与上游漂移冲突）；
+3. 把 P1–P7 按文件重放到新版（`app_shim.rs` 的 P1+P5+P7 最容易与上游漂移冲突；
+   P7 的 ScrollBar 模板需按新版 `ScrollBar_themeresources.xaml` 重新转换，见
+   `install_scroll_bar_overrides` 文档注释里的转换规则）；
 4. `tools/cargo-gates.ps1` 三道闸门 + `make api-parity` 必须全过；
 5. 更新本文件：上游版本 / sha、差异面数字、引入提交。
 6. `Cargo.toml` 的 `[patch.crates-io]` 注释**只指向本文件**，不要在注释里重复清单
