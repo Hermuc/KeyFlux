@@ -806,6 +806,7 @@ impl App {
                     install_xaml_controls_resources(&application)?;
                     install_global_ui_font(&application)?;
                     install_dialog_layer_overrides(&application)?;
+                    install_scroll_bar_overrides(&application)?;
                     let create_pumps = launch_create_pumps.borrow_mut().take().unwrap();
                     let mut pumps = create_pumps(application.clone()).into_iter();
                     let mut primary_pump = pumps.next().ok_or_else(|| {
