@@ -55,10 +55,7 @@ fn assemble(api: &dyn SettingsApi, port: u16, options: &BackendSessionOptions) -
     // 读不到再回退后端（语义对齐旧 `HomePageViewModel.LoadAsync`）。
     let mut doc_md = config.overview_doc_md.clone();
     if doc_md.trim().is_empty() {
-        doc_md = root
-            .and_then(|dir| crate::services::local_fs::read_site_text(dir, "/config_doc.md"))
-            .or_else(|| api.get_raw_text("/config_doc.md").value)
-            .unwrap_or_default();
+        doc_md = load_default_doc(root, api);
     }
 
     // 面板私有 UI 偏好：部署根可得时读取（缺失/损坏 ⇒ 默认值，不影响装载）。
@@ -74,6 +71,16 @@ fn assemble(api: &dyn SettingsApi, port: u16, options: &BackendSessionOptions) -
         data_root,
         ui_prefs,
     }
+}
+
+/// 出厂默认使用指南文档（**单一真源**）：本机直读 `<deploy>/bin/site/config_doc.md`，
+/// 读不到回退后端 `/config_doc.md`。
+/// 装载（`assemble`）与指南编辑的「恢复默认 / 保存空文本」共用 —— 后两者若用
+/// 「清空渲染态」代替回落，指南页会落进「暂不可用」降级态（2026-10-05 用户报障）。
+pub(super) fn load_default_doc(root: Option<&std::path::Path>, api: &dyn SettingsApi) -> String {
+    root.and_then(|dir| crate::services::local_fs::read_site_text(dir, "/config_doc.md"))
+        .or_else(|| api.get_raw_text("/config_doc.md").value)
+        .unwrap_or_default()
 }
 
 /// 解析部署根（`<deploy>`）：`<deploy>/bin/settings.exe` ⇒ 其祖父目录。
