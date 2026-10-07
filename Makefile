@@ -3,14 +3,18 @@ ahkVersion = 2.0.19
 folder = KeyFlux-$(version)
 zip = $(folder).7z
 
-buildServer:
-	go.exe build -C ./config-server -tags=nomsgpack -ldflags "-s -w -X settings/internal/script.KeyfluxVersion=$(version)" -o ../bin/settings.exe ./cmd/settings
+# sync-templates: 模板资产 → bin/templates (运行时引擎读: Launcher.ahk 的
+# NeedsRegenerate 判定 + MiscTools.ahk 的计划任务模板)。模板真源 = 仓库根 templates/
+# (2026-10-06 自 config-server/templates 迁出, Go 后端同日退役)。
+# settings.exe 本体由 cargo 直接产出 (config-ui-reactor, bin 目标 settings),
+# 版本注入走 KEYFLUX_VERSION 环境变量 (见 tools/cargo-gates.ps1 -Version)。
+sync-templates:
 	rm -f -r bin/templates
-	cp -r config-server/templates bin/templates
+	cp -r templates bin/templates
 
 # 发布 Rust/WinUI3 原生设置界面 (config-ui-reactor) 到 bin/ui/。
 # 三道闸门 (迁移知识库 12 号): fmt --check / clippy -D warnings / test, 全绿才允许出包。
-# ⚠️ 单一真源: 闸门序列只在 tools/cargo-gates.ps1 定义一处 (analyzers / drop-in-rust /
+# ⚠️ 单一真源: 闸门序列只在 tools/cargo-gates.ps1 定义一处 (analyzers / release.yml /
 #   两个 GitHub workflow 全部调用它), 勿在本文件再抄一份。
 # 自包含: build.rs 的 as_self_contained() 把 pinned Windows App Runtime stage 进 target/release
 #   (exe + 28 DLL + 4 PRI + ~87 语言资源目录), 排除 cargo 中间产物后整体拷入 bin/ui
@@ -49,7 +53,7 @@ CopyAHK:
 	cmd.exe /c CopyAHK.bat
 	rm CopyAHK.bat
 
-build: buildServer buildClientReactor copyFiles
+build: sync-templates buildClientReactor copyFiles
 	cd bin; ./settings.exe ChangeVersion $(version)
 	rm -f KeyFlux-*.7z
 	7z.exe a $(zip) $(folder)
@@ -86,11 +90,8 @@ upload: uploadLanZou createRelease
 
 # 下面是开发时用到的命令:
 
-server: buildServer
-	@cd config-server; ../bin/settings.exe debug
-
-ahk: buildServer
-	@bin/settings.exe GenerateAHK ./data/config.json ./config-server/templates/keyflux.tmpl ./bin/KeyFlux.ahk
+ahk:
+	@bin/settings.exe GenerateAHK ./data/config.json ./templates/keyflux.tmpl ./bin/KeyFlux.ahk
 
 # ===== 编译输出目录 (单一真源) =====
 # 编译产物的最终落点, 固定为本机部署目录 D:\PortableApps\KeyFlux-1.0-beta1。
@@ -111,7 +112,7 @@ CHECK_CONFIG := $(DEPLOY_DIR)/data/config.json
 
 # check-deploy-tree: 「部署树已就绪」守卫。
 #   由来 (2026-09-30): check 直接读 $(CHECK_CONFIG) 生成 + /Validate, 但此前没有任何前置
-#   断言 —— 全新环境(make out 到临时 OUT_DIR、或 OUT_DIR 写错)会先跑完 buildServer/lint/
+#   断言 —— 全新环境(make out 到临时 OUT_DIR、或 OUT_DIR 写错)会先跑完 sync-templates/lint/
 #   check-texttypes/check-hooks 才在 GenerateAHK 处报一句含糊的失败, 分不清是「部署树没
 #   就绪」还是「生成器坏了」。本目标把「缺什么、怎么补」提前说清楚。
 #   必须声明为 order-only (|) 前置: 它只做存在性断言、不产出任何文件, 不能参与时间戳比较。
@@ -128,8 +129,8 @@ check-deploy-tree:
 lint:
 	python tools/lint_ident.py $$(find bin/lib -name '*.ahk')
 
-# check-texttypes: 内置文本特征**三端一致性**闸门 (Go 注册表 behaviors/textfeatures.go ⇄
-# AHK TextFeatureSpecs ⇄ 共享向量 config-server/internal/script/testdata/text_types.json)。
+# check-texttypes: 内置文本特征**三端一致性**闸门 (Rust 镜像 services/selected_action.rs
+# ::TEXT_TYPES ⇄ AHK TextFeatureSpecs ⇄ 共享向量 testdata/text_types.json)。
 # 两层: ① 静态对账 (值/大小写开关/正则/顺序逐项比对, 兜底项唯一且居末);
 #       ② 运行时对账 (从 AHK 源逐字提取函数体跑向量全部用例 —— 2026-09-17 之前
 #          SelectedAction.ahk 声称由 match_ops.json 守护, 但该向量只有 Go 侧消费, 属无强制契约)。
@@ -176,9 +177,9 @@ check-ime:
 #         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
 #   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
 #       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
-check: buildServer lint check-texttypes check-hooks sync-plugins | check-deploy-tree $(OUT_DIR)
+check: sync-templates lint check-texttypes check-hooks sync-plugins | check-deploy-tree $(OUT_DIR)
 	@mkdir -p "$(DEPLOY_DIR)/bin"
-	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./config-server/templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
+	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/oracle.ps1 -Config "$(CHECK_CONFIG)"
@@ -191,36 +192,16 @@ parity:
 	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/parity/run_parity.ps1
 
 # api-parity: API 级差分对账闸门 (P0, 见 tools/api-parity/README.md)。
-#   **双 exe 语义**: 对 Go 版 bin/settings.exe 跑一次 -Check, 再对 Rust 版
-#   config-ui-reactor/target/release/settings.exe 跑一次 -Check; 任一非全绿即目标失败
-#   (脚本末行 "API-PARITY: 23/23 PASS [CHECK]"; 候选 exe 未实现的端点记 MISSING_ENDPOINT
-#   且不算工具失败 —— Rust 迁移期的既定口径, 见 README)。
-#   由来 (2026-09-30 审计): 这是唯一能同时抓住「Go 基线漂移」与「双实现分叉」的闸门, 但
-#   Makefile 与两个 workflow 此前零引用 —— 工具在仓库里躺着没人跑。
-#   ⚠️ 不依赖 buildServer: 那会重新 go build 覆盖 bin/settings.exe, 把 make drop-in-rust 的
-#      切换结果悄悄冲掉; 这里只对**已存在**的两个 exe 做只读对账, 缺哪个就报缺哪个。
-#   ⚠️ Rust 侧 exe 必须带 KEYFLUX_VERSION 构建 (option_env! 注入), 否则 GET /config 的
-#      keyfluxVersion 字段与 Go 基线不同字节 ⇒ step 2 报 MISMATCH。构建口径见 drop-in-rust
-#      / cargo-gates -Version。
-#   ⚠️ 守卫信息刻意 ASCII-only, 理由见 check-deploy-tree 上方注释。
+#   对 bin/settings.exe (Rust) 复现 tools/api-parity/reference 基线 (2026-09-30 自 Go 版
+#   settings.exe 冻结录制 —— Go 后端已于 2026-10-06 退役, 基线即契约快照)。
+#   脚本末行 "API-PARITY: 23/23 PASS [CHECK]" (exit 0); FAIL (exit 1) = 端点行为漂移。
+#   ⚠️ bin/settings.exe 必须带 KEYFLUX_VERSION 构建 (option_env! 注入), 否则 GET /config 的
+#      keyfluxVersion 字段与基线不同字节 ⇒ step 2 报 MISMATCH。构建口径: KEYFLUX_VERSION=$(version)
+#      cargo build --release (或 tools/cargo-gates.ps1 -Release -Version $(version))。
 api-parity:
-	@test -f bin/settings.exe || (echo "[FAIL] api-parity: missing bin/settings.exe (Go build) -- run: make buildServer"; exit 1)
-	@test -f config-ui-reactor/target/release/settings.exe || (echo "[FAIL] api-parity: missing config-ui-reactor/target/release/settings.exe (Rust build)"; echo "       run: make drop-in-rust (gates + parity self-check), or: cargo build --release with KEYFLUX_VERSION (see this target's comment)"; exit 1)
-	@test -d bin/templates && test -d data/plugins || (echo "[FAIL] api-parity: sandbox source tree incomplete (needs bin/templates and data/plugins)"; echo "       run: make buildServer (produces bin/templates); mkdir -p data/plugins && cp -r plugins/examples/. data/plugins/"; exit 1)
-	@echo "== api-parity [1/2] Go  : bin/settings.exe"
+	@test -f bin/settings.exe || (echo "[FAIL] api-parity: missing bin/settings.exe -- build: KEYFLUX_VERSION=$(version) cargo build --release -C config-ui-reactor (bin settings), then copy to bin/"; exit 1)
+	@test -d bin/templates && test -d data/plugins || (echo "[FAIL] api-parity: sandbox source tree incomplete (needs bin/templates and data/plugins)"; echo "       run: make sync-templates; mkdir -p data/plugins && cp -r plugins/examples/. data/plugins/"; exit 1)
 	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/api-parity/run_api_parity.ps1 -Check -Exe bin/settings.exe
-	@echo "== api-parity [2/2] Rust: config-ui-reactor/target/release/settings.exe"
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/api-parity/run_api_parity.ps1 -Check -Exe config-ui-reactor/target/release/settings.exe
-
-# drop-in-rust: (P4 切换, **显式执行**) 用 Rust settings.exe 覆盖 Go 版。
-#   消费方 (bin/Launcher.ahk:40 / tools/oracle.ps1 / 误报病毒时执行这个.bat) 全部按
-#   **文件名**调用 bin/settings.exe —— 覆盖该文件即完成切换, 消费方零改动。
-#   前置: parity 须全绿 (Rust 与 Go 双向)。该前置**已改为脚本内自检**, 不再写成 make 依赖:
-#     ① 只读环境(Go-only)不该被 make 依赖卡住; ② 切换前的 last-mile 断言放在脚本里才
-#     保证「无论谁怎么调用」都成立 (见 tools/drop-in-rust.ps1 [2/3])。
-#   切换后下一次 deploy/sync-out 生效; 回退 = 重新 make buildServer (Go 源码保留至 Go 退役)。
-drop-in-rust:
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/drop-in-rust.ps1
 
 # check-cs: (已退役) 原 C# 设置界面单测随 config-ui-avalonia 一并移除;
 #   等价契约覆盖在 config-ui-reactor 的 cargo test (models/services 单测) 中。
@@ -281,7 +262,7 @@ check-commandinput-patch:
 # ⚠️ 配方里的 echo 串必须带引号: 裸写的 `-> $(OUT_DIR)` 会被 sh 解析成**重定向**
 #    (`-` 后跟 `>`), 报 "D:/...: Is a directory" 并让 make 以 Error 1 收尾 —— 依赖链已全部执行完,
 #    但退出码骗人 (2026-09-17 实测踩到, 已加引号)。同一坑对 `build` 目标不适用 (其 echo 无 `->`)。
-out: buildServer buildClientReactor sync-out
+out: sync-templates buildClientReactor sync-out
 	@echo "------------------------- out ok -> $(OUT_DIR) -------------------------------"
 
 # deploy: 回归通过后编译并同步到部署目录, 重启实例 (robocopy 退出码 0-7 均为成功)
@@ -294,4 +275,4 @@ out: buildServer buildClientReactor sync-out
 deploy: check buildClientReactor sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: server ahk buildServer buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch out deploy drop-in-rust parity api-parity check-deploy-tree
+.PHONY: ahk sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch out deploy parity api-parity check-deploy-tree

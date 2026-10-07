@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "comment": "Differential-parity corpus for the Rust generator migration. Inputs are frozen; reference/ holds byte-exact outputs captured from the reference implementation (Go).",
-  "template": "config-server/templates/keyflux.tmpl",
-  "skinTemplate": "config-server/templates/CommandInputSkin.tmpl",
+  "comment": "Differential-parity corpus for the generator. Inputs are frozen; reference/ holds byte-exact outputs captured from the reference implementation (Go backend, retired 2026-10-06 -- the baseline is now the frozen contract).",
+  "template": "templates/keyflux.tmpl",
+  "skinTemplate": "templates/CommandInputSkin.tmpl",
   "items": [
     {
       "name": "factory",

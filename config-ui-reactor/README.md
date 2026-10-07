@@ -37,7 +37,8 @@ Functions.ahk:140/146/147/149  ProcessExist/ProcessClose "KeyFlux.Settings.exe"
 
 ## 边界（不可动）
 
-* Go 后端 `config-server/`、AHK 引擎 `bin/**`、部署树 `data/config.json` **零改动**；
+* AHK 引擎 `bin/**`、部署树 `data/config.json` **零改动**（`config-server/` Go 后端
+  已于 2026-10-06 退役，其职责由本 crate 的 settings.exe + 生成器接管）；
 * HTTP 协议串 `KEYFLUX_PORT` / `KEYFLUX_GUI_READY` / `KEYFLUX_BACKEND_EXITED` 语义不变；
 * DTO 字段名与 Go/C# 契约**逐字一致**。
 

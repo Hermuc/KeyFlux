@@ -4,7 +4,7 @@
 # WHY THIS EXISTS:
 #   The same three-gate sequence was copy-pasted into five places:
 #     Makefile:24 (buildClientReactor), Makefile:183 (analyzers),
-#     tools/drop-in-rust.ps1, .github/workflows/analyzers.yml (reactor-gates),
+#     .github/workflows/analyzers.yml (reactor-gates), .github/workflows/release.yml,
 #     .github/workflows/release.yml (reactor UI build).
 #   Gates that exist five times drift apart: the copy nobody updates keeps reporting
 #   green. This script is the single source of truth; every caller invokes it.
@@ -20,8 +20,8 @@
 #   runners have the toolchain on PATH already and MUST NOT pass it (env.ps1 pins this
 #   machine's MSVC/SDK paths and throws when they are absent).
 # -Version: sets KEYFLUX_VERSION for the release build; the Rust binaries read it via
-#   option_env! so GET /config matches the Go baseline byte-for-byte (see
-#   tools/drop-in-rust.ps1). Only pass it when a caller passed it before this refactor.
+#   option_env! so GET /config matches the frozen api-parity baseline byte-for-byte
+#   (captured from the Go backend, retired 2026-10-06).
 #
 # EXIT CODES (unchanged from the inlined recipes): 0 = every requested gate green,
 #   1 = the first failing gate (fail fast, like the `if ($LASTEXITCODE -ne 0) { exit 1 }`
@@ -62,7 +62,7 @@ if (![string]::IsNullOrEmpty($EnvScript)) {
 if (![string]::IsNullOrEmpty($Version)) {
   # NOTE: only the release build below gets this; the test gate must keep running with
   # the variable UNSET (handlers_config's keyfluxVersion test asserts the empty default
-  # and would fail otherwise -- same ordering as the original drop-in-rust.ps1).
+  # and would fail otherwise).
   Write-Host "[cargo-gates] KEYFLUX_VERSION=$Version (release build only)"
 }
 

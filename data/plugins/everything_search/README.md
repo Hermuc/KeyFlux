@@ -175,7 +175,7 @@ selection / run 两种能力分别走引擎全局 `SelectionContext` 与原生 `
 1. **`bin/lib/core/CommandInputHooks.ahk`（新增）**：provider 列表 + 分发入口
    `CommandInputOnChar(ih, char, scope)` / `CommandInputOnKeyDown(ih, vk, sc, scope)`。
    顺序调用 provider，任一返回 `true` 即消费该次按键（不再走引擎原有语义）。
-2. **`config-server/templates/keyflux.tmpl`**：`capsHook.OnChar/OnKeyDown` 改绑上述分发入口；
+2. **`templates/keyflux.tmpl`**（原 `config-server/templates/`，Go 后端 2026-10-06 退役后迁出）：`capsHook.OnChar/OnKeyDown` 改绑上述分发入口；
    并为 `{Up}` `{Down}` `{Enter}` 加 `KeyOpt(..., "N")`。
 
    为什么必须加 `KeyOpt(...,"N")`：`N` 只**通知**不投递，不消费时行为与历史完全一致
@@ -307,7 +307,7 @@ es.exe 查询会读取 Everything.ini 的 `sort=` / `sort_ascending=`（便携�
 - 触发键只在**本次命令框会话的第一个字符**位置生效（前置键语义）；一旦输入过别的字符，
   本会话就不再触发 —— 避免与命令框自身的缩写模糊匹配抢键。
 - 检索词全部走 `es.exe` 的一次性调用，**不**做增量/防抖；单次含子进程启动与全库查询，
-  本机实测约 **141ms**（`config-server` 一词，含 `-timeout 4000` 与导出落盘），在命令框
+  本机实测约 **141ms**（以 `config-server` 一词计时，含 `-timeout 4000` 与导出落盘），在命令框
   输入期**同步**执行 —— 每次追加/退格字符都会重查一次。
 - 检索词里的双引号会被替换为空格、连续空白折叠为一个空格（AHK 的 `Run` 无法表达嵌套引号，
   而引号在 Everything 语法里只是短语包裹）；以 `-` 开头的词会前置 `--` 关闭开关解析。

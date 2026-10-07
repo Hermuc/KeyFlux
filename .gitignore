@@ -12,11 +12,9 @@ bin/settings.exe
 todo.md
 .idea
 KeyFlux-*/
-config-server/settings.exe
 shortcuts/
 lanzou_cookie.txt
 CommandInputSkin.txt
-/go-tmp/
 # Rust 构建产物 (cargo, 不入库; bin/ui 由 buildClientReactor 生成)
 config-ui-reactor/target/
 # 插件: **内置插件 (bundled) 的源码入库**; 用户安装的插件不入库 (2026-10-03 修正)。

@@ -315,7 +315,7 @@ class EverythingSession {
    *
    * 🔴 守卫链 (2026-09-30: 修「连点/按住 Enter 成批弹出『文档 - 文件资源管理器』窗口」)。
    *   症状根因: Enter 在引擎模板里是 `KeyOpt("{Enter}","N")` —— 只保留 OnKeyDown 通知、
-   *   不吞键 (bin/templates/keyflux.tmpl:134), 于是长按/连击会产生**多次**通知; 旧实现没有
+   *   不吞键 (templates/keyflux.tmpl:134 → bin/templates/), 于是长按/连击会产生**多次**通知; 旧实现没有
    *   任何守卫, 每次都 `Run('explorer.exe ...')`; 而高亮项 path 为空或已失效时
    *   `explorer.exe ""` 会打开资源管理器的默认「文档」目录 ⇒ 成批同标题窗口。
    *   四道闸按顺序:

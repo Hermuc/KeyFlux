@@ -1,7 +1,7 @@
 # tools/api-parity — API 级差分对账基线
 
 为 Rust 版面板后端的**逐字节验收**冻结 Go `settings.exe` 的 HTTP 响应基线。路由表面由
-`config-server/internal/server/bridge_test.go:37-72` 钉死（19 条）。本工具按**固定顺序**
+基线录制时由 `config-server/internal/server/bridge_test.go:37-72` 钉死（19 条；该文件随 Go 后端于 2026-10-06 退役，路由面契约现由本工具的冻结基线 + `config-ui-reactor` 的 cargo 单测承载）。本工具按**固定顺序**
 采集 23 步（只读端点 + 副作用端点的完整 CRUD 场景），基线内容确定性由双跑门禁保证。
 
 ## 工具说明
@@ -31,7 +31,7 @@
 ```
 
 **cwd 恒为 `<sandbox>/bin/`**（Go 侧依赖相对 `../data`、`./behaviors`、`./templates`，
-见 `config-server/internal/server/bridge.go:16-17`）。传输统一走 `Call` 子命令
+（Go 传输入口随 2026-10-06 Go 后端退役；Rust 端为 `config-ui-reactor/src/server/bridge.rs`）。传输统一走 `Call` 子命令
 （进程内 gin，不开 socket，免端口管理）：`Call <METHOD> <PATH> <out-file> [--body f]
 [--content-type ct]`，stdout 末行契约 `KEYFLUX_CALL status=<n>`，响应原始字节写
 `<out-file>`。`%TEMP%` 路径含空格也可跑（`ProcessStartInfo` 逐参数加引号，不经 shell）。

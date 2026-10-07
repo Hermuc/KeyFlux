@@ -46,59 +46,40 @@ jobs:
             echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: config-server/go.mod
-          cache-dependency-path: config-server/go.sum
+      # (2026-10-06 Go 后端退役) settings.exe 由 cargo 直接产出 (config-ui-reactor
+      # 的 bin 目标 settings), 版本注入走 KEYFLUX_VERSION (对齐 Go 时代的 ldflags 注入口径
+      # —— GET /config 的 keyfluxVersion 与发布版本号一致)。
+      # 自包含: build.rs 的 as_self_contained() 把 pinned Windows App Runtime stage 进
+      # target/release, robocopy 排除 cargo 中间产物后整体拷入 bin/ui (实测 207 文件 / 65MB)。
+      - name: Build reactor UI + settings.exe (cargo gates + release)
+        shell: pwsh
+        env:
+          KEYFLUX_VERSION: ${{ steps.ver.outputs.version }}
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release -Version "${{ steps.ver.outputs.version }}"
 
-      - name: Go unit tests
-        working-directory: config-server
-        run: go test ./...
-
-      - name: Build settings.exe (version injected via ldflags)
+      - name: Deploy settings.exe (CLI/backend, drop-in)
+        shell: pwsh
         run: |
-          go build -C ./config-server -tags=nomsgpack \
-            -ldflags "-s -w -X settings/internal/script.KeyfluxVersion=${{ steps.ver.outputs.version }}" \
-            -o ../bin/settings.exe ./cmd/settings
-
-      - name: Stage headless backend for C# endpoint tests
-        shell: bash
-        run: |
-          mkdir -p "$TEMP/mk_settings_headless"
-          cp bin/settings.exe "$TEMP/mk_settings_headless/settings.exe"
-
-      # (2026-09-28) 原 C# 单测步骤随 config-ui-avalonia 退役;
-      #   等价契约覆盖在 config-ui-reactor 的 cargo 单测中 (见下方 Rust client gates)。
+          Copy-Item "config-ui-reactor/target/release/settings.exe" "bin/settings.exe" -Force
+          if (!(Test-Path "bin/settings.exe")) { Write-Error "missing bin/settings.exe"; exit 1 }
+          Write-Host "[OK] settings.exe (Rust) -> bin/"
 
       - name: Generate + validate AHK script (/Validate)
         run: |
-          bin/settings.exe GenerateAHK ./data/config.json ./config-server/templates/keyflux.tmpl ./bin/KeyFlux.ahk
+          bin/settings.exe GenerateAHK ./data/config.json ./templates/keyflux.tmpl ./bin/KeyFlux.ahk
           MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate ./bin/KeyFlux.ahk
 
-      - name: Sync templates (buildServer 后半段)
+      - name: Sync templates
         run: |
           rm -rf bin/templates
-          cp -r config-server/templates bin/templates
-
-      # 2026-09-28 Avalonia 退役: 设置界面改由 config-ui-reactor (Rust + WinUI3) 提供。
-      # 2026-09-30: 三道闸门 (fmt --check / clippy -D warnings / test) + release 构建改为
-      #   调用 tools/cargo-gates.ps1 —— 与本地 make buildClientReactor、analyzers.yml 的
-      #   reactor-gates 用同一份实现, 避免「CI 与本地各写一份闸门」漂移。
-      #   刻意不传 -Version: 与退役前的 CI 口径保持一致 (本 workflow 从不注入
-      #   KEYFLUX_VERSION); 需要时显式加 `-Version <版本>` (GET /config 的 keyfluxVersion)。
-      # 自包含: build.rs 的 as_self_contained() 把 pinned Windows App Runtime stage 进
-      # target/release, robocopy 排除 cargo 中间产物后整体拷入 bin/ui (实测 207 文件 / 65MB)。
-      - name: Build reactor UI (cargo gates + release)
-        shell: pwsh
-        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release
+          cp -r templates bin/templates
 
       - name: Deploy reactor UI to bin/ui (self-contained, renamed)
         shell: pwsh
         run: |
           $src = (Resolve-Path "config-ui-reactor/target/release").Path
           $dst = "bin/ui"
-          robocopy $src $dst /E /XD .fingerprint build deps examples incremental /XF *.pdb *.d *.cargo-lock *.cargo-build-lock *.cargo-artifact-lock keyflux-settings.exe | Out-Null
+          robocopy $src $dst /E /XD .fingerprint build deps examples incremental /XF *.pdb *.d *.cargo-lock *.cargo-build-lock *.cargo-artifact-lock keyflux-settings.exe settings.exe | Out-Null
           if ($LASTEXITCODE -ge 8) { Write-Error "robocopy exit $LASTEXITCODE"; exit 1 }
           Copy-Item "$src/keyflux-settings.exe" "$dst/KeyFlux.Settings.exe" -Force
           if (!(Test-Path "$dst/KeyFlux.Settings.exe")) { Write-Error "missing bin/ui/KeyFlux.Settings.exe"; exit 1 }

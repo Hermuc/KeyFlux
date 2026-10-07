@@ -2,7 +2,7 @@
 ; 选中动作系统 (Selected Action) —— 方案 D「单键分发」
 ; 参考 RunAny 的「选中内容 + 快捷键触发预设行为」能力
 ;
-; 生成端契约 (config-server selectedActionCode 渲染, 任务 #29 冻结):
+; 生成端契约 (config-ui-reactor 生成器 selectedActionCode 渲染; 任务 #29 冻结):
 ;   SelectedActionData := Array(
 ;     {matchType: "textType", matchValue: "url", key: 1, behavior: "open_url",
 ;      action: "open_url", actionValue: "", workingDir: "", name: "open_url"},
@@ -463,7 +463,8 @@ class SelectedAction {
   /**
    * 执行一条 entry (8 列契约, action 为生成端展开后的基础动作)
    * textType 特征的专用行为 (open_url 等) 直接作用于选中内容, 不接受命令模板;
-   * 特征与行为的合法组合见 config-server/internal/script/actionscheme.go 的 textTypeActions。
+   * 特征与行为的合法组合由共享向量 testdata/text_types.json +
+   * tools/texttype_conformance.py 守护 (生成端 = config-ui-reactor 生成器)。
    * 执行前广播 selection_action 慢事件 (薄观察层, 隔离兜底, 不影响动作执行;
    * 方案 D 后事件字段由 schemeId/ruleIndex 调整为 behavior/name/selected)。
    */
@@ -640,8 +641,8 @@ GetSelectedContent() {
 ; ============================================================
 ; 自定义匹配类型 (方案 C7): 用户可在设置界面新增"文本特征"(如 网盘链接) 与"文件后缀分组",
 ; 映射的条件值写 "type:<id>" 引用它们, 生成端把"可用匹配类型"渲染为全局表 CustomMatchTypes
-; (config-server/internal/script/model/methods.go 的 CustomMatchTypes(); 挂载点
-;  config-server/templates/keyflux.tmpl:74)。表结构:
+; (config-ui-reactor/src/generator/config.rs 的 CustomMatchTypes 移植; 挂载点
+;  templates/keyflux.tmpl:74)。表结构:
 ;   {id: {kind: "text", rules: [{op, value}, ...]} | {kind: "fileExt", exts: [...]}}
 ;   - kind=text    -> 4 个封闭算子 OR 求值 (MatchCustomRules)
 ;   - kind=fileExt -> 后缀集匹配 (MatchFileExtList) —— 自定义文件类型与文件分组共用该形态
@@ -652,7 +653,7 @@ GetSelectedContent() {
 ; "type:<id>" 一类形态 (加法扩展)。
 ;
 ; 与 Go 端一致性: 算子语义由双端一致性向量
-; (config-server/internal/script/testdata/match_ops.json) 守护; 大小写折叠一律走 AsciiLower
+; (testdata/text_types.json 向量对账) 守护; 大小写折叠一律走 AsciiLower
 ; (仅折 A-Z), 禁止 StrLower —— 后者对非 ASCII 做区域相关变换, 会造成两端语义分歧。
 ; ============================================================
 
@@ -808,7 +809,8 @@ MatchFileExt(matchValue, content) {
 /**
  * 内置文本特征注册表 —— AHK 侧唯一真源。
  *
- * 组织方式 (与 Go 端 config-server/internal/behaviors/textfeatures.go **同构** 且同序):
+ * 组织方式 (与面板镜像 config-ui-reactor/src/services/selected_action.rs :: TEXT_TYPES
+ * **同构** 且同序, 由 tools/texttype_conformance.py 对账):
  *   - 表的顺序 = 界面顺序 (「添加映射」类型下拉 / 映射行特征 Toggle), **兜底特征恒居末位**;
  *   - named=true  具名特征: 各持一条**锚定**正则, 命中即"属于该特征";
  *   - named=false 兜底特征 (目前仅 plain): **不持正则**, 命中条件由具名集**派生** ——

@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""文本特征双端一致性对账 (Go 真源 vs AHK 运行时)。
+"""文本特征双端一致性对账 (Rust 面板镜像 vs AHK 运行时, 共享向量钉死行为)。
 
 背景
 ----
-内置文本特征 (url/path/magnet/bilibili/plain) 的命中语义由两份**独立实现**承载:
-  - 生成端/校验端: Go  `config-server/internal/behaviors/textfeatures.go`
-  - 运行时:        AHK `bin/lib/rules/SelectedAction.ahk`
-两份真源之间历来靠"注释里写一句必须一致"约束 (SelectedAction.ahk 曾声称由
-`testdata/match_ops.json` 守护, 但该向量只有 Go 侧消费) —— 属于**无强制力的契约**。
+内置文本特征 (url/path/magnet/bilibili/plain) 的**取值与顺序**由两处独立声明承载:
+  - 面板镜像:  Rust `config-ui-reactor/src/services/selected_action.rs` :: TEXT_TYPES
+    (真源随 2026-10-06 Go 后端退役迁移至此 —— 原 Go 注册表
+    `config-server/internal/behaviors/textfeatures.go` 的 value/顺序由本镜像继承);
+  - 运行时:    AHK `bin/lib/rules/SelectedAction.ahk` (TextFeatureSpecs 注册表 +
+    MatchTextType 命中逻辑, 含正则/大小写开关 —— Go 退役后正则字面量的**唯一来源**)。
+两处之间靠共享向量 `testdata/text_types.json` 钉死 (2026-10-06 自
+config-server/internal/script/testdata/ 迁出; 同日删除仅 Go 消费的 match_ops.json
+—— 其契约早已被判定为无强制力, 见 git 历史)。
 本工具把这条契约变成可执行断言, 两层校验:
 
-  1. 静态对账: 解析两侧注册表, 逐项比对 value / named / ignoreCase / pattern 与**顺序**,
-     并断言顺序与共享向量 testdata/text_types.json 的 `types` 完全一致。
+  1. 静态对账: 解析两侧注册表, 逐项比对 **value 与顺序**,
+     并断言与共享向量 text_types.json 的 `types` 完全一致; 兜底特征唯一且居末。
+     (named/ignoreCase/pattern 在 Go 退役后只剩 AHK 单一来源, 无对账意义 ——
+     其行为正确性由第 2 层向量对账兜底。)
   2. 运行时对账: 从 AHK 源**逐字提取**函数体 (不手抄, 杜绝探针与产品代码漂移),
      按共享向量的用例逐 (用例 × 特征) 求值, 比对 expectTypes 全集。
 
@@ -47,20 +53,15 @@ for _stream in (sys.stdout, sys.stderr):
 
 # ---------------------------------------------------------------- 源文件定位
 
-GO_SRC = os.path.join("config-server", "internal", "behaviors", "textfeatures.go")
+RUST_SRC = os.path.join("config-ui-reactor", "src", "services", "selected_action.rs")
 AHK_SRC = os.path.join("bin", "lib", "rules", "SelectedAction.ahk")
-VECTOR = os.path.join("config-server", "internal", "script", "testdata", "text_types.json")
+VECTOR = os.path.join("testdata", "text_types.json")
 
 # ---------------------------------------------------------------- 两侧注册表解析
-# Go 具名项:  {Value: "url", Label: "链接", Named: true, IgnoreCase: true, Pattern: `^(https?|ftp)://`},
-# Go 兜底项:  {Value: "plain", Label: "纯文本", Fallback: true},
-GO_ROW = re.compile(
-    r'^[ \t]*\{[ \t]*Value:[ \t]*"(?P<value>[a-z][a-z0-9_]*)"[ \t]*,[ \t]*'
-    r'Label:[ \t]*"(?P<label>[^"]*)"[ \t]*,(?P<rest>.*)\}[ \t]*,[ \t]*$'
-)
-GO_PATTERN = re.compile(r'Pattern:[ \t]*`(?P<pattern>[^`]*)`')
-GO_IGNORECASE = re.compile(r'IgnoreCase:[ \t]*(?P<flag>true|false)')
-
+# Rust 镜像:  pub const TEXT_TYPES: [(&str, &str); 5] = [
+#                 ("url", "1059"), ... ("plain", "1062"),
+#             ];
+#   (第二个元素是 i18n 键, 不参与对账 —— 标签文案不属于本契约。)
 # AHK:  {value: "url", named: true, ignoreCase: true, pattern: "^(https?|ftp)://"},
 AHK_ROW = re.compile(
     r'^[ \t]*\{[ \t]*value:[ \t]*"(?P<value>[a-z][a-z0-9_]*)"[ \t]*,[ \t]*'
@@ -69,39 +70,31 @@ AHK_ROW = re.compile(
     r'pattern:[ \t]*"(?P<pattern>[^"]*)"[ \t]*\}[ \t]*,[ \t]*$'
 )
 
-COMPARE_KEYS = ("value", "named", "ignoreCase", "pattern")
-
 
 def read_text(path: str) -> str:
     with io.open(path, "r", encoding="utf-8-sig") as fh:
         return fh.read()
 
 
-def parse_go_registry(repo: str):
-    src = read_text(os.path.join(repo, GO_SRC))
-    rows = []
-    for line in src.splitlines():
-        m = GO_ROW.match(line)
-        if not m:
-            continue
-        rest = m.group("rest")
-        pm = GO_PATTERN.search(rest)
-        im = GO_IGNORECASE.search(rest)
-        rows.append(
-            {
-                "value": m.group("value"),
-                "label": m.group("label"),
-                "named": pm is not None,
-                "ignoreCase": bool(im and im.group("flag") == "true"),
-                "pattern": pm.group("pattern") if pm else "",
-            }
-        )
-    return rows
+def parse_rust_registry(repo: str):
+    """解析 services/selected_action.rs 的 TEXT_TYPES 常量 → value 有序列表。"""
+    src = read_text(os.path.join(repo, RUST_SRC))
+    m = re.search(
+        r"TEXT_TYPES:\s*\[\(&str,\s*&str\);\s*\d+\]\s*=\s*\[(.*?)\];",
+        src,
+        re.S,
+    )
+    if not m:
+        return None
+    return [
+        mm.group("value")
+        for mm in re.finditer(r'\("(?P<value>[a-z][a-z0-9_]*)",\s*"[^"]*"\)', m.group(1))
+    ]
 
 
 def extract_ahk_func(src: str, name: str):
     """逐字提取 `name(...) {` 到顶格 `}` 的函数体 (含首尾行)。未找到返回 None。"""
-    m = re.search(r"(?m)^%s\(.*?\)[ \t]*\{.*?^\}" % re.escape(name), src, re.S)
+    m = re.search(r"(?m)^%s\(.*?\)[ 	]*\{.*?^\}" % re.escape(name), src, re.S)
     return m.group(0) if m else None
 
 
@@ -118,7 +111,6 @@ def parse_ahk_registry(repo: str):
         rows.append(
             {
                 "value": m.group("value"),
-                "label": "",
                 "named": m.group("named") == "true",
                 "ignoreCase": m.group("ignoreCase") == "true",
                 "pattern": m.group("pattern"),
@@ -163,7 +155,7 @@ def build_probe(src: str, types, cases, result_path: str) -> str:
         "#Requires AutoHotkey v2.0",
         "; !!! 本文件由 tools/texttype_conformance.py 生成, 请勿手工编辑 !!!",
         "; 下列函数体从 bin/lib/rules/SelectedAction.ahk **逐字提取** (非手抄),",
-        "; 目的 = 让 PCRE2 侧行为与 Go/RE2 侧 (testdata/text_types.json) 逐条对齐。",
+        "; 目的 = AHK PCRE2 命中行为与共享向量 (testdata/text_types.json) 逐条对齐。",
         "",
     ]
     probe.append("\n".join(funcs))
@@ -204,7 +196,7 @@ def main() -> int:
     args = ap.parse_args()
 
     repo = os.path.abspath(args.repo)
-    for rel in (GO_SRC, AHK_SRC, VECTOR):
+    for rel in (RUST_SRC, AHK_SRC, VECTOR):
         if not os.path.isfile(os.path.join(repo, rel)):
             print("[FAIL] 缺少文件: %s" % rel)
             return 2
@@ -213,32 +205,27 @@ def main() -> int:
     types = doc["types"]
     cases = doc["cases"]
 
-    go_rows = parse_go_registry(repo)
+    rust_values = parse_rust_registry(repo)
     ahk_rows = parse_ahk_registry(repo)
     failures = []
 
-    # ---- 1. 注册表静态对账 ----
-    if not go_rows:
-        failures.append("未能从 %s 解析出任何注册表项" % GO_SRC)
-    if [r["value"] for r in go_rows] != list(types):
-        failures.append("Go 注册表取值/顺序 %s ≠ 向量 types %s"
-                        % ([r["value"] for r in go_rows], list(types)))
+    # ---- 1. 注册表静态对账 (value + 顺序; 模式/大小写行为由第 2 层向量兜底) ----
+    if not rust_values:
+        failures.append("未能从 %s 解析出任何注册表项" % RUST_SRC)
+    if rust_values != list(types):
+        failures.append("Rust 镜像取值/顺序 %s ≠ 向量 types %s"
+                        % (rust_values, list(types)))
     if ahk_rows is None:
         failures.append("AHK 源中未找到 TextFeatureSpecs() 注册表")
     else:
-        if len(ahk_rows) != len(go_rows):
-            failures.append("AHK 注册表 %d 项 ≠ Go %d 项" % (len(ahk_rows), len(go_rows)))
-        for i, (g, a) in enumerate(zip(go_rows, ahk_rows)):
-            for key in COMPARE_KEYS:
-                if g[key] != a[key]:
-                    failures.append(
-                        "注册表第 %d 项字段 %s 不一致: Go=%r AHK=%r (value=%s)"
-                        % (i + 1, key, g[key], a[key], g["value"])
-                    )
+        ahk_values = [r["value"] for r in ahk_rows]
+        if ahk_values != list(types):
+            failures.append("AHK 注册表取值/顺序 %s ≠ 向量 types %s"
+                            % (ahk_values, list(types)))
 
     # 结构性不变量: 兜底项唯一且居末 (plain 的"其余都不命中"语义依赖它)
-    if go_rows:
-        fallbacks = [r["value"] for r in go_rows if not r["named"]]
+    if ahk_rows:
+        fallbacks = [r["value"] for r in ahk_rows if not r["named"]]
         if fallbacks != [types[-1]]:
             failures.append("兜底特征必须唯一且居末, 实际 = %s (types 末位 %s)"
                             % (fallbacks, types[-1]))
@@ -247,7 +234,7 @@ def main() -> int:
         for f in failures:
             print("[FAIL] " + f)
         return 1
-    print("[OK] 注册表静态对账: %d 项, 顺序 %s" % (len(go_rows), " / ".join(types)))
+    print("[OK] 注册表静态对账: %d 项, 顺序 %s" % (len(types), " / ".join(types)))
 
     if args.static_only:
         return 0
