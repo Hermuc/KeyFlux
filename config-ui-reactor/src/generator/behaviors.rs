@@ -14,7 +14,6 @@
 //! * 目录名必须与 manifest 的 `id` 一致（否则该包被拒）；
 //! * `sortPacks` = 按 ID 稳定排序；插件贡献包遇同 ID **跳过**（先到者胜：builtin > user > 插件）。
 
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -218,11 +217,6 @@ pub fn load_catalog_for_config(config_path: &Path, exe_dir: &Path) -> Catalog {
         &config_dir.join("behaviors"),
         &plugin_dirs,
     )
-}
-
-/// 供调用方快速判重的内置 ID 集合视图。
-pub fn builtin_ids() -> HashSet<&'static str> {
-    BUILTIN_ACTION_IDS.into_iter().collect()
 }
 
 #[cfg(test)]

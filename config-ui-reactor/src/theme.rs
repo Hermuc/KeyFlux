@@ -215,12 +215,12 @@ pub const FONT_BADGE: f64 = 11.0;
 
 // ---------------------------------------------------------------- 尺寸（旧 MainWindow）
 
-pub const WINDOW_WIDTH: f64 = 1200.0;
-pub const WINDOW_HEIGHT: f64 = 760.0;
-/// 侧栏宽度（旧 ColumnDefinitions="264,*"）。
+/// 侧栏宽度（旧 `ColumnDefinitions="264,*"`；`app.rs` 侧栏 pane 长度消费）。
 pub const SIDEBAR_WIDTH: f64 = 264.0;
-/// 旧自绘标题栏高度（改用 `TitleBar` 后为 `WindowTitleBarHeight::Tall`）。
-pub const TITLE_BAR_HEIGHT: f64 = 36.0;
+// 窗口默认尺寸（1200×760）的真源是 `platform::WindowSpec::default()` —— 不在本层重复定义
+// （platform 是底层适配层，反向依赖本层的展示令牌会破坏分层）。
+// 旧 `WINDOW_WIDTH`/`WINDOW_HEIGHT`/`TITLE_BAR_HEIGHT` 已于 2026-10-07 删除：
+// 三者除自身测试外零消费，且各有真源（窗口尺寸在 platform；标题栏已改 `TitleBar`）。
 
 #[cfg(test)]
 mod tests {
@@ -318,10 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn layout_tokens_match_legacy_window() {
-        assert_eq!(WINDOW_WIDTH, 1200.0);
-        assert_eq!(WINDOW_HEIGHT, 760.0);
+    fn sidebar_width_matches_legacy_layout() {
         assert_eq!(SIDEBAR_WIDTH, 264.0);
-        assert_eq!(TITLE_BAR_HEIGHT, 36.0);
     }
 }

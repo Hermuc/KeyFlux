@@ -19,7 +19,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::generator::behaviors::{self, Catalog};
-use crate::generator::model::{Action, Config, MatchType, REMAP_KEY, WindowGroup};
+use crate::generator::model::{Action, Config, MatchType, WindowGroup};
 use crate::generator::text::{contains_only_modifier, divide, to_ahk_func_arg};
 
 /// Go `generators.PlanVersion`。
@@ -409,9 +409,6 @@ pub(crate) fn sort_actions(actions: &[Action]) -> Vec<Action> {
     result.extend(suffix);
     result
 }
-
-/// 供外部（bin）复用的常量视图。
-pub const REMAP_TYPE_ID: i32 = REMAP_KEY;
 
 #[cfg(test)]
 mod tests {

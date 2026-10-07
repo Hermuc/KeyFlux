@@ -1,6 +1,7 @@
 //! 面板后端 HTTP 服务模式 —— Rust `settings.exe --headless`（R1）。
 //!
-//! Go 参考实现（移植语义的唯一权威）：
+//! Go 参考实现（**已退役** `36ccb83`；本模块为现行实现，语义与冻结基线对齐 —— 溯源
+//! `git show 36ccb83^:config-server/internal/server/`）：
 //! * `config-server/cmd/settings/main.go:26`（`--headless` 分派）；
 //! * `config-server/internal/server/server.go:74-115`（bind `localhost:12333` →
 //!   失败退 `localhost:0`；**bind 成功后**打印 `KEYFLUX_PORT=<port>\n`，必须是

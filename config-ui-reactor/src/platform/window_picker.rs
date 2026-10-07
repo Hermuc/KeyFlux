@@ -141,7 +141,6 @@ pub enum MatchKind {
 struct Descriptor {
     hwnd: HWND,
     title: String,
-    #[allow(dead_code)]
     class_name: String,
     pid: u32,
     exe_name: String,
@@ -270,7 +269,8 @@ fn run_session(kind: MatchKind, highlight: Rgb, throttle_ms: u32) -> PickOutcome
             return PickOutcome::cancelled();
         }
 
-        guard.highlight = create_highlight(highlight);
+        // 高亮窗句柄由 `create_highlight` 存入全局 `HIGHLIGHT_HWND`（Drop 从全局取用清理）。
+        create_highlight(highlight);
         guard.cursor_applied = apply_cross_cursor().is_some();
 
         let throttle = throttle_ms.max(THROTTLE_MIN);
@@ -601,8 +601,6 @@ struct PickGuard {
     mouse_hook: HHOOK,
     kb_hook: HHOOK,
     timer: usize,
-    #[allow(dead_code)]
-    highlight: HWND,
     cursor_applied: bool,
 }
 

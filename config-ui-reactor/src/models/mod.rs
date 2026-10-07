@@ -3,10 +3,11 @@
 //! 为什么逐字一致：Go 后端保存时会**全量落盘** config.json，任何它不认识的字段会被静默剥掉，
 //! 于是「前端改了名但后端不认识」会表现为**静默丢数据**。
 //!
-//! 权威来源：
-//! * `config-ui-avalonia/Models/ConfigModels.cs`（561 行，本模块逐字对照）
+//! 移植起点（**均已退役** —— Go 后端 `36ccb83`、Avalonia 客户端 `1f3dc9f`；现行契约 = 本模块 + `generator/model.rs`）：
+//! * `config-ui-avalonia/Models/ConfigModels.cs`（561 行）
 //! * Go 蓝本 `config-server/internal/script/model/types.go`
 //! * 端点点清单：`config-ui-avalonia/Services/SettingsApiClient.cs`
+//!   溯源：`git show 36ccb83^:config-server/internal/script/model/types.go`。
 //!
 //! 本模块的单元测试即旧版 `ModelUnitTests` 的等价物（键名/键集合断言）。
 

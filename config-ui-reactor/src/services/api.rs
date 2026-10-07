@@ -1,9 +1,10 @@
-﻿//! settings.exe（Go）HTTP 客户端 —— 严格对齐 `config-ui-avalonia/Services/SettingsApiClient.cs`。
+﻿//! settings.exe HTTP 客户端 —— 契约对齐旧 `config-ui-avalonia/Services/SettingsApiClient.cs`（Avalonia 客户端已退役 `1f3dc9f`；settings.exe 现为 Rust 实现，本文件即现行客户端）。
 //!
 //! **契约铁律**：
 //! * 只作 `http://127.0.0.1:{KEYFLUX_PORT}` 的客户端；**永不因网络异常 panic**，
 //!   传输层错误（连接失败/超时）统一折叠为 `status = 0` 的失败响应（对齐 C# 语义）。
-//! * 端点清单（权威：`config-server/cmd/settings/main.go` + `selectedaction.go`）：
+//! * 端点清单（现行权威 = `server/` 路由 + `tools/api-parity/reference`；旧 Go
+//!   `config-server/cmd/settings/main.go` + `selectedaction.go` 已退役 `36ccb83`）：
 //!   | 方法 | 路径 | 说明 |
 //!   |---|---|---|
 //!   | GET | `/health` | 后端零 IO 立即 200（连接基础设施专用，不在 12 端点契约内）|
@@ -192,14 +193,6 @@ impl HttpSettingsApi {
         Self {
             base: format!("http://127.0.0.1:{port}"),
             agent: config.into(),
-        }
-    }
-
-    /// 注入外部 Agent（测试替身用）。
-    pub fn with_agent(base: impl Into<String>, agent: ureq::Agent) -> Self {
-        Self {
-            base: base.into(),
-            agent,
         }
     }
 
