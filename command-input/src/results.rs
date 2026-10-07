@@ -272,12 +272,14 @@ mod tests {
         ];
         let bytes = encode_payload(&src, 1);
         assert_eq!(&bytes[0..4], b"KFR2");
+        // 空提示项贡献 = 两个长度头 (title "" + subtitle ""), 无内容字节
+        const HINT_ITEM_BYTES: usize = 8;
         assert_eq!(
             bytes.len(),
             HEADER_BYTES
                 + (4 + 1 + 4 + "C:\\a.txt".len())
                 + (4 + "路径.txt".len() + 4 + "C:\\中文\\路径.txt".len())
-                + (4 + 0 + 4 + 0)
+                + HINT_ITEM_BYTES
         );
         let (items, sel) = decode_payload(&bytes).expect("decode");
         assert_eq!(items, src);

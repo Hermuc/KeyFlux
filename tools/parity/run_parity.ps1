@@ -15,11 +15,11 @@
 #   ASCII-only on purpose -- `pwsh -File` misreads non-BOM UTF-8 (same rule as tools/oracle.ps1).
 #   Exit 0 = all pass, 1 = any mismatch/error. Final line is ASCII: "PARITY: n/n PASS [MODE]".
 #   Repo root, sandbox creation, SHA256 and the determinism gate come from
-#   tools/lib/kf-tools.ps1 (shared with run_api_parity.ps1 and drop-in-rust.ps1).
+#   tools/lib/kf-tools.ps1 (shared with run_api_parity.ps1 / cargo-gates.ps1).
 #
 # NOTE 1: -Capture refuses to record when an artifact is not byte-deterministic across two runs
-#   (the Go renderer has known map-iteration nondeterminism for configs with ties; the corpus
-#   must stay free of those, cf. golden_test.go "determinism constraints").
+#   (the historical Go renderer had map-iteration nondeterminism for configs with ties; the corpus
+#   was kept free of those -- cf. golden_test.go, retired with the Go backend 2026-10-06 / 36ccb83).
 #
 # NOTE 2: artifacts per item are declared in manifest.json ("artifacts"). Both outputs of the
 #   runtime generation pipeline are covered: bin/KeyFlux.ahk (keyflux.tmpl) and

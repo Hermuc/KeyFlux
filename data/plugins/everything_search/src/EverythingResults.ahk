@@ -18,7 +18,7 @@
 ;     与 Flow Launcher 的「UI 层自提图标」同架构, 本插件零图标职责)。
 ;
 ; 消息契约 (与引擎协议 0x401-0x405 同构, 只加不改):
-;   0x406 WM_COPYDATA (dwData = 'KFR1')  ← 整表推送 (EverythingHost.ShowResults)
+;   0x406 WM_COPYDATA (dwData = 'KFR2')  ← 整表推送 (EverythingHost.ShowResults; 每项 {t,s})
 ;   0x407 (wParam = 0 基下标; -1 无高亮) ← 只移动高亮 (EverythingHost.SelectResult)
 ;   0x408                                ← 收起列表 (EverythingHost.ClearResults)
 ;   0x409 命令框 → 本进程              → 鼠标点选/悬停/滚轮 (InstallNotify 接收)

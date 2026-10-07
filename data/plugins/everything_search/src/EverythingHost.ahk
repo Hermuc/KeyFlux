@@ -30,8 +30,8 @@ class EverythingHost {
   ; 「长高 + 绘制列表」的能力, 插件只把数据推过去。
   ; 与既有协议 (0x401-0x405) 同构: 命令框窗口的消息面就是本插件与它之间的唯一契约,
   ; 新增能力**只加消息, 不改既有语义**。
-  ; 载荷 = WM_COPYDATA + 自定义 dwData 魔数 'KFR1'; 逐字节格式定义在
-  ; `command-input/src/results.rs::encode_payload` (两端必须一致, 由该文件单测锁定),
+  ; 载荷 = WM_COPYDATA + 自定义 dwData 魔数 'KFR2' (二版: 每项 {标题, 路径} 双字段); 逐字节
+  ; 格式定义在 `command-input/src/results.rs::encode_payload` (两端必须一致, 由该文件单测锁定),
   ; 跨进程由系统编组, 不共享指针。
 
   static WM_COPYDATA := 0x004A
