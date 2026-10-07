@@ -1033,10 +1033,13 @@ impl Shell {
         ));
 
         // 右列：旧 `StackPanel Width="460" Spacing="16" Margin="24,0,24,24"`（卡间距由
-        // section_card 自带底距 16 承担）；整页容器 = 旧 `Margin="24,20,24,28"`
+        // section_card 自带底距 16 承担）；整页容器 = 旧 `Margin="24,20,24,28"`。
+        // 宽度 460 → 520 (2026-10-06)：程序分组行单行四控件需 ~440 DIP，460 卡内
+        // (380) 放不下（标识符被裁的根因）；页面右列 STAR 实际有 ~580 DIP 余量，
+        // 收窄到 520 仍留 ~60 缓冲。右列所有卡片都是弹性内容，整体加宽无副作用。
         let right: View = ScrollViewer::new().content(
             StackPanel::new()
-                .width(460.0)
+                .width(520.0)
                 .horizontal_alignment(HorizontalAlignment::Left)
                 .margin(Thickness::new(24.0, 0.0, 24.0, 24.0))
                 .keyed_children(sections),
@@ -1045,7 +1048,7 @@ impl Shell {
         // 右边距必须为 0：纵向滚动条贴在右列 ScrollViewer 的右缘，若这里再留 24，
         // 滚动条会悬在离窗口右缘 ~35px 处（使用指南页 ScrollViewer 是页面根、贴边，
         // 两页并排看滚动条位置不一致——2026-10-06 用户报障）。右列内容是 Left 对齐
-        // 的定宽 460 卡片列，右缘外扩不挪卡片；左列 560 定宽亦不受影响。
+        // 的定宽 520 卡片列，右缘外扩不挪卡片；左列 560 定宽亦不受影响。
         Grid::new()
             .margin(Thickness::new(24.0, 20.0, 0.0, 28.0))
             .columns([GridLength::Pixel(560.0), GridLength::STAR])
