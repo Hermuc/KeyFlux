@@ -592,8 +592,12 @@ Verify(s19.index = 2 && ExplorerRecorder.Calls.Length = 0 && ResultsHideCount() 
 ResetObservers()
 s16 := EverythingSession(0)
 r13 := s16.OnChar(StubInputHook(), " ", "probe")     ; 前置位置的触发键
+; 2026-10-07 种子采集异步化 (首搜慢修复): 触发键只同步做激活/前台/徽标, 种子采集
+;   (GetSelection) 由 SetTimer(-1) 延一拍执行 —— 等它跑完再断言 (Sleep 期间 AHK 会泵
+;   timer, 与 477 行既有惯例同款)。
+Sleep 150
 Verify(r13 = true && HostRecorder.Count("GetSelection") = 1 && HostRecorder.Count("UnlockForSearch") = 1,
-    "12a 触发键: GetSelection 与 UnlockForSearch 各走 1 次 (透传给查询输入面)",
+    "12a 触发键: GetSelection 与 UnlockForSearch 各走 1 次 (透传给查询输入面; 种子异步一拍)",
     "实际 r=" r13 " Unlock=" HostRecorder.Count("UnlockForSearch") " GetSel=" HostRecorder.Count("GetSelection"))
 r14 := s16.OnChar(StubInputHook(), "a", "probe")     ; 激活后的普通字符
 Verify(r14 = true && s16.query = "" && HostRecorder.Count("EchoChar") = 0,

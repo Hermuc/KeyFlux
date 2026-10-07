@@ -185,7 +185,14 @@ class EverythingSession {
       EverythingHost.BoxForeground()
       EverythingResults.Hide()   ; 清上一会话残留列表 (防"变大"残留)
       EverythingHost.ShowBadge() ; 搜索徽标 (0x40A): 查询区右侧放大镜, 搜索模式的可视标识
-      this.SeedFromSelection()
+      ; 🔴 种子采集**异步化** (2026-10-07 用户报障「按空格进入搜索模式后第一次搜索等好久」):
+      ;   SeedFromSelection 是同步的「切前台 → 清剪贴板 → ^C → ClipWait(0.4, 无选中时吃满)
+      ;   → 恢复剪贴板 → 切回前台」链, 串行占住钩子线程 0.4~0.6s, 首次 es 查询被整体推迟。
+      ;   现改为 SetTimer(-1) 延一拍执行: 命令框先立现 (0x404/前台/徽标全部就位), 种子
+      ;   在下一拍采集并经 BoxSendText 逐码元注入命令框 (框内文本 = 检索词唯一真源,
+      ;   _SyncQuery 轮询拾取; 修复种子结果只进 this.query、40ms 后被空文本轮询撤掉的
+      ;   白闪 bug)。采集期间 capturing=true, _SyncQuery 让位 (防读到部分注入的文本)。
+      SetTimer(ObjBindMethod(this, "_SeedFromSelectionAsync"), -1)
       SetTimer(ObjBindMethod(this, "_SyncQuery"), EverythingSession.QUERY_SYNC_MS)
       this.Refresh()
       return true     ; 消费触发键本身 (空间不投递到命令框)
@@ -238,31 +245,41 @@ class EverythingSession {
   ; ---- 检索 ----
 
   /**
-   * 用当前选中文字做初始检索词:
-   *   - 选中文字 (type=text) -> 原文;
+   * 异步种子采集 (由 OnChar 的 SetTimer(-1) 触发; 时序与设计依据见 OnChar 内 🔴 注释):
+   *   - 选中文字 (type=text) -> 原文作为初始检索词;
    *   - 选中文件 (type=file) -> 首个文件名 (资源管理器里选中文件时, 用户意图通常是「找同名/同类」);
-   *   - 未取到 -> 空 (初始态: 命令框保持原样, 不出列表)。
-   * 取文字前先把前台切回会话开始时的窗口 (命令框可能抢了前台, 否则 Ctrl+C 发不到目标程序)。
+   *   - 未取到 -> 什么都不做 (命令框保持初始样式, 用户直接输入检索词)。
    *
-   * 🔴 取完必须把焦点还给命令框 (2026-09-19 v4.1 透传补丁): ActivateBackend 把前台切到了
-   * 原窗口 —— 历史形态无影响 (显示靠投递 WM_CHAR, 与焦点无关, 且当时命令框本就不在
-   * 前台, ActivateBackend 实际是 no-op); 透传模式下物理键按「焦点窗口」路由, 焦点不还原
-   * 则后续字符全部漏进原窗口 (命令框看不见, 原窗口还会被打字污染)。用户实测: 按空格
-   * 触发后能搜索但命令框看不见字符, 即此因。
+   * 与旧同步版的差异 (2026-10-07):
+   *   1. 不再把种子写进 this.query 了事 —— 种子经 EverythingHost.BoxSendText 逐码元
+   *      **注入命令框** (每码元 10ms, 框侧原生追加+键音), 之后由 _SyncQuery 轮询拾取,
+   *      「框内文本 = 检索词唯一真源」的定版语义首次对种子成立 (旧版种子只进会话字段,
+      *      40ms 后即被空文本轮询撤掉, 列表白闪)。
+   *   2. 注入/采集期间 capturing=true, _SyncQuery 让位 —— 防止轮询读到**部分注入**的
+   *      文本触发中间态查询。
+   *
+   * 取文字前先把前台切回会话开始时的窗口 (命令框可能抢了前台, 否则 Ctrl+C 发不到目标程序);
+   * 取完把焦点还给命令框 (2026-09-19 v4.1 透传补丁: 焦点不还原则后续字符全部漏进原窗口)。
    */
-  SeedFromSelection() {
+  _SeedFromSelectionAsync() {
+    if (this.closed || !this.active)
+      return
     this.capturing := true
+    seed := ""
     try {
       EverythingHost.ActivateBackend()
       sel := EverythingHost.GetSelection(true)
-      if (sel.type = "file")
-        this.query := this._FirstBaseName(sel.content)
-      else
-        this.query := sel.content
+      seed := (sel.type = "file") ? this._FirstBaseName(sel.content) : sel.content
     } catch {
-      this.query := ""
+      seed := ""
     }
-    this.capturing := false
+    seed := Trim(seed, " `t`r`n")
+    if (seed != "") {
+      EverythingHost.BoxSendText(seed)
+      this.query := seed
+      this.Refresh()          ; 种子结果立现 (不等 40ms 轮询拍)
+    }
+    this.capturing := false   ; 放行 _SyncQuery (此刻框内文本 == this.query, 轮询幂等)
     ; 焦点还原: 搜索模式下命令框自取前台+焦点 (0x404), 种子已在框内
     EverythingHost.BoxActivateForSearch()
   }
@@ -404,6 +421,8 @@ class EverythingSession {
       SetTimer(ObjBindMethod(this, "_SyncQuery"), 0)
       return
     }
+    if (this.capturing)
+      return    ; 种子注入中: 框内是逐码元部分文本, 轮询此刻读到的是中间态 (见 _SeedFromSelectionAsync)
     t := EverythingHost.BoxGetText()
     if (t = this.query)
       return

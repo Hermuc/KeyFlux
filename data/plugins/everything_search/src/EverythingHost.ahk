@@ -290,7 +290,7 @@ class EverythingHost {
   static BoxSendText(text) {
     impl := EverythingHost.Impl
     if (IsObject(impl))
-      return impl.BoxSendText()
+      return impl.BoxSendText(text)
     hwnd := this._FindBoxWindow()
     if (!hwnd)
       return false
