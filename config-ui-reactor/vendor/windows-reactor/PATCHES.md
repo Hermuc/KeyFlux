@@ -51,6 +51,7 @@ tar -xzf wr.crate
 | P5 | **ContentDialog 遮罩层覆盖** | `native/winui/app_shim.rs`（同上 hunk）· `src/app.rs`（1 / +2 中的 1 行）| `10eee9a` | vendor `src/app.rs:808` |
 | P6 | **TextBox 挂载顺序：AcceptsReturn 先于 Text** | `src/generated.rs`（1 / 移动 7 行，零增删）| `eff21fd+`（本次）| 指南编辑弹窗等一切**程序化灌入多行文本**的 TextBox |
 | P7 | **滚动条响应计时覆盖（隐式 ScrollBar 样式）** | `native/winui/app_shim.rs`（同上 hunk 续扩）· `src/app.rs`（1 / +3 中的 1 行）| 本次 | vendor `src/app.rs:809` |
+| P8 | **窗口居中通道（`WindowVisuals.centered`）** | `src/element.rs`（2 / +10）· `native/winui/bindings.rs`（2 / +23）· `native/winui/mod.rs`（6 / +55，含 diff 语义测试）| `2026-10-07` 用户报障：面板打开不在屏幕正中央 | 面板 `src/platform/mod.rs`（`WindowSpec::visuals` 恒 `centered(true)`）|
 
 - `native/winui/app_shim.rs`：**一个 hunk，P1 / P5 / P7 都落在这里**（P7 引入后共
   约 `+740 −0`，其中约 530 行是 P7 的整段 XAML 字面量）——

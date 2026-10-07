@@ -1740,6 +1740,7 @@ pub struct WindowVisuals {
     pub(crate) constraints: Option<WindowConstraints>,
     pub(crate) icon: Option<&'static str>,
     pub(crate) theme: WindowTheme,
+    pub(crate) centered: bool,
 }
 
 impl WindowVisuals {
@@ -1790,6 +1791,15 @@ impl WindowVisuals {
 
     pub fn theme(mut self, theme: WindowTheme) -> Self {
         self.theme = theme;
+        self
+    }
+
+    /// Requests the window be centered within its monitor's work area when first applied.
+    ///
+    /// Best-effort: applied only when the flag first turns on; later publications with the
+    /// same value never reposition the window (user drags are preserved).
+    pub fn centered(mut self, centered: bool) -> Self {
+        self.centered = centered;
         self
     }
 }

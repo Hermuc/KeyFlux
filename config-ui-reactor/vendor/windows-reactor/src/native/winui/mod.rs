@@ -320,6 +320,7 @@ struct WindowVisualChanges {
     constraints: bool,
     icon: bool,
     theme: bool,
+    centered: bool,
 }
 
 fn set_resource_style(
@@ -513,6 +514,7 @@ fn window_visual_changes(
         constraints: previous.is_none_or(|previous| previous.constraints != next.constraints),
         icon: next.icon.is_some() && previous.is_none_or(|previous| previous.icon != next.icon),
         theme: previous.is_none_or(|previous| previous.theme != next.theme),
+        centered: previous.is_none_or(|previous| previous.centered != next.centered),
     }
 }
 
@@ -539,6 +541,7 @@ mod window_visual_tests {
                 constraints: false,
                 icon: false,
                 theme: true,
+                centered: false,
             }
         );
     }
@@ -569,6 +572,7 @@ mod window_visual_tests {
                 constraints: false,
                 icon: false,
                 theme: false,
+                centered: false,
             }
         );
         assert_eq!(
@@ -579,7 +583,25 @@ mod window_visual_tests {
                 constraints: true,
                 icon: false,
                 theme: false,
+                centered: false,
             }
+        );
+    }
+
+    #[test]
+    fn centered_applies_on_first_declaration_and_flags_only() {
+        let first = WindowVisuals::new().centered(true);
+        assert!(
+            window_visual_changes(None, first).centered,
+            "首次声明即应用居中"
+        );
+        assert!(
+            !window_visual_changes(Some(first), first).centered,
+            "flag 不变不重复应用（用户拖动后的位置不被覆盖）"
+        );
+        assert!(
+            window_visual_changes(Some(WindowVisuals::new()), first).centered,
+            "false → true 变化时重新应用"
         );
     }
 }
@@ -895,6 +917,39 @@ impl WinUiRuntime {
                     })
                 })
                 .map_err(native_error)?;
+        }
+        if changes.centered && visuals.centered {
+            // 定位是锦上添花：任一步失败都静默跳过（窗口留在 Windows 摆放的位置），
+            // 绝不因居中失败让整次视觉应用报错。窗口矩形 / 工作区全程物理像素，
+            // 无需 DPI 换算；工作区取窗口当前所在显示器（多显示器感知）。
+            if let Ok(hwnd) = window_handle() {
+                let mut rect = unsafe { std::mem::zeroed::<RECT>() };
+                if unsafe { GetWindowRect(hwnd, &mut rect) } != 0 {
+                    let monitor =
+                        unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+                    let mut info = unsafe { std::mem::zeroed::<MONITORINFO>() };
+                    info.cbSize = size_of::<MONITORINFO>() as u32;
+                    if unsafe { GetMonitorInfoW(monitor, &mut info) } != 0 {
+                        let width = rect.right - rect.left;
+                        let height = rect.bottom - rect.top;
+                        let x = info.rcWork.left
+                            + (info.rcWork.right - info.rcWork.left - width) / 2;
+                        let y = info.rcWork.top
+                            + (info.rcWork.bottom - info.rcWork.top - height) / 2;
+                        unsafe {
+                            SetWindowPos(
+                                hwnd,
+                                std::ptr::null_mut(),
+                                x,
+                                y,
+                                0,
+                                0,
+                                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+                            );
+                        }
+                    }
+                }
+            }
         }
         self.window_visuals.insert(node, visuals);
         Ok(())
