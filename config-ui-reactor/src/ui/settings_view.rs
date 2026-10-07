@@ -570,7 +570,14 @@ where
         ))
 }
 
-/// 「程序分组」行：组名(602) / 条件(605-608 下拉) / 窗口标识符(603) / 删除(912)。
+/// 「程序分组」行：组名(602) / 条件(605-608 下拉) / 窗口标识符(603) / 删除(✕)。
+///
+/// 两行布局 (2026-10-06 用户报障「卡片拥挤 + ahk_exe 标识符显示不完整」)：
+/// 卡内可用宽实测 ≈ 353 DIP，四个控件单行怎么排都放不下 —— 旧布局固定列合计
+/// 510 DIP 一直在溢出，标识符框被裁成 `ahk_exe chrome.e|`（且窄到选字拖动都滚不动）。
+/// 现改为：第一行 = 组名(STAR) + 条件下拉(96) + ✕(Auto)，第二行 = 标识符通栏
+/// (跨 3 列 ≈ 353 DIP，常规 `ahk_exe xxx.exe` 全宽可见)；条件文案同步简化
+/// (i18n 605-608：前台/存在/非前台/不存在)。
 pub fn group_row<N, V, C, D>(
     name: &str,
     value: &str,
@@ -592,38 +599,36 @@ where
         .collect();
     let name_box: View = TextBox::new()
         .text(name.to_string())
-        .min_width(100.0)
         .on_text_changed(on_name)
         .into();
+    // ComboBox 不自动撑满 (布局陷阱 #1) ⇒ 显式 Stretch 与组名框等宽
     let condition: View = ComboBox::new()
         .items_source(conditions)
         .selected_index(condition_index)
-        .min_width(120.0)
+        .min_width(84.0)
+        .horizontal_alignment(HorizontalAlignment::Stretch)
         .on_selection_changed(on_condition)
         .into();
     let value_box: View = TextBox::new()
         .text(value.to_string())
-        .min_width(200.0)
         .on_text_changed(on_value)
         .into();
-    let delete: View = Button::new()
-        .on_click(on_delete)
-        .content(TextBlock::new().text(i18n::t("912")));
+    let delete: View = crate::ui::icon_button("✕", 15.0, theme::ERROR_CRIMSON, true, on_delete);
 
-    Grid::new()
-        .columns([
-            GridLength::Pixel(120.0),
-            GridLength::Pixel(130.0),
-            GridLength::STAR,
-            GridLength::Auto,
-        ])
-        .margin(Thickness::new(0.0, 0.0, 0.0, 2.0))
+    // 两行用 StackPanel 叠放而不用单个 Grid 的跨行/跨列 —— 跨列 STAR + Auto 混合
+    // 排布实测会把同行的固定列挤没 (2026-10-06 首版两行 Grid 复测：条件下拉与 ✕
+    // 整列消失)；StackPanel 的第二行天然通栏，第一行三列各自独立测量，行为可预期。
+    let head: View = Grid::new()
+        .columns([GridLength::STAR, GridLength::Pixel(96.0), GridLength::Auto])
         .children((
             name_box,
             Border::new().grid_column(1).content(condition),
-            Border::new().grid_column(2).content(value_box),
-            Border::new().grid_column(3).content(delete),
-        ))
+            Border::new().grid_column(2).content(delete),
+        ));
+    StackPanel::new()
+        .spacing(4.0)
+        .margin(Thickness::new(0.0, 0.0, 0.0, 2.0))
+        .children((head, value_box))
 }
 
 /// 「命令框皮肤」字段行：标签（键号文案）+ 文本框。
