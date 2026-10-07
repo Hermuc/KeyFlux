@@ -73,5 +73,8 @@ impl WindowSpec {
             .backdrop(self.backdrop)
             .theme(self.theme)
             .client_size(self.size.0, self.size.1)
+            // 每次打开面板都居中于所在显示器的工作区（任务栏感知）；vendor P8 通道，
+            // 仅首次应用生效，用户拖动后的位置不会被后续发布覆盖。
+            .centered(true)
     }
 }
