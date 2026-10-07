@@ -1,5 +1,11 @@
 # 方案：在代码安全前提下将 Go 后端职责迁移到 Rust（终版）
 
+> ✅ **状态：已完成并退役（2026-10-06）**。P4 切换于 2026-10-02 生效（部署树
+> `bin/settings.exe` 为 Rust 构建并稳定运行）；本日执行收尾：仓库 `bin/settings.exe`
+> 切换为 Rust 构建（PARITY 4/4 + API-PARITY 23/23 双闸门通过）、`config-server/`
+> 删除、CI release 流程改用 Rust settings.exe、模板迁至仓库根 `templates/`、
+> 共享向量迁至 `testdata/`。下文保留为迁移过程的设计与 runbook 记录。
+
 ## 0. 项目信息
 
 | 项 | 值 |

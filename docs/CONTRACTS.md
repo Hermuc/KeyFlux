@@ -1,5 +1,10 @@
 # KeyFlux 架构契约文档(方案 D 定稿)
 
+> 🔴 **2026-10-06 Go 后端退役**: `config-server/` 已整体删除。文中提及的 Go 实现真源
+> （`internal/script/generators`、`internal/server`、`internal/proc`、`behaviors/`、
+> `cmd/settings` 等）由 **`config-ui-reactor`**（Rust: 生成器 `src/generator/`、
+> 后端 `src/server/`、CLI `src/bin/settings.rs`）接管；历史小节保留原文作为契约演化记录。
+
 > 本文档是模块化重构的**唯一权威契约**。所有接口先在此定义并冻结,再迁移实现。
 > 状态:**骨架版(阶段 0)** — 接口签名已定,实现细节随阶段推进补充。
 > 分支:`dev`(原名 refactor/modularize, 重构完成后更名, 继续承载新功能开发)
@@ -1049,7 +1054,7 @@ v4.1 焦点降级语义 + 延后收尾状态 + 终止字符强制投递语义) +
   `{{ PLUGIN_LATE_INIT }}` 晚初始化扩展点(空块零字节; **P7b 起仅由 `entry.late` 声明驱动**,
   生成器不再有任何插件特判)。
 
-## 5. Go 生成端契约
+## 5. 生成端契约（Go → 2026-10-06 起由 config-ui-reactor 接管）
 
 - 阶段 3 起,`config-server/internal/script/action.go` 的 `actionMap` 拆入
   `generators/` 目录,每个 TypeID 一文件;
@@ -1069,7 +1074,7 @@ v4.1 焦点降级语义 + 延后收尾状态 + 终止字符强制投递语义) +
 - 遗留代码载荷(`ahkCode` / `ahk-expression:` / `ahk:` 行 / conditionType 5 表达式)
   继续由 Go 编译,输出到 `compat/` 消费格式,直至用户迁移为插件。
 
-## 5.1 settings.exe `--headless` 模式契约(2026-08 冻结)
+## 5.1 settings.exe `--headless` 模式契约(2026-08 冻结; 实现已由 Rust `server::run_headless` 接管)
 
 供 Avalonia 原生设置壳(`config-ui-avalonia/`)以子进程方式拉起后端,与既有模式共存:
 

@@ -13,8 +13,8 @@
 | artifact | 命令 | 模板 | 基线文件 |
 |---|---|---|---|
 | `plan` | `DumpPlan <cfg> <out>` | —（`generators.WritePlan`） | `<name>.plan.json` |
-| `ahk` | `GenerateAHK <cfg> keyflux.tmpl <out>` | `config-server/templates/keyflux.tmpl` | `<name>.keyflux.ahk` |
-| `skin` | `GenerateAHK <cfg> CommandInputSkin.tmpl <out>` | `config-server/templates/CommandInputSkin.tmpl` | `<name>.skin.txt` |
+| `ahk` | `GenerateAHK <cfg> keyflux.tmpl <out>` | `templates/keyflux.tmpl` | `<name>.keyflux.ahk` |
+| `skin` | `GenerateAHK <cfg> CommandInputSkin.tmpl <out>` | `templates/CommandInputSkin.tmpl` | `<name>.skin.txt` |
 
 它的作用是：把"两份实现"从**无对账的第二真源**变成**受守护的对照实现**——Rust 生成器接入后，
 同一脚本即成为 Go vs Rust 的等价性闸门（**对账不通过不许切换**）。
@@ -66,22 +66,22 @@ pwsh tools/parity/run_parity.ps1 -Capture     # 导出后必须重录基线
 
 ⚠️ **`synthetic` 不是 golden 的输入**：`ParseConfig` 在加载时会把为空的 entry `name`
 补成行为目录里的本地化名（`open_url` → `默认浏览器打开网址`），因此 JSON 往返**无法**
-与 Go 字面量逐字节等价 ⇒ 不能拿 `testdata/golden.keyflux.ahk` 直接对账。它是一份**不同的、
+生成端真源已迁至 Rust（`config-ui-reactor/src/generator/`）。历史备注：基线录制时与 Go 字面量逐字节等价 ⇒ 不能拿（已随 Go 退役删除的）`testdata/golden.keyflux.ahk` 直接对账。它是一份**不同的、
 但同样合法**的输入；价值在于让 Rust 侧也走到全矩阵的每条渲染分支（已用 21 个矩阵锚点核对）。
 
 ## 基线依赖的输入（这些改动必须重新 `-Capture`）
 
 | 输入 | 说明 |
 |---|---|
-| `config-server/templates/keyflux.tmpl` | 模板（manifest 的 `template`） |
-| `config-server/templates/CommandInputSkin.tmpl` | 模板（manifest 的 `skinTemplate`） |
+| `templates/keyflux.tmpl` | 模板（manifest 的 `template`；2026-10-06 自 config-server/templates 迁出） |
+| `templates/CommandInputSkin.tmpl` | 模板（manifest 的 `skinTemplate`） |
 | `bin/behaviors/**` | **内置行为包**——`LoadBehaviorCatalog` 从 **`settings.exe` 所在目录**读 `behaviors/`（故 Rust 实现也须落在同目录，否则目录不同→目录内容不同→基线不等） |
 | 语料同级 `plugins/` | 由 manifest 的 `plugins` 字段在运行时拷入工作目录 |
 | `syntheticConfig()` | 改了它就要重导出 `corpus/synthetic/config.json`（见上） |
 
 ## 语料约束（重要）
 
-Go 渲染路径存在**已知 map 迭代非确定性**（见 `config-server/internal/script/golden_test.go`
+（历史）Go 渲染路径存在已知 map 迭代非确定性（见 `config-server/internal/script/golden_test.go`，该文件随 Go 后端于 2026-10-06 退役
 的「确定性约束」段）：同一 keymap 内 `(TypeID, hotkey)` 并列、或 ID==1 里 `WindowGroupID` 重复时，
 输出顺序取决于 map 随机序。
 

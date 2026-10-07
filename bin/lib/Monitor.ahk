@@ -17,7 +17,7 @@
 ; 唯一消费者: bin/ChangeBrightness.ahk:6 `#Include ./lib/Monitor.ahk`。
 ;   跨进程拉起链: bin/lib/actions/builtins/type2_system.ahk:61-63 BrightnessControl()
 ;   → Run("KeyFlux.exe /script bin\ChangeBrightness.ahk"), 由动作 TypeID 2 生成
-;   (config-server/internal/script/generators/type2_system.go:16), UI 文案键 ["22"] 显示器亮度调节。
+;   (config-ui-reactor 生成器 type2_system 分支), UI 文案键 ["22"] 显示器亮度调节。
 ;   本文件不在 bin/KeyFlux.ahk 的 include 链内, 故 `make check` 的 /Validate ./bin/KeyFlux.ahk
 ;   不解析本文件; 唯一会解析它的自动检查 = /Validate ./bin/ChangeBrightness.ahk。
 ; 实际使用面: Monitor() 实例化 + GetBrightness() + SetBrightness() 及其 13 方法传递闭包

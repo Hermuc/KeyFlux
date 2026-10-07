@@ -19,7 +19,9 @@ pub const MATCH_FILE_EXT: &str = "fileExt";
 /// matchType 分区值：文本特征。
 pub const MATCH_TEXT_TYPE: &str = "textType";
 
-/// 内置文本特征 —— 界面侧镜像（真源 = 后端注册表 `textfeatures.go`；自定义走 `Config.MatchTypes`）。
+/// 内置文本特征 —— 注册表真源（2026-10-06 Go 后端退役后由本镜像承载；
+/// 原 Go 真源 `textfeatures.go` 的 value/顺序由此继承。自定义走 `Config.MatchTypes`。
+/// 与 AHK TextFeatureSpecs 的对账由 tools/texttype_conformance.py 强制）。
 /// 顺序 = 界面 toggle 顺序，**兜底特征 plain 恒居末位**（TextFeatureRegistryConsistencyTests 钉死）。
 pub const TEXT_TYPES: [(&str, &str); 5] = [
     ("url", "1059"),
