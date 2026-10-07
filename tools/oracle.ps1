@@ -10,7 +10,7 @@
 #                            script lives in (tools/lib/kf-tools.ps1 Get-KfRepoRoot).
 #   -Config deploy config.   default: $env:KEYFLUX_DEPLOY_CONFIG, else
 #                            $env:KEYFLUX_DEPLOY_DIR/data/config.json, else
-#                            D:\PortableApps\KeyFlux-1.0-beta1\data\config.json
+#                            D:\PortableApps\KeyFlux-compiled\data\config.json
 #                            (the live deploy tree whose config.json the instance uses).
 #   -Take   register lines   (previously parsed by hand from $args) limit for bisection.
 param(
@@ -30,7 +30,7 @@ if ([string]::IsNullOrEmpty($Config)) {
   }
   else {
     $deployDir = $env:KEYFLUX_DEPLOY_DIR
-    if ([string]::IsNullOrEmpty($deployDir)) { $deployDir = 'D:\PortableApps\KeyFlux-1.0-beta1' }
+    if ([string]::IsNullOrEmpty($deployDir)) { $deployDir = 'D:\PortableApps\KeyFlux-compiled' }
     $Config = Join-Path $deployDir 'data\config.json'
   }
 }
@@ -88,7 +88,7 @@ $harness += '}'
 [IO.File]::WriteAllLines("$repo\tmp_oracle_harness.ahk", $harness, (New-Object Text.UTF8Encoding $false))
 
 # 2. Run harness to export runtime registry (kill stray AHK processes first)
-Get-Process | Where-Object { $_.ProcessName -match 'AutoHotkey' -and $_.Path -notlike '*KeyFlux-1.0-beta1*' } | Stop-Process -Force
+Get-Process | Where-Object { $_.ProcessName -match 'AutoHotkey' -and $_.Path -notlike '*KeyFlux-compiled*' } | Stop-Process -Force
 Start-Sleep -Milliseconds 300
 Remove-Item "$tmp\resolver_dump.json", "$tmp\oracle_progress.txt" -ErrorAction SilentlyContinue
 $p = Start-Process -FilePath "$repo\bin\AutoHotkey64.exe" -ArgumentList '/ErrorStdOut', "$repo\tmp_oracle_harness.ahk" -WorkingDirectory "$repo\bin" -PassThru -NoNewWindow -RedirectStandardError "$tmp\oracle_err.txt"

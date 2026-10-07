@@ -94,11 +94,11 @@ ahk:
 	@bin/settings.exe GenerateAHK ./data/config.json ./templates/keyflux.tmpl ./bin/KeyFlux.ahk
 
 # ===== 编译输出目录 (单一真源) =====
-# 编译产物的最终落点, 固定为本机部署目录 D:\PortableApps\KeyFlux-1.0-beta1。
+# 编译产物的最终落点, 固定为本机部署目录 D:\PortableApps\KeyFlux-compiled。
 # 路径用正斜杠写法 (MSYS/Git Bash 与 robocopy 均可识别); 需要临时换落点时用 make OUT_DIR=<路径> 覆盖。
 # 说明: bin/ 只是「暂存区」(check 回归、build 打 7z 包都要读它, 不能取消),
 #       真正对外生效的产物由 sync-out 从这里同步到 OUT_DIR, 不会留在项目目录里。
-OUT_DIR ?= D:/PortableApps/KeyFlux-1.0-beta1
+OUT_DIR ?= D:/PortableApps/KeyFlux-compiled
 
 # 输出目录不存在时自动创建 (order-only 前置目标: 目录已存在则直接跳过, 不会误触发重建)
 $(OUT_DIR):

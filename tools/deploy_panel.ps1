@@ -12,13 +12,13 @@
 #
 # Usage (from repo root, pwsh 7):
 #   pwsh -NoProfile -ExecutionPolicy Bypass -File tools/deploy_panel.ps1
-#   pwsh ... -DeployRoot 'D:\PortableApps\KeyFlux' -Version '1.0-beta1' -SkipGates
+#   pwsh ... -DeployRoot 'D:\PortableApps\KeyFlux-compiled' -Version '1.0-beta1' -SkipGates
 #
 # Exit code 0 = deployed and panel running; non-zero = aborted before any
 # production write (steps 0-1) or at the failed step.
 
 param(
-    [string]$DeployRoot = 'D:\PortableApps\KeyFlux',
+    [string]$DeployRoot = 'D:\PortableApps\KeyFlux-compiled',
     [string]$Version = '1.0-beta1',
     [switch]$SkipGates
 )
