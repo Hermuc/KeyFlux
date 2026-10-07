@@ -13,7 +13,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$repo = Split-Path -Parent $PSScriptRoot
+# Repo root via the shared helper (single source; also honors $env:KEYFLUX_REPO_ROOT
+# like the parity/deploy tools -- this script is invoked from make, so its cwd is not
+# guaranteed to be the repo root).
+. (Join-Path $PSScriptRoot 'lib/kf-tools.ps1')
+$repo = Get-KfRepoRoot
 $src = Join-Path $repo 'plugins\examples'
 $dst = Join-Path $OutDir 'data\plugins'
 

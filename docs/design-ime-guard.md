@@ -84,7 +84,7 @@
 - **插件侧零引擎改动**: 插件只需在某一行调用 `UnlockForSearch()`, 插件缺失时该调用
   不存在, 对 `CommandImeGuard` 本体零影响。
 - **新文件**: `bin/lib/core/CommandImeGuard.ahk` (全 static, 自包含, 不新增全局碰撞)。
-- **挂载点**: `config-server/templates/keyflux.tmpl` 在 `CommandInputHooks.Register(ImeInputHost)`
+- **挂载点**: `templates/keyflux.tmpl` 在 `CommandInputHooks.Register(ImeInputHost)`
   同区新增一行 `CommandInputHooks.Register(CommandImeGuard)`。
 
 ## 4. 具体行为时序 (v2 布局切换)
@@ -119,7 +119,7 @@
 ## 7. 实现清单
 
 1. `bin/lib/core/CommandImeGuard.ahk` (全 static provider, 布局切换状态机)。
-2. `config-server/templates/keyflux.tmpl` 注册 `CommandImeGuard` (与 ImeInputHost 并排)。
+2. `templates/keyflux.tmpl` 注册 `CommandImeGuard` (与 ImeInputHost 并排)。
 3. `plugins/examples/everything_search/src/EverythingSession.ahk` 触发键命中处调
    `CommandImeGuard.UnlockForSearch()` (极薄, 插件可增删)。
 4. 同步 CHANGELOG / CONTRACTS 补一条新节。
