@@ -187,3 +187,27 @@ jobs:
       - name: API parity vs settings.exe (frozen Go-era baseline)
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/api-parity/run_api_parity.ps1 -Check -Exe config-ui-reactor/target/release/settings.exe
+  # 断链护栏一: 「全仓 make 目标可解析」冒烟 (2026-10-07 加)。
+  #   背景: Makefile:148 的 check-hooks 说明行漏了行首 `#`, 被 make 当成前置依赖 ⇒
+  #   `make check-hooks` / `make check` / `make deploy` 静默停摆 5 天, 而本 workflow
+  #   从不调用这些目标 ⇒ 断链在 CI 完全隐形。`-n` 只解析不执行, 成本极低,
+  #   却能一次性兜住所有「目标名/依赖拼写」类断链。
+  make-parse:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: 'make -n check (parse every prerequisite, no side effects)'
+        run: make -n check
+
+  # 断链护栏二: check-hooks 真跑 (AHK 运行时断言 = provider 分发契约)。
+  #   与 make-parse 互补: 前者保证「门禁可被调度」, 本 job 保证「门禁真断言到行为」。
+  #   bin/AutoHotkey64.exe 已入库, 无需额外准备; 不并入 check 是因为它属回归探针,
+  #   不是「随时可跑」的无副作用静态闸门 (见 Makefile 该目标上方注释)。
+  check-hooks:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: 'make check-hooks (AHK provider dispatch contract)'
+        run: make check-hooks

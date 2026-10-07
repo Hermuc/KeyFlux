@@ -90,15 +90,8 @@ fn external_agent() -> ureq::Agent {
     // TLS 根证书跟随 **OS 信任库**（PlatformVerifier）：内置 webpki-roots 不含
     // 用户安装的代理/企业根，国内网络下 raw.githubusercontent 被劫持重签时恒报
     // UnknownIssuer（2026-10-02 实测）；跟随系统库与 git/curl 行为一致。
-    let tls = ureq::tls::TlsConfig::builder()
-        .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-        .build();
-    let config = ureq::Agent::config_builder()
-        .tls_config(tls)
-        .timeout_global(Some(EXTERNAL_TIMEOUT))
-        .http_status_as_error(false)
-        .build();
-    config.into()
+    // 策略本体收口在 `services::http`（市场与发布工具共用同一份，避免两处漂移）。
+    super::http::platform_agent(EXTERNAL_TIMEOUT)
 }
 
 /// 拉取并解析市场目录（外部网络；逐源尝试，全部失败返回带源的原因）。

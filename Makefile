@@ -28,7 +28,7 @@ buildClientReactor:
 	rm -f -r bin/ui
 	mkdir bin/ui
 	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release -EnvScript config-ui-reactor/env.ps1
-	@pwsh -NoProfile -Command '$$src=(Resolve-Path "config-ui-reactor/target/release").Path; $$dst="bin/ui"; robocopy $$src $$dst /E /XD .fingerprint build deps examples incremental /XF *.pdb *.d *.rlib *.rmeta *.cargo-lock *.cargo-build-lock *.cargo-artifact-lock keyflux-settings.exe settings.exe | Out-Null; if($$LASTEXITCODE -ge 8){Write-Error ("[FAIL] robocopy exit " + $$LASTEXITCODE); exit 1}; Copy-Item "$$src/keyflux-settings.exe" "$$dst/KeyFlux.Settings.exe" -Force; Write-Host ("[OK] reactor client -> bin/ui: " + (Get-ChildItem $$dst -Recurse -File | Measure-Object).Count + " files")'
+	@pwsh -NoProfile -Command '$$src=(Resolve-Path "config-ui-reactor/target/release").Path; $$dst="bin/ui"; robocopy $$src $$dst /E /XD .fingerprint build deps examples incremental /XF *.pdb *.d *.rlib *.rmeta *.cargo-lock *.cargo-build-lock *.cargo-artifact-lock keyflux-settings.exe settings.exe build-tools.exe | Out-Null; if($$LASTEXITCODE -ge 8){Write-Error ("[FAIL] robocopy exit " + $$LASTEXITCODE); exit 1}; Copy-Item "$$src/keyflux-settings.exe" "$$dst/KeyFlux.Settings.exe" -Force; Write-Host ("[OK] reactor client -> bin/ui: " + (Get-ChildItem $$dst -Recurse -File | Measure-Object).Count + " files")'
 	@pwsh -NoProfile -Command 'New-Item -ItemType Directory -Force -Path "bin/ui/fonts" | Out-Null; Copy-Item "config-ui-reactor/resources/fonts/*.ttf" "bin/ui/fonts/" -Force; Write-Host "[OK] bundled fonts -> bin/ui/fonts: " + (Get-ChildItem "bin/ui/fonts" -File).Count + " files"'
 	@test -f bin/ui/KeyFlux.Settings.exe || (echo "[FAIL] missing bin/ui/KeyFlux.Settings.exe"; exit 1)
 
@@ -79,10 +79,14 @@ createRelease:
 	rm release_id
 
 
+# uploadLanZou: 上传蓝奏云 + 把分享链接写回 readme/站点文档。
+# 前置检查与文本改写 = `build-tools`（原 Go `scripts/build_tools.go` 的 Rust 移植，
+# 逻辑在 config-ui-reactor/src/services/build_tools.rs，bin 只做 argv→退出码映射）；
+# Go 工具链已于 2026-10-07 从本机退役 ⇒ 该目标不再依赖 Go 或任何 Go 运行时。
 uploadLanZou:
-	go run scripts/build_tools.go checkForAHKUpdate $(ahkVersion)
+	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/build-tools.ps1 checkForAHKUpdate $(ahkVersion)
 	python scripts/lanzou_client.py $(zip) 2> share_link.json
-	go run scripts/build_tools.go updateShareLink $(version)
+	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/build-tools.ps1 updateShareLink $(version)
 	rm -f share_link.json
 
 upload: uploadLanZou createRelease
@@ -145,7 +149,7 @@ deploy-panel:
 
 .PHONY: deploy-panel
 
-check-hooks: CommandInputHooks 的 provider 分发契约回归探针 (AHK 运行时断言, 自带 0/1 退出码)。
+# check-hooks: CommandInputHooks 的 provider 分发契约回归探针 (AHK 运行时断言, 自带 0/1 退出码)。
 # 2026-09-19: _Call 曾以「取方法引用再 .Call()」的方式派发, 而 AHK v2 的 `obj.Method` **不绑定 this**
 #   (this 只是普通首参, 取值前无值) ⇒ 首个实参被顶成 this、末位实参缺失 ⇒ 每次回调抛
 #   `Missing a required parameter.`, 被分发的 try/catch 吞掉并视为「未消费」。
