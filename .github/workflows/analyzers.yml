@@ -116,6 +116,13 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release
 
+      # 消费方按**文件名**调用 bin\settings.exe (对账脚本缺省亦然), 先按名落位
+      - name: Stage settings.exe to bin/ (by-name contract)
+        shell: pwsh
+        run: |
+          Copy-Item "config-ui-reactor/target/release/settings.exe" "bin/settings.exe" -Force
+          if (!(Test-Path "bin/settings.exe")) { Write-Error "missing bin/settings.exe"; exit 1 }
+
       - name: Parity gate (reference reproduction)
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./tools/parity/run_parity.ps1
