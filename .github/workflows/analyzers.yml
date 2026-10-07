@@ -211,3 +211,14 @@ jobs:
       - uses: actions/checkout@v5
       - name: 'make check-hooks (AHK provider dispatch contract)'
         run: make check-hooks
+  # 断链护栏三: 「官方插件两树镜像」闸门 (2026-10-07 加)。
+  #   plugins/examples 与 data/plugins 必须逐字节一致: 前者是规范源 (sync-plugins / CI 沙箱 /
+  #   cargo 生成器测试都读它), 后者被 .gitignore 反选放行、是发布打包 (copyFiles / release.yml
+  #   的 `cp -r data`) 的唯一来源 —— 两树历史上曾静默分叉。为何不整树去重见 Makefile 目标注释。
+  check-plugins-mirror:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: 'make check-plugins-mirror (bundled plugin trees must be byte-identical)'
+        run: make check-plugins-mirror

@@ -1,11 +1,14 @@
-# Shared helpers for the KeyFlux parity harnesses and the drop-in switch helper.
+# Shared helpers for the KeyFlux parity harnesses and the build/deploy tools.
 #
 # WHY THIS EXISTS:
-#   run_parity.ps1, run_api_parity.ps1 and drop-in-rust.ps1 each re-implemented the
-#   same primitives: repo-root resolution, the unique %TEMP% sandbox name, the SHA256
-#   digest, and the "capture twice, refuse to record on drift" determinism gate.
-#   A gate copied N times drifts apart silently (the copy that is not updated keeps
-#   reporting green), so this file is the single source of truth for all of them.
+#   run_parity.ps1, run_api_parity.ps1 and the other tools each re-implemented (or
+#   duplicated) the same primitives: repo-root resolution, the unique %TEMP% sandbox
+#   name, the SHA256 digest, and the "capture twice, refuse to record on drift"
+#   determinism gate. A gate copied N times drifts apart silently (the copy that is
+#   not updated keeps reporting green), so this file is the single source of truth
+#   for all of them. (drop-in-rust.ps1 was a consumer until it was removed together
+#   with the Go backend on 2026-10-06; consumers today include tools/cargo-gates.ps1,
+#   tools/deploy_panel.ps1 and tools/sync-plugins.ps1.)
 #
 # CONVENTION:
 #   ASCII-only on purpose -- `pwsh -File` and Windows PowerShell 5.1 misparse non-BOM

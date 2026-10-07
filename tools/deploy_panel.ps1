@@ -24,7 +24,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repo = (Resolve-Path "$PSScriptRoot\..").Path
+. (Join-Path $PSScriptRoot 'lib/kf-tools.ps1')
+$repo = Get-KfRepoRoot
 Set-Location $repo
 
 function Step($n, $msg) { Write-Host "[deploy-panel $n/6] $msg" }
@@ -79,8 +80,8 @@ Start-Sleep -Seconds 2
 Step 4 "sync bin/ui -> $DeployRoot\bin\ui"
 robocopy "$repo\bin\ui" "$DeployRoot\bin\ui" /E /R:1 /W:1 /NFL /NDL /NJH | Out-Null
 if ($LASTEXITCODE -ge 8) { Write-Error "[FAIL] prod robocopy exit $LASTEXITCODE"; exit 1 }
-$localHash = (Get-FileHash "$repo\bin\ui\KeyFlux.Settings.exe" -Algorithm SHA256).Hash
-$prodHash  = (Get-FileHash "$DeployRoot\bin\ui\KeyFlux.Settings.exe" -Algorithm SHA256).Hash
+$localHash = Get-KfSha256 "$repo\bin\ui\KeyFlux.Settings.exe"
+$prodHash  = Get-KfSha256 "$DeployRoot\bin\ui\KeyFlux.Settings.exe"
 if ($localHash -ne $prodHash) {
     Write-Error "[FAIL] hash mismatch local=$localHash prod=$prodHash"
     exit 1

@@ -21,6 +21,12 @@ AHK: not (isURL or isPath or isMagnet or isBilibili)
 
 ### 2.1 组织方式（三端同构）
 
+> ⚠️ **现状（2026-10-06 起）**：下表是**设计当时**（Go 后端 + Avalonia 面板并存）的三端结构。
+> Go 后端已退役（`36ccb83`）、Avalonia 面板已退役（`1f3dc9f`）⇒ 表中的 Go 蓝本与 C# 镜像
+> 均已删除（溯源 `git show 36ccb83^:config-server/`）。**现行真源** =
+> `config-ui-reactor/src/services/selected_action.rs::TEXT_TYPES`；共享契约向量现址为仓库根
+> `testdata/text_types.json`；AHK 运行时端不变。三端一致性由 `make check-texttypes` 守护。
+
 | 端 | 位置 | 角色 |
 |---|---|---|
 | Go（真源） | `config-server/internal/behaviors/textfeatures.go` | 值 / 中文名 / 正则 / 大小写开关 / 具名与兜底；`init()` 自检 |

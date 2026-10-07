@@ -141,6 +141,16 @@ lint:
 check-texttypes:
 	python tools/texttype_conformance.py
 
+# check-plugins-mirror: 两棵官方插件树必须逐字节一致。
+#   plugins/examples 是**规范源**（sync-plugins.ps1 / CI 沙箱 staging / cargo 生成器测试都读它）；
+#   data/plugins/<id> 下的两个 bundled 插件另被 .gitignore(27-29 行) 反选放行，是发布打包
+#   （Makefile copyFiles 与 release.yml 的 `cp -r data`）的**唯一**来源。两树历史上曾静默分叉
+#   （examples 落后 data/plugins）⇒ 本门禁把静默漂移变成显式失败。
+#   ⚠ 未做「整树去重」：去重前须先让 release.yml 从 examples 补齐 data/plugins，否则发布包会丢插件。
+check-plugins-mirror:
+	@diff -rq plugins/examples data/plugins >/dev/null 2>&1 || (echo "[FAIL] bundled plugin mirror drift (plugins/examples != data/plugins):"; diff -rq plugins/examples data/plugins; exit 1)
+	@echo "[ok] bundled plugin mirror in sync"
+
 # # deploy-panel: guarded manual deploy of the settings panel (probe-marker gate +
 # cargo-gates single source + staging + prod hash gate + relaunch). Replaces the
 # error-prone hand-rolled chain; -SkipGates skips fmt/clippy/test but never the marker gate.
@@ -181,7 +191,7 @@ check-ime:
 #         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
 #   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
 #       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
-check: sync-templates lint check-texttypes check-hooks sync-plugins | check-deploy-tree $(OUT_DIR)
+check: sync-templates lint check-texttypes check-hooks check-plugins-mirror sync-plugins | check-deploy-tree $(OUT_DIR)
 	@mkdir -p "$(DEPLOY_DIR)/bin"
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
@@ -279,4 +289,4 @@ out: sync-templates buildClientReactor sync-out
 deploy: check buildClientReactor sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: ahk sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch out deploy parity api-parity check-deploy-tree
+.PHONY: ahk sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-plugins-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch out deploy parity api-parity check-deploy-tree
