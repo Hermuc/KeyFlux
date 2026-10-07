@@ -1,7 +1,7 @@
 /**
  * CommandInputHooks —— 命令框 (KeyFlux-CommandInput) 输入期的可插拔拦截点。
  *
- * 背景: 命令框本体是上游预编译二进制 (bin/KeyFlux-CommandInput.exe, 无源码), 它只做
+ * 背景: 命令框本体 (bin/KeyFlux-CommandInput.exe, 2026-10 起为自研 Rust 版) 只做
  * 「按键镜像显示」; 真正的键盘捕获在主进程的 InputHook (见 core/AbbrInput.ahk)。
  * 因此任何「输入期间的新交互」(例如插件按下前置键唤起下拉列表) 都只能挂在 InputHook 的
  * OnChar / OnKeyDown 上 —— 本文件就是那一层稳定的扩展点。

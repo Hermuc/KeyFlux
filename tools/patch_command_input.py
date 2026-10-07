@@ -16,11 +16,16 @@
 该白名单不再匹配任何真实输入字符 ⇒ 字母/数字走普通字形路径 ⇒ 命令框内直接显示、
 无八角框。长度不变 ⇒ 不移动任何后续数据, 段表/校验和均不受影响。
 
-⚠ 为什么必须有这个脚本
---------------------
-`make sync-out` 的 robocopy 白名单含 `'*.exe'`, 会用**仓库侧未 patch** 的 exe
-覆盖部署树 ⇒ patch 是部署树本地事实, **每次 sync-out 之后都会失效**。
-本脚本幂等, 可反复执行; 已接入 Makefile `sync-out` 末尾, 自动在 robocopy 之后重施。
+⚠ 适用范围 (2026-10-07 更新)
+--------------------------
+命令框现在是自研 Rust 产物 (`command-input/`, 窗口类同为 `MyKeymap_Command_Input`)。
+Rust 版**不含**上游那段 0x1CCA0 keycap 白名单 (它自绘结果列表) ⇒ 本 patch 对它**不适用**,
+脚本会自动识别并跳过 (exit 0)。其余目标 (历史上游闭源 exe) 行为不变。
+
+历史背景: 本 patch 原本只针对闭源上游 exe, 而 `make sync-out` 的 robocopy 白名单曾含
+`'*.exe'`, 会用仓库副本覆盖部署树 ⇒ patch 每次失效, 故曾接入 sync-out 末尾重施。
+2026-10-07 起 sync-out 已用 `/XF KeyFlux-CommandInput.exe` 排除命令框 (回退路径消失),
+不再调用本脚本; 本文件保留为诊断 (`--check`) / 还原 (`--revert`) 工具。
 
 用法
 ----
@@ -28,7 +33,8 @@
     python tools/patch_command_input.py <exe路径> --check     # 只报告状态, 不写
     python tools/patch_command_input.py <exe路径> --revert    # 还原成官方原版白名单
 
-退出码: 0 成功/幂等跳过, 1 前置校验失败 (文件不符预期, 绝不盲写)。
+退出码: 0 = 成功 / 幂等跳过 / **不适用** (Rust 重写版, 见「适用范围」);
+        1 = 前置校验失败 (文件不符预期, 绝不盲写)。
 """
 
 from __future__ import annotations
@@ -52,6 +58,18 @@ SENTINEL_BEFORE_OFF = 0x1CC80
 SENTINEL_BEFORE = bytes.fromhex("6100630065002d003e0045006e0064")
 SENTINEL_AFTER_OFF = 0x1CD1C
 SENTINEL_AFTER = bytes.fromhex("000000006400770072006900740065")
+
+# Rust 重写版 (command-input/) 的识别标记: std 默认 panic handler 会把 "panicked at"
+# 编进二进制, 而上游闭源 exe 不会有该串。这是「目标根本不是 patch 对象」的可判定信号 ——
+# Rust 版自绘结果列表, 不存在 0x1CCA0 的 keycap 白名单, 因此哨兵必然不符。
+# (哨兵不符 **且** 命中该标记 ⇒ 判定 not_applicable 并跳过; 仅哨兵不符 ⇒ 仍按原样硬失败,
+#  以免把「未知版本的上游 exe」误判成安全目标。)
+RUST_PANIC_MARKER = b"panicked at"
+
+
+def is_rust_rewrite(blob: bytes) -> bool:
+    """目标是否为自研 Rust 命令框 (command-input/ 的构建产物)。"""
+    return RUST_PANIC_MARKER in blob
 
 
 def classify(blob: bytes) -> str:
@@ -100,6 +118,11 @@ def main() -> int:
 
     err = verify_sentinels(blob)
     if err:
+        if is_rust_rewrite(blob):
+            print(f"[skip] {p}")
+            print("[skip] 目标为自研 Rust 命令框 (command-input/)，不含上游 0x1CCA0 keycap 白名单")
+            print("[skip] keycap patch 仅对闭源上游 exe 适用 —— Rust 版自绘结果列表，无需 patch")
+            return 0
         print(f"[FAIL] {err}")
         return 1
 

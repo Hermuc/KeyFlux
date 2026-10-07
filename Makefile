@@ -244,8 +244,11 @@ sync-plugins: | $(OUT_DIR)
 #   🔴 实测经验 (2026-09-30): robocopy 遇到被独占打开(运行中 exe 自锁)的目标文件**不报错,
 #      而是无限重试**(默认 /R:1000000 /W:30 ≈ 每次等 30 秒), 表现为 make 卡死而非失败 ——
 #      与本文件其它「失败即失败」的闸门语义完全相反, 只能靠前置检测兜住。
-#      patch-commandinput 也提到同一件事(exe 自锁不可写), 但它只在白名单 robocopy **之后**
-#      才结束命令框进程, 挡不住这一条; 故这里提前断言, 报错信息里直接给出要关的进程名。
+#   🔴 命令框 exe 例外 (/XF, 2026-10-07): `bin/KeyFlux-CommandInput.exe` **不参与**本步同步。
+#      它是自研 Rust 产物 (command-input/, 开源), 由 `make command-input` 收编到仓库供打包;
+#      部署树那一份是同一源码的构建, 由人工复制。此前白名单里的 '*.exe' 会用仓库副本覆盖
+#      部署树 (实测把部署树命令框回退), 且随后 `patch-commandinput` 必失败 (哨兵不符, 见下)
+#      ⇒ make 在**破坏之后**才中断。/XF 后该路径整体消失, keycap patch 亦无重施必要。
 sync-out: sync-plugins | check-deploy-tree $(OUT_DIR)
 	@pwsh -NoProfile -Command '. ./tools/lib/kf-tools.ps1; Assert-KfEngineStopped; Write-Host "[ok] engine not running: bin/*.exe can be overwritten"'
 	MSYS_NO_PATHCONV=1 robocopy bin/lib $(OUT_DIR)/bin/lib /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
@@ -254,16 +257,17 @@ sync-out: sync-plugins | check-deploy-tree $(OUT_DIR)
 	MSYS_NO_PATHCONV=1 robocopy bin/ui $(OUT_DIR)/bin/ui /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
 	# 文件模式必须加引号: 否则在 make 工作目录(仓库根)被 shell 展开, *.exe 会变成根目录下的 KeyFlux.exe,
 	# 导致 bin/settings.exe 等永远同步不到部署目录 (历史遗留缺陷)
-	MSYS_NO_PATHCONV=1 robocopy bin $(OUT_DIR)/bin '*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll' /XF KeyFlux.ahk /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
-	@$(MAKE) --no-print-directory patch-commandinput
+	MSYS_NO_PATHCONV=1 robocopy bin $(OUT_DIR)/bin '*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll' /XF KeyFlux.ahk KeyFlux-CommandInput.exe /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
 
-# patch-commandinput: 重新施加命令框 exe 的「抑制八角 keycap」数据 patch。
-# 🔴 为什么必须放在 sync-out **之后**: 上面那条 robocopy 的白名单含 '*.exe', 会用仓库侧
-#    **未 patch** 的 KeyFlux-CommandInput.exe 覆盖部署树 ⇒ keycap patch 每次都被冲掉,
-#    症状是命令框里 a-zA-Z0-9 又被套上八角框 (2026-09-21 实测复现: sync-out 后部署树 exe
-#    SHA 退回 f14bba71… = 官方原版。契约 §3.11 硬约束 4 早已警告, 但此前只靠人工纪律执行)。
-# 🔴 运行中的 exe 自锁不可写 ⇒ 先结束命令框进程 (懒加载, 引擎会在下次唤起时重建;
-#    deploy 末步本就 Stop-Process 重启实例, 此处提前结束不引入新的状态破坏)。
+# patch-commandinput: 对**闭源上游**命令框 exe 重施「抑制八角 keycap」数据 patch (契约 §3.11)。
+# 🔴 现状 (2026-10-07): 命令框已是自研 Rust 产物 (command-input/), 不含上游那段 0x1CCA0
+#    keycap 白名单 ⇒ 本 patch 对它**不适用**; tools/patch_command_input.py 会自动识别并跳过
+#    (exit 0)。该目标保留为诊断/还原工具 (对历史上游 exe 仍有效), 但 **sync-out 不再调用它**。
+# 历史背景 (回归上游 exe 时仍适用): 该 patch 曾必须放在 sync-out **之后** —— 白名单 robocopy
+#    的 '*.exe' 会用仓库未 patch 的副本覆盖部署树, keycap 每次被冲掉 (2026-09-21 实测:
+#    sync-out 后部署树 exe SHA 退回 f14bba71… = 官方原版)。2026-10-07 起 sync-out 已用
+#    /XF KeyFlux-CommandInput.exe 排除命令框 ⇒ 该回退路径整体消失, 故无需再重施。
+# 🔴 运行中的 exe 自锁不可写 ⇒ 先结束命令框进程 (懒加载, 引擎会在下次唤起时重建)。
 patch-commandinput: | $(OUT_DIR)
 	@pwsh -NoProfile -Command 'Stop-Process -Name KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 400'
 	python tools/patch_command_input.py "$(OUT_DIR)/bin/KeyFlux-CommandInput.exe"
@@ -271,6 +275,16 @@ patch-commandinput: | $(OUT_DIR)
 # check-commandinput-patch: 断言部署树 exe 的 keycap patch 在位 (只读, 供诊断/CI 用)。
 check-commandinput-patch:
 	python tools/patch_command_input.py "$(OUT_DIR)/bin/KeyFlux-CommandInput.exe" --check
+
+# command-input: 构建自研 Rust 命令框并**收编到仓库 bin/** (仓库随包携带)。
+# 🔴 release.yml 不做 command-input 构建, 打包段是 `cp -r bin` ⇒ 仓库这份**必须**是当前
+#    源码的构建, 否则发布包带旧命令框 (2026-10-07 实测: 仓库 3A0FFCB4 (10-06 构建)
+#    vs 当前源码构建 E1E09585)。部署树那一边由人工复制本目标产物 —— sync-out 已 /XF 排除它。
+# 幂等: 同一源码 + 同一工具链在同一路径下构建字节稳定 (已实测).
+command-input:
+	@pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (Test-Path ./config-ui-reactor/env.ps1) { . ./config-ui-reactor/env.ps1 }; cargo build --release --manifest-path command-input/Cargo.toml'
+	cp command-input/target/release/keyflux-command-input.exe bin/KeyFlux-CommandInput.exe
+	@pwsh -NoProfile -Command 'Write-Host ("[ok] command-input -> bin/KeyFlux-CommandInput.exe  md5=" + (Get-FileHash bin/KeyFlux-CommandInput.exe -Algorithm MD5).Hash)'
 
 # out: 只编译并把产物落到 OUT_DIR (不跑回归、不重启实例, 便于验证输出目录配置)
 # ⚠️ 配方里的 echo 串必须带引号: 裸写的 `-> $(OUT_DIR)` 会被 sh 解析成**重定向**
@@ -289,4 +303,4 @@ out: sync-templates buildClientReactor sync-out
 deploy: check buildClientReactor sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: ahk sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-plugins-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch out deploy parity api-parity check-deploy-tree
+.PHONY: ahk sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-plugins-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy parity api-parity check-deploy-tree

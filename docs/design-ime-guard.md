@@ -42,8 +42,8 @@
 
 引用自 `docs/CONTRACTS.md §3.10/3.11/3.12`:
 
-- 命令框是**上游预编译二进制** `bin/KeyFlux-CommandInput.exe` (无源码), 只接受
-  `WM_CHAR` 单向通道, 无数据 IPC。命令框窗口带 `WS_EX_NOACTIVATE`。
+- 命令框 (`bin/KeyFlux-CommandInput.exe`；2026-10 起为**自研 Rust 版**, 此前为上游预编译二进制)
+  只接受 `WM_CHAR` 单向通道, 无数据 IPC。命令框窗口带 `WS_EX_NOACTIVATE`。
 - 命令框键盘捕获在主进程 `InputHook`; 透传模式 (v4, ImeInputHost 启用时) hook 恒
   `V`, 物理键透传给命令框窗口 → 英文原生显示, 中文由 **IME 在前台线程 (命令框线程)
   原生组合/上屏**。
