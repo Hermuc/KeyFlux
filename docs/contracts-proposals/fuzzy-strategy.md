@@ -1,6 +1,6 @@
 # 提案: FuzzyStrategy —— 缩写命令编辑距离容错匹配 + 候选提示
 
-> 状态: 待评审 (本文件为 CONTRACTS 约束 #2「接口先行」的提案载体; 实现随本提案同批提交)
+> 状态: **已落地（`bin/lib/commands/FuzzyStrategy.ahk` + `CommandResolver.Strategy` 挂接, 2026-10-01; 本文件保留为决策记录）**
 > 关联契约: `docs/CONTRACTS.md` §3.6 `CommandResolver.Strategy` 留桩、§0 快路径红线、约束 #4/#6/#7
 > 落地文件: `bin/lib/commands/FuzzyStrategy.ahk` (新增) + `bin/lib/commands/CommandResolver.ahk` (2 处最小接入)
 > 分支: `agent/fuzzy-strategy`

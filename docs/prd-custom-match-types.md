@@ -1,5 +1,10 @@
 # PRD-lite：用户自定义匹配类型（文本特征 + 文件后缀分组）
 
+> ⚠️ **状态（2026-10-07 标注）**：**需求已落地** —— 「管理匹配类型」对话框与匹配类型草稿编辑见
+> `config-ui-reactor/src/app/dialogs.rs` / `match_types_edit`（含文本特征与文件后缀分组两条新建路径）。
+> 下表「技术栈（现状）」行描述的是写作当时的事实（Go `config-server` + Avalonia `config-ui-avalonia`），
+> 二者均已退役（Go 2026-10-06 / 36ccb83）；本文件保留为需求依据。
+
 ## 0. 项目信息
 
 | 项 | 值 |
