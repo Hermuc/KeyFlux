@@ -2,9 +2,10 @@
 # backend and replays the same ordered request sequence against a candidate
 # implementation (Rust) to diff them byte-for-byte.
 #
-# WHY: docs/plan-rust-migration.md replaces the Go panel backend with a Rust one. The
-# route surface is locked by config-server/internal/server/bridge_test.go (19 routes).
-# This tool freezes the Go responses (via the in-process `Call` transport, so no port
+# WHY: docs/plan-rust-migration.md replaced the Go panel backend with a Rust one (Go backend
+# retired 2026-10-06 / 36ccb83). The route surface (19 routes) is now locked by the frozen
+# baseline below + config-ui-reactor's cargo tests (was: bridge_test.go).
+# This tool froze the Go responses (via the in-process `Call` transport, so no port
 # management) into tools/api-parity/reference/go/*.json and later diffs any exe.
 #
 # USAGE (PowerShell 7 recommended; parses under Windows PowerShell 5.1 too):
@@ -17,7 +18,7 @@
 #   - ASCII-only on purpose: `pwsh -File` / PS 5.1 misparse non-BOM UTF-8 (same rule as
 #     tools/parity/run_parity.ps1). Human-readable Chinese docs live in README.md.
 #   - Repo root, %TEMP% sandbox naming, SHA256 and the determinism gate come from
-#     tools/lib/kf-tools.ps1 (shared with run_parity.ps1 / drop-in-rust.ps1).
+#     tools/lib/kf-tools.ps1 (shared with run_parity.ps1 / cargo-gates.ps1).
 #   - Steps run in a FIXED order inside ONE sandbox per pass (stateful steps depend on
 #     earlier steps; manifest.json items carry the "step" number and "stateful" flag).
 #   - Sandbox always under %TEMP%, unique per run, deleted afterwards.

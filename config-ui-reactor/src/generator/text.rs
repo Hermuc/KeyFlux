@@ -3,11 +3,8 @@
 //! 这些函数跨越 Go/Rust 两端后必须**逐字节相同**：转义顺序、浮点格式、trim 语义的任一
 //! 差异都会让 `KeyFlux.ahk` 字节不等。故除 `substr` / `contains_only_modifier`
 //! （Go 侧未导出，取不到参考值）外，全部由 `tests/fixtures/text_primitives.json`
-//! 对账 —— 该夹具由 Go 真实实现产出：
-//!
-//! ```text
-//! cd config-server && UPDATE_TEXT_FIXTURE=1 go test ./internal/script/ -run TestExportTextPrimitives
-//! ```
+//! 对账 —— 该夹具 = **Go 冻结契约快照**（Go 后端 2026-10-06 退役, 36ccb83；不再有再生成入口,
+//! 溯源: `git show 36ccb83^:config-server/internal/script/`）。
 //!
 //! ⚠️ 已知的跨语言陷阱（对账夹具已钉住）：
 //! * `divide` 除零：Go `%.3f` 打印 **`+Inf`**，Rust `{:.3}` 打印 `inf` ⇒ 必须特判。
@@ -166,7 +163,8 @@ mod tests {
         let raw = std::fs::read_to_string(path).unwrap_or_else(|error| {
             panic!(
                 "读取对账夹具 {path} 失败: {error}\n\
-                 重新生成: cd config-server && UPDATE_TEXT_FIXTURE=1 go test ./internal/script/ -run TestExportTextPrimitives"
+                 夹具 = Go 冻结契约快照 (仓库自带文件, 缺失即仓库不完整); \
+                 历史实现在 git 36ccb83^:config-server/internal/script/"
             )
         });
         serde_json::from_str(&raw).expect("夹具 JSON 解析失败")

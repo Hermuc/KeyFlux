@@ -333,8 +333,9 @@ mod tests {
     }
 
     /// 跨语言逐字节：同一输入经 Go / Rust 的「ParseConfig → 落盘」后字节必须完全相同。
-    /// 夹具真源 `config-server/internal/script/config_save_export_test.go`（再生成：
-    /// `cd config-server && UPDATE_CONFIGSAVE_FIXTURE=1 go test ./internal/script/ -run TestExportConfigSave -count=1`）。
+    /// 夹具 `tests/fixtures/config_save.json` = **Go 冻结契约快照**（来源
+    /// `config-server/internal/script/config_save_export_test.go`；Go 后端 2026-10-06 退役, 36ccb83
+    /// ⇒ 不再有再生成入口, 溯源用 `git show 36ccb83^:config-server/internal/script/`）。
     /// 覆盖 16 keymap / 55KB 的真实出厂配置 + 覆盖字节序陷阱的合成用例。
     ///
     /// 已知且**先于本次改动**存在的形态差异（本次不修，已单独上报）：Go 的 nil slice 落盘为
@@ -350,8 +351,9 @@ mod tests {
             .join("tests/fixtures/config_save.json");
         let raw = std::fs::read_to_string(&fixture_path).unwrap_or_else(|error| {
             panic!(
-                "读取跨语言夹具 {} 失败: {error}\n重新生成: cd config-server && \
-                 UPDATE_CONFIGSAVE_FIXTURE=1 go test ./internal/script/ -run TestExportConfigSave -count=1",
+                "读取跨语言夹具 {} 失败: {error}\n\
+                 夹具 = Go 冻结契约快照 (仓库自带文件, 缺失即仓库不完整); \
+                 历史实现在 git 36ccb83^:config-server/internal/script/",
                 fixture_path.display()
             )
         });

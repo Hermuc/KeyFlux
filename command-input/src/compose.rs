@@ -263,7 +263,7 @@ fn to_u8(v: f64) -> u8 {
 ///   * DIB 内存序 = **B,G,R,A** (32bpp `BI_RGB` 的小端像素布局, GDI/`DrawIconEx` 同此);
 ///   * [`Plan::pixel`] 的 `drawn_rgb` 语义 = **[R,G,B]** (与其 `Rgb(R,G,B)` 字段序一致),
 ///     返回的预乘 RGB 同为 [R,G,B]。
-///   ⇒ 读入时首尾交换一次, 写回时 `pm[0]→R 槽 / pm[2]→B 槽`。历史上两端各错半边
+///   * ⇒ 读入时首尾交换一次, 写回时 `pm[0]→R 槽 / pm[2]→B 槽`。历史上两端各错半边
 ///     (读入当 [R,G,B] + 写回按 B 槽←pm[2]), 抵消成「非灰内容色 R/B 互换」—— 文件
 ///     图标变互补色、选中行/强调条变暖色 (2026-10-05 用户报障修复)。
 ///
@@ -634,7 +634,7 @@ mod tests {
         let n = (p.w * p.h * 4) as usize;
         let mut dib = vec![255u8; n];
         // 模拟 GDI 落盘的靛蓝内容 (皮肤 gridlineColor #2843AD) —— BGRA 内存序
-        for px in dib.chunks_exact_mut(4) {
+        for px in dib.as_chunks_mut::<4>().0 {
             px[0] = 0xAD; // B
             px[1] = 0x43; // G
             px[2] = 0x28; // R

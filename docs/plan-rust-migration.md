@@ -149,7 +149,8 @@ plan/ahk/skin 共 12 份产物与 Go **逐字节一致**（双向 `PARITY: 4/4 P
 **切换步骤**（需要真机验收，建议用户在场）：
 
 1. `make parity` 必须 `4/4 PASS`；`cargo test` 全绿。
-2. `make drop-in-rust`（新增目标：fmt/clippy/test/release 全过才覆盖 `bin/settings.exe`）。
+2. ~~`make drop-in-rust`~~（该目标随 Go 后端退役于 2026-10-06 删除, 36ccb83；
+   现口径：`cargo build --release -C config-ui-reactor` 产出 `settings.exe` 后按名复制到 `bin/`）。
 3. 仓库内验证：`cd bin && ./settings.exe DumpPlan ../data/config.json %TEMP%\p.json`，
    与 `tools/parity/reference/factory.plan.json` 比对应相等。
 4. 部署：`make deploy`（sync-out 会把新二进制带进部署树并重启实例）。

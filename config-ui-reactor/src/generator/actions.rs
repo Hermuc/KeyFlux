@@ -23,11 +23,9 @@
 //! 6. `model.Action.RemapInHotIf` 在 Go 是 `json:"-"`（不落盘）⇒ 夹具无法经 JSON 携带它，
 //!    故导出测试用旁挂字段 `remapInHotIf` 记录、Rust 单测读回后再赋值（见 tests）。
 //!
-//! 对账夹具再生成：
-//!
-//! ```text
-//! cd config-server && UPDATE_ACTION_FIXTURE=1 go test ./internal/script/ -run TestExportActionRender
-//! ```
+//! 对账夹具 `tests/fixtures/action_render.json` = **Go 冻结契约快照**：Go 后端已于 2026-10-06
+//! 退役（36ccb83），夹具不再有再生成入口 —— 它是渲染行为的契约基线，只在契约本身变更时才更新。
+//! 溯源上游实现：`git show 36ccb83^:config-server/internal/script/`。
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -706,7 +704,8 @@ mod tests {
         let raw = std::fs::read_to_string(path).unwrap_or_else(|error| {
             panic!(
                 "读取对账夹具 {path} 失败: {error}\n\
-                 重新生成: cd config-server && UPDATE_ACTION_FIXTURE=1 go test ./internal/script/ -run TestExportActionRender"
+                 夹具 = Go 冻结契约快照 (仓库自带文件, 缺失即仓库不完整); \
+                 历史实现在 git 36ccb83^:config-server/internal/script/"
             )
         });
         // ⚠️ 跨语言陷阱：Go 的 nil map/slice 落进 JSON 是 `null`（如空 Keymap 的 `hotkeys: null`），
