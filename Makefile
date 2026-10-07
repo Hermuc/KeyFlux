@@ -27,9 +27,19 @@ sync-templates:
 buildClientReactor:
 	rm -f -r bin/ui
 	mkdir bin/ui
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release -EnvScript config-ui-reactor/env.ps1
+	# 🔴 -Version 不可省 (2026-10-07 补): 版本经 KEYFLUX_VERSION 注入 settings.exe / 面板
+	#    (本文件顶部注释即如此声明, deploy_panel.ps1 与 release.yml 也都带)。此前本地漏传 ⇒
+	#    本地 `make out`/`deploy` 产出**无版本号**的二进制, 与 CI / 面板部署脚本产出不一致。
+	#    注: reactor 两个 bin 的构建**非逐字节可复现** (同一源码+参数重编 md5 亦不同) ⇒
+	#    判定一致性只能用「配置/参数一致」, 不能拿 md5 相等当证据 (与 command-input 不同)。
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release -Version $(version) -EnvScript config-ui-reactor/env.ps1
 	@pwsh -NoProfile -Command '$$src=(Resolve-Path "config-ui-reactor/target/release").Path; $$dst="bin/ui"; robocopy $$src $$dst /E /XD .fingerprint build deps examples incremental /XF *.pdb *.d *.rlib *.rmeta *.cargo-lock *.cargo-build-lock *.cargo-artifact-lock keyflux-settings.exe settings.exe build-tools.exe | Out-Null; if($$LASTEXITCODE -ge 8){Write-Error ("[FAIL] robocopy exit " + $$LASTEXITCODE); exit 1}; Copy-Item "$$src/keyflux-settings.exe" "$$dst/KeyFlux.Settings.exe" -Force; Write-Host ("[OK] reactor client -> bin/ui: " + (Get-ChildItem $$dst -Recurse -File | Measure-Object).Count + " files")'
 	@pwsh -NoProfile -Command 'New-Item -ItemType Directory -Force -Path "bin/ui/fonts" | Out-Null; Copy-Item "config-ui-reactor/resources/fonts/*.ttf" "bin/ui/fonts/" -Force; Write-Host "[OK] bundled fonts -> bin/ui/fonts: " + (Get-ChildItem "bin/ui/fonts" -File).Count + " files"'
+	# 🔴 后端 settings.exe 也必须落 bin/ (2026-10-07 补): 它是 `sync-out` 白名单要推给部署树的
+	#    暂存副本 (bin/settings.exe 被 .gitignore, 非入库)。此前本地**没有任何目标生产它** ——
+	#    release.yml 有显式 `Copy-Item ... settings.exe bin/` 一步, 本地缺 ⇒ 它会悄悄变旧并被
+	#    推上部署树 (实测停在 17:24 旧构建 8A66F100, 而当时 target/release 已是 CB43276B)。
+	@pwsh -NoProfile -Command 'Copy-Item "config-ui-reactor/target/release/settings.exe" "bin/settings.exe" -Force; if(!(Test-Path bin/settings.exe)){Write-Error "[FAIL] missing bin/settings.exe"; exit 1}; Write-Host ("[OK] settings.exe (CLI/backend) -> bin/  md5=" + (Get-FileHash bin/settings.exe -Algorithm MD5).Hash)'
 	@test -f bin/ui/KeyFlux.Settings.exe || (echo "[FAIL] missing bin/ui/KeyFlux.Settings.exe"; exit 1)
 
 copyFiles: CopyAHK
