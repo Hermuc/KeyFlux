@@ -1,7 +1,9 @@
 //! `data/config.json` 的 DTO。
 //!
-//! **权威蓝本**：Go `config-server/internal/script/model/types.go`
-//! 与 C# `config-ui-avalonia/Models/ConfigModels.cs`（561 行，已逐字核对）。
+//! **权威蓝本**：`data/config.json` 的字节契约由**本文件 + `generator/model.rs`** 定义
+//! （旧 Go `config-server/internal/script/model/types.go` 与 C# `config-ui-avalonia/Models/ConfigModels.cs`
+//! 为移植起点，均已退役 —— Go 后端 `36ccb83`、Avalonia 客户端 `1f3dc9f`；
+//! 溯源 `git show 36ccb83^:config-server/internal/script/model/types.go`）。
 //!
 //! 铁律：
 //! 1. 字段顺序与 json 名**不得改动**；`*ID` 类键（`parentID` / `actionTypeID` /

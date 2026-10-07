@@ -75,13 +75,6 @@ impl Catalog {
         }
     }
 
-    /// 行为提示（description；缺失回退空串）。
-    pub fn hint_for(&self, id: &str) -> String {
-        self.find(id)
-            .and_then(|pack| pack.description.clone())
-            .unwrap_or_default()
-    }
-
     /// 是否无参行为：内置语义集，或 builtin 包未声明默认命令模板。
     pub fn is_no_value(&self, id: &str) -> bool {
         if BASE_ACTION_NO_VALUE.contains(&id) {
@@ -347,14 +340,6 @@ fn custom_type_label(id: &str, label: &str, label_en: &str) -> String {
     } else {
         id.to_string()
     }
-}
-
-/// 内置文本特征的显示名（走 i18n）；未知值返回 `None`（自定义/孤儿由调用方处理）。
-pub fn builtin_text_type_label(value: &str) -> Option<String> {
-    TEXT_TYPES
-        .iter()
-        .find(|(candidate, _)| *candidate == value)
-        .map(|(_, key)| i18n::t(key))
 }
 
 /// 分区标题（「文件后缀」/「文本特征」）。

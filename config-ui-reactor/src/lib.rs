@@ -5,11 +5,15 @@
 //! HTTP 协议串（KEYFLUX_PORT 等）全部不动，风险限制在「一个 HTTP 客户端 + 一套 UI」。
 //!
 //! 分层（见 `D:\PortableApps\KeyFlux-WinUI-migration\01-项目规范.md`）：
-//!   `app`      组件与导航
-//!   `theme`    主题令牌（Color/Brush/CornerRadius/Thickness）
-//!   `models`   DTO（字段名必须与 Go/C# 契约逐字一致）
-//!   `services` HTTP 客户端 / 配置存取 / i18n / Markdown
-//!   `platform` reactor 与原生互操作的**唯一**落点（Ports & Adapters）
+//!   `app`       组件与导航（根组件 + 视图 + 弹窗 + 状态）
+//!   `ui`        可复用视图构件（卡片/行/按钮/指示字等纯渲染单元）
+//!   `theme`     主题令牌（Color/Brush/CornerRadius/Thickness）
+//!   `models`    DTO（字段名必须与 Go/C# 契约逐字一致）
+//!   `generator` 配置生成器（纯逻辑；零 UI 依赖，与 `settings.exe` drop-in 对齐）
+//!   `server`    内嵌 localhost HTTP 服务（Rust 版 settings.exe 的路由层）
+//!   `services`  HTTP 客户端 / 配置存取 / i18n / Markdown
+//!   `glass`     毛玻璃背板策略（Mica Alt 等）
+//!   `platform`  reactor 与原生互操作的**唯一**落点（Ports & Adapters；不得反向依赖上层）
 //!
 //! ⚠️ API 依据纪律：**一律以本机 `cargo registry/src/windows-reactor-0.100.0` 源码为准**，
 //!    不要照抄 master 文档（0.100.0 无 `window_frame` / `run_window` / `set_timeout`，

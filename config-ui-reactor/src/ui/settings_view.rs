@@ -157,18 +157,6 @@ pub fn combo_row<C: IntoPayloadCallback<Option<usize>>>(
     field_row(label, control)
 }
 
-/// 标签 + 按钮行。
-pub fn button_row<C: IntoUnitCallback>(
-    label: impl Into<String>,
-    text: impl Into<String>,
-    on_click: C,
-) -> View {
-    let control: View = Button::new()
-        .on_click(on_click)
-        .content(TextBlock::new().text(text.into()));
-    field_row(label, control)
-}
-
 /// 标签 + 控件 + 行尾按钮 (三列: 标签 100 | 控件 STAR | 按钮 Auto)。
 ///
 /// 命令框字体卡 (2503) 用户定版 2026-10-05: 「浏览」「恢复默认」从各自下面的独立

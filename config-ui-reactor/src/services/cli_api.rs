@@ -2,10 +2,11 @@
 //! （`trait SettingsApi`）的另一种传输实现。
 //!
 //! 传输方式：一次性调用 `settings.exe Call <METHOD> <PATH> <out-file> [--body f] [--content-type ct]`。
-//! 服务端由 `config-server/internal/server/bridge.go` 用 gin 引擎在**进程内**执行同一条 handler，
+//! 服务端由 [`crate::server::bridge`]（Rust）在**进程内**执行同一条 handler
+//! （旧 Go `config-server/internal/server/bridge.go` 已退役 `36ccb83`），
 //! **不开 socket、不占端口、无端口协商、无常驻进程** ⇒ 「换传输不换逻辑」，handler 逻辑仍是单一真源。
 //!
-//! ⚠️ 工作目录语义与 HTTP 模式一致：Go 依赖相对 `../data`、`./site`、`./templates`，故调用时
+//! ⚠️ 工作目录语义与 HTTP 模式一致：settings.exe 依赖相对 `../data`、`./site`、`./templates`，故调用时
 //! `current_dir` 必须是 `settings.exe` 所在目录（`bin/`）—— 这是本适配器最容易踩的坑。
 
 use std::os::windows::process::CommandExt;

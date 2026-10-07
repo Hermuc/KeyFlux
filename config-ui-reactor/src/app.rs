@@ -10,8 +10,8 @@
 //! ⚠️ 0.100.0 实测约束（勿照抄 master 文档）：
 //! * `View` **不**实现 `LayoutControl` ⇒ `grid_row` 只能设在**未收尾的 builder** 上。
 //! * `Component::Message` 必须 `Clone` ⇒ 后端子进程经 `Arc<Mutex<Option<BackendSession>>>` 旁路移交。
-//! * 弹窗现统一走 `ContentDialog`（旧「会崩溃」结论已被 2026-10 的生产使用推翻；
-//! * `open_window` 通道保留但全仓零调用）。
+//! * 弹窗现统一走 `ContentDialog`（旧「会崩溃」结论已被 2026-10 的生产使用推翻）。
+//! * `open_window` 通道保留但全仓零调用。
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
