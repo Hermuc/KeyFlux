@@ -18,6 +18,9 @@ name: analyzers
 #   - 新增 lint / check-texttypes / api-parity 三个 job —— 这三个 make 目标此前在 CI
 #     零引用: 其中 api-parity 是唯一同时覆盖「Go 基线漂移」与「Go/Rust 双实现分叉」的闸门,
 #     躺在仓库里没人跑 (Makefile 里也刚补上同名目标)。
+# 2026-10-06 Go 后端退役: parity-gate / api-parity 的 Go 构建腿 (setup-go + go build)
+#   删除, settings.exe 统一由 cargo 产出 (config-ui-reactor bin 目标); api-parity 收敛为
+#   "Rust 实现 vs Go 时代冻结基线" 的单实现口径。
 #
 # 注: 本 workflow 假定 runner 自带 GNU make (windows-latest 镜像的 Build Tools 含 make),
 #   lint / check-texttypes / api-parity job 直接复用 Makefile 目标, 避免把配方抄第二份。
@@ -85,9 +88,9 @@ jobs:
         run: make check-texttypes
 
   # 生成端差分对账 (P0, docs/plan-rust-migration.md §4)。
-  #   用当前构建的 settings.exe 复现 tools/parity/reference 的逐字节基线:
-  #   P0 阶段守护「基准不漂移」(生成规则改动未重新录制 reference 即红);
-  #   Rust 生成器接入后, 同一脚本即为 Go vs Rust 的等价性闸门。
+  #   用当前构建的 settings.exe (Rust —— 2026-10-06 Go 后端退役后唯一实现) 复现
+  #   tools/parity/reference 的逐字节基线 (录制自 Go 版, 现为冻结契约):
+  #   生成规则改动未重新录制 reference 即红。
   parity-gate:
     runs-on: windows-latest
     timeout-minutes: 20
@@ -95,40 +98,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Go (version pinned by config-server/go.mod)
-        uses: actions/setup-go@v5
+      - name: Setup Rust toolchain (version pinned by rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
         with:
-          go-version-file: config-server/go.mod
-          cache-dependency-path: config-server/go.sum
+          components: rustfmt, clippy
 
-      - name: Build backend (settings.exe)
-        working-directory: config-server
-        run: go build -tags=nomsgpack -ldflags "-s -w -X settings/internal/script.KeyfluxVersion=ci" -o ../bin/settings.exe ./cmd/settings
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            config-ui-reactor/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('config-ui-reactor/Cargo.lock') }}
+
+      - name: 'Build settings.exe (cargo gates + release)'
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release
 
       - name: Parity gate (reference reproduction)
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./tools/parity/run_parity.ps1
 
-  # API 级差分对账 (P0/P1) —— 唯一覆盖「Go 基线漂移 + Go/Rust 双实现分叉」的闸门。
-  #   两侧各自 -Check 一次 (与本地 `make api-parity` 同一语义):
-  #     [1] Go   : bin/settings.exe (make buildServer, 版本号取自 Makefile ⇒ 与基线一致)
-  #     [2] Rust : config-ui-reactor/target/release/settings.exe
+  # API 级差分对账 (P0/P1) —— 唯一覆盖「基线漂移 vs 实现分叉」的闸门。
+  #   2026-10-06 Go 后端退役后收敛为单实现口径: 用 Rust settings.exe 对
+  #   tools/api-parity/reference (录制自 Go 版的冻结契约快照) 做 -Check;
   #   脚本口径: 候选 exe 未实现的端点记 MISSING_ENDPOINT (不算工具失败), 字节不一致记
-  #   MISMATCH (exit 1)。故 Rust 迁移未完成时本 job 仍可绿, 真正分叉才会红。
-  #   ⚠️ 两个构建都必须注入 KEYFLUX_VERSION (GET /config 的 keyfluxVersion 字段在基线内),
-  #      否则 step 2 会因版本串不同而报 MISMATCH —— 那是构建口径问题, 不是实现分叉。
+  #   MISMATCH (exit 1)。
+  #   ⚠️ settings.exe 必须带 KEYFLUX_VERSION 构建 (option_env! 注入), 否则 GET /config 的
+  #      keyfluxVersion 字段与基线不同字节 ⇒ step 2 会因版本串不同报 MISMATCH —— 那是
+  #      构建口径问题, 不是实现分叉。
   api-parity:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Setup Go (version pinned by config-server/go.mod)
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: config-server/go.mod
-          cache-dependency-path: config-server/go.sum
 
       - name: Setup Rust toolchain (version pinned by rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@stable
@@ -152,16 +157,17 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "KeyFlux version from Makefile: ${VERSION}"
 
-      - name: Build Go settings.exe (version via ldflags, also stages bin/templates)
-        run: make buildServer
-
-      - name: Build Rust settings.exe (cargo gates + release, version via option_env!)
+      - name: 'Build settings.exe (cargo gates + release, version via option_env!)'
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release -Version ${{ steps.ver.outputs.version }}
 
-      # 沙箱源树: bin/behaviors 与 data/config.json 已入库; bin/templates 由 buildServer 产出;
+      # 沙箱源树: bin/behaviors 与 data/config.json 已入库; bin/templates 由
+      # sync-templates 产出 (2026-10-06 Go buildServer 退役后的等价目标);
       # data/plugins 是忽略项 (部署/启动产物), 这里用官方示例插件补齐, 否则 GET /api/plugins
       # 会因「少一个内置插件」在 step 5 报 MISMATCH。
+      - name: Sync templates
+        run: make sync-templates
+
       - name: Stage plugin examples for the sandbox
         shell: bash  # `cp -r src/. dst` 是 POSIX 语义; Windows runner 缺省 shell 是
                      # pwsh, Copy-Item 对结尾的 `/.` 解析为空拷贝 (CI 实测 data/plugins
@@ -171,10 +177,6 @@ jobs:
           cp -r plugins/examples/. data/plugins/
           ls data/plugins
 
-      - name: API parity [1/2] vs Go settings.exe
-        shell: pwsh
-        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/api-parity/run_api_parity.ps1 -Check -Exe bin/settings.exe
-
-      - name: API parity [2/2] vs Rust settings.exe
+      - name: API parity vs settings.exe (frozen Go-era baseline)
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/api-parity/run_api_parity.ps1 -Check -Exe config-ui-reactor/target/release/settings.exe
