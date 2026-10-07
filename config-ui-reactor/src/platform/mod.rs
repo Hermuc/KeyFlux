@@ -11,6 +11,8 @@
 
 use windows_reactor::{WindowBackdrop, WindowTheme, WindowVisuals};
 
+/// UAC 提权启动（ShellExecuteW runas；自启计划任务命令 3/4 用）。
+pub mod elevation;
 /// Windows Job Object 封装（保证 GUI 死亡时连带回收后端子进程树）。
 pub mod file_dialog;
 /// 随包字体（MiSans）进程内私有加载。
