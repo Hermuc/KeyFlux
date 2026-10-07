@@ -73,7 +73,9 @@ config-server/cmd/settings/                 (仅保留入口与模式判断)
 └── main.go        main() CLI 分发 + debug/headless 判断 + 代码雨编排 + hideMatrix + server.Run() 调用
 config-ui-avalonia/Resources/i18n.json      (双语文案真源, 385 键, UTF-8 无 BOM; 构建产物请勿手改)
 bin/ui/Resources/i18n.json                  (松散部署物, 由 csproj Content 项产出, 随 robocopy /MIR 同步到部署目录)
-scripts/                                    (维护者脚本, 不随发布包出货, 与出货的 tools/ 区分)
+scripts/                                    (维护者脚本, 不随发布包出货, 与出货的 tools/ 区分;
+                                             构建/运维 CLI 已 Rust 化: build-tools.go 于 2026-10-07
+                                             迁入 config-ui-reactor/src/bin/build_tools.rs, 此处只剩 lanzou_client.py)
 ├── build_tools.go     发布前 AHK 版本闸 (checkForAHKUpdate) + 回写分享链接 (updateShareLink)
 └── lanzou_client.py   蓝奏云上传 (make uploadLanZou 调用)
 ```
@@ -1267,3 +1269,4 @@ action-scheme 端点直接在 model 上设置该字段后序列化返回, 未经
 ',''])`, 空行跳过语义不变) ⇒ 三行命令正确生成 `Send("^+="), Sleep(500), Send("r{enter}")`; ② `ahk_string` 追加第 4/5 步转义 (CR→反引号 r / LF→反引号 n, 在既有 反引号/双引号/分号 步之后, 不二次转义) —— 对 Go `model.AhkString` 的**有意偏离** (Go 原样透传, 其生成脚本同样损坏), 所有内联字段的原始换行从此兜底不再出坏脚本。**夹具**: `tests/fixtures/text_primitives.json` ahk_string 用例 `a
 b` 期望按偏离订正 + 新增 ``/`
 ` 两例 (Go 已退役, 定向偏离记录于此与本行)。**门禁**: cargo-gates 四闸门全绿 (312 tests, 新增 send_keys6 分行回归 + ahk_string 换行转义), **parity 4/4 PASS 基线零重录** (语料多行值全走 send 分行路径, 行内无换行进 ahk_string ⇒ 字节零漂移), 部署树 bin/settings.exe 同步 + GenerateScripts 重生成 + `AutoHotkey64 /Validate` exit=0 + 引擎重启存活。变更记录本行 |
+| 2026-10-07 | **Go 工具链收尾：build_tools.go → Rust `build-tools` bin + 修复 `make check` 断链**（本机 Go 工具链已退役，`Makefile:83,85` 的 `go run scripts/build_tools.go` 已不可执行）。**① 移植**：新 lib 模块 `config-ui-reactor/src/services/build_tools.rs`（逻辑 + 5 组单测：行改写语义/标记过滤/格式化串/链接校验/端到端三态）与薄壳 bin `src/bin/build_tools.rs`（argv→退出码；`checkForAHKUpdate` 不匹配 → stdout `error: outdated ahk version` + exit 1，IO/网络失败 → stderr + exit 2；`updateShareLink` 的 `skip site doc update: …` / `update site doc failed: …` 文案逐字保留；文件改写复刻 Go `ReplaceInFile`：去行尾 CR → 每行补 LF → 同目录临时文件 + 原子 rename）。包装器 `tools/build-tools.ps1`（ASCII/PS5.1 可解析，仓库根 + env 脚本 + `cargo run --quiet` 单点）。**零新增依赖**：只用既有 `ureq`（PlatformVerifier TLS）/`serde_json`；顺带把外部 HTTP 的 TLS/超时/状态码策略收口为新模块 `services/http.rs::platform_agent`，`services/market.rs` 改为复用（消除两处策略维护）。**② 死链修复**：`Makefile:148` 的 `check-hooks` 说明行漏行首 `#`（`bd9371f` 引入），被 make 当作前置依赖 ⇒ `make check-hooks`/`make check`/`make deploy` 全部不可执行且 CI 从不调用（隐形 5 天）。**③ 防复发**：`analyzers.yml` 增 `make-parse`（`make -n check`）与 `check-hooks`（真跑 AHK 探针）两个 job。**④ /XF 收口**：三处 robocopy（Makefile / tools/deploy_panel.ps1 / release.yml）统一排除 `build-tools.exe`，并把 release.yml 缺失的 `*.rlib *.rmeta` 补齐（消除本地↔CI 漂移）。**验证**：cargo-gates 全绿（含新模块单测）；`make -n check-hooks` / `make -n check` exit 0；`make -n upload` 显示新两行；`grep -rn "build_tools.go\|go run" Makefile scripts/ .github/` 零命中。 |

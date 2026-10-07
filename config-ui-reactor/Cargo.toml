@@ -16,6 +16,15 @@ path = "src/main.rs"
 name = "settings"
 path = "src/bin/settings.rs"
 
+[[bin]]
+# 发布运维 CLI：原 `scripts/build_tools.go` 的 Rust 移植（Go 工具链已于 2026-10-07 退役）。
+# 逻辑在 lib（services/build_tools.rs，带单测），本 bin 只做 argv → 退出码映射。
+# ⚠️ 产物 build-tools.exe 与 settings.exe 同在 target/release ⇒ 三处 robocopy（Makefile /
+#    tools/deploy_panel.ps1 / .github/workflows/release.yml）的 /XF 必须排除它，
+#    否则会被拷进部署的 bin/ui 目录。
+name = "build-tools"
+path = "src/bin/build_tools.rs"
+
 [lib]
 # P3（Rust 迁移）起 crate = lib + bin：
 # * lib 承载面板各层（app/models/platform/services/theme/ui），并作为后续 **Rust 生成器**
