@@ -3,8 +3,8 @@
  *
  * 为什么需要这层 (而不是各处直接调 PostCharToCaspAbbr):
  *
- * 命令框本体是上游预编译二进制 (bin/KeyFlux-CommandInput.exe, 无源码)。经反汇编与实测
- * 确认其绘制约束:
+ * 命令框本体 = bin/KeyFlux-CommandInput.exe（2026-10 起为自研 Rust 版, 源码 command-input/;
+ * 此前为闭源上游 exe）。下列约束来自对**上游版**的反汇编与实测, Rust 重写沿用同一投递 ABI:
  *
  *   1. 命令框的显示 = **纯投递的 WM_CHAR (0x0102)**: capsHook 以 InputHook("", ...) 创建
  *      (无 V ⇒ 默认不可见, 吞掉文本键), 物理键到不了命令框窗口 —— 实测铁证: 上轮

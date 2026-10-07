@@ -37,9 +37,10 @@ PostMessageToCpasAbbr(msg, wParam := 0) {
   temp := A_DetectHiddenWindows
   DetectHiddenWindows(1)
   ; 调用 WinExist 的耗时都不超过 2ms, 没必要做缓存了
-  ; 注意: ahk_class 是 KeyFlux-CommandInput.exe（上游预编译二进制, 仓库无源码）内烧录的
-  ; Win32 窗口类名, 属于该二进制的 ABI, 实际值仍为 MyKeymap_Command_Input（UTF-16 烧录）。
-  ; 改名需上游源码重新编译才生效, 故按"二进制实际值优先"策略保留旧名, 勿随品牌改名同步。
+  ; 注意: ahk_class 是命令框 exe 内烧录的 Win32 窗口类名, 属其 ABI, 值仍为
+  ; MyKeymap_Command_Input（UTF-16 烧录）。命令框自 2026-10 起由自研 Rust 版取代闭源上游 exe
+  ; (源码 command-input/, 部署名 KeyFlux-CommandInput.exe), 但该类名按「drop-in ABI」刻意保留
+  ; ⇒ 改名须同时改 command-input/ 源码与引擎这里的匹配串, 故按"二进制实际值优先"保留旧名, 勿随品牌改名同步。
   if WinExist("ahk_class MyKeymap_Command_Input ahk_exe KeyFlux-CommandInput.exe") {
     PostMessage(msg, wParam, 0)
   } else {
