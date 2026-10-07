@@ -91,8 +91,13 @@ TryTrayRestoreByNav(processName, winTitle) {
       cmd := 'pwsh -NoProfile -ExecutionPolicy Bypass -File "' script '" -Target "' kw '" -Process "' processName '" -LogFile mk_traynav.txt'
       try
         exitCode := RunWait(cmd, , "Hide")
-      catch
+      catch {
+        ; 这不是「静默失败」而是**降级**: 首选 pwsh 不可用 (未安装 / 被安全软件拦) ⇒ 回退
+        ; powershell (脚本本身保持 5.1/7 双兼容)。回退仍失败会抛出, 由引擎 OnError →
+        ; EngineOnError 统一记日志, 故此处无需重复记录 (2026-10-07 审查: 把「不记」的理由
+        ; 写进代码, 而不是留一个无解释的空 catch)。
         exitCode := RunWait(StrReplace(cmd, "pwsh ", "powershell "), , "Hide")
+      }
       if (exitCode = 0)
         return true
     }

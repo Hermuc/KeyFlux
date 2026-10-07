@@ -388,7 +388,10 @@ class SelectedAction {
       }
       return true
     }
-    catch {
+    catch as err {
+      ; 修饰键状态读取失败 (会话切换期 / 钩子异常) ⇒ 按「非主键重复」处理, 不打断热键链;
+      ; 留痕: 否则表现为「某热键偶发不触发」, 日志里无任何线索。
+      EngineLogWarn("SelectedAction._IsMainKey: 修饰键探测失败", "hotkey=" hotkeyStr " err=" err.Message)
       return false
     }
   }
@@ -606,7 +609,11 @@ class SelectedAction {
       return
     }
     try content := FileRead(path)
-    catch {
+    catch as err {
+      ; 文件存在却读不出 (后端写入中途被抢读 / 被占用 / 权限) ⇒ 与下方「格式异常」同款处置:
+      ; 删文件避免 250ms 一次的 tick 无限重试, 并留痕 (否则静默失败, 彩蛋功能失效能潜伏很久)。
+      EngineLogWarn("SelectedAction.WatchPlayRequest: 请求文件读取失败", "path=" path " err=" err.Message)
+      FileDelete(path)
       return
     }
     ; 解析 typeId 与 seq (引擎无内置 JSON 库, 用受控格式的正则提取)
@@ -938,6 +945,9 @@ CheckMagnetHandler() {
     return cmd != ""
   }
   catch {
+    ; 未注册 magnet: 是**正常状态** (返回 false 即正确答案), 不是故障 ⇒ 刻意不记日志。
+    ; 读不到 HKCR 才会落到此处 (权限受限), 但本函数可能被高频调用, 记日志会刷屏。
+    ; 2026-10-07 审查: 把「此处不记」的理由写进代码, 而不是留一个无解释的空 catch。
     return false
   }
 }
@@ -954,7 +964,9 @@ OpenRegistryKey(content) {
     return
   }
   try RegWrite(path, "REG_SZ", "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit", "LastKey")
-  catch {
+  catch as err {
+    ; 已有用户可见提示, 再补一条留痕: 弹窗转瞬即逝, 事后无从复盘「为什么没打开注册表」。
+    EngineLogWarn("SelectedAction.OpenRegistryKey: 写 LastKey 失败", "path=" path " err=" err.Message)
     Tip(Translation().registry_open_failed, -2500)
     return
   }
