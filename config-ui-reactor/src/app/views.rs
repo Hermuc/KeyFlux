@@ -585,7 +585,7 @@ impl Shell {
             ));
         }
 
-        // 505 其他设置：506 开机自启（即时生效）/ 901 隐藏矩阵 / 781 语言
+        // 505 其他设置：506 开机自启（命令入队，随保存生效）/ 901 隐藏矩阵 / 781 语言
         sections.push((
             sections.len(),
             self.section(context, "other", "505", |this, context| {

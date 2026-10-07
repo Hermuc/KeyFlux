@@ -4,8 +4,8 @@
 //! （git `1f3dc9f~1`）逐分区复刻：键盘布局预设、开机自启命令映射、鼠标/滚轮字符串型数值、
 //! 命令框皮肤 18 字段表、命令框字重枚举、路径变量行编辑。
 //!
-//! 保存语义：除「开机自启」（即时 `POST /server/command/3|4`）外，全部随保存链路
-//! （Ctrl+S → `PUT /config` → Go 重启引擎）。
+//! 保存语义：除「开机自启」（计划任务命令 3/4 入队，随保存链路统一发送）外，
+//! 全部随保存链路（Ctrl+S → `PUT /config` → 服务端重启引擎）。
 
 use crate::models::{Config, PathVariable};
 
@@ -75,7 +75,8 @@ pub const STARTUP_ON_COMMAND: i32 = 3;
 /// 开机自启「关」的服务端命令（`POST /server/command/4`）。
 pub const STARTUP_OFF_COMMAND: i32 = 4;
 
-/// 开关 → 服务端命令 id（旧语义：**即时生效**，不走保存链路；config 值只是回显态）。
+/// 开关 → 服务端命令 id（命令入队，随「保存配置」经保存管线统一发送；
+/// config 值只是回显态）。
 pub fn startup_command_id(enabled: bool) -> i32 {
     if enabled {
         STARTUP_ON_COMMAND
