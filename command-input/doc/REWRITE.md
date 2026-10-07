@@ -1,5 +1,11 @@
 # KeyFlux-CommandInput Rust 重写报告
 
+> ⚠️ **文档定位（2026-10-07 标注）**：本文是**重写期的设计与实施记录（v1 口径）** —— 其中
+> 「模块结构」表的行数与渲染机制描述停留在 v1（`LWA_COLORKEY` + 整窗 layered alpha）。
+> v1.1 起改为 `UpdateLayeredWindow` 逐像素自合成（白边/填充/阴影各自 alpha），后续又加了
+> 结果列表（0x406 `KFR2` 双行版式）、搜索徽标（0x40A/0x40B）、系统文件图标缓存。
+> **当前实现口径以 `command-input/README.md` + `docs/CONTRACTS.md` 为准**，本文只作历史依据。
+
 KeyFlux 命令输入框（窗口类 `MyKeymap_Command_Input`）从原版可执行文件逆向后以 Rust 重写的
 终版记录：设计决策 / 模块结构 / 验证证据 / 已知差距 / 部署与回退。
 

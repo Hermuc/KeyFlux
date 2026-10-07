@@ -1,6 +1,6 @@
 # 提案: QuickSwitch 插件化 —— 把内建模块降级为可启停 / 可删除的随包插件
 
-> 状态: 待评审 (本文件为 CONTRACTS 约束 #2「接口先行」的提案载体; 实现随本提案分批提交)
+> 状态: **已全部落地（P0–P7b, 2026-10-02; 本文件保留为决策记录）**
 > 关联契约: `docs/CONTRACTS.md` §0 总原则 1/2/3、§1 约束 #1/#4/#5/#6/#7、§3.4 ActionRegistry、
 > §3.7 PluginManager/APIBridge/ScriptHost、§3.8 ConfigProvider、§4 插件清单格式、§5 生成端契约
 > 落地文件: `plugins/bundled/quick_switch/`(真源, 新增) · `data/plugins/quick_switch/`(部署, 新增) ·
