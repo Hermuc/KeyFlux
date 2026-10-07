@@ -230,32 +230,50 @@ pub(crate) fn dispatch(
 }
 
 /// Go `ServerCommandHandler`（handlers.go:117-140）：白名单 2=WindowSpy /
-/// 3=自启开 / 4=自启关，spawn KeyFlux.exe /script …；未知 id 也 200 空 `{}`。
+/// 3=自启开 / 4=自启关。未知 id 也 200 空 `{}`。
 /// （Go 路由 `:id` 不匹配空段或含 `/` 的段 → 落 NoRoute 404。）
+///
+/// 与 Go 的**显式差异**（2026-10-07）：3/4 改经 [`proc::exec_cmd_elevated`]
+/// 提权 spawn。计划任务 KeyFlux 由提权链创建（runLevel HIGHEST），非提权上下文
+/// `schtasks /delete` 直接「拒绝访问」，而 MiscTools.ahk 仅 On 分支内建 `*RunAs`
+/// 自提权（`bin/**` 边界零改动，无法给 Off 补）——引擎托盘拉起的面板链本就提权
+/// 无感，直启未提权面板弹一次 UAC，与 On 自提权的既有 UX 对称。
+/// spawn 结果照旧被忽略（Go 同）：HTTP 契约恒 `200 {}`，失败只进 stderr 诊断。
 fn server_command(_ctx: &ServerContext, id: &str) -> HttpReply {
     if id.is_empty() || id.contains('/') {
         return HttpReply::empty(404);
     }
+    // 夹具模式（api-parity）：3/4 不真正 spawn —— 基线沙箱里 stub 引擎「吞参数
+    // 即退」，而提权 spawn 只会对账一次 UAC 噪音；与 query_startup_from_task 的
+    // 夹具分支（handlers_config）同一口径。响应字节不受影响，恒 `200 {}`。
+    let fixture = std::env::var("KEYFLUX_API_PARITY").as_deref() == Ok("1");
     // proc.ExecCmd 的返回值在此被忽略（Go 同）
-    match id {
-        "2" => {
-            proc::exec_cmd("./KeyFlux.exe", &["/script", "bin/WindowSpy.ahk"]);
+    if let Some((elevated, args)) = command_spec(id)
+        && !fixture
+    {
+        if elevated {
+            proc::exec_cmd_elevated("./KeyFlux.exe", args);
+        } else {
+            proc::exec_cmd("./KeyFlux.exe", args);
         }
-        "3" => {
-            proc::exec_cmd(
-                "./KeyFlux.exe",
-                &["/script", "./bin/MiscTools.ahk", "RunAtStartup", "On"],
-            );
-        }
-        "4" => {
-            proc::exec_cmd(
-                "./KeyFlux.exe",
-                &["/script", "./bin/MiscTools.ahk", "RunAtStartup", "Off"],
-            );
-        }
-        _ => {}
     }
     HttpReply::json(200, "{}".to_string())
+}
+
+/// 白名单命令表（KeyFlux.exe 参数，与 Go 逐字一致）。
+const WINDOWSPY_ARGS: &[&str] = &["/script", "bin/WindowSpy.ahk"];
+const STARTUP_ON_ARGS: &[&str] = &["/script", "./bin/MiscTools.ahk", "RunAtStartup", "On"];
+const STARTUP_OFF_ARGS: &[&str] = &["/script", "./bin/MiscTools.ahk", "RunAtStartup", "Off"];
+
+/// 白名单命令表：id → (是否需提权, KeyFlux.exe 参数)。
+/// 3/4 写计划任务需要提权（见 [`server_command`] 边界说明），2=WindowSpy 不需要。
+fn command_spec(id: &str) -> Option<(bool, &'static [&'static str])> {
+    match id {
+        "2" => Some((false, WINDOWSPY_ARGS)),
+        "3" => Some((true, STARTUP_ON_ARGS)),
+        "4" => Some((true, STARTUP_OFF_ARGS)),
+        _ => None,
+    }
 }
 
 /// Go `net.Listen("tcp", addr)` 的语义复刻：**只绑一个地址**。
@@ -415,21 +433,21 @@ mod tests {
         assert_eq!(reply.content_type, Some("application/json; charset=utf-8"));
     }
 
-    /// 白名单 id 的参数表与 Go 逐字一致（字节锁定，防止参数漂移）。
+    /// 白名单 id 的参数表与 Go 逐字一致（字节锁定，防止参数漂移）；
+    /// 提权分类：3/4 写计划任务需提权（见 `server_command` 边界说明），2 不需要。
     #[test]
     fn whitelist_command_args_match_go() {
-        let expected: [&[&str]; 3] = [
-            &["/script", "bin/WindowSpy.ahk"],
-            &["/script", "./bin/MiscTools.ahk", "RunAtStartup", "On"],
-            &["/script", "./bin/MiscTools.ahk", "RunAtStartup", "Off"],
-        ];
-        for (index, args) in expected.iter().enumerate() {
-            assert_eq!(
-                args.first(),
-                Some(&"/script"),
-                "id={} 应以 /script 开头",
-                index + 2
-            );
+        assert_eq!(command_spec("2"), Some((false, WINDOWSPY_ARGS)));
+        assert_eq!(command_spec("3"), Some((true, STARTUP_ON_ARGS)));
+        assert_eq!(command_spec("4"), Some((true, STARTUP_OFF_ARGS)));
+        assert_eq!(command_spec("99"), None);
+        for (id, spec) in [
+            ("2", command_spec("2")),
+            ("3", command_spec("3")),
+            ("4", command_spec("4")),
+        ] {
+            let (_, args) = spec.expect("白名单 id 恒有表");
+            assert_eq!(args.first(), Some(&"/script"), "id={id} 应以 /script 开头");
         }
     }
 

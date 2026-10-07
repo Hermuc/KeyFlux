@@ -40,7 +40,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 # UnknownIssuer（2026-10-02 实测）。跟随 OS 信任库 = git/curl 同行为。
 ureq = { version = "3.4.2", features = ["platform-verifier"] }
 windows-reactor = "0.100"
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_UI_Controls_Dialogs", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_UI_Controls_Dialogs", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 # vendor 补丁（2026-09-28）：上游 0.100.0 无字体通道（无 font_family builder /
 # ResourceOverrides 仅色值 / AppContext 不暴露 Resources），fork 在装完 Fluent

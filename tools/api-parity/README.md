@@ -80,7 +80,8 @@ stub exe 让 `ExecCmd` 走 breakaway 快速路径，**响应字节两种情形�
 | step | 请求 | corpus | Go 实际行为（已实录） |
 |---|---|---|---|
 | 10 | `PUT /config` | body = GET /config 基线字节做**确定微改**（首个 `"comment":"label:36"` → `"label:36|parity"`，原文手术式替换，非 JSON 重序列化） | 校验通过 → 覆盖写 `../data/config.json`；沙箱 stub 引擎启动成功 → 200 `{"message":"ok","restartFailed":false}` |
-| 11-13 | `POST /server/command/2|3|4` | — | 白名单分发（WindowSpy / 开机自启 On/Off）；stub 引擎吞掉参数即退 → 恒 200 `{}` |
+| 11-13 | `POST /server/command/2` | — | 白名单分发：WindowSpy 经 breakaway 直启 stub（吞参数即退）→ 恒 200 `{}` |
+| 12-13 | `POST /server/command/3\|4` | — | 开机自启 On/Off：生产路径为 runas 提权 spawn（2026-10-07 起，见 `server::server_command`）；夹具模式下**跳过 spawn**（否则对账弹 UAC）→ 恒 200 `{}` |
 | 14 | `POST /api/behaviors` | `behavior_pack_demo.json`（plain 包，builtin copy entry） | 校验通过 → 写 `../data/behaviors/parity_demo/` → 200 回显包 JSON（含 `source:"user"`） |
 | 15 | `PUT /api/behaviors/parity_demo` | `behavior_pack_demo_update.json`（改 name/version） | 覆写包 → 200 回显修改后包 JSON |
 | 16 | `POST /api/behaviors/apply` | — | 重启引擎（stub 成功）→ 200 `{"restartFailed":false}` |
