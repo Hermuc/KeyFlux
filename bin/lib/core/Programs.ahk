@@ -85,8 +85,12 @@ GetTargetProcessName(target) {
   ; 快捷方式解析指向的真实程序
   if SubStr(programPath, -4) == ".lnk" {
     try FileGetShortcut(programPath, &outTarget)
-    catch
+    catch as err {
+      ; .lnk 存在却解析失败 (损坏 / 无权限 / 指向非文件) ⇒ 取不到真实目标, 只能放弃匹配。
+      ; 放弃前留痕: 否则症状是「用快捷方式启动的程序匹配不上」, 日志里毫无线索。
+      EngineLogWarn("Programs.GetTargetProcessName: 快捷方式解析失败", "path=" programPath " err=" err.Message)
       return ""
+    }
     if not (outTarget)
       return ""
     programPath := outTarget

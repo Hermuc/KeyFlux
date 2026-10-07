@@ -69,6 +69,29 @@ EngineOnError(err, mode) {
 }
 
 /**
+ * 已处理失败分支的**唯一留痕入口** (2026-10-07 代码审查新增)。
+ *
+ * 为什么需要: 引擎里有一批 catch 是**故意**不抛异常的 (定时器/热键链不能被打断; 或失败本身
+ * 就是正确答案)。但「故意吞掉」不等于「不必记录」—— 过去这些分支失败后 logs\engine_error.log
+ * 里没有任何痕迹, 现场只能靠猜。本函数让「吞异常」与「留痕」并存:
+ *   * 只追加一行摘要 (时间 + 位置 + 细节), **不弹窗**、不打断调用方、不改变控制流;
+ *   * 与 EngineOnError 的分工: EngineOnError 管**未捕获**异常的终极兜底 (带 Error 全文),
+ *     本函数管**已就地降级/放弃**的分支 (一行摘要即可定位)。
+ * @param context 失败位置 (建议 "模块.函数"), 便于事后 grep
+ * @param detail  补充信息 (路径/参数/底层错误文本等)
+ */
+EngineLogWarn(context, detail := "") {
+  try {
+    DirCreate("logs")
+    line := FormatTime(, "yyyy-MM-dd HH:mm:ss") " [warn] " context
+    if (detail != "")
+      line .= " | " detail
+    FileAppend(line "`n", "logs\engine_error.log", "UTF-8")
+  }
+  ; 记录失败本身绝不能再抛 —— 否则日志函数会成为新的故障源
+}
+
+/**
  * 暂停
  */
 KeyFluxToggleSuspend() {
