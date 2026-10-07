@@ -14,10 +14,15 @@
 /// Go `model.AhkString`：转成 AHK 字符串字面量（转义反引号 / 双引号 / 空格后的分号）。
 ///
 /// 替换顺序不可调换：Go 是先全局替换反引号，再替换双引号，最后处理 `" ;"`。
+/// 第 4/5 步（CR/LF → 反引号 r / 反引号 n）是本仓库对 Go 的**扩展**：Go 时代值来自
+/// 单行输入框从无换行，2026-10-02 P5 多行输入框上线后，任何内联字段的原始换行都会令
+/// 生成的 AHK 字面量语法损坏（2026-10-07 用户报障）。新增步在既有转义之后追加，
+/// 不会二次转义前面插入的反引号。
 pub fn ahk_string(s: &str) -> String {
     let escaped = s.replace('`', "``").replace('"', "`\"");
     // 空格后的分号会被 AHK 解释为注释起始 ⇒ 转义为 `;
     let escaped = escaped.replace(" ;", " `;");
+    let escaped = escaped.replace('\r', "`r").replace('\n', "`n");
     format!("\"{escaped}\"")
 }
 
@@ -181,6 +186,7 @@ mod tests {
     }
 
     /// 与 Go 实现逐值对账（转义顺序 + 浮点格式 + trim 语义）。
+
     #[test]
     fn matches_go_reference_fixture() {
         let fixture = fixture();
@@ -245,6 +251,15 @@ mod tests {
                 case.input
             );
         }
+    }
+
+    /// CR/LF 必须转义为反引号 r / 反引号 n（多行输入框兜底，见 ahk_string 文档）。
+    #[test]
+    fn ahk_string_escapes_newlines() {
+        assert_eq!(ahk_string("a\r\nb"), "\"a`r`nb\"");
+        assert_eq!(ahk_string("a\rb"), "\"a`rb\"");
+        assert_eq!(ahk_string("a\nb"), "\"a`nb\"");
+        assert_eq!(ahk_string("a`b\"c ;d"), "\"a``b`\"c `;d\"");
     }
 
     #[test]

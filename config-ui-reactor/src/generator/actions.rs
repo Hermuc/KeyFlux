@@ -273,7 +273,9 @@ fn remap_key5(config: &Config, action: &Action, in_abbr_context: bool) -> String
 /// Go `sendKeys6`：发送按键（支持多行、`ahk:` 行、`sleep ` 行）。
 fn send_keys6(config: &Config, action: &Action, in_abbr_context: bool) -> String {
     let mut res: Vec<String> = Vec::new();
-    for line in action.keys_to_send.split('\n') {
+    // 换行分隔符兼容孤 \r：多行输入框 (2026-10-02 P5 multiline) 产生 \r 或
+    // \r\n（旧 Avalonia 单行框只可能整段无换行, Go 按纯 \n 切即够）。
+    for line in action.keys_to_send.split(['\n', '\r']) {
         if line.trim().is_empty() {
             continue;
         }
@@ -638,6 +640,31 @@ pub fn group_disable_keyflux(groups: &[WindowGroup]) -> String {
 mod tests {
     use super::*;
     use crate::generator::model::config_from_json;
+
+    /// 多行输入框产生的命令行必须逐行拆开（含孤 \r 与 \r\n 两种形态）。
+    /// 回归 (2026-10-07 用户报障)：edge 键配置三行命令, 旧实现只按 \n 切,
+    /// 原始 CR 落进 Send 字面量 → 生成的 KeyFlux.ahk 85 行 Missing " 引擎加载失败。
+    #[test]
+    fn send_keys6_splits_cr_and_crlf_lines() {
+        let config = Config::default();
+        let action = Action {
+            keys_to_send: "^+=\rsleep 500\rr{enter}".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(
+            send_keys6(&config, &action, true),
+            "Send(\"^+=\"), Sleep(500), Send(\"r{enter}\")"
+        );
+
+        let action = Action {
+            keys_to_send: "a\r\nb".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(
+            send_keys6(&config, &action, true),
+            "Send(\"a\"), Send(\"b\")"
+        );
+    }
     use serde::Deserialize;
 
     /// Go 侧导出的对账夹具（见模块头注的再生成命令）。
