@@ -3,6 +3,11 @@ name = "cmdinput"
 version = "1.0.0"
 edition = "2021"
 description = "KeyFlux-CommandInput: KeyFlux command input window (class MyKeymap_Command_Input) rewritten in Rust. Drop-in replacement when deployed as KeyFlux-CommandInput.exe."
+# 非发布物（与 config-ui-reactor 同口径）：本 crate 只随 KeyFlux 分发、不单独上 crates.io。
+# 另：cargo-deny（报告 #8）对「非 private 且无 license」的根 crate 报 `unlicensed` ——
+# 置 private 后由 `[licenses] private = { ignore = true }` 豁免（其自身许可即仓库 GPL-3.0，
+# 不应进入「依赖允许清单」）。若将来要单独发布，请改回并补 license 字段 + 许可例外。
+publish = false
 
 [lib]
 name = "cmdinput"
