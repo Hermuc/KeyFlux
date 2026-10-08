@@ -32,7 +32,7 @@ class PluginManager {
       return false
     }
     this.Actions[pluginId ":" actionId] := fn
-    this._log("action registered: " pluginId ":" actionId)
+    ; 正常轨迹（注册成功）不落盘 —— 见 _log 的头注（2026-10-08 批 M-fix 决策）。
     return true
   }
 
@@ -89,7 +89,7 @@ class PluginManager {
       return false
     }
     this.Plugins[id] := Map("manifest", manifest, "enabled", true)
-    this._log("plugin registered: " id)
+    ; 正常轨迹（注册成功）不落盘 —— 见 _log 的头注（2026-10-08 批 M-fix 决策）。
     ; 阶段 6: 插件生命周期事件 (隔离兜底, 不影响注册结果)
     try EventBus.Publish("plugin_loaded", Map("pluginId", id))
     catch as e
@@ -123,7 +123,7 @@ class PluginManager {
       this._recordError(id, "entry '" fnName "' failed: " err.Message " @ " err.What " line " err.Line)
       return false
     }
-    this._log("plugin entry loaded: " id " (" fnName ")")
+    ; 正常轨迹（入口加载成功）不落盘 —— 见 _log 的头注（2026-10-08 批 M-fix 决策）。
     return true
   }
 
@@ -177,9 +177,14 @@ class PluginManager {
       EngineLogWarn("PluginManager._recordError", e.Message)
   }
 
-  ; 日志 (与 ActionRegistry._log 同策略)。2026-10-08 收敛: 委派引擎唯一留痕入口
-  ; (EngineLogWarn → logs\engine_error.log, 其内部自建目录并 try 包裹),
+  ; **错误/异常**留痕 (与 ActionRegistry._log 同策略)。2026-10-08 批 M 收敛: 委派引擎唯一
+  ; 留痕入口 (EngineLogWarn → logs\engine_error.log, 其内部自建目录并 try 包裹),
   ; 不再各自维护 sink 文件与 DirCreate。
+  ;
+  ; 🔴 批 M-fix (2026-10-08): 本函数**只服务失败路径**。此前它被复用于 3 处「正常轨迹」
+  ;    (action registered / plugin registered / plugin entry loaded) ⇒ 成功信息以 `[warn]`
+  ;    写进 `engine_error.log`, 稀释错误信号 (实测每次启动 +6 行)。已移除;
+  ;    正常轨迹**不落盘** —— 插件是否加载成功可由引擎可用性直接观察, 不需日志。
   static _log(msg) {
     EngineLogWarn("PluginManager", msg)
   }
