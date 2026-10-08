@@ -56,7 +56,7 @@ fn is_valid_method(method: &str) -> bool {
 pub fn run_call(args: &[String]) -> std::process::ExitCode {
     // Go: len(os.Args) < 5 —— 程序名 + Call + METHOD + PATH + out-file
     if args.len() < 5 {
-        eprintln!(
+        crate::devlog!(
             "Call requires: Call <METHOD> <PATH> <out-file> [--body <file>] [--content-type <ct>]"
         );
         return std::process::ExitCode::from(2);
@@ -75,7 +75,7 @@ pub fn run_call(args: &[String]) -> std::process::ExitCode {
                     match std::fs::read(&args[index + 1]) {
                         Ok(data) => body = data,
                         Err(error) => {
-                            eprintln!("Call: read body failed: {error}");
+                            crate::devlog!("Call: read body failed: {error}");
                             return std::process::ExitCode::from(2);
                         }
                     }
@@ -93,14 +93,14 @@ pub fn run_call(args: &[String]) -> std::process::ExitCode {
 
     // CallOnce：进程内执行一次（debug 恒 false —— 与生产 HTTP 路径一致）
     if !is_valid_method(method) {
-        eprintln!("Call: request failed: net/http: invalid method {method:?}");
+        crate::devlog!("Call: request failed: net/http: invalid method {method:?}");
         return std::process::ExitCode::from(2);
     }
     let ctx = ServerContext::new();
     let reply = dispatch(&ctx, method, path, &body, &content_type);
 
     if let Err(error) = std::fs::write(out_file, &reply.body) {
-        eprintln!("Call: write output failed: {error}");
+        crate::devlog!("Call: write output failed: {error}");
         return std::process::ExitCode::from(2);
     }
     println!("{CALL_STATUS_PREFIX}{}", reply.status);
