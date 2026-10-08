@@ -39,6 +39,8 @@ pub fn run() -> i32 {
     dpi::make_process_dpi_aware();
 
     // ② R2: CoInitializeEx(NULL, 6) = APARTMENTTHREADED | DISABLE_OLE1DDE; 失败不建窗
+    // SAFETY: CoInitializeEx 无指针入参，None = 默认并发模型（本线程初始化 STA）；
+    // 返回 HRESULT 已显式判错并走 R29 致命路径。
     unsafe {
         let hr = CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
         if hr.is_err() {
@@ -74,6 +76,7 @@ pub fn run() -> i32 {
         notify_target: HWND::default(), // 0x406 的 wParam (结果交互回推目标)
     });
 
+    // SAFETY: GetModuleHandleW(None) 取本进程主模块句柄，无指针入参；失败返回 Err 已处理。
     let hmodule: HMODULE = match unsafe { GetModuleHandleW(None) } {
         Ok(m) => m,
         Err(e) => error::fatal(
@@ -98,6 +101,8 @@ pub fn run() -> i32 {
         lpszMenuName: PCWSTR::null(),
         lpszClassName: PCWSTR::from_raw(class_name.as_ptr()),
     };
+    // SAFETY: `wc` 的指针字段（lpszClassName / lpfnWndProc / hCursor）都指向本函数内、
+    // 调用期间存活的实体；RegisterClassW 只读 `wc`，返回 0 已判为失败。
     let atom = unsafe { RegisterClassW(&wc) };
     if atom == 0 {
         error::fatal(file!(), line!(), "RegisterClassW failed", 0);
@@ -107,6 +112,9 @@ pub fn run() -> i32 {
     //    标题 = " "; CW_USEDEFAULT×4 (创建后 WM_CREATE 一次定位, R11); 初始隐藏
     let title = wide(config::WINDOW_TITLE);
     let ex_style = WINDOW_EX_STYLE(config::WS_EX_BASE | shell.backend.ex_style_additions());
+    // SAFETY: 类名 / 标题都是存活于本函数的 NUL 结尾宽字符串；lpParam 传入指向 `shell`
+    // 的裸指针，随后立即 `mem::forget(shell)` 使该分配与窗口同生命周期（进程常驻），
+    // WM_NCCREATE 依约取回同一指针 ⇒ 不存在悬垂。
     let hwnd = unsafe {
         CreateWindowExW(
             ex_style,
@@ -142,10 +150,13 @@ pub fn run() -> i32 {
     //     返回 0 (WM_QUIT) 退出; -1 (错误) 视为致命退出防死循环
     let mut msg = MSG::default();
     loop {
+        // SAFETY: `msg` 是本函数持有的可写 MSG，生命周期覆盖循环；hwnd=None + 过滤
+        // (0,0) = 取本线程全部消息。返回 0 表示 WM_QUIT（退出），非 0 即有效消息。
         let r = unsafe { GetMessageW(&mut msg, None, 0, 0) };
         if !r.as_bool() {
             break;
         }
+        // SAFETY: `msg` 已由上面的 GetMessageW 成功填充；两者只读它，不改所有权。
         unsafe {
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
@@ -156,6 +167,8 @@ pub fn run() -> i32 {
 
 /// R3: hCursor = 标准 IDC_ARROW。加载失败回落 NULL 光标 (不阻断建窗)。
 fn load_arrow_cursor() -> HCURSOR {
+    // SAFETY: LoadCursorW(None, IDC_ARROW) 取系统标准箭头光标，无指针入参；失败返回 Err，
+    // 已用 unwrap_or_default 回落到空句柄（不阻断建窗）。
     unsafe { LoadCursorW(None, IDC_ARROW).unwrap_or_default() }
 }
 

@@ -52,6 +52,8 @@ impl SoundBackend for WinmmSound {
         };
         let path = &self.files[idx];
         // 返回值不检查: PlaySound 失败本就静默 (SND_NODEFAULT), R24
+        // SAFETY: PlaySoundW 只读一个 NUL 结尾宽字符串（不保留指针）；`path` 在构造期
+        // 已保证末尾为 0（wide_path 链上 `once(0)`），且借用覆盖整个调用期间。
         unsafe {
             let _ = PlaySoundW(
                 windows::core::PCWSTR::from_raw(path.as_ptr()),

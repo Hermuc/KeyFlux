@@ -40,3 +40,13 @@ windows = { version = "=0.62.2", features = [
 [profile.release]
 strip = true
 lto = true
+
+# 与 config-ui-reactor 同口径的 clippy 门禁（2026-10-09）：本 crate 装着全部 Win32 unsafe
+# 并产出正式发布的 bin/KeyFlux-CommandInput.exe，此前**零闸门**。
+# 注：**不**设 `unsafe_code = "warn"` —— 本 crate 的职责就是封装 Win32，全部调用点都写
+#     `unsafe`，设 warn 等于对整库报错（config-ui-reactor 那样把 unsafe 收在叶层才适用）。
+#     unsafe 的正确性由每处的 `// SAFETY:` 注释负责，而非 lint 禁止。
+[lints.clippy]
+all = "warn"
+# pedantic 项：函数长度门禁，阈值 = 默认 100（与 config-ui-reactor 一致）。
+too_many_lines = "warn"

@@ -5,13 +5,22 @@
 为什么需要这个工具
 ------------------
 本仓库的 AHK 侧长期缺一把**可执行的尺子**：Rust 侧有 `cargo fmt` / `clippy`，
-而 44 个 `.ahk` 的风格与「失败是否留痕」只能靠人眼。2026-10-07/10-08 两轮审查
+而手写的 `.ahk`（引擎 + 插件 + 工具）的风格与「失败是否留痕」只能靠人眼。2026-10-07/10-08 两轮审查
 各自"人工整理"过一批（空 catch、BOM、NUL 字节），但**没有护栏** ⇒ 整理完就会回退。
 
 本脚本把若干事实变成计数 + `文件:行`，并用 `--write-baseline` 把当前值冻结成基线：
 后续任何改动只要让某类计数**变差**（高于基线）即 exit 1。
 判据不是「绝对零」而是「不高于基线」—— 存量债分批偿还（批 L/M/N/O），每批只能往下压。
 基线文件：`tools/lint_ahk_style.baseline.json`。
+
+扫描范围
+--------
+* **文本形态**（`bom_files` / `crlf_files` / `tab_indent_files` / `spelling_drift`）：
+  `bin/lib` + `bin` 顶层 + `plugins` + `tools` 顶层 —— 与 `.gitattributes` 声明 `eol=lf`
+  的四类**逐一对应**（那些声明的存在理由就是本护栏；此前只扫 `bin/lib`，其余三类的
+  声明形同虚设，2026-10-09 补齐）。生成物 `bin/KeyFlux.ahk` 与 parity 冻结基线**排除**。
+* **静默失败面**（`try_no_catch` / `catch_no_trace`）与 `log_sinks`：**仅引擎核心 `bin/lib`**
+  —— 插件/工具是独立层次，其 best-effort `try` 语义与引擎不同，纳入只会引入无关噪声。
 
 检查项
 ------
@@ -55,6 +64,7 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import io
 import json
 import os
@@ -65,12 +75,25 @@ for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
-AHK_ROOT = os.path.join("bin", "lib")
+ENGINE_ROOT = "bin/lib"
 BASELINE = os.path.join("tools", "lint_ahk_style.baseline.json")
+
+# 文本形态检查（bom / crlf / tab / spelling）的 scope —— 与 `.gitattributes` 里声明
+# `eol=lf` 的四类**逐一对应**：那些声明的存在理由就是这个护栏，而此前它只扫 bin/lib
+# ⇒ 另外三类的声明实际上无人检查（2026-10-09 补齐，消除"承诺了却没执行"的守卫）。
+# 键一律用**仓库相对路径**。
+TEXT_DIR_SCOPES = ("bin/lib", "plugins")           # 递归
+TEXT_FILE_SCOPES = ("bin/*.ahk", "tools/*.ahk")     # 仅顶层（避免扫到 parity 冻结基线）
+# 生成物（不入库、按设计 CRLF）与 parity reference 不参与文本形态检查。
+TEXT_EXCLUDE = {"bin/KeyFlux.ahk"}
+
+# 静默失败面（try/catch）与日志 sink 只对**引擎核心**求值 —— 插件/工具是独立层次，
+# 其 best-effort try 语义与引擎不同（见文件头注「检查项」）。
+ENGINE_PREFIX = "bin/lib/"
 
 # vendored 上游库：缩进用 tab（上游原样）。改它 = 破坏 vendor 差异基线
 # （先例见 vendor/windows-reactor/PATCHES.md）。
-VENDORED = {"core/Monitor.ahk"}
+VENDORED = {"bin/lib/core/Monitor.ahk"}
 
 # 「同概念拼写分裂」：键 = 应归零的误拼，值 = 正解（仅用于提示）。
 # 首版把 `Casp` 当规范、只查 `Cpas`；实测**两者都是错**——`Caps`(CapsLock 命令框) 的
@@ -88,17 +111,18 @@ TRACE_CALLS = ("EngineLogWarn(", "EngineOnError(", "LogError(", "_log(", "_recor
 #   ② 上一轮审查**已裁定接受**的「有解释的刻意不记」（理由写在 catch 内的注释里）——
 #      本表只是把那个裁定编码化，避免下一轮把它当新问题重新"修"一遍。
 EXEMPT_FUNCS = {
-    ("core/Functions.ahk", "EngineOnError"): "日志设施自身：兜底函数内不能再调日志",
-    ("core/Functions.ahk", "EngineLogWarn"): "日志设施自身：递归风险",
-    ("core/Functions.ahk", "KeyFluxExit"): "进程退出路径：日志设施可能已不可用",
-    ("core/WindowUtils.ahk", "TryTrayRestoreByNav"):
+    ("bin/lib/core/Functions.ahk", "EngineOnError"): "日志设施自身：兜底函数内不能再调日志",
+    ("bin/lib/core/Functions.ahk", "EngineLogWarn"): "日志设施自身：递归风险",
+    ("bin/lib/core/Functions.ahk", "KeyFluxExit"): "进程退出路径：日志设施可能已不可用",
+    ("bin/lib/core/WindowUtils.ahk", "TryTrayRestoreByNav"):
         "pwsh→powershell 降级；回退仍失败会抛出并由 EngineOnError 统一记录 ⇒ 不重复记"
         "（2026-10-07 审查裁定：把「不记」的理由写进代码，见该处 catch 内注释）",
 }
 
-# 解析器自检下限：bin/lib 实测 44 个 .ahk。低于此值 = 扫描器退化，必须报错
-# 而不是"安静地少算"（本项目对解析器的硬要求：静默退化 = 假绿）。
-MIN_EXPECTED_FILES = 40
+# 解析器自检下限：文本形态 scope（bin/lib 44 + bin 顶层 6 + plugins 17 + tools 3 = 70）
+# 实测 70 个 .ahk。低于此值 = 扫描器退化，必须报错而不是"安静地少算"
+# （本项目对解析器的硬要求：静默退化 = 假绿）。
+MIN_EXPECTED_FILES = 65
 
 FUNC_DEF = re.compile(r"^\s*(?:static\s+)?([A-Za-z_]\w*)\s*\([^)]*\)\s*\{\s*$")
 
@@ -280,7 +304,7 @@ def function_spans(codes):
 
 # ---------------------------------------------------------------- 扫描
 
-def scan_file(path: str, rel: str, f: dict, verbose: bool):
+def scan_file(path: str, rel: str, f: dict, verbose: bool, is_engine: bool):
     raw = read_bytes(path)
     if raw.startswith(b"\xef\xbb\xbf"):
         f["bom_files"].append(rel)
@@ -292,6 +316,10 @@ def scan_file(path: str, rel: str, f: dict, verbose: bool):
 
     if rel not in VENDORED and any(ln.startswith("\t") for ln in lines if ln.strip()):
         f["tab_indent_files"].append(rel)
+
+    # 以下两项只对引擎核心（bin/lib）求值；插件/工具脚本是独立层次（见常量区注释）。
+    if not is_engine:
+        return
 
     for idx, seg in enumerate(codes, 1):
         if "FileAppend(" in seg and '"logs\\' in seg:
@@ -337,14 +365,29 @@ def scan_naming(files: dict, f: dict, verbose: bool):
             print("  [spelling] %r (应为 %r): %s" % (wrong, canon, ", ".join(hits[:8])))
 
 
-def scan(repo: str, verbose: bool) -> dict:
-    root = os.path.join(repo, AHK_ROOT)
+def discover(repo: str) -> dict:
+    """文本形态 scope 下的全部 .ahk（键 = 仓库相对路径）。"""
     files = {}
-    for dirpath, _dirs, names in os.walk(root):
-        for name in sorted(names):
-            if name.endswith(".ahk"):
-                full = os.path.join(dirpath, name)
-                files[os.path.relpath(full, root).replace(os.sep, "/")] = full
+
+    def add(full: str):
+        rel = os.path.relpath(full, repo).replace(os.sep, "/")
+        if rel in TEXT_EXCLUDE:
+            return
+        files[rel] = full
+
+    for scope in TEXT_DIR_SCOPES:
+        for dirpath, _dirs, names in os.walk(os.path.join(repo, scope)):
+            for name in sorted(names):
+                if name.endswith(".ahk"):
+                    add(os.path.join(dirpath, name))
+    for pattern in TEXT_FILE_SCOPES:
+        for full in sorted(glob.glob(os.path.join(repo, pattern))):
+            add(full)
+    return files
+
+
+def scan(repo: str, verbose: bool) -> dict:
+    files = discover(repo)
 
     f = {
         "try_no_catch": [], "catch_no_trace": [], "try_exempt": [],
@@ -353,7 +396,7 @@ def scan(repo: str, verbose: bool) -> dict:
         "_exempt_hits": set(),
     }
     for rel, path in sorted(files.items()):
-        scan_file(path, rel, f, verbose)
+        scan_file(path, rel, f, verbose, rel.startswith(ENGINE_PREFIX))
     scan_naming(files, f, verbose)
     return f
 
@@ -387,8 +430,8 @@ def main() -> int:
     args = ap.parse_args()
 
     repo = os.path.abspath(args.repo)
-    if not os.path.isdir(os.path.join(repo, AHK_ROOT)):
-        print("[FAIL] 找不到 %s（--repo 指错了？）" % AHK_ROOT)
+    if not os.path.isdir(os.path.join(repo, ENGINE_ROOT)):
+        print("[FAIL] 找不到 %s（--repo 指错了？）" % ENGINE_ROOT)
         return 2
 
     f = scan(repo, args.verbose)
@@ -407,7 +450,9 @@ def main() -> int:
               % (cur["files_scanned"], MIN_EXPECTED_FILES))
         return 2
 
-    print("AHK 风格/静默失败扫描（%s）：" % AHK_ROOT)
+    print("AHK 风格/静默失败扫描：")
+    print("  文本形态 scope       %s" % ", ".join(TEXT_DIR_SCOPES + TEXT_FILE_SCOPES))
+    print("  静默失败/日志 scope  %s  (仅引擎核心)" % ENGINE_ROOT)
     print("  文件数               %3d" % cur["files_scanned"])
     print("  try 无 catch/finally %3d" % cur["try_no_catch"])
     print("  catch 无留痕         %3d" % cur["catch_no_trace"])

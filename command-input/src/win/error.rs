@@ -18,6 +18,8 @@ pub fn fatal(file: &str, line: u32, message: &str, hresult: u32) -> ! {
     );
     let text_w = wide(&text);
     let caption_w = wide("KeyFlux-CommandInput");
+    // SAFETY: 两个文本入参都是 `wide()` 产出的 NUL 结尾 UTF-16 缓冲，且在本调用期间
+    // 存活；MessageBoxW 只读它们。hwnd = None（无属主窗口）是合法用法。
     unsafe {
         MessageBoxW(
             None,

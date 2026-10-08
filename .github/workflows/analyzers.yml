@@ -31,10 +31,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Rust/WinUI3 客户端 (config-ui-reactor) 三道闸门。
+  # 两个 Rust crate (config-ui-reactor + command-input) 三道闸门。
   # 说明: build.rs 的 windows_reactor_setup 在构建期会拉取 pinned Windows App Runtime
   #   (NuGet 缓存), GitHub 托管机自带网络与 MSVC, 无需额外准备。
-  #   cargo-gates.ps1 自己切到 config-ui-reactor 目录, 故不需要 defaults.working-directory。
+  #   cargo-gates.ps1 自己切到 -Project 指定的 crate 目录, 故不需要 defaults.working-directory。
   #   刻意**不传** -EnvScript: config-ui-reactor/env.ps1 钉的是本机的 MSVC/SDK 路径,
   #   在 runner 上找不到会直接 throw (runner 的 cargo/rustc 本来就在 PATH 上)。
   reactor-gates:
@@ -44,7 +44,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Rust toolchain (version pinned by rust-toolchain.toml)
+      - name: Setup Rust toolchain (channel = stable, per rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -56,11 +56,19 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             config-ui-reactor/target
-          key: cargo-${{ runner.os }}-${{ hashFiles('config-ui-reactor/Cargo.lock') }}
+            command-input/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('config-ui-reactor/Cargo.lock', 'command-input/Cargo.lock') }}
 
-      - name: 'Cargo gates (fmt + clippy + test) -- single source: tools/cargo-gates.ps1'
+      - name: 'Cargo gates (fmt + clippy + test) -- config-ui-reactor (single source: tools/cargo-gates.ps1)'
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1
+
+      # command-input 此前**零闸门**（cargo-gates 硬编码 config-ui-reactor）：它装着全部
+      # Win32 unsafe 并产出正式发布的 bin/KeyFlux-CommandInput.exe，却从不被 fmt/clippy 检查
+      # （2026-10-09 补齐）。同一脚本、同一序列，仅换 -Project。
+      - name: 'Cargo gates (fmt + clippy + test) -- command-input (same single source)'
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Project command-input
 
   # 标识符冲突静态闸门 = `make lint`。
   #   AHK 大小写不敏感, 「局部变量遮蔽同名函数」是纯运行时崩溃, /Validate 查不出;
@@ -98,7 +106,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Rust toolchain (version pinned by rust-toolchain.toml)
+      - name: Setup Rust toolchain (channel = stable, per rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -146,7 +154,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Rust toolchain (version pinned by rust-toolchain.toml)
+      - name: Setup Rust toolchain (channel = stable, per rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy

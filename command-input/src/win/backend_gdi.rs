@@ -100,9 +100,12 @@ struct Dib {
 impl Dib {
     fn new(w: i32, h: i32) -> Result<Dib, BackendError> {
         // 屏幕 DC 只作创建参数 (格式/色板用), 用完立即释放 (否则每次 resize 漏一个 DC)
+        // SAFETY: GetDC(None) 请求整个屏幕的 DC, 无窗口句柄前置条件。
         let screen = unsafe { GetDC(None) };
+        // SAFETY: screen 是上一行取得且尚未释放的合法屏幕 DC。
         let dc = unsafe { CreateCompatibleDC(Some(screen)) };
         if dc.0.is_null() {
+            // SAFETY: screen 与 GetDC(None) 配对 (NULL 窗口); 此处提前释放避免泄漏。
             unsafe {
                 let _ = ReleaseDC(None, screen);
             }
@@ -127,19 +130,23 @@ impl Dib {
         };
         let mut bits: *mut core::ffi::c_void = core::ptr::null_mut();
         let bmp =
+            // SAFETY: screen 有效; &info/&mut bits 均为本地变量, 生命周期覆盖调用; DIB_RGB_COLORS 与 32bpp 匹配。
             unsafe { CreateDIBSection(Some(screen), &info, DIB_RGB_COLORS, &mut bits, None, 0) }
                 .map_err(|e| {
                     BackendError::with_hresult("CreateDIBSection failed", e.code().0 as u32)
                 })?;
+        // SAFETY: screen 与 GetDC(None) 配对, 此处用完最后释放一次。
         unsafe {
             let _ = ReleaseDC(None, screen);
         }
         if bits.is_null() {
+            // SAFETY: dc 由本次 CreateCompatibleDC 成功创建且非空, 只在此销毁一次。
             unsafe {
                 let _ = DeleteDC(dc);
             }
             return Err(BackendError::new("CreateDIBSection returned null bits"));
         }
+        // SAFETY: dc 与 bmp 均为本函数新建的有效 GDI 对象; 返回值是被替换的旧位图对象。
         let old = unsafe { SelectObject(dc, HGDIOBJ(bmp.0)) };
         Ok(Dib {
             dc,
@@ -152,15 +159,18 @@ impl Dib {
 
     /// 供合成器读写的字节切片 (调用前必须先 `flush`, GDI 批次未必已落到位内存)。
     fn bytes_mut(&mut self) -> &mut [u8] {
+        // SAFETY: bits 指向 CreateDIBSection 分配的面, len = w*h*4 即其字节数; &mut self 保证独占。
         unsafe { core::slice::from_raw_parts_mut(self.bits, self.len) }
     }
 
     /// 只读字节切片 (合成器从内容面读、写呈现面时用; 同样先 `flush`)。
     fn bytes(&self) -> &[u8] {
+        // SAFETY: 同 bytes_mut: bits 指向存活的内容面, len 为其实际字节数; &self 不改写。
         unsafe { core::slice::from_raw_parts(self.bits, self.len) }
     }
 
     fn flush(&self) {
+        // SAFETY: GdiFlush 无参数, 刷新当前线程 GDI 批次, 无前置条件。
         unsafe {
             let _ = GdiFlush();
         }
@@ -169,6 +179,7 @@ impl Dib {
 
 impl Drop for Dib {
     fn drop(&mut self) {
+        // SAFETY: dc/bmp 由构造保证有效且本结构独占; old 是创建时被替换的原始对象; 三者仅在此释放一次。
         unsafe {
             SelectObject(self.dc, self.old);
             let _ = DeleteObject(HGDIOBJ(self.bmp.0));
@@ -199,6 +210,7 @@ struct Resources {
 
 impl Drop for Resources {
     fn drop(&mut self) {
+        // SAFETY: 列表中全部句柄由 create_resources 创建并被本结构独占, 仅在此 delete 一次。
         unsafe {
             for h in [
                 HGDIOBJ(self.font.0),
@@ -259,12 +271,14 @@ impl GdiBackend {
     /// 白框圆角区域 (窗口坐标; GDI 绘制裁剪用 —— 框外带留给阴影)。
     fn frame_region(w: i32, h: i32, inset: i32, radius: f64) -> HRGN {
         let rr = (radius.round() as i32).max(0);
+        // SAFETY: CreateRoundRectRgn 只接受坐标/半径整型参数, 返回的新区域由调用方接管。
         unsafe { CreateRoundRectRgn(inset, inset, w - inset, h - inset, 2 * rr, 2 * rr) }
     }
 
     /// 命中测试区域 = 白框 + 框外阴影带 (区域同时约束合成与命中: 不扩展就把阴影裁掉)。
     fn hit_region(w: i32, h: i32, inset: i32, radius: f64, ext: i32) -> HRGN {
         let rr = (radius.round() as i32).max(0) + ext;
+        // SAFETY: 同上; 坐标已 clamp 到非负, 半径 rr ≥ 0, 无非法参数。
         unsafe {
             CreateRoundRectRgn(
                 (inset - ext).max(0),
@@ -325,6 +339,7 @@ impl GdiBackend {
         let font_ttf = resources::font_file(&exe_dir);
         let path_w = super::wide(&font_ttf.display().to_string());
         let loaded =
+            // SAFETY: path_w 是 super::wide 生成的 NUL 结尾 UTF-16 且存活至调用结束; FR_PRIVATE 仅本进程可见。
             unsafe { AddFontResourceExW(PCWSTR::from_raw(path_w.as_ptr()), FR_PRIVATE, None) };
         if loaded == 0 {
             // R29: 字体缺失 = 渲染初始化失败 → 弹窗终止 (不静默错渲染; 音效/皮肤才降级)
@@ -335,10 +350,12 @@ impl GdiBackend {
         }
         let bold_ttf = resources::font_bold_file(&exe_dir);
         let bold_w = super::wide(&bold_ttf.display().to_string());
+        // SAFETY: bold_w 同上为 NUL 结尾 UTF-16 且在本语句内存活; 失败仅降级为无粗体面。
         unsafe { AddFontResourceExW(PCWSTR::from_raw(bold_w.as_ptr()), FR_PRIVATE, None) }; // 真粗体面 best effort
 
         let face = super::wide(config::FONT_FAMILY);
         let make_font = |height_px: i32, weight: i32| -> Result<HFONT, BackendError> {
+            // SAFETY: face 是 NUL 结尾 UTF-16 (闭包捕获, 生命周期覆盖调用); 其余参数均为整型字面量。
             let f = unsafe {
                 CreateFontW(
                     -height_px,
@@ -374,6 +391,7 @@ impl GdiBackend {
         let grid = skin::grid_content_color(s);
 
         let brush = |c: Rgb| -> Result<HBRUSH, BackendError> {
+            // SAFETY: CreateSolidBrush 只接受 COLORREF 值, 无指针前置条件。
             let b = unsafe { CreateSolidBrush(COLORREF(c.as_colorref())) };
             if b.0.is_null() {
                 Err(BackendError::new("CreateSolidBrush failed"))
@@ -438,6 +456,7 @@ impl GdiBackend {
         // 显式给出目标矩形 (与窗口当前矩形同值): 实测 NULL/NULL 组合在本机不产生可见像素,
         // 与隔离探针 (ulw_probe.py, pptdst/psize 都显式传) 的唯一差别就是这里。
         let mut wr = RECT::default();
+        // SAFETY: self.hwnd 由 init 存入的合法窗口句柄; &mut wr 是本地 RECT, 生命周期覆盖调用。
         unsafe {
             let _ = GetWindowRect(self.hwnd, &mut wr);
         }
@@ -449,6 +468,7 @@ impl GdiBackend {
             cx: wr.right - wr.left,
             cy: wr.bottom - wr.top,
         };
+        // SAFETY: self.hwnd 有效且已置 WS_EX_LAYERED; dst/size/pptSrc/blend 均指向本地值且存活至调用; res.layer.dc 是有效的 DIB 呈现面。
         let r = unsafe {
             UpdateLayeredWindow(
                 self.hwnd,
@@ -502,84 +522,23 @@ impl GdiBackend {
         if let Some(res) = self.res.as_mut() {
             res.plan = Self::build_plan(state);
         }
+        let Some(res) = self.res.as_ref() else {
+            return Err(BackendError::new("GDI backend not initialized"));
+        };
+        let hdc = res.content.dc;
+        // 白框矩形 = 后续各步骤共用的几何基准
+        let frame = RECT {
+            left: inset,
+            top: inset,
+            right: (state.width_px - inset).max(inset),
+            bottom: (state.height_px - inset).max(inset),
+        };
+
+        // SAFETY: hdc 取自 res.content.dc (有效的 DIB 兼容 DC, 由 Dib 独占); 刷/区域/字体均
+        // 来自同一 res 且生命周期覆盖; RECT 局部构造。
         unsafe {
-            let hdc = {
-                let Some(res) = self.res.as_ref() else {
-                    return Err(BackendError::new("GDI backend not initialized"));
-                };
-                res.content.dc
-            };
-            // 1) 全客户区先铺**阴影色** (框外带的底色 = 阴影色; 合成器按阴影 alpha 预乘后,
-            //    带内只剩黑 + alpha ⇒ 桌面被压暗 = 阴影)
-            {
-                let Some(res) = self.res.as_ref() else {
-                    return Err(BackendError::new("GDI backend not initialized"));
-                };
-                let whole = RECT {
-                    left: 0,
-                    top: 0,
-                    right: state.width_px,
-                    bottom: state.height_px,
-                };
-                FillRect(hdc, &whole, res.shadow_brush);
-            }
-
-            // 裁剪到白框圆角区域 (GDI 只画框内; 框外带留给解析式阴影)
-            {
-                let Some(res) = self.res.as_ref() else {
-                    return Err(BackendError::new("GDI backend not initialized"));
-                };
-                SelectClipRgn(hdc, Some(res.clip));
-            }
-
-            // 2) 白框矩形填 backgroundColor (净观感由 compose 的 fill_alpha 决定)
-            let frame = RECT {
-                left: inset,
-                top: inset,
-                right: (state.width_px - inset).max(inset),
-                bottom: (state.height_px - inset).max(inset),
-            };
-            {
-                let Some(res) = self.res.as_ref() else {
-                    return Err(BackendError::new("GDI backend not initialized"));
-                };
-                FillRect(hdc, &frame, res.bg_brush);
-            }
-            // 3) 白边不再由 GDI 画: 它必须是**不透明**色带 (borderOpacity), 而 GDI 画不出
-            //    逐像素 alpha —— 由 compose 按几何解析式生成 (含 AA 内外沿)。
-
-            // 4) 网格 (R28): 横竖双向 1px, 首线偏移 = 间距−1。只覆盖**查询区**。
-            let fw = frame.right - frame.left;
-            let qh = (query_bottom - frame.top).max(0);
-            let step = geometry::grid_step_px(dpi);
-            let off = geometry::grid_first_offset(step);
-            {
-                let Some(res) = self.res.as_ref() else {
-                    return Err(BackendError::new("GDI backend not initialized"));
-                };
-                let mut x = off;
-                while x < fw - 2 {
-                    let line = RECT {
-                        left: frame.left + x,
-                        top: frame.top + 2,
-                        right: frame.left + x + 1,
-                        bottom: frame.top + 2 + (qh - 4).max(0),
-                    };
-                    FillRect(hdc, &line, res.grid_brush);
-                    x += step;
-                }
-                let mut y = off;
-                while y < qh - 2 {
-                    let line = RECT {
-                        left: frame.left + 2,
-                        top: frame.top + y,
-                        right: frame.left + 2 + (fw - 4),
-                        bottom: frame.top + y + 1,
-                    };
-                    FillRect(hdc, &line, res.grid_brush);
-                    y += step;
-                }
-            }
+            self.fill_frame(hdc, state, res, &frame); // 1)+2) 阴影底 → 裁剪 → 白框底
+            self.draw_grid(hdc, res, &frame, query_bottom, dpi); // 4) 查询区网格 (R28)
 
             // 5) 查询文字 (R23 + 原版排版活体定案): 显示层大写化 + 逐字形固定步距布局。
             let query_rect = RECT {
@@ -588,12 +547,7 @@ impl GdiBackend {
                 right: frame.right,
                 bottom: query_bottom.max(frame.top),
             };
-            {
-                let Some(res) = self.res.as_ref() else {
-                    return Err(BackendError::new("GDI backend not initialized"));
-                };
-                self.draw_query_text(hdc, state, res, &query_rect);
-            }
+            self.draw_query_text(hdc, state, res, &query_rect);
 
             // 6) 结果列表面板 (0x406 推进来的行; 空表时整段不绘制 ⇒ 无列表 = 基准观感)
             if !state.results.is_empty() {
@@ -604,15 +558,7 @@ impl GdiBackend {
                     right: frame.right,
                     bottom: query_bottom + sep,
                 };
-                {
-                    let Some(res) = self.res.as_ref() else {
-                        return Err(BackendError::new("GDI backend not initialized"));
-                    };
-                    FillRect(hdc, &line, res.sep_brush);
-                }
-                let Some(res) = self.res.as_ref() else {
-                    return Err(BackendError::new("GDI backend not initialized"));
-                };
+                FillRect(hdc, &line, res.sep_brush);
                 self.draw_results(hdc, state, res, inset, query_bottom + sep);
             }
 
@@ -625,11 +571,65 @@ impl GdiBackend {
         self.content_valid = true;
 
         if validate {
+            // SAFETY: self.hwnd 有效; 矩形 None 表示整客户区, 无指针参数。
             unsafe {
                 let _ = ValidateRect(Some(self.hwnd), None); // R23: 处理尾 ValidateRect
             }
         }
         Ok(())
+    }
+
+    /// 步骤 1+2: 全客户区先铺**阴影色** (框外带的底色 = 阴影色; 合成器按阴影 alpha 预乘后,
+    /// 带内只剩黑 + alpha ⇒ 桌面被压暗 = 阴影) → 裁剪到白框圆角区 (GDI 只画框内) →
+    /// 白框矩形填 backgroundColor (净观感由 compose 的 fill_alpha 决定)。
+    /// 注: 白边**不**在此画 —— 它必须是**不透明**色带 (borderOpacity), 而 GDI 画不出逐像素
+    /// alpha, 由 compose 按几何解析式生成 (含 AA 内外沿)。
+    fn fill_frame(&self, hdc: HDC, state: &FrameState, res: &Resources, frame: &RECT) {
+        // SAFETY: hdc 是调用方保证有效的 DIB DC; 刷/区域来自 res 且在调用期间存活; whole 局部构造。
+        unsafe {
+            let whole = RECT {
+                left: 0,
+                top: 0,
+                right: state.width_px,
+                bottom: state.height_px,
+            };
+            FillRect(hdc, &whole, res.shadow_brush);
+            SelectClipRgn(hdc, Some(res.clip));
+            FillRect(hdc, frame, res.bg_brush);
+        }
+    }
+
+    /// 步骤 4 (R28): 查询区网格 —— 横竖双向 1px, 首线偏移 = 间距−1, 只覆盖查询区。
+    fn draw_grid(&self, hdc: HDC, res: &Resources, frame: &RECT, query_bottom: i32, dpi: f64) {
+        let fw = frame.right - frame.left;
+        let qh = (query_bottom - frame.top).max(0);
+        let step = geometry::grid_step_px(dpi);
+        let off = geometry::grid_first_offset(step);
+        // SAFETY: hdc 有效; res.grid_brush 来自 res 且存活; line 逐次局部构造。
+        unsafe {
+            let mut x = off;
+            while x < fw - 2 {
+                let line = RECT {
+                    left: frame.left + x,
+                    top: frame.top + 2,
+                    right: frame.left + x + 1,
+                    bottom: frame.top + 2 + (qh - 4).max(0),
+                };
+                FillRect(hdc, &line, res.grid_brush);
+                x += step;
+            }
+            let mut y = off;
+            while y < qh - 2 {
+                let line = RECT {
+                    left: frame.left + 2,
+                    top: frame.top + y,
+                    right: frame.left + 2 + (fw - 4),
+                    bottom: frame.top + y + 1,
+                };
+                FillRect(hdc, &line, res.grid_brush);
+                y += step;
+            }
+        }
     }
 
     /// 查询区文字: 显示层大写化 + 逐字形固定步距 (pitch = 4×网格步距 DIP) 水平居中于
@@ -640,6 +640,7 @@ impl GdiBackend {
             return;
         }
         let fw = rect.right - rect.left;
+        // SAFETY: hdc 为调用方传入的有效 DIB DC; res.font 有效; units 为本地 Vec, CharUpperW 前已 push(0) 保证 NUL 结尾且独占可变; 退出前还原字体。
         unsafe {
             let old = SelectObject(hdc, HGDIOBJ(res.font.0));
             SetBkMode(hdc, TRANSPARENT);
@@ -698,6 +699,7 @@ impl GdiBackend {
         list_top: i32,
     ) {
         let lay = ListLayout::of(state, inset, list_top);
+        // SAFETY: hdc/res 由调用方保证有效; 字体在块内选入并在退出前还原; 被调的 paint_result_row 前置同已满足。
         unsafe {
             let old_font = SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
             SetBkMode(hdc, TRANSPARENT);
@@ -738,6 +740,7 @@ impl GdiBackend {
         let (start, end) = state.results.window();
         // 条带几何 (窗口坐标): 行条带 + 滚动条列 (行重画会擦掉与行重叠的滑块段)
         let mut strips: Vec<(i32, i32, i32, i32)> = Vec::with_capacity(rows.len() + 1);
+        // SAFETY: res.content.dc 是有效的 DIB DC 且由 Dib 独占; 刷/字体取自 res; RECT 局部构造; 退出前还原字体。
         unsafe {
             let hdc = res.content.dc;
             let old_font = SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
@@ -802,6 +805,7 @@ impl GdiBackend {
         }
         let total = state.results.len();
         let vis = state.results.visible_rows();
+        // SAFETY: hdc 由调用方传入有效; bar 为本地 RECT; res.scroll_brush 有效。
         unsafe {
             let track_top = lay.list_top + 4;
             let track_bot = (state.height_px - lay.inset - 4).max(track_top + 1);
@@ -824,6 +828,7 @@ impl GdiBackend {
 
     /// 单行内容 (draw_results / repaint_rows 共用): 选中底 + 强调条 + 图标 +
     /// 标题/副标题双行 (或无路径时的单行提示)。调用方保证字体/文字色已选入。
+    // SAFETY: 调用方须传入有效的 DIB DC (hdc) 与有效的 res 资源集合, 且已按契约选入标题/副标题字体与文字色; 本函数只绘制, 不获取/释放句柄。
     unsafe fn paint_result_row(
         &self,
         hdc: HDC,
@@ -998,6 +1003,7 @@ impl RenderBackend for GdiBackend {
 
         // 🔴 不再调用 SetLayeredWindowAttributes: 一旦用过它, UpdateLayeredWindow 会失效
         //    (两者互斥), 而逐像素 alpha 正是本次样式还原的机制前提。
+        // SAFETY: self.hwnd 为刚存入的有效窗口句柄; policy/margins 为本地值, 指针与长度取自同一结构。
         unsafe {
             // DWM 阴影钩子 (R28, 参考实现同款; 逐像素自合成窗上大概率无效, 零成本保留)
             if let Ok(enabled) = DwmIsCompositionEnabled() {
@@ -1072,6 +1078,7 @@ impl RenderBackend for GdiBackend {
             );
             if !new.0.is_null() {
                 if !old.0.is_null() {
+                    // SAFETY: old 是本结构持有的旧区域句柄, 已被 new 取代, 只在此删除一次。
                     unsafe {
                         let _ = DeleteObject(HGDIOBJ(old.0));
                     }
@@ -1114,6 +1121,7 @@ impl RenderBackend for GdiBackend {
                 }
                 let g = from * (1.0 - accelerate_decelerate(t));
                 self.blit_gain(g);
+                // SAFETY: Sleep 只接受毫秒整型, 无线程/指针前置条件。
                 unsafe {
                     Sleep(16);
                 }
@@ -1150,6 +1158,7 @@ impl GdiBackend {
         let inset = plan.frame.l.round() as i32;
         let rgn = Self::hit_region(plan.w, plan.h, inset, plan.frame.radius, ext);
         if !rgn.0.is_null() {
+            // SAFETY: self.hwnd 有效; rgn 由 hit_region 新建且已判非空, 所有权移交系统。
             unsafe {
                 let _ = SetWindowRgn(self.hwnd, Some(rgn), true);
             }

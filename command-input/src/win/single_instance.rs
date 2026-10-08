@@ -17,6 +17,9 @@ use crate::win::wide;
 
 /// 启动即调用。互斥句柄有意泄漏 (释放即失互斥, 进程生命周期 = 互斥生命周期)。
 pub fn acquire_and_notify() {
+    // SAFETY: 指涉字符串的入参都指向本函数内、调用期间存活的 NUL 结尾宽字符串
+    // （wide()）；其余入参是按值传递的 Win32 标量。互斥句柄有意不关闭
+    // （进程生命周期持有，见函数文档），故不存在句柄泄漏以外的未定义行为。
     unsafe {
         let name = wide(config::MUTEX_NAME);
         let mutex = CreateMutexW(None, true, PCWSTR::from_raw(name.as_ptr()));

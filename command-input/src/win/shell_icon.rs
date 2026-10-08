@@ -51,6 +51,8 @@ impl IconCache {
         if map.len() >= CACHE_CAP {
             // 先清空 (归还全部旧图标) 再插入 —— 新图标尚未入表, 不受影响
             for (_, old) in map.drain() {
+                // SAFETY: `old` 来自本缓存（extract 成功返回的 HICON），drain 已把所有权
+                // 移出 map ⇒ 每个图标只在此销毁一次，不会双重释放。
                 unsafe {
                     let _ = DestroyIcon(old);
                 }
@@ -63,6 +65,7 @@ impl IconCache {
     /// 清空缓存并归还全部图标。
     pub fn clear(&self) {
         for (_, h) in self.map.borrow_mut().drain() {
+            // SAFETY: 同 get：drain 把所有权移出 map，每个 HICON 只销毁一次。
             unsafe {
                 let _ = DestroyIcon(h);
             }
@@ -75,6 +78,9 @@ impl IconCache {
         }
         // NUL 结尾 UTF-16 (SHGetFileInfoW 不接受长度参数)
         let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+        // SAFETY: `wide` 是 NUL 结尾 UTF-16 缓冲且在本调用期间存活；两个 SHFILEINFOW 均为
+        // 本地零初始化结构、大小按 size_of 如实传入；SHGetFileInfoW 只写它们，成功时返回
+        // 的 HICON 交由调用方 DestroyIcon（本模块的归还纪律）。
         unsafe {
             let mut fi = SHFILEINFOW::default();
             let ok = SHGetFileInfoW(

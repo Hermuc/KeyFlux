@@ -1,4 +1,4 @@
-# Cargo gate runner for config-ui-reactor -- the ONE place the "fmt / clippy / test"
+# Cargo gate runner for the repo's Rust crates -- the ONE place the "fmt / clippy / test"
 # (optionally + release build) sequence is defined.
 #
 # WHY THIS EXISTS:
@@ -9,12 +9,17 @@
 #   Gates that exist five times drift apart: the copy nobody updates keeps reporting
 #   green. This script is the single source of truth; every caller invokes it.
 #
+# -Project (default config-ui-reactor): which crate to gate. command-input (the Win32
+#   command-input window, shipped as bin/KeyFlux-CommandInput.exe) was long ungated in
+#   CI, so both crates now go through this same sequence (2026-10-09).
+#
 # USAGE (invoke as a script, NOT dot-sourced -- it calls exit):
 #   pwsh -File tools/cargo-gates.ps1                     # fmt + clippy + test
 #   pwsh -File tools/cargo-gates.ps1 -NoTest             # style gates only (make analyzers)
 #   pwsh -File tools/cargo-gates.ps1 -Release            # + cargo build --release
 #   pwsh -File tools/cargo-gates.ps1 -Release -Version 1.0-beta1 `
 #        -EnvScript config-ui-reactor/env.ps1
+#   pwsh -File tools/cargo-gates.ps1 -Project command-input   # gate the 2nd crate
 #
 # -EnvScript (local builds): dot-sourced first so cargo/rustc/link.exe resolve. CI
 #   runners have the toolchain on PATH already and MUST NOT pass it (env.ps1 pins this
@@ -40,7 +45,9 @@ param(
   # Optional KEYFLUX_VERSION to inject into the release build.
   [string]$Version = '',
   # Optional env script (e.g. config-ui-reactor/env.ps1) dot-sourced before running cargo.
-  [string]$EnvScript = ''
+  [string]$EnvScript = '',
+  # Crate to gate (repo-relative dir). Default = the settings panel/backend crate.
+  [string]$Project = 'config-ui-reactor'
 )
 
 $ErrorActionPreference = 'Continue'
@@ -49,7 +56,7 @@ $ErrorActionPreference = 'Continue'
 . (Join-Path $PSScriptRoot 'lib\kf-tools.ps1')
 $repo = Get-KfRepoRoot
 
-$projectDir = Join-Path $repo 'config-ui-reactor'
+$projectDir = Join-Path $repo $Project
 if (!(Test-Path $projectDir)) { Write-Host "[FAIL] not found: $projectDir"; exit 1 }
 
 if (![string]::IsNullOrEmpty($EnvScript)) {
