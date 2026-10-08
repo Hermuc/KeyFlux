@@ -26,6 +26,8 @@ pub mod fonts;
 pub mod glass;
 /// Windows Job Object 封装（保证 GUI 死亡时连带回收后端子进程树）。
 pub mod job;
+/// 用系统默认关联程序打开路径（ShellExecuteW `open` 动词；「查看引擎日志」入口用）。
+pub mod shell;
 /// 窗口拾取「准星」会话（WH_MOUSE_LL/WH_KEYBOARD_LL + 高亮框 + 十字光标；移植自旧 Avalonia）。
 pub mod window_picker;
 

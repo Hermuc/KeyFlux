@@ -45,6 +45,10 @@ fn normalize_to_crlf(text: &str) -> String {
 /// 与 Go `SaveAHK(config, "keyflux.tmpl", out)` 逐字节等价（`config` 必须已经
 /// `parse_config` 且 `preprocess`；`catalog` 供选中动作解析；`plugins_dir` =
 /// `<config.json 目录>/plugins`）。
+#[expect(
+    clippy::too_many_lines,
+    reason = "模板总装配：分段顺序即产物字节顺序，不可重排"
+)]
 pub fn render_keyflux_ahk(
     config: &mut Config,
     catalog: Option<&PackCatalog>,

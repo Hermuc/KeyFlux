@@ -67,3 +67,8 @@ unsafe_code = "warn"
 
 [lints.clippy]
 all = "warn"
+# 函数长度门禁（多维度优化报告 #12）：clippy 的 pedantic 项，阈值 = clippy.toml 的
+# too-many-lines-threshold（默认 100）。存量超长者就地 `#[expect(clippy::too_many_lines,
+# reason = "…")]` 登记 —— 与「移除 crate 级 allow(dead_code)」同一策略：expect 会在该项将来
+# 变短时报 unfulfilled_lint_expectations 迫使清理，allow 不会。
+too_many_lines = "warn"

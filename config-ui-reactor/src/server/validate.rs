@@ -844,6 +844,7 @@ mod tests {
 
     /// Go `script.TestValidateMatchTypes` 的镜像：三类非法（重复 id / label 空 / op 非法）
     /// 逐一断言**逐字节一致**的错误文案，另加合法形态放行 + fileExt/kind/超长等分支。
+    #[expect(clippy::too_many_lines, reason = "逐条断言 Go 相同错误文案的镜像测试")]
     #[test]
     fn validate_match_types_rejects_invalid_with_go_identical_messages() {
         let groups: Vec<FileGroup> = vec![FileGroup {

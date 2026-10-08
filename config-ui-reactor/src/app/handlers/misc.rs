@@ -41,6 +41,8 @@ impl Shell {
                     config.options.command_font.source_path = path.to_string_lossy().into_owned();
                 }
             }
+            // ---------------------------------------------------------- 引擎可观测性
+            Message::OpenEngineLog => self.open_engine_log(),
             _ => {}
         }
     }
@@ -79,6 +81,44 @@ impl Shell {
         self.hotkey_editor_row = None;
         self.selected_hotkey = None;
     }
+
+    /// 「查看引擎日志」：解析部署树的 `logs/engine_error.log` 并用系统默认程序打开。
+    /// 文件不存在时给一条**带期望路径**的红条（可操作性 —— 而不是点了没反应）。
+    fn open_engine_log(&mut self) {
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+            .unwrap_or_default();
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let (path, exists) = resolve_engine_log(&exe_dir, &cwd);
+        if exists {
+            let _ = platform::shell::open_path(&path);
+            return;
+        }
+        self.notice_show_error(i18n::t_fmt("2602", &[&path.to_string_lossy()]));
+    }
+}
+
+/// 引擎错误日志路径解析（纯函数，可测）。面板 exe 位于 `<root>/bin/ui`（部署契约），
+/// 引擎工作目录 = `<root>`，日志 = `<root>/logs/engine_error.log`。依序试三个候选，
+/// 返回（首个存在的路径, 是否存在）；都不存在时返回**首个候选**（供提示里给出期望路径）。
+fn resolve_engine_log(
+    exe_dir: &std::path::Path,
+    cwd: &std::path::Path,
+) -> (std::path::PathBuf, bool) {
+    let candidates = [
+        exe_dir
+            .join("..")
+            .join("..")
+            .join("logs")
+            .join("engine_error.log"),
+        cwd.join("..").join("logs").join("engine_error.log"),
+        cwd.join("logs").join("engine_error.log"),
+    ];
+    if let Some(found) = candidates.iter().find(|path| path.is_file()) {
+        return (found.clone(), true);
+    }
+    (candidates[0].clone(), false)
 }
 
 #[cfg(test)]
@@ -146,5 +186,24 @@ mod tests {
         // 越界 row：no-op（不得打开编辑器）
         shell.custom_hotkey_edit(99);
         assert!(shell.hotkey_editor_row.is_none());
+    }
+
+    /// 引擎日志路径解析：都不存在时给出**首个候选**（面板 exe 上两级 + logs）且 exists=false
+    /// —— 提示里必须有期望路径，否则用户不知道去哪找。
+    #[test]
+    fn resolve_engine_log_falls_back_to_first_candidate() {
+        let exe_dir = std::path::Path::new("D:/root/bin/ui");
+        let cwd = std::path::Path::new("D:/root/bin");
+        let (path, exists) = resolve_engine_log(exe_dir, cwd);
+        assert!(!exists, "测试环境不存在 D:/root，应报告不存在");
+        let normalized = path.to_string_lossy().replace('\\', "/");
+        assert!(
+            normalized.ends_with("logs/engine_error.log"),
+            "回退路径应指向 logs/engine_error.log，实际: {normalized}"
+        );
+        assert!(
+            normalized.contains("bin/ui/../../logs"),
+            "回退 = 首个候选（面板 exe 上两级），实际: {normalized}"
+        );
     }
 }

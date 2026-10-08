@@ -285,12 +285,13 @@ impl Component for Shell {
             | StartupToggle(..)
             | Opt(..)
             | DelayScheme(..) => self.handle_keymap(message, context),
-            // 杂项域（通知 / 自定义热键编辑 / 字体浏览）
+            // 杂项域（通知 / 自定义热键编辑 / 字体浏览 / 查看引擎日志）
             ClearNotice
             | Notice(..)
             | CustomHotkeyEdit(..)
             | CustomHotkeyEditClose
-            | FontBrowse => self.handle_misc(message, context),
+            | FontBrowse
+            | OpenEngineLog => self.handle_misc(message, context),
             // 选中动作域
             SaHotkey(..)
             | SaEnable(..)
