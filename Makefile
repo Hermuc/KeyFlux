@@ -33,7 +33,11 @@ buildClientReactor:
 	#    注: reactor 两个 bin 的构建**非逐字节可复现** (同一源码+参数重编 md5 亦不同) ⇒
 	#    判定一致性只能用「配置/参数一致」, 不能拿 md5 相等当证据 (与 command-input 不同)。
 	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release -Version $(version) -EnvScript config-ui-reactor/env.ps1
-	@pwsh -NoProfile -Command '$$src=(Resolve-Path "config-ui-reactor/target/release").Path; $$dst="bin/ui"; robocopy $$src $$dst /E /XD .fingerprint build deps examples incremental /XF *.pdb *.d *.rlib *.rmeta *.cargo-lock *.cargo-build-lock *.cargo-artifact-lock keyflux-settings.exe settings.exe build-tools.exe | Out-Null; if($$LASTEXITCODE -ge 8){Write-Error ("[FAIL] robocopy exit " + $$LASTEXITCODE); exit 1}; Copy-Item "$$src/keyflux-settings.exe" "$$dst/KeyFlux.Settings.exe" -Force; Write-Host ("[OK] reactor client -> bin/ui: " + (Get-ChildItem $$dst -Recurse -File | Measure-Object).Count + " files")'
+	# 排除集**单一真源** = tools/lib/kf-tools.ps1 的 Get-KfReactorExcludes / Invoke-KfReactorStaging
+	#   (2026-10-08 收编): 该 /XD+/XF 列表曾在本 Makefile / tools/deploy_panel.ps1 /
+	#   .github/workflows/release.yml 三处逐字各抄一份 —— 正是本仓库已付过代价的
+	#   「同一命令抄多份 ⇒ 悄悄漂移」模式。改排除集只改 kf-tools.ps1 一处。
+	@pwsh -NoProfile -Command '. ./tools/lib/kf-tools.ps1; $$src=(Resolve-Path "config-ui-reactor/target/release").Path; $$dst="bin/ui"; $$code=Invoke-KfReactorStaging -Source $$src -Destination $$dst; if($$code -ge 8){Write-Error ("[FAIL] robocopy exit " + $$code); exit 1}; Copy-Item "$$src/keyflux-settings.exe" "$$dst/KeyFlux.Settings.exe" -Force; Write-Host ("[OK] reactor client -> bin/ui: " + (Get-ChildItem $$dst -Recurse -File | Measure-Object).Count + " files")'
 	@pwsh -NoProfile -Command 'New-Item -ItemType Directory -Force -Path "bin/ui/fonts" | Out-Null; Copy-Item "config-ui-reactor/resources/fonts/*.ttf" "bin/ui/fonts/" -Force; Write-Host "[OK] bundled fonts -> bin/ui/fonts: " + (Get-ChildItem "bin/ui/fonts" -File).Count + " files"'
 	# 🔴 后端 settings.exe 也必须落 bin/ (2026-10-07 补): 它是 `sync-out` 白名单要推给部署树的
 	#    暂存副本 (bin/settings.exe 被 .gitignore, 非入库)。此前本地**没有任何目标生产它** ——

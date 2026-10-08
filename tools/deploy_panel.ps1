@@ -58,10 +58,10 @@ if ($SkipGates) {
 Step 2 'staging target/release -> bin/ui'
 $src = (Resolve-Path 'config-ui-reactor/target/release').Path
 $dst = Join-Path $repo 'bin/ui'
-robocopy $src $dst /E /XD .fingerprint build deps examples incremental `
-    /XF *.pdb *.d *.rlib *.rmeta *.cargo-lock *.cargo-build-lock *.cargo-artifact-lock `
-    keyflux-settings.exe settings.exe build-tools.exe /NFL /NDL /NJH | Out-Null
-if ($LASTEXITCODE -ge 8) { Write-Error "[FAIL] robocopy exit $LASTEXITCODE"; exit 1 }
+# Exclude set + robocopy step come from tools/lib/kf-tools.ps1 (single source --
+# it used to be copied verbatim here, in the Makefile and in release.yml).
+$code = Invoke-KfReactorStaging -Source $src -Destination $dst
+if ($code -ge 8) { Write-Error "[FAIL] robocopy exit $code"; exit 1 }
 Copy-Item "$src/keyflux-settings.exe" "$dst/KeyFlux.Settings.exe" -Force
 New-Item -ItemType Directory -Force -Path "$dst/fonts" | Out-Null
 Copy-Item 'config-ui-reactor/resources/fonts/*.ttf' "$dst/fonts/" -Force
