@@ -369,8 +369,29 @@ where
     C5: IntoUnitCallback,
     C6: IntoUnitCallback,
 {
-    // 行为名胶囊头（旧 `.axaml:69-73`：白底冷边圆角胶囊，菜单序 + 行为显示名）
-    let pill: View = Border::new()
+    let pill = entry_pill(index, &switch_items, switch_selected);
+    let badge = entry_badge(index);
+    let switch_combo = entry_switch_combo(switch_items, switch_selected, on_switch);
+    let selector = entry_selector_row(
+        badge,
+        switch_combo,
+        can_up,
+        can_down,
+        on_up,
+        on_down,
+        on_remove,
+    );
+    let body = entry_value_body(is_no_value, value, on_value);
+    let working = entry_working_dir(working_dir, on_working_dir);
+
+    StackPanel::new()
+        .spacing(10.0)
+        .children((pill, selector, body, working))
+}
+
+/// 行为名胶囊头（旧 `.axaml:69-73`：白底冷边圆角胶囊，菜单序 + 行为显示名）。
+fn entry_pill(index: usize, switch_items: &[String], switch_selected: Option<usize>) -> View {
+    Border::new()
         .corner_radius(CornerRadius::uniform(14.0))
         .border_brush(theme::solid(theme::RING_SOFT))
         .border_thickness(theme::hairline())
@@ -389,10 +410,12 @@ where
                 ))
                 .font_size(13.0)
                 .foreground(theme::near_black()),
-        );
+        )
+}
 
-    // 序号方块（Sand 底 + 强调蓝字，26×26 圆角 4）
-    let badge: View = Border::new()
+/// 序号方块（Sand 底 + 强调蓝字，26×26 圆角 4）。
+fn entry_badge(index: usize) -> View {
+    Border::new()
         .width(26.0)
         .height(26.0)
         .corner_radius(theme::radius_sm())
@@ -406,24 +429,44 @@ where
                 .foreground(theme::accent_solid())
                 .horizontal_alignment(HorizontalAlignment::Center)
                 .vertical_alignment(VerticalAlignment::Center),
-        );
+        )
+}
 
-    // 行为下拉：切换即重置该行为默认模板（复刻 `EntryRowVm` 的 `OnBehaviorChanged`）
-    let switch_combo: View = ComboBox::new()
+/// 行为下拉：切换即重置该行为默认模板（复刻 `EntryRowVm` 的 `OnBehaviorChanged`）。
+fn entry_switch_combo<C1: IntoPayloadCallback<Option<usize>>>(
+    switch_items: Vec<String>,
+    switch_selected: Option<usize>,
+    on_switch: C1,
+) -> View {
+    ComboBox::new()
         .min_height(36.0)
         .horizontal_alignment(HorizontalAlignment::Stretch)
         .items_source(switch_items)
         .selected_index(switch_selected)
         .on_selection_changed(on_switch)
-        .into();
+        .into()
+}
 
-    // ↑ ↓ ✕ = 无边框图形钮（icon_button 全态透明覆盖）
-    let up: View = crate::ui::icon_button("↑", 15.0, theme::STONE_GRAY, can_up, on_up);
-    let down: View = crate::ui::icon_button("↓", 15.0, theme::STONE_GRAY, can_down, on_down);
-    // 旧版删除 = 淡红 ✕（tooltip 1108 因 reactor 无 Tooltip API 暂缺）
-    let remove: View = crate::ui::icon_button("✕", 15.0, theme::ERROR_CRIMSON, true, on_remove);
-
-    let selector: View = Grid::new()
+/// `[序号方块 | 行为下拉 | ↑ | ↓ | ✕]` 选择行；↑↓✕ = 无边框图形钮
+/// （`icon_button` 全态透明覆盖；旧版删除 = 淡红 ✕，tooltip 1108 因 reactor 无 Tooltip API 暂缺）。
+fn entry_selector_row<C4, C5, C6>(
+    badge: View,
+    switch_combo: View,
+    can_up: bool,
+    can_down: bool,
+    on_up: C4,
+    on_down: C5,
+    on_remove: C6,
+) -> View
+where
+    C4: IntoUnitCallback,
+    C5: IntoUnitCallback,
+    C6: IntoUnitCallback,
+{
+    let up = crate::ui::icon_button("↑", 15.0, theme::STONE_GRAY, can_up, on_up);
+    let down = crate::ui::icon_button("↓", 15.0, theme::STONE_GRAY, can_down, on_down);
+    let remove = crate::ui::icon_button("✕", 15.0, theme::ERROR_CRIMSON, true, on_remove);
+    Grid::new()
         .columns([
             GridLength::Auto,
             GridLength::STAR,
@@ -452,10 +495,16 @@ where
                 .margin(Thickness::new(4.0, 0.0, 4.0, 0.0))
                 .vertical_alignment(VerticalAlignment::Center)
                 .content(remove),
-        ));
+        ))
+}
 
-    // 无参行为：1013+1014 提示（复刻旧 `.axaml:75-77`）；有参行为：模板框（1012）
-    let body: View = if is_no_value {
+/// 无参行为：1013+1014 提示（复刻旧 `.axaml:75-77`）；有参行为：模板框（1012）。
+fn entry_value_body<C2: IntoPayloadCallback<String>>(
+    is_no_value: bool,
+    value: &str,
+    on_value: C2,
+) -> View {
+    if is_no_value {
         TextBlock::new()
             .text(format!("{}{}", i18n::t("1013"), i18n::t("1014")))
             .font_size(theme::FONT_CAPTION)
@@ -482,19 +531,20 @@ where
                         .on_text_changed(on_value),
                 ),
             ))
-    };
+    }
+}
 
-    // 工作目录：全宽 + 占位 1015（旧 `.axaml:81-83` 的 placeholder 造型）
-    let working: View = TextBox::new()
+/// 工作目录：全宽 + 占位 1015（旧 `.axaml:81-83` 的 placeholder 造型）。
+fn entry_working_dir<C3: IntoPayloadCallback<String>>(
+    working_dir: &str,
+    on_working_dir: C3,
+) -> View {
+    TextBox::new()
         .text(working_dir.to_string())
         .placeholder_text(i18n::t("1015"))
         .border_brush(theme::solid(INPUT_STROKE))
         .on_text_changed(on_working_dir)
-        .into();
-
-    StackPanel::new()
-        .spacing(10.0)
-        .children((pill, selector, body, working))
+        .into()
 }
 
 /// 行为编辑行的**子卡外框**（旧 `Border.rowEditor`：Ivory 面 + 圆角 4 + Padding 10 + 底距 6）。

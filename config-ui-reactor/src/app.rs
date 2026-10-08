@@ -258,115 +258,94 @@ impl Component for Shell {
     /// 本函数只做**路由**, 不含业务逻辑: 各域臂体在 `app/handlers/<域>.rs`,
     /// 由脚本按变体前缀机械迁移、逐字未改。仍 match 全部变体 ⇒ 穷尽性由编译器保证。
     fn update(&mut self, message: Message, context: &ComponentContext<Self>) {
+        use Message::*;
         match message {
-            Message::Nav(..) => self.handle_keymap(message, context),
-            Message::ToggleComments => self.handle_keymap(message, context),
-            Message::PaneOverlay(..) => self.handle_keymap(message, context),
-            Message::AcrylicToggle(..) => self.handle_keymap(message, context),
-            Message::SelectKey(..) => self.handle_keymap(message, context),
-            Message::CmdText(..) => self.handle_keymap(message, context),
-            Message::Noop => self.handle_keymap(message, context),
-            Message::SelectWindowGroup(..) => self.handle_keymap(message, context),
-            Message::SelectActionType(..) => self.handle_keymap(message, context),
-            Message::EditField(..) => self.handle_keymap(message, context),
-            Message::SelectRadio { .. } => self.handle_keymap(message, context),
-            Message::SelectPluginAction { .. } => self.handle_keymap(message, context),
-            Message::WindowSpy => self.handle_keymap(message, context),
-            Message::Ready { .. } => self.handle_keymap(message, context),
-            Message::Failed(..) => self.handle_keymap(message, context),
-            Message::Retry => self.handle_keymap(message, context),
-            Message::Save => self.handle_keymap(message, context),
-            Message::ClearNotice => self.handle_misc(message, context),
-            Message::SaveFinished(..) => self.handle_keymap(message, context),
-            Message::PickWindow => self.handle_keymap(message, context),
-            Message::WindowPicked(..) => self.handle_keymap(message, context),
-            Message::Notice(..) => self.handle_misc(message, context),
-            Message::SaHotkey(..) => self.handle_sa(message, context),
-            Message::SaEnable(..) => self.handle_sa(message, context),
-            Message::SaSelectToggle { .. } => self.handle_sa(message, context),
-            Message::SaDeleteAsk => self.handle_sa(message, context),
-            Message::SaDeleteCancelled => self.handle_sa(message, context),
-            Message::SaDeleteConfirmed => self.handle_sa(message, context),
-            Message::SaPlaySample => self.handle_sa(message, context),
-            Message::SaSelectBehavior { .. } => self.handle_sa(message, context),
-            Message::SaAddBehavior { .. } => self.handle_sa(message, context),
-            Message::SaRemoveEntry { .. } => self.handle_sa(message, context),
-            Message::SaEntrySwitch { .. } => self.handle_sa(message, context),
-            Message::SaEntryMove { .. } => self.handle_sa(message, context),
-            Message::SaEntryValue { .. } => self.handle_sa(message, context),
-            Message::SaEntryWorkingDir { .. } => self.handle_sa(message, context),
-            Message::SaPlayDone(..) => self.handle_sa(message, context),
-            Message::SaAddOpen => self.handle_sa(message, context),
-            Message::SaHotkeyClear => self.handle_sa(message, context),
-            Message::SaNewType { .. } => self.handle_sa(message, context),
-            Message::SaAddCancel => self.handle_sa(message, context),
-            Message::SaAddType(..) => self.handle_sa(message, context),
-            Message::SaAddToggle(..) => self.handle_sa(message, context),
-            Message::SaAddConfirm => self.handle_sa(message, context),
-            Message::MatchTypesOpen => self.handle_mt(message, context),
-            Message::MatchTypesClose => self.handle_mt(message, context),
-            Message::MatchTypesSelect(..) => self.handle_mt(message, context),
-            Message::MtNew => self.handle_mt(message, context),
-            Message::MtLabel(..) => self.handle_mt(message, context),
-            Message::MtLabelEn(..) => self.handle_mt(message, context),
-            Message::MtKind(..) => self.handle_mt(message, context),
-            Message::MtRuleOp(..) => self.handle_mt(message, context),
-            Message::MtRuleValue(..) => self.handle_mt(message, context),
-            Message::MtRuleAdd => self.handle_mt(message, context),
-            Message::MtRuleRemove(..) => self.handle_mt(message, context),
-            Message::MtExts(..) => self.handle_mt(message, context),
-            Message::SaExtsEditValue(..) => self.handle_sa(message, context),
-            Message::SaExtsEditCommit(..) => self.handle_sa(message, context),
-            Message::MtSave(..) => self.handle_mt(message, context),
-            Message::MtDelete => self.handle_mt(message, context),
-            Message::MtTest(..) => self.handle_mt(message, context),
-            Message::MtTestRun => self.handle_mt(message, context),
-            Message::MtTestDone(..) => self.handle_mt(message, context),
-            Message::BehaviorsOpen => self.handle_bh(message, context),
-            Message::BehaviorsClose => self.handle_bh(message, context),
-            Message::BhSelect(..) => self.handle_bh(message, context),
-            Message::BhNew => self.handle_bh(message, context),
-            Message::BhName(..) => self.handle_bh(message, context),
-            Message::BhId(..) => self.handle_bh(message, context),
-            Message::BhDescription(..) => self.handle_bh(message, context),
-            Message::BhAppliesKind(..) => self.handle_bh(message, context),
-            Message::BhAppliesValue(..) => self.handle_bh(message, context),
-            Message::BhAppliesDefault(..) => self.handle_bh(message, context),
-            Message::BhAppliesAdd => self.handle_bh(message, context),
-            Message::BhAppliesRemove(..) => self.handle_bh(message, context),
-            Message::BhBaseAction(..) => self.handle_bh(message, context),
-            Message::BhTemplate(..) => self.handle_bh(message, context),
-            Message::BhWorkingDir(..) => self.handle_bh(message, context),
-            Message::BhSave => self.handle_bh(message, context),
-            Message::BhDelete => self.handle_bh(message, context),
-            Message::GuideEditOpen => self.handle_guide(message, context),
-            Message::GuideEditValue(..) => self.handle_guide(message, context),
-            Message::GuideEditReset => self.handle_guide(message, context),
-            Message::GuideEditClose => self.handle_guide(message, context),
-            Message::GuideEditSave => self.handle_guide(message, context),
-            Message::CustomHotkeyEdit(..) => self.handle_misc(message, context),
-            Message::CustomHotkeyEditClose => self.handle_misc(message, context),
-            Message::PluginsReload => self.handle_plugin(message, context),
-            Message::PluginsLoaded(..) => self.handle_plugin(message, context),
-            Message::PluginToggle { .. } => self.handle_plugin(message, context),
-            Message::PluginDelete(..) => self.handle_plugin(message, context),
-            Message::PluginImport => self.handle_plugin(message, context),
-            Message::PluginsMarket => self.handle_plugin(message, context),
-            Message::MarketReload => self.handle_market(message, context),
-            Message::MarketLoaded(..) => self.handle_market(message, context),
-            Message::MarketInstall { .. } => self.handle_market(message, context),
-            Message::MarketClosed => self.handle_market(message, context),
-            Message::PsValue(..) => self.handle_ps(message, context),
-            Message::PsPickFile(..) => self.handle_ps(message, context),
-            Message::PsLoaded { .. } => self.handle_ps(message, context),
-            Message::PsClosed(..) => self.handle_ps(message, context),
-            Message::PluginConfigure(..) => self.handle_ps(message, context),
-            Message::SettingsSection(..) => self.handle_keymap(message, context),
-            Message::StartupToggle(..) => self.handle_keymap(message, context),
-            Message::Opt(..) => self.handle_keymap(message, context),
-            Message::DelayScheme(..) => self.handle_keymap(message, context),
-            Message::FontBrowse => self.handle_misc(message, context),
-            Message::BehaviorsLoaded(..) => self.handle_bh(message, context),
+            // 键位 / 选项 / 导航域
+            Nav(..)
+            | ToggleComments
+            | PaneOverlay(..)
+            | AcrylicToggle(..)
+            | SelectKey(..)
+            | CmdText(..)
+            | Noop
+            | SelectWindowGroup(..)
+            | SelectActionType(..)
+            | EditField(..)
+            | SelectRadio { .. }
+            | SelectPluginAction { .. }
+            | WindowSpy
+            | Ready { .. }
+            | Failed(..)
+            | Retry
+            | Save
+            | SaveFinished(..)
+            | PickWindow
+            | WindowPicked(..)
+            | SettingsSection(..)
+            | StartupToggle(..)
+            | Opt(..)
+            | DelayScheme(..) => self.handle_keymap(message, context),
+            // 杂项域（通知 / 自定义热键编辑 / 字体浏览）
+            ClearNotice
+            | Notice(..)
+            | CustomHotkeyEdit(..)
+            | CustomHotkeyEditClose
+            | FontBrowse => self.handle_misc(message, context),
+            // 选中动作域
+            SaHotkey(..)
+            | SaEnable(..)
+            | SaSelectToggle { .. }
+            | SaDeleteAsk
+            | SaDeleteCancelled
+            | SaDeleteConfirmed
+            | SaPlaySample
+            | SaSelectBehavior { .. }
+            | SaAddBehavior { .. }
+            | SaRemoveEntry { .. }
+            | SaEntrySwitch { .. }
+            | SaEntryMove { .. }
+            | SaEntryValue { .. }
+            | SaEntryWorkingDir { .. }
+            | SaPlayDone(..)
+            | SaAddOpen
+            | SaHotkeyClear
+            | SaNewType { .. }
+            | SaAddCancel
+            | SaAddType(..)
+            | SaAddToggle(..)
+            | SaAddConfirm
+            | SaExtsEditValue(..)
+            | SaExtsEditCommit(..) => self.handle_sa(message, context),
+            // 匹配类型域
+            MatchTypesOpen | MatchTypesClose | MatchTypesSelect(..) | MtNew | MtLabel(..)
+            | MtLabelEn(..) | MtKind(..) | MtRuleOp(..) | MtRuleValue(..) | MtRuleAdd
+            | MtRuleRemove(..) | MtExts(..) | MtSave(..) | MtDelete | MtTest(..) | MtTestRun
+            | MtTestDone(..) => self.handle_mt(message, context),
+            // 行为库域
+            BehaviorsOpen | BehaviorsClose | BhSelect(..) | BhNew | BhName(..) | BhId(..)
+            | BhDescription(..) | BhAppliesKind(..) | BhAppliesValue(..) | BhAppliesDefault(..)
+            | BhAppliesAdd | BhAppliesRemove(..) | BhBaseAction(..) | BhTemplate(..)
+            | BhWorkingDir(..) | BhSave | BhDelete | BehaviorsLoaded(..) => {
+                self.handle_bh(message, context)
+            }
+            // 使用指南域
+            GuideEditOpen | GuideEditValue(..) | GuideEditReset | GuideEditClose
+            | GuideEditSave => self.handle_guide(message, context),
+            // 插件域
+            PluginsReload
+            | PluginsLoaded(..)
+            | PluginToggle { .. }
+            | PluginDelete(..)
+            | PluginImport
+            | PluginsMarket => self.handle_plugin(message, context),
+            // 插件市场域
+            MarketReload | MarketLoaded(..) | MarketInstall { .. } | MarketClosed => {
+                self.handle_market(message, context)
+            }
+            // 插件设置域
+            PsValue(..) | PsPickFile(..) | PsLoaded { .. } | PsClosed(..) | PluginConfigure(..) => {
+                self.handle_ps(message, context)
+            }
         }
     }
 
