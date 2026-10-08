@@ -205,7 +205,7 @@ pub fn install_command_font(
 
     // 字重：先按档位试预烘焙变体，缺失/不合法 ⇒ 回落源字体本体
     let weight = normalize_font_weight(&option.weight);
-    let mut chosen = src.clone();
+    let mut selected = src.clone();
     let variant = variant_path(&src, &weight);
     if !variant.is_empty()
         && let Ok(variant_info) = std::fs::metadata(&variant)
@@ -216,24 +216,24 @@ pub fn install_command_font(
             Ok(FontKind::Accepted)
         )
     {
-        chosen = variant;
+        selected = variant;
     }
 
     // 5. 源已就位（自复制会把目标截断为 0 字节）
-    if same_path(Path::new(&chosen), Path::new(&dst)) {
+    if same_path(Path::new(&selected), Path::new(&dst)) {
         return Ok(());
     }
 
     // 4. 字体格式校验（必须 glyf，命令框 exe 只认 TrueType）
-    match classify_font_kinds(Path::new(&chosen), 0) {
+    match classify_font_kinds(Path::new(&selected), 0) {
         Err(error) => {
             return Err(format!(
-                "命令框字体源读取失败, 沿用现有字体: {chosen}: {error}"
+                "命令框字体源读取失败, 沿用现有字体: {selected}: {error}"
             ));
         }
         Ok(FontKind::Rejected(reason)) => {
             return Err(format!(
-                "命令框字体源不被接受, 沿用现有字体: {chosen}: {reason}"
+                "命令框字体源不被接受, 沿用现有字体: {selected}: {reason}"
             ));
         }
         Ok(FontKind::Accepted) => {}
@@ -245,7 +245,7 @@ pub fn install_command_font(
         std::fs::create_dir_all(parent)
             .map_err(|error| format!("命令框字体落点目录创建失败: {error}"))?;
     }
-    let data = std::fs::read(&chosen).map_err(|error| format!("命令框字体读取失败: {error}"))?;
+    let data = std::fs::read(&selected).map_err(|error| format!("命令框字体读取失败: {error}"))?;
     // 权限 0644（便携式部署，无多用户隔离需求）
     std::fs::write(&target, data).map_err(|error| format!("命令框字体写入失败: {error}"))?;
     Ok(())

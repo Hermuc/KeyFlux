@@ -16,19 +16,19 @@ impl Shell {
             Message::BehaviorsOpen => {
                 self.bh_dialog = true;
                 self.bh_status = None;
-                self.bh_pick = None;
+                self.bh_selected = None;
                 self.bh_draft = None;
             }
             Message::BehaviorsClose => {
                 self.bh_dialog = false;
-                self.bh_pick = None;
+                self.bh_selected = None;
                 self.bh_draft = None;
                 self.bh_status = None;
             }
-            Message::BhPick(pick) => {
-                self.bh_pick = pick;
+            Message::BhSelect(selected) => {
+                self.bh_selected = selected;
                 let merged: Vec<&crate::models::BehaviorPack> = self.catalog.packs().collect();
-                self.bh_draft = pick.and_then(|index| {
+                self.bh_draft = selected.and_then(|index| {
                     merged.get(index).map(|pack| {
                         let mut draft = behaviors_edit::BehaviorDraft::from_pack(pack);
                         draft.index = index;
@@ -39,7 +39,7 @@ impl Shell {
             }
             Message::BhNew => {
                 self.bh_draft = Some(behaviors_edit::BehaviorDraft::new_draft());
-                self.bh_pick = None;
+                self.bh_selected = None;
                 self.bh_status = None;
             }
             Message::BhName(value) => self.bh_edit_draft(|draft| draft.name = value),

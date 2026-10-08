@@ -133,7 +133,7 @@ pub struct Shell {
     /// 「管理行为」对话框是否打开。
     bh_dialog: bool,
     /// 行为目录选中项（内置在前；`None` = 未选）。
-    bh_pick: Option<usize>,
+    bh_selected: Option<usize>,
     /// 行为编辑草稿（`None` = 展示只读详情占位）。
     bh_draft: Option<behaviors_edit::BehaviorDraft>,
     /// 行为对话框内状态条。
@@ -161,9 +161,9 @@ pub struct Shell {
     /// 选中动作页：文件卡当前点亮的 toggle id。
     sa_file_sel: Option<String>,
     /// 选中动作页：文本卡「添加行为」下拉当前索引。
-    sa_text_pick: Option<usize>,
+    sa_text_selected: Option<usize>,
     /// 选中动作页：文件卡「添加行为」下拉当前索引。
-    sa_file_pick: Option<usize>,
+    sa_file_selected: Option<usize>,
     /// 选中动作页：热键已改未保存（保存成功后复位，对齐旧版 `HotkeyPendingSave`）。
     hotkey_pending_save: bool,
     /// 选中动作页热键与既有占用集冲突（1025 红字提示）。
@@ -225,7 +225,7 @@ impl Component for Shell {
             mt_test: String::new(),
             mt_test_result: None,
             bh_dialog: false,
-            bh_pick: None,
+            bh_selected: None,
             bh_draft: None,
             bh_status: None,
             guide_edit_open: false,
@@ -239,8 +239,8 @@ impl Component for Shell {
             pending: save_pipeline::PendingQueue::default(),
             sa_text_sel: None,
             sa_file_sel: None,
-            sa_text_pick: None,
-            sa_file_pick: None,
+            sa_text_selected: None,
+            sa_file_selected: None,
             hotkey_pending_save: false,
             sa_hotkey_conflict: false,
             window_group_id: 0,
@@ -282,7 +282,7 @@ impl Component for Shell {
             Message::SaDeleteCancelled => self.handle_sa(message, context),
             Message::SaDeleteConfirmed => self.handle_sa(message, context),
             Message::SaPlaySample => self.handle_sa(message, context),
-            Message::SaPickBehavior { .. } => self.handle_sa(message, context),
+            Message::SaSelectBehavior { .. } => self.handle_sa(message, context),
             Message::SaAddBehavior { .. } => self.handle_sa(message, context),
             Message::SaRemoveEntry { .. } => self.handle_sa(message, context),
             Message::SaEntrySwitch { .. } => self.handle_sa(message, context),
@@ -299,7 +299,7 @@ impl Component for Shell {
             Message::SaAddConfirm => self.handle_sa(message, context),
             Message::MatchTypesOpen => self.handle_mt(message, context),
             Message::MatchTypesClose => self.handle_mt(message, context),
-            Message::MatchTypesPick(..) => self.handle_mt(message, context),
+            Message::MatchTypesSelect(..) => self.handle_mt(message, context),
             Message::MtNew => self.handle_mt(message, context),
             Message::MtLabel(..) => self.handle_mt(message, context),
             Message::MtLabelEn(..) => self.handle_mt(message, context),
@@ -318,7 +318,7 @@ impl Component for Shell {
             Message::MtTestDone(..) => self.handle_mt(message, context),
             Message::BehaviorsOpen => self.handle_bh(message, context),
             Message::BehaviorsClose => self.handle_bh(message, context),
-            Message::BhPick(..) => self.handle_bh(message, context),
+            Message::BhSelect(..) => self.handle_bh(message, context),
             Message::BhNew => self.handle_bh(message, context),
             Message::BhName(..) => self.handle_bh(message, context),
             Message::BhId(..) => self.handle_bh(message, context),

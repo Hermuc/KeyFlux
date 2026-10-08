@@ -58,6 +58,19 @@ fn wide_null(value: &str) -> Vec<u16> {
     wide
 }
 
+/// 组装**单条目**过滤器串：`"标签\0模式\0\0"`。
+///
+/// 为什么要有这个函数：Win32 的 `lpstrFilter` 用「条目内 `\0` 分隔、整体以 `\0\0` 收口」的
+/// 编码，而 `\0` 一旦被**写成原始字节**（而非源码里的 `\0` 转义），整个 `.rs` 文件就会被
+/// grep 判定为二进制 —— `grep -l` / `grep -r` 会**静默跳过该文件**，工具链漏检且不报错
+/// （2026-10-07 审查报告 #7b 的标本案例：`app.rs` 因此长期被 grep 跳过，随后字节随代码
+/// 迁移到 `handlers/plugin.rs`）。把约定收在本模块，调用方只给标签与模式串即可。
+///
+/// 与 `ZIP_FILTER` / `FONT_FILTER` 等常量同一编码；那些常量因需 `const` 而不能用 `format!`。
+pub fn single_filter(label: &str, patterns: &str) -> String {
+    format!("{label}\0{patterns}\0\0")
+}
+
 /// 插件包（`.zip`）的过滤器串。
 pub const ZIP_FILTER: &str = "插件包 (*.zip)\0*.zip\0所有文件 (*.*)\0*.*\0\0";
 
@@ -85,5 +98,16 @@ mod tests {
         assert_eq!(*wide.last().unwrap(), 0);
         assert_eq!(wide[wide.len() - 2], 0, "必须以双零结尾");
         assert!(wide.contains(&0), "内部含分隔零");
+    }
+
+    #[test]
+    fn single_filter_matches_const_encoding() {
+        // 单条目构造器与既有常量必须同编码：标签 + `\0` + 模式 + `\0\0`
+        let built = single_filter("KeyFlux 插件包", "*.zip");
+        assert_eq!(built, "KeyFlux 插件包\0*.zip\0\0");
+        assert!(built.ends_with("*.zip\0\0"), "模式后紧跟双零收口");
+        let wide = wide_null(&built);
+        // 尾部三个零 = `\0\0` 双零收口 + `wide_null` 补的终止零
+        assert_eq!(&wide[wide.len() - 3..], &[0, 0, 0], "必须以三个宽零收尾");
     }
 }

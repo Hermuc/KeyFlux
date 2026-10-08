@@ -16,6 +16,13 @@
 //! `KILL_ON_JOB_CLOSE` + `BREAKAWAY_OK`）保证 GUI 被强杀时由 OS 连带回收后端进程树；
 //! `BREAKAWAY_OK` 允许保存时以 `CREATE_BREAKAWAY_FROM_JOB` 重启的 KeyFlux **脱离**本 Job
 //! （关面板不杀托盘程序）。
+//!
+//! **有意忽略的返回值**（审查报告 #3 的复核结论）：`let _ = child.kill()` / `let _ = child.wait()`
+//! （含 `Drop`，共 4 处）是**刻意**的，不是漏处理 —— 子进程可能已自行退出（`kill` 报错属正常
+//! 竞态）、`wait` 仅用于回收僵尸；进程树的兜底回收由 Job Object 负责，此处没有可做的补救动作。
+//! 真正的失败经 `KEYFLUX_BACKEND_EXITED`（见上表）上报。**勿改成 `unwrap`/`expect`**：
+//! 「关窗时后端已死」是常态，panic 会把正常退出变成崩溃。（`job.assign` 的忽略已在其调用点
+//! 注明「失败降级为无 Job 运行」。）
 
 use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;

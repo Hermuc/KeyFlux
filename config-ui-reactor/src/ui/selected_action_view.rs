@@ -513,7 +513,7 @@ pub fn row_editor(body: View) -> View {
 /// `hint` = 禁用原因（1107 满 9 / 1119 全部已加），无则不渲染。
 pub fn add_behavior_row<C1, C2>(
     covering_labels: Vec<String>,
-    picked: Option<usize>,
+    selected: Option<usize>,
     can_add: bool,
     hint: Option<String>,
     on_pick: C1,
@@ -527,7 +527,7 @@ where
         .min_width(200.0)
         .is_enabled(can_add)
         .items_source(covering_labels)
-        .selected_index(picked)
+        .selected_index(selected)
         .on_selection_changed(on_pick)
         .into();
 

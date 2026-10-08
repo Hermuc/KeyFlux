@@ -134,14 +134,16 @@ impl Shell {
             .min_width(320.0)
             .placeholder_text(i18n::t("1032"))
             .items_source(labels)
-            .selected_index(draft.type_pick)
-            .on_selection_changed(context.callback(|pick: Option<usize>| Message::SaAddType(pick)))
+            .selected_index(draft.type_selected)
+            .on_selection_changed(
+                context.callback(|selected: Option<usize>| Message::SaAddType(selected)),
+            )
             .into();
         rows.push((rows.len(), type_combo));
 
         // 选中类型 → 条件值回显 + 行为勾选列表
-        if let Some(pick) = draft.type_pick
-            && let Some(option) = options.get(pick)
+        if let Some(selected) = draft.type_selected
+            && let Some(option) = options.get(selected)
         {
             let (match_type, match_value) = sa::add_target(config, &option.id);
             let condition_text = if match_type == sa::MATCH_TEXT_TYPE {
@@ -251,10 +253,9 @@ impl Shell {
                             .placeholder_text(i18n::t("2519"))
                             .items_source(type_labels)
                             .selected_index(pick_index)
-                            .on_selection_changed(
-                                context
-                                    .callback(|pick: Option<usize>| Message::MatchTypesPick(pick)),
-                            )
+                            .on_selection_changed(context.callback(|selected: Option<usize>| {
+                                Message::MatchTypesSelect(selected)
+                            }))
                             .into();
                         combo
                     },
@@ -292,7 +293,8 @@ impl Shell {
                     i18n::t("2556"),
                     &[i18n::t("2556"), i18n::t("2551")],
                     usize::from(draft.kind == "fileExt"),
-                    context.callback(|pick: Option<usize>| Message::MtKind(pick.unwrap_or(0))),
+                    context
+                        .callback(|selected: Option<usize>| Message::MtKind(selected.unwrap_or(0))),
                 ),
             ));
         } else {
@@ -347,8 +349,8 @@ impl Shell {
                                     .items_source(ops.to_vec())
                                     .selected_index(op_index)
                                     .on_selection_changed(context.callback(
-                                        move |pick: Option<usize>| {
-                                            Message::MtRuleOp(rule, pick.unwrap_or(3))
+                                        move |selected: Option<usize>| {
+                                            Message::MtRuleOp(rule, selected.unwrap_or(3))
                                         },
                                     ))
                                     .into();
@@ -484,15 +486,16 @@ impl Shell {
                 .columns([GridLength::STAR, GridLength::Auto])
                 .children((
                     {
-                        let combo: View = ComboBox::new()
-                            .min_width(280.0)
-                            .placeholder_text(i18n::t("1083"))
-                            .items_source(labels)
-                            .selected_index(self.bh_pick)
-                            .on_selection_changed(
-                                context.callback(|pick: Option<usize>| Message::BhPick(pick)),
-                            )
-                            .into();
+                        let combo: View =
+                            ComboBox::new()
+                                .min_width(280.0)
+                                .placeholder_text(i18n::t("1083"))
+                                .items_source(labels)
+                                .selected_index(self.bh_selected)
+                                .on_selection_changed(context.callback(
+                                    |selected: Option<usize>| Message::BhSelect(selected),
+                                ))
+                                .into();
                         combo
                     },
                     Button::new()
@@ -549,8 +552,8 @@ impl Shell {
                                     .items_source(kind_labels.to_vec())
                                     .selected_index(usize::from(applies.kind == "fileExt"))
                                     .on_selection_changed(context.callback(
-                                        move |pick: Option<usize>| {
-                                            Message::BhAppliesKind(row, pick.unwrap_or(0))
+                                        move |selected: Option<usize>| {
+                                            Message::BhAppliesKind(row, selected.unwrap_or(0))
                                         },
                                     ))
                                     .into();
@@ -594,8 +597,9 @@ impl Shell {
                     i18n::t("1011"),
                     &base_options,
                     base_index.unwrap_or(0),
-                    context
-                        .callback(|pick: Option<usize>| Message::BhBaseAction(pick.unwrap_or(0))),
+                    context.callback(|selected: Option<usize>| {
+                        Message::BhBaseAction(selected.unwrap_or(0))
+                    }),
                 ),
             ));
             rows.push((

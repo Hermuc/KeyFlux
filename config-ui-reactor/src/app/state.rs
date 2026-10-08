@@ -8,12 +8,12 @@ use super::*;
 
 impl Shell {
     /// 当前卡「添加行为」下拉的有效选中（越界折叠为 `None`）。
-    pub(super) fn sa_picked(&self, match_type: &str, covering_len: usize) -> Option<usize> {
+    pub(super) fn sa_selected(&self, match_type: &str, covering_len: usize) -> Option<usize> {
         let stored = match match_type {
-            MATCH_TEXT_TYPE => self.sa_text_pick,
-            _ => self.sa_file_pick,
+            MATCH_TEXT_TYPE => self.sa_text_selected,
+            _ => self.sa_file_selected,
         };
-        stored.filter(|pick| *pick < covering_len)
+        stored.filter(|selected| *selected < covering_len)
     }
 
     /// 覆盖行为的显示名列表（下拉源）。
@@ -37,11 +37,11 @@ impl Shell {
         match match_type {
             MATCH_TEXT_TYPE => {
                 self.sa_text_sel = None;
-                self.sa_text_pick = None;
+                self.sa_text_selected = None;
             }
             _ => {
                 self.sa_file_sel = None;
-                self.sa_file_pick = None;
+                self.sa_file_selected = None;
             }
         }
     }
@@ -145,9 +145,9 @@ impl Shell {
         if id.is_empty() {
             return;
         }
-        let pick = match match_type {
-            MATCH_TEXT_TYPE => self.sa_text_pick,
-            _ => self.sa_file_pick,
+        let selected = match match_type {
+            MATCH_TEXT_TYPE => self.sa_text_selected,
+            _ => self.sa_file_selected,
         };
         // 1) matchValue（不可变借用阶段）
         let match_value = match self.config.as_ref() {
@@ -160,8 +160,8 @@ impl Shell {
         // 2) 目录推导（catalog 不可变借用）；未显式选择时自动取**首个未用**覆盖行为
         //    （复刻 `AddEntry` 的 CanAddEntry 自动挑选）
         let covering = sa::covering(&self.catalog, match_type, &match_value);
-        let pick = match pick {
-            Some(pick) => Some(pick),
+        let selected = match selected {
+            Some(selected) => Some(selected),
             None => self
                 .config
                 .as_ref()
@@ -177,10 +177,10 @@ impl Shell {
                 })
                 .unwrap_or(None),
         };
-        let Some(pick) = pick else {
+        let Some(selected) = selected else {
             return;
         };
-        let Some(pack) = covering.get(pick) else {
+        let Some(pack) = covering.get(selected) else {
             return;
         };
         let behavior = pack.id.clone();
