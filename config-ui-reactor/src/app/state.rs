@@ -708,3 +708,29 @@ impl Shell {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Shell;
+
+    /// 批 W（2026-10-08）：`Shell::default()`（`cfg_attr(test)` derive，见 app.rs）让
+    /// 状态方法脱离窗口直接断言。mt_pick_set 的契约 = 换草稿时**同时清空**对话框内
+    /// 状态条与「试一下」结果 —— 换了上下文，旧状态必然失效，残留会串页显示。
+    #[test]
+    fn mt_pick_set_resets_dialog_state() {
+        // clippy `field_reassign_with_default`: 用结构体更新语法而非逐字段赋值。
+        let mut shell = Shell {
+            mt_status: Some(("旧状态".to_string(), true)),
+            mt_test_result: Some(Ok("旧结果".to_string())),
+            mt_test: "旧内容".to_string(),
+            ..Shell::default()
+        };
+
+        shell.mt_pick_set(None);
+
+        assert!(shell.mt_draft.is_none());
+        assert!(shell.mt_status.is_none());
+        assert!(shell.mt_test_result.is_none());
+        assert!(shell.mt_test.is_empty());
+    }
+}
