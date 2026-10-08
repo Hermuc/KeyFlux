@@ -35,7 +35,7 @@ use super::{HttpReply, ServerContext, ServerPaths};
 /// Go `plugins.Entry` 的 wire 投影。
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
-pub(crate) struct WireEntry {
+pub(crate) struct PluginWireEntry {
     pub kind: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub file: String,
@@ -135,7 +135,7 @@ pub(crate) struct WireManifest {
     pub description: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub author: String,
-    pub entry: WireEntry,
+    pub entry: PluginWireEntry,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permissions: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -193,7 +193,7 @@ impl WireManifest {
             spec_version: self.spec_version,
             description: self.description.clone(),
             author: self.author.clone(),
-            entry: gplugins::Entry {
+            entry: gplugins::ManifestEntry {
                 kind: self.entry.kind.clone(),
                 file: self.entry.file.clone(),
                 func: self.entry.func.clone(),

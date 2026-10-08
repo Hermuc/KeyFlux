@@ -30,7 +30,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use crate::generator::behaviors::{self, Catalog};
+use crate::generator::behaviors::{self, PackCatalog};
 use crate::generator::model::{
     Action, Config, Keymap, SelectedAction, WindowGroup, group_to_win_tile,
 };
@@ -512,7 +512,7 @@ pub fn abbr_registry_code(
 /// 同一 mapping 内 key 递增超过 9 的 entry 跳过并留注释告警（与 Go `selectedActionKeyCap` 同口径）。
 ///
 /// ⚠️ 与 Go 一致：`catalog == None` 等价于 `BehaviorCatalog == nil`（内置 ID 直通、显示名回退 ID）。
-pub fn selected_action_code(sa: Option<&SelectedAction>, catalog: Option<&Catalog>) -> String {
+pub fn selected_action_code(sa: Option<&SelectedAction>, catalog: Option<&PackCatalog>) -> String {
     let Some(sa) = sa else {
         return String::new();
     };

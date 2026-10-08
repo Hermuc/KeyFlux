@@ -1,7 +1,7 @@
 //! 插件体系 —— Go **两处**源码的同名移植，合并在一个模块里:
 //!
 //! 1. `internal/plugins/plugins.go`（管理面）: 目录加载 [`load_catalog`] / manifest 校验
-//!    [`validate_manifest`] / 目录快照 [`Catalog`]（仅移植生成端真正消费的部分）；
+//!    [`validate_manifest`] / 目录快照 [`ManifestCatalog`]（仅移植生成端真正消费的部分）；
 //! 2. `internal/script/generators/plugins.go`（注入面）: 模板注入块
 //!    [`render_plugin_blocks`]（`PLUGIN_INCLUDES` / `PLUGIN_BOOTSTRAP`）。
 //!
@@ -45,7 +45,7 @@ const SETTING_TYPES: [&str; 5] = ["char", "text", "number", "file", "bool"];
 /// Go `plugins.Entry`：插件入口声明（当前仅 `script` 形态）。
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
-pub struct Entry {
+pub struct ManifestEntry {
     pub kind: String,
     pub file: String,
     pub func: String,
@@ -118,7 +118,7 @@ pub struct Manifest {
     pub spec_version: i32,
     pub description: String,
     pub author: String,
-    pub entry: Entry,
+    pub entry: ManifestEntry,
     pub permissions: Vec<String>,
     pub settings: Vec<Setting>,
     /// 能力提供块（可选；缺省 = 无 = wire 不出场，存量插件零漂移）。
@@ -136,7 +136,7 @@ impl Manifest {
 
 /// Go `plugins.Catalog`：用户插件目录快照（按 ID 字典序 + 逐包错误隔离）。
 #[derive(Debug, Clone, Default)]
-pub struct Catalog {
+pub struct ManifestCatalog {
     pub plugins: Vec<Manifest>,
     pub errors: Vec<String>,
 }
@@ -468,8 +468,8 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
 }
 
 /// Go `plugins.LoadCatalog`：扫描用户插件目录（缺目录 = 空；点前缀目录跳过；按 ID 稳定排序）。
-pub fn load_catalog(user_dir: &Path) -> Catalog {
-    let mut catalog = Catalog::default();
+pub fn load_catalog(user_dir: &Path) -> ManifestCatalog {
+    let mut catalog = ManifestCatalog::default();
     let entries = match std::fs::read_dir(user_dir) {
         Ok(entries) => entries,
         Err(error) => {
@@ -766,7 +766,7 @@ mod tests {
             id: "hello_world".to_string(),
             name: "Hello".to_string(),
             spec_version: SPEC_VERSION,
-            entry: Entry {
+            entry: ManifestEntry {
                 kind: "script".to_string(),
                 file: "main.ahk".to_string(),
                 func: "PluginMain".to_string(),

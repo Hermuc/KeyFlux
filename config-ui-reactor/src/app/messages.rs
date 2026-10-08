@@ -311,7 +311,7 @@ pub enum Message {
     /// 删除（仅用户包）。
     BhDelete,
     /// 行为目录快照到达（Ready 后台拉取 `GET /api/behaviors`）。
-    BehaviorsLoaded(Result<Box<sa::Catalog>, String>),
+    BehaviorsLoaded(Result<Box<sa::SaCatalog>, String>),
     // ------------------------------------------------------------- 插件页
     /// 重新拉取插件目录（进入页面 / 导入 / 删除后）。
     PluginsReload,

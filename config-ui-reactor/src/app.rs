@@ -157,7 +157,7 @@ pub struct Shell {
     /// 部署根路径（`<deploy>`；用于 acrylic 偏好落盘（ui-prefs.json）与 CLI 模式静态站目录定位）。
     data_root: Option<std::path::PathBuf>,
     /// 行为目录快照（选中动作页；`GET /api/behaviors`）。
-    catalog: sa::Catalog,
+    catalog: sa::SaCatalog,
     /// 选中动作页：文本卡当前点亮的 toggle id。
     sa_text_sel: Option<String>,
     /// 选中动作页：文件卡当前点亮的 toggle id。
@@ -237,7 +237,7 @@ impl Component for Shell {
             delay_scheme: 0,
             settings_notice: None,
             data_root: None,
-            catalog: sa::Catalog::default(),
+            catalog: sa::SaCatalog::default(),
             pending: save_pipeline::PendingQueue::default(),
             sa_text_sel: None,
             sa_file_sel: None,

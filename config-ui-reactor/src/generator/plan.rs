@@ -18,7 +18,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::generator::behaviors::{self, Catalog};
+use crate::generator::behaviors::{self, PackCatalog};
 use crate::generator::model::{Action, Config, MatchType, WindowGroup};
 use crate::generator::text::{contains_only_modifier, divide, to_ahk_func_arg};
 
@@ -124,7 +124,7 @@ pub struct PlanSelectedEntry {
 
 /// Go `generators.BuildPlan`。调用方**必须**先执行 `Preprocess`（注入 `!f17`），
 /// 与 `GenerateAHK` / `GenerateScripts` 路径保持一致。
-pub fn build_plan(config: &mut Config, catalog: Option<&Catalog>) -> Plan {
+pub fn build_plan(config: &mut Config, catalog: Option<&PackCatalog>) -> Plan {
     let window_groups = if config.options.window_groups.is_empty() {
         None
     } else {
@@ -148,7 +148,7 @@ pub fn build_plan(config: &mut Config, catalog: Option<&Catalog>) -> Plan {
 /// Go `generators.WritePlan`：2 空格缩进 + 末尾换行 + **Go 口径的 HTML 转义**。
 pub fn write_plan(
     config: &mut Config,
-    catalog: Option<&Catalog>,
+    catalog: Option<&PackCatalog>,
     output_file: &Path,
 ) -> io::Result<()> {
     let plan = build_plan(config, catalog);
@@ -279,7 +279,7 @@ fn plan_abbr_entries(
     result
 }
 
-fn plan_selected_action(config: &Config, catalog: Option<&Catalog>) -> PlanSelectedAction {
+fn plan_selected_action(config: &Config, catalog: Option<&PackCatalog>) -> PlanSelectedAction {
     let mut result = PlanSelectedAction {
         hotkey: String::new(),
         enable: false,

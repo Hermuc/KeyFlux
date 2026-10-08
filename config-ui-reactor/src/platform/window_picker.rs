@@ -328,7 +328,7 @@ fn post_to_pump(msg: u32) -> bool {
 fn handle_commit(kind: MatchKind) -> PickOutcome {
     let x = COMMIT_X.load(Ordering::Relaxed);
     let y = COMMIT_Y.load(Ordering::Relaxed);
-    match Probe.probe_at(x, y) {
+    match WindowProbe.probe_at(x, y) {
         Ok(d) => PickOutcome {
             status: PickStatus::Success,
             text: format_match(kind, &d),
@@ -447,7 +447,7 @@ unsafe extern "system" fn timer_proc(_hwnd: HWND, _msg: u32, _id: usize, _tick: 
     {
         return;
     }
-    match Probe.probe_at(x, y) {
+    match WindowProbe.probe_at(x, y) {
         Ok(d) => update_highlight(d.bounds),
         // 探测失败 (无窗口/自身/拒绝) 一律收高亮 (旧版探测异常同路径)。
         Err(_) => hide_highlight(),
@@ -686,9 +686,9 @@ thread_local! {
 }
 
 /// 窗口探测器 (旧 Win32WindowProbe 的移植; 无状态, 缓存在线程局部)。
-struct Probe;
+struct WindowProbe;
 
-impl Probe {
+impl WindowProbe {
     /// 探测屏幕坐标 (物理像素) 指向的顶层窗口。
     fn probe_at(&mut self, x: i32, y: i32) -> Result<Descriptor, PickStatus> {
         unsafe {

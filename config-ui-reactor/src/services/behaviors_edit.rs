@@ -5,7 +5,7 @@
 //! 校验失败 400，文案经 `error_message` 回显）；此处只保留草稿模型与轻量检查。
 
 use crate::models::{BehaviorAppliesTo, BehaviorEntry, BehaviorEntryParams, BehaviorPack};
-use crate::services::selected_action::Catalog;
+use crate::services::selected_action::SaCatalog;
 
 /// 新建草稿标记（无对应目录项）。
 pub const NEW_INDEX: usize = usize::MAX;
@@ -184,7 +184,7 @@ pub fn validate(draft: &BehaviorDraft) -> Result<(), String> {
 }
 
 /// 基础动作下拉候选：内置包的 entry.action 全集 ∪ 无参基础动作集（去重排序）。
-pub fn base_action_options(catalog: &Catalog) -> Vec<String> {
+pub fn base_action_options(catalog: &SaCatalog) -> Vec<String> {
     let mut options: Vec<String> = Vec::new();
     for pack in catalog.builtin.iter() {
         if pack.entry.kind.eq_ignore_ascii_case("builtin")

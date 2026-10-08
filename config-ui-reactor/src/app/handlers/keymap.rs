@@ -178,7 +178,7 @@ impl Shell {
                     let api = crate::services::transport::new_settings_api(port);
                     let response = api.get_behaviors();
                     if let Some(value) = response.value {
-                        Message::BehaviorsLoaded(Ok(Box::new(sa::Catalog {
+                        Message::BehaviorsLoaded(Ok(Box::new(sa::SaCatalog {
                             builtin: value.builtin,
                             user: value.user,
                         })))

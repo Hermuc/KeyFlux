@@ -59,7 +59,7 @@ fn is_false(value: &bool) -> bool {
 /// Go `behaviors.EntryParams`：两字段均 omitempty（结构体本身恒出场）。
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
-pub(crate) struct WireEntryParams {
+pub(crate) struct BehaviorWireEntryParams {
     #[serde(rename = "actionValue", skip_serializing_if = "String::is_empty")]
     pub action_value: String,
     #[serde(rename = "workingDir", skip_serializing_if = "String::is_empty")]
@@ -69,11 +69,11 @@ pub(crate) struct WireEntryParams {
 /// Go `behaviors.Entry`。注意 `params` 带 omitempty 但是非指针结构体 ⇒ 恒输出。
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
-pub(crate) struct WireEntry {
+pub(crate) struct BehaviorWireEntry {
     pub kind: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub action: String,
-    pub params: WireEntryParams,
+    pub params: BehaviorWireEntryParams,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub file: String,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -99,7 +99,7 @@ pub(crate) struct WirePack {
     pub spec_version: i32,
     #[serde(rename = "appliesTo")]
     pub applies_to: Option<Vec<WireAppliesToEntry>>,
-    pub entry: WireEntry,
+    pub entry: BehaviorWireEntry,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permissions: Option<Vec<String>>,
     #[serde(rename = "boundTypeId", skip_serializing_if = "String::is_empty")]

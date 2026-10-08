@@ -4,7 +4,7 @@
 //! * `ViewModels/SelectedActionPageViewModel.cs`（页面编排）
 //! * `ViewModels/TypeCardVm.cs`（聚合卡 toggle 构建 / transient 详情 / 删除）
 //! * `Services/BehaviorCatalog.cs`（行为目录覆盖/默认/显示名推导 —— Rust 侧改为
-//!   显式传 `&Catalog` 的纯函数，不再用 C# 的静态全局）
+//!   显式传 `&SaCatalog` 的纯函数，不再用 C# 的静态全局）
 //! * `Services/ActionSchemeCatalog.cs`（TextTypes 镜像 / NormalizeExts / SameExts）
 //!
 //! ⚠️ 与 C# 的口径差异（均已在文档登记）：
@@ -42,12 +42,12 @@ pub const BASE_ACTION_NO_VALUE: [&str; 4] =
 
 /// 行为目录快照（内置在前、用户在后；各自 ID 字典序由后端保证 —— 决定 `default_for` 稳定序）。
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Catalog {
+pub struct SaCatalog {
     pub builtin: Vec<BehaviorPack>,
     pub user: Vec<BehaviorPack>,
 }
 
-impl Catalog {
+impl SaCatalog {
     /// 合并视图（内置在前）。
     pub fn packs(&self) -> impl Iterator<Item = &BehaviorPack> {
         self.builtin.iter().chain(self.user.iter())
@@ -233,7 +233,7 @@ fn covers_dedicated(pack: &BehaviorPack, match_type: &str, values: &[String]) ->
 
 /// 覆盖某前提的行为列表，展示序：专属前提（非通配）在前、通配在后，各自保持目录序。
 pub fn covering<'a>(
-    catalog: &'a Catalog,
+    catalog: &'a SaCatalog,
     match_type: &str,
     match_value: &str,
 ) -> Vec<&'a BehaviorPack> {
@@ -255,7 +255,11 @@ pub fn covering<'a>(
 }
 
 /// 某前提是否拥有「专属」行为（精确 appliesTo 命中；自定义文本类型引用由 plain 继承段兜底）。
-pub fn has_dedicated_behavior_for(catalog: &Catalog, match_type: &str, match_value: &str) -> bool {
+pub fn has_dedicated_behavior_for(
+    catalog: &SaCatalog,
+    match_type: &str,
+    match_value: &str,
+) -> bool {
     let values = rule_values(match_type, match_value);
     catalog
         .packs()
@@ -263,7 +267,7 @@ pub fn has_dedicated_behavior_for(catalog: &Catalog, match_type: &str, match_val
 }
 
 /// 前提桶默认行为：default 标记优先（目录序），回退第一条覆盖包。
-pub fn default_for(catalog: &Catalog, match_type: &str, match_value: &str) -> Option<String> {
+pub fn default_for(catalog: &SaCatalog, match_type: &str, match_value: &str) -> Option<String> {
     let values = rule_values(match_type, match_value);
     let mut first: Option<&BehaviorPack> = None;
     for pack in catalog.packs() {
@@ -597,7 +601,7 @@ pub enum BadgeColor {
 }
 
 impl BadgeColor {
-    /// 由行为的基础动作 ID 推导（基础动作 = `Catalog::base_action_of` 的结果）。
+    /// 由行为的基础动作 ID 推导（基础动作 = `SaCatalog::base_action_of` 的结果）。
     pub fn for_base_action(base_action: &str) -> Self {
         match base_action {
             "open_url" => Self::LinkDarkWarm,
@@ -649,8 +653,8 @@ mod tests {
         }
     }
 
-    fn sample_catalog() -> Catalog {
-        Catalog {
+    fn sample_catalog() -> SaCatalog {
+        SaCatalog {
             builtin: vec![
                 pack(
                     "open_url",
@@ -764,7 +768,7 @@ mod tests {
         // base_action_of：builtin 用户包取 entry.action
         assert_eq!(catalog.base_action_of("es_search"), "es_search");
         assert_eq!(catalog.base_action_of("open_url"), "open_url");
-        let catalog = Catalog::default();
+        let catalog = SaCatalog::default();
         assert_eq!(catalog.base_action_of("ghost_id"), "ghost_id", "未知原样");
     }
 
