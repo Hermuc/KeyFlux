@@ -173,12 +173,11 @@ class PluginManager {
     try EventBus.Publish("plugin_error", Map("pluginId", pluginId, "message", msg))
   }
 
-  ; 日志 (与 ActionRegistry._log 同策略: 追加写, 失败静默; 目录自建, cwd=部署根)
+  ; 日志 (与 ActionRegistry._log 同策略)。2026-10-08 收敛: 委派引擎唯一留痕入口
+  ; (EngineLogWarn → logs\engine_error.log, 其内部自建目录并 try 包裹),
+  ; 不再各自维护 sink 文件与 DirCreate。
   static _log(msg) {
-    try {
-      DirCreate("logs")
-      FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " msg "`n", "logs\plugin_manager.log")
-    }
+    EngineLogWarn("PluginManager", msg)
   }
 }
 

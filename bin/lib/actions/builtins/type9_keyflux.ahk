@@ -62,7 +62,7 @@ EnterCapslockAbbr() {
     ; 错误弹窗 + 热键永久失效 (见 CommandInputHooks.ahk 的 CommandInputOnChar 注释)
     ; 🔴 终止字符必须**绕过 ShouldEcho** 投递 (2026-09-20 实测缺陷): 命中这一击就结束了会话,
     ; 该字符**不会被原生显示**; 而透传模式下 ShouldEcho 恒 false ⇒ 走 EchoChar 等于不投递
-    ; ⇒ 用户看到「最后一个字母不显示」(铁证 = logs\command_input_hooks.log 连发
+    ; ⇒ 用户看到「最后一个字母不显示」(铁证 = logs\engine_error.log 连发
     ; `EchoChar(Match) 异常` —— 旧写法连实参个数都是错的)。故改走唯一允许绕过总开关的收口
     ; `CommandDisplay.EchoTerminalChar`; 它是该字符**唯一**的显示来源, 两种形态都必须投。
     try CommandDisplay.EchoTerminalChar(char)

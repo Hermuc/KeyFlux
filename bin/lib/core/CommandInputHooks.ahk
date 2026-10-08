@@ -184,10 +184,10 @@ class CommandInputHooks {
     return out
   }
 
+  ; 错误日志。2026-10-08 收敛: 委派引擎唯一留痕入口 (EngineLogWarn → logs\engine_error.log),
+  ; 不再各自维护 sink 文件。调用点签名 (1 参) 保持不变。
   static _log(msg) {
-    try {
-      FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " msg "`n", "logs\command_input_hooks.log")
-    }
+    EngineLogWarn("CommandInputHooks", msg)
   }
 }
 
