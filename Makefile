@@ -106,13 +106,15 @@ createRelease:
 
 
 # uploadLanZou: 上传蓝奏云 + 把分享链接写回 readme/站点文档。
-# 前置检查与文本改写 = `build-tools`（原 Go `scripts/build_tools.go` 的 Rust 移植，
+# 前置检查与文本改写 = `build-tools` bin（原 Go `scripts/build_tools.go` 的 Rust 移植，
 # 逻辑在 config-ui-reactor/src/services/build_tools.rs，bin 只做 argv→退出码映射）；
-# Go 工具链已于 2026-10-07 从本机退役 ⇒ 该目标不再依赖 Go 或任何 Go 运行时。
+# Go 工具链已于 2026-10-07 从本机退役。原 tools/build-tools.ps1 包装器已于 2026-10-08 移除，
+# 此处直接 cargo run（本目标是维护者发布路径、非常态 CI 闸门，reactor crate 此时已构建）。
+# lanzou_client.py 保留：依赖第三方 lanzou-api + 蓝奏云上传协议，非纯逻辑、不可离线验证。
 uploadLanZou:
-	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/build-tools.ps1 checkForAHKUpdate $(ahkVersion)
+	pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path config-ui-reactor/Cargo.toml --bin build-tools -- checkForAHKUpdate $(ahkVersion)'
 	python scripts/lanzou_client.py $(zip) 2> share_link.json
-	pwsh -NoProfile -ExecutionPolicy Bypass -File tools/build-tools.ps1 updateShareLink $(version)
+	pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path config-ui-reactor/Cargo.toml --bin build-tools -- updateShareLink $(version)'
 	rm -f share_link.json
 
 upload: uploadLanZou createRelease
@@ -158,33 +160,35 @@ check-deploy-tree:
 # check-freshness: 暂存产物「新鲜度」门禁 (多维度优化报告 #5)。
 #   断言 bin/settings.exe 与 bin/ui/KeyFlux.Settings.exe 的 mtime **晚于 HEAD** —— 二进制
 #   「被调包 / 没重建」时, check 会在**旧生成器**上假绿、release 会带**旧面板**; 本门禁把这种
-#   静默陈旧变成红灯。单一真源 = tools/check-freshness.ps1 (默认只查 .gitignore 的构建产物;
+#   静默陈旧变成红灯。单一真源 = devtools check-freshness (原 tools/check-freshness.ps1, 2026-10-08 移植为 Rust; 默认只查 .gitignore 的构建产物;
 #   已入库的 KeyFlux-CommandInput.exe 与 vendor 的 AutoHotkey64.exe 刻意排除 —— 见脚本头「SCOPE」)。
 #   注: 正因如此 deploy 目标已改为「先 build 再 check」(否则本门禁会在 deploy 会自行重建的情况下
 #   先一步拦下), 详见 deploy 目标注释。
 check-freshness:
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-freshness.ps1
+	@pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- check-freshness'
 
 # check-upstream: 上游 windows-reactor 是否有新版 (多维度优化报告 #7)。
 #   vendored fork (vendor/windows-reactor, P1..P8) 的补丁面对编译器/测试/CI 全不可见 ⇒
 #   上游发新版时仓库不会有任何提示。本目标把"上游已往前走"变成一次可见信号, 交给人按
 #   PATCHES.md §四 的 rebase 清单重放补丁 (不自动升级)。
 #   ⚠ 需要网络 ⇒ **不并入 check** (check 是随时可跑的无副作用闸门); 每周由
-#     .github/workflows/deps-watch.yml 跑一次 (单一真源 = tools/check-upstream-reactor.ps1)。
+#     .github/workflows/deps-watch.yml 跑一次 (单一真源 = devtools check-upstream-reactor, 原 tools/check-upstream-reactor.ps1)。
 check-upstream:
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-upstream-reactor.ps1
+	@pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- check-upstream-reactor'
 
 # check-deps: 依赖供应链审计 (多维度优化报告 #8) —— RUSTSEC 漏洞库 + 许可/来源合规。
-#   单一真源 = tools/check-deps.ps1 (覆盖两个 cargo 工程); 配置 = 仓库根 deny.toml。
+#   单一真源 = devtools check-deps (原 tools/check-deps.ps1, 2026-10-08 移植为 Rust; 覆盖三个 cargo 工程); 配置 = 仓库根 deny.toml。
 #   ⚠ 需要网络 + 预装 cargo-audit / cargo-deny (cargo install cargo-audit cargo-deny)
 #     ⇒ **不并入 check**; 每周由 .github/workflows/deps-watch.yml 跑一次。
 check-deps:
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-deps.ps1
+	@pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- check-deps'
 
 # lint: 标识符冲突静态闸门 (AHK 大小写不敏感, /Validate 查不出「局部变量遮蔽同名函数」类
 # 运行时崩溃; 详见阶段 0 §7.3)。扫描 bin/lib 下全部 AHK 源文件, 有 ERROR 即非零退出。
+# (原 tools/lint_ident.py 已移植为独立轻量 crate devtools/; env.ps1 仅本机需要 —— 钉的是本机
+#  MSVC 路径, CI 上 cargo 已在 PATH 故跳过, 见 analyzers.yml 的「刻意不传 -EnvScript」同理)
 lint:
-	python tools/lint_ident.py $$(find bin/lib -name '*.ahk')
+	pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- lint-ident @args' $$(find bin/lib -name '*.ahk')
 
 # lint-ahk-style: AHK 侧「风格一致性 + 静默失败面」护栏 (2026-10-08, 规范化批 G)。
 #   检查项: try 无 catch/finally、catch 无留痕、日志 sink 数、BOM/CRLF/缩进偏差、拼写分裂。
@@ -193,7 +197,7 @@ lint:
 #   上线首日即绿（基线就是当时的实态）；它守的是"不让它变坏"，而不是"立刻归零"。
 #   ⚠️ 有意放宽某类计数时必须显式重写基线，不得绕门禁。
 lint-ahk-style:
-	python tools/lint_ahk_style.py
+	pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- lint-ahk-style'
 
 # check-texttypes: 内置文本特征**三端一致性**闸门 (Rust 镜像 services/selected_action.rs
 # ::TEXT_TYPES ⇄ AHK TextFeatureSpecs ⇄ 共享向量 testdata/text_types.json)。
@@ -201,10 +205,10 @@ lint-ahk-style:
 #       ② 运行时对账 (从 AHK 源逐字提取函数体跑向量全部用例 —— 2026-09-17 之前
 #          SelectedAction.ahk 声称由 match_ops.json 守护, 但该向量只有 Go 侧消费, 属无强制契约)。
 check-texttypes:
-	python tools/texttype_conformance.py
+	pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- texttype-conformance'
 
 # check-plugins-mirror: 两棵官方插件树必须一致。
-#   🔴 **唯一手改点 = `plugins/examples/<id>`**（入库、有版本历史、sync-plugins.ps1 / CI 沙箱
+#   🔴 **唯一手改点 = `plugins/examples/<id>`**（入库、有版本历史、devtools sync-plugins / CI 沙箱
 #      staging / cargo 生成器测试 / parity 语料 `factory-plugins` 都读它）；
 #   `data/plugins/<id>` 是**发布源**（Makefile copyFiles 与 release.yml 的 `cp -r data` 打包它，
 #      被 .gitignore 反选放行），改完 examples 用 `make sync-plugin-mirror` 单向同步过来。
@@ -220,10 +224,10 @@ check-plugins-mirror:
 # check-vendor: 第三方随包内容「勿改」hash 门禁 (多维度优化报告 #13)。
 #   守护 Monitor.ahk / AHK 运行时 / 小工具 / windows-reactor fork —— 防止好人误"修正"上游
 #   (拼写、看似死代码的分支、格式)。清单与理由见 vendor/README.md;
-#   单一真源 = tools/check-vendor-hashes.ps1 + tools/vendor-manifest.json。
-#   有意变更后跑 `pwsh -File tools/check-vendor-hashes.ps1 -Write` 重录并在提交里说明原因。
+#   单一真源 = devtools check-vendor-hashes（原 tools/check-vendor-hashes.ps1，2026-10-08 移植为 Rust）+ tools/vendor-manifest.json。
+#   有意变更后跑 `cargo run --release --manifest-path devtools/Cargo.toml -- check-vendor-hashes -Write` 重录并在提交里说明原因。
 check-vendor:
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-vendor-hashes.ps1
+	@pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- check-vendor-hashes'
 
 # sync-plugin-mirror: 把**唯一手改点** plugins/examples 单向同步到发布源 data/plugins。
 #   让「同步」从口头约定变成一条可执行、可自验的动作（跑完立即复验门禁）。
@@ -337,9 +341,9 @@ check-command-input:
 #   robocopy 刻意**不带 /MIR**: 只增改, 不删 —— 用户自己导入到 data/plugins 的插件
 #   不会被这一步清掉 (仓库里的 plugins/examples 是「随软件分发的官方插件」单一真源)。
 #   2026-10-02 P4 墓碑: 复制后按 config.json options.plugins.removed 删除对应目录 ——
-#   用户主动删除的随包插件不再被同步带回 (tools/sync-plugins.ps1)。
+#   用户主动删除的随包插件不再被同步带回 (devtools sync-plugins, 原 tools/sync-plugins.ps1)。
 sync-plugins: | $(OUT_DIR)
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/sync-plugins.ps1 -OutDir "$(OUT_DIR)"
+	@pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- sync-plugins -OutDir "$(OUT_DIR)"'
 
 # sync-out: 把编译产物同步到 OUT_DIR (robocopy 退出码 0-7 均为成功)
 # 守卫 ① 「部署树已就绪」(check-deploy-tree): 见该目标注释 —— 防止 OUT_DIR 写错后在别的
@@ -365,7 +369,7 @@ sync-out: sync-plugins | check-deploy-tree $(OUT_DIR)
 
 # patch-commandinput: 对**闭源上游**命令框 exe 重施「抑制八角 keycap」数据 patch (契约 §3.11)。
 # 🔴 现状 (2026-10-07): 命令框已是自研 Rust 产物 (command-input/), 不含上游那段 0x1CCA0
-#    keycap 白名单 ⇒ 本 patch 对它**不适用**; tools/patch_command_input.py 会自动识别并跳过
+#    keycap 白名单 ⇒ 本 patch 对它**不适用**; devtools patch-command-input 会自动识别并跳过
 #    (exit 0)。该目标保留为诊断/还原工具 (对历史上游 exe 仍有效), 但 **sync-out 不再调用它**。
 # 历史背景 (回归上游 exe 时仍适用): 该 patch 曾必须放在 sync-out **之后** —— 白名单 robocopy
 #    的 '*.exe' 会用仓库未 patch 的副本覆盖部署树, keycap 每次被冲掉 (2026-09-21 实测:
@@ -374,11 +378,11 @@ sync-out: sync-plugins | check-deploy-tree $(OUT_DIR)
 # 🔴 运行中的 exe 自锁不可写 ⇒ 先结束命令框进程 (懒加载, 引擎会在下次唤起时重建)。
 patch-commandinput: | $(OUT_DIR)
 	@pwsh -NoProfile -Command 'Stop-Process -Name KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 400'
-	python tools/patch_command_input.py "$(OUT_DIR)/bin/KeyFlux-CommandInput.exe"
+	MSYS_NO_PATHCONV=1 pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- patch-command-input "$(OUT_DIR)/bin/KeyFlux-CommandInput.exe"'
 
 # check-commandinput-patch: 断言部署树 exe 的 keycap patch 在位 (只读, 供诊断/CI 用)。
 check-commandinput-patch:
-	python tools/patch_command_input.py "$(OUT_DIR)/bin/KeyFlux-CommandInput.exe" --check
+	MSYS_NO_PATHCONV=1 pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- patch-command-input "$(OUT_DIR)/bin/KeyFlux-CommandInput.exe" --check'
 
 # command-input: 构建自研 Rust 命令框并**收编到仓库 bin/** (仓库随包携带)。
 # 🔴 release.yml 不做 command-input 构建, 打包段是 `cp -r bin` ⇒ 仓库这份**必须**是当前
@@ -422,6 +426,6 @@ deploy: buildClientReactor check sync-out
 #     (见 buildClientReactor 注释); deploy_panel.ps1 的第 4 步校验的是另一段 (仓库 bin/ui
 #     -> 生产部署树), 与本节互补。
 verify-deploy:
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify_deploy.ps1
+	@pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- verify-deploy'
 
 .PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-fuzzy check-plugins-mirror check-vendor check-command-input sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy verify-deploy check-freshness check-upstream check-deps parity api-parity check-deploy-tree

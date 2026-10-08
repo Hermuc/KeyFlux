@@ -8,7 +8,8 @@
 #   not updated keeps reporting green), so this file is the single source of truth
 #   for all of them. (drop-in-rust.ps1 was a consumer until it was removed together
 #   with the Go backend on 2026-10-06; consumers today include tools/cargo-gates.ps1,
-#   tools/deploy_panel.ps1 and tools/sync-plugins.ps1.)
+#   tools/deploy_panel.ps1, tools/oracle.ps1 and the two parity harnesses. The former
+#   tools/sync-plugins.ps1 was ported to Rust `devtools sync-plugins` on 2026-10-08.)
 #
 # CONVENTION:
 #   ASCII-only on purpose -- `pwsh -File` and Windows PowerShell 5.1 misparse non-BOM

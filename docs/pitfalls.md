@@ -21,7 +21,7 @@
 
 | # | 症状 | 根因 | 防线（自动化） |
 |---|---|---|---|
-| A1 | 两侧 md5 全一致，却行为异常 | 一个 exe 被拷进了 `settings.exe` 与 `KeyFlux.Settings.exe` 两个槽（「四侧一致」反而是**危险信号**） | `make verify-deploy` → `tools/verify_deploy.ps1`：各腿 `built == staged`，**且两腿彼此不等** |
+| A1 | 两侧 md5 全一致，却行为异常 | 一个 exe 被拷进了 `settings.exe` 与 `KeyFlux.Settings.exe` 两个槽（「四侧一致」反而是**危险信号**） | `make verify-deploy` → `devtools verify-deploy`（原 `tools/verify_deploy.ps1`）：各腿 `built == staged`，**且两腿彼此不等** |
 | A2 | 本地产物无版本号，CI 产物有 | `buildClientReactor` 漏传 `-Version`（版本经 `KEYFLUX_VERSION` 注入 `settings.exe`/面板） | `Makefile` 的 `buildClientReactor` 显式带 `-Version $(version)` |
 | A3 | 部署树后端悄悄停在旧构建 | 本地**没有**任何目标生产 `bin/settings.exe`，它只会变旧然后被 `sync-out` 推走 | `buildClientReactor` 末尾复制并打印 md5 |
 | A4 | 部署树命令框 exe 被回退 | `sync-out` 的 `'*.exe'` 白名单会用仓库副本覆盖部署树那一份 | `sync-out` 的 `/XF KeyFlux-CommandInput.exe` |
@@ -36,7 +36,7 @@
 
 | # | 症状 | 根因 | 防线 |
 |---|---|---|---|
-| B1 | 在**旧生成器**上 check 通过、发布包带**旧面板** | 二进制没重建；文件「在」所以没人报警 | `make check-freshness` → `tools/check-freshness.ps1`：`mtime > HEAD` |
+| B1 | 在**旧生成器**上 check 通过、发布包带**旧面板** | 二进制没重建；文件「在」所以没人报警 | `make check-freshness` → `devtools check-freshness`（原 `tools/check-freshness.ps1`）：`mtime > HEAD` |
 | B2 | 报「body N bytes != baseline M bytes」，按差值排障却对不上 | 打印的是 **base64 字符串长度**，不是字节数（base64 ≈ 4/3 源长） | `tools/api-parity/run_api_parity.ps1`：解码回**真实字节数** + 首个差异偏移 |
 | B3 | `GET /api/plugins` 少数内置插件报 MISMATCH | 沙箱缺 `data/plugins`（staging 步骤漏了） | `analyzers.yml` / `release.yml` 的 staging 步骤 |
 | B4 | `GET /config` 的 `keyfluxVersion` 与基线不同字节 | settings.exe 未带 `KEYFLUX_VERSION` 构建（`option_env!` 注入） | `api-parity` 的构建口径注释 + `cargo-gates.ps1 -Version` |
@@ -111,6 +111,6 @@
 | `make -n check`（CI `make-parse`） | D5 |
 | `make check-hooks` / `check-fuzzy` | 命令框 provider 分发 / 容错匹配（运行时契约） |
 | `make check-command-input`（`check` 前置；`make analyzers` 双工程） | F1 |
-| `make lint-ahk-style`（`tools/lint_ahk_style.py`） | F2、F3 |
+| `make lint-ahk-style`（`devtools lint-ahk-style`，原 `tools/lint_ahk_style.py`，2026-10-08 移植为 Rust） | F2、F3 |
 | `tools/deploy_panel.ps1` 内建门禁 | A5、A6 |
 | `tools/lib/kf-tools.ps1` | C1、C3、E4（单一真源本身） |

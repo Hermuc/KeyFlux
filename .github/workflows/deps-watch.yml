@@ -23,20 +23,33 @@ on:
 jobs:
   upstream-windows-reactor:
     runs-on: windows-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: 'Check upstream windows-reactor version (single source: tools/check-upstream-reactor.ps1)'
-        shell: pwsh
-        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-upstream-reactor.ps1
+      # 单一真源 = devtools check-upstream-reactor（原 tools/check-upstream-reactor.ps1，
+      # 2026-10-08 移植为 Rust）；经 make check-upstream 调用 ⇒ 本 job 需自带 Rust 工具链。
+      - name: Setup Rust toolchain (channel = stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & devtools target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            devtools/target
+          key: devtools-${{ runner.os }}-${{ hashFiles('devtools/Cargo.lock') }}
+
+      - name: 'Check upstream windows-reactor version (single source: devtools check-upstream-reactor)'
+        run: make check-upstream
 
   # 依赖供应链审计（多维度优化报告 #8）：RUSTSEC 漏洞库 + 许可 / 来源 / 反模式合规。
   #   为什么独立于 push 闸门：需要网络 + 外部 advisory DB，且"新披露漏洞"与本次改动无关，
   #   每周一次即可（与上游版本检测同一节奏，故并入本 workflow）。
-  #   单一真源 = tools/check-deps.ps1（覆盖 config-ui-reactor 与 command-input 两个 cargo 工程）；
-  #   配置单一真源 = 仓库根 deny.toml。
+  #   单一真源 = devtools check-deps（原 tools/check-deps.ps1，2026-10-08 移植为 Rust；覆盖
+  #   config-ui-reactor / command-input / devtools 三个 cargo 工程）；配置单一真源 = 仓库根 deny.toml。
   deps-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -49,6 +62,15 @@ jobs:
         with:
           tool: cargo-audit,cargo-deny
 
-      - name: 'Dependency audit (single source: tools/check-deps.ps1)'
-        shell: pwsh
-        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-deps.ps1
+      - name: Cache cargo registry & devtools target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            devtools/target
+          key: devtools-${{ runner.os }}-${{ hashFiles('devtools/Cargo.lock') }}
+
+      # ubuntu runner 自带 cargo（PATH）⇒ 直接 cargo run，无需 env.ps1（那是本机 MSVC 注入）。
+      - name: 'Dependency audit (single source: devtools check-deps)'
+        run: cargo run --release --manifest-path devtools/Cargo.toml -- check-deps

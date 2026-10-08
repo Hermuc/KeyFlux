@@ -1,0 +1,2 @@
+# Rust 构建产物不入库 (与 command-input/.gitignore、根 .gitignore 的 config-ui-reactor/target/ 同理)
+/target

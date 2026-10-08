@@ -57,7 +57,8 @@ jobs:
             ~/.cargo/git
             config-ui-reactor/target
             command-input/target
-          key: cargo-${{ runner.os }}-${{ hashFiles('config-ui-reactor/Cargo.lock', 'command-input/Cargo.lock') }}
+            devtools/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('config-ui-reactor/Cargo.lock', 'command-input/Cargo.lock', 'devtools/Cargo.lock') }}
 
       - name: 'Cargo gates (fmt + clippy + test) -- config-ui-reactor (single source: tools/cargo-gates.ps1)'
         shell: pwsh
@@ -70,15 +71,34 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Project command-input
 
+      # devtools = 原 tools/*.py 脚本的 Rust 移植（2026-10-08）；同口径纳入 fmt/clippy/test 闸门。
+      - name: 'Cargo gates (fmt + clippy + test) -- devtools (same single source)'
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Project devtools
+
   # 标识符冲突静态闸门 = `make lint`。
   #   AHK 大小写不敏感, 「局部变量遮蔽同名函数」是纯运行时崩溃, /Validate 查不出;
   #   扫描 bin/lib 下全部 AHK 源, 有 ERROR 即非零退出。
   lint:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      # make lint 现走独立轻量 crate devtools/（原 tools/lint_ident.py 的 Rust 移植）⇒
+      # 本 job 需自带 Rust 工具链（此前依赖 runner 内置 Python，零 setup）。
+      - name: Setup Rust toolchain (channel = stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & devtools target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            devtools/target
+          key: devtools-${{ runner.os }}-${{ hashFiles('devtools/Cargo.lock') }}
 
       - name: make lint
         run: make lint
@@ -87,10 +107,23 @@ jobs:
   #   Go 注册表 ⇄ AHK TextFeatureSpecs ⇄ 共享向量 (值/大小写/正则/顺序 + 运行时逐字提取)。
   check-texttypes:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      # 同 lint：make check-texttypes 现走 devtools crate（原 tools/texttype_conformance.py）。
+      - name: Setup Rust toolchain (channel = stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & devtools target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            devtools/target
+          key: devtools-${{ runner.os }}-${{ hashFiles('devtools/Cargo.lock') }}
 
       - name: make check-texttypes
         run: make check-texttypes
@@ -237,11 +270,25 @@ jobs:
   # 断链护栏四: 第三方随包内容「勿改」hash 门禁 = `make check-vendor` (2026-10-08, 报告 #13)。
   #   Monitor.ahk / AHK 运行时 / 小工具 / windows-reactor fork 逐个 SHA256 对账 —— 防"好人误修正"
   #   上游(拼写、看似死代码的分支、格式)。清单与理由 = vendor/README.md;
-  #   有意变更后须 `tools/check-vendor-hashes.ps1 -Write` 重录并在提交里说明。
+  #   有意变更后须 `devtools check-vendor-hashes -Write` 重录并在提交里说明。
   vendor-hashes:
     runs-on: windows-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+
+      # make check-vendor 现走 devtools crate（原 tools/check-vendor-hashes.ps1）⇒ 需自带 Rust。
+      - name: Setup Rust toolchain (channel = stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & devtools target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            devtools/target
+          key: devtools-${{ runner.os }}-${{ hashFiles('devtools/Cargo.lock') }}
+
       - name: 'make check-vendor (vendored third-party content unchanged)'
         run: make check-vendor

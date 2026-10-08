@@ -95,7 +95,7 @@ Go 侧的错误文案（`可选：链接 / 路径 / … / 纯文本`）、`reser
 1. **共享向量 = 双端契约**：`text_types.json` 的 `expectTypes` 记录"全部命中特征"（非单点），
    天然同时断言具名互斥性与 plain 排除集。
 2. **Go**：`texttype_vector_test.go` —— 注册表顺序 == `types`、兜底唯一居末、逐用例比对。
-3. **AHK 运行时对账**：`tools/texttype_conformance.py` 从源文件**逐字提取**函数体生成探针
+3. **AHK 运行时对账**：`devtools texttype-conformance`（原 `tools/texttype_conformance.py`，2026-10-08 移植为 Rust）从源文件**逐字提取**函数体生成探针
    （不手抄，杜绝探针与产品代码漂移），跑 63 用例 × 5 特征 = 315 次求值比对。
 4. **静态对账**：同一工具解析两侧注册表源码，逐项比对 value / named / ignoreCase / pattern 与顺序。
 5. **重构等价性**：重构前后各跑一次探针，`diff` 逐位一致（本次 63×5 全同）。
