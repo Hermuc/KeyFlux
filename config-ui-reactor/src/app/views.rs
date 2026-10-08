@@ -1,4 +1,4 @@
-﻿//! `app` 的 views：页面装配方法（把 Shell 状态 + ViewContext 翻译成 View）。
+//! `app` 的 views：页面装配方法（把 Shell 状态 + ViewContext 翻译成 View）。
 //!
 //! 自原 `app.rs` 的 `impl Shell` 拆分；纯代码搬移，行为不变。
 
@@ -345,11 +345,11 @@ impl Shell {
                         self.catalog.is_no_value(&behavior),
                         index > 0,
                         index + 1 < entry_count,
-                        context.callback(move |pick: Option<usize>| match pick {
-                            Some(pick) => Message::SaEntrySwitch {
+                        context.callback(move |selected: Option<usize>| match selected {
+                            Some(selected) => Message::SaEntrySwitch {
                                 match_type,
                                 index,
-                                pick,
+                                selected,
                             },
                             None => Message::Noop,
                         }),
@@ -378,15 +378,15 @@ impl Shell {
                 ));
             }
 
-            // 「添加行为」：自动选首个未用覆盖行为（pick 为 None 时），禁用原因 1107/1119
-            let picked = self.sa_picked(match_type, covering.len());
+            // 「添加行为」：自动选首个未用覆盖行为（selected 为 None 时），禁用原因 1107/1119
+            let selected = self.sa_selected(match_type, covering.len());
             let first_unused = covering.iter().position(|pack| {
                 !mapping
                     .entries
                     .iter()
                     .any(|entry| entry.behavior == pack.id)
             });
-            let effective_pick = picked.or(first_unused);
+            let effective_selected = selected.or(first_unused);
             let full = mapping.entries.len() >= 9;
             let exhausted = first_unused.is_none();
             let hint = if full {
@@ -401,12 +401,12 @@ impl Shell {
                 "add".to_string(),
                 selected_action_view::add_behavior_row(
                     self.sa_covering_labels(match_type, &mapping.match_value),
-                    effective_pick,
+                    effective_selected,
                     can_add,
                     hint,
-                    context.callback(move |pick: Option<usize>| Message::SaPickBehavior {
+                    context.callback(move |selected: Option<usize>| Message::SaSelectBehavior {
                         match_type,
-                        pick,
+                        selected,
                     }),
                     context.message(Message::SaAddBehavior { match_type }),
                 ),
@@ -419,8 +419,8 @@ impl Shell {
         } else {
             let match_value = sa::transient_match_value(config, match_type, &sel_id);
             let covering = sa::covering(&self.catalog, match_type, &match_value);
-            let picked = self.sa_picked(match_type, covering.len());
-            let can_add = picked.is_some();
+            let selected = self.sa_selected(match_type, covering.len());
+            let can_add = selected.is_some();
 
             StackPanel::new()
                 .spacing(8.0)
@@ -433,12 +433,14 @@ impl Shell {
                     )),
                     selected_action_view::add_behavior_row(
                         self.sa_covering_labels(match_type, &match_value),
-                        picked,
+                        selected,
                         can_add,
                         None,
-                        context.callback(move |pick: Option<usize>| Message::SaPickBehavior {
-                            match_type,
-                            pick,
+                        context.callback(move |selected: Option<usize>| {
+                            Message::SaSelectBehavior {
+                                match_type,
+                                selected,
+                            }
                         }),
                         context.message(Message::SaAddBehavior { match_type }),
                     ),

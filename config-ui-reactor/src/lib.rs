@@ -4,7 +4,7 @@
 //! 边界原则：**换实现，不换边界** —— Go 后端 / AHK 引擎 / `data/config.json` 真源 /
 //! HTTP 协议串（KEYFLUX_PORT 等）全部不动，风险限制在「一个 HTTP 客户端 + 一套 UI」。
 //!
-//! 分层（见 `D:\PortableApps\KeyFlux-WinUI-migration\01-项目规范.md`）：
+//! 分层（规范原文归档在仓内 `doc/poc-archive/01-项目规范.md`）：
 //!   `app`       组件与导航（根组件 + 视图 + 弹窗 + 状态）
 //!   `ui`        可复用视图构件（卡片/行/按钮/指示字等纯渲染单元）
 //!   `theme`     主题令牌（Color/Brush/CornerRadius/Thickness）
@@ -14,6 +14,15 @@
 //!   `services`  HTTP 客户端 / 配置存取 / i18n / Markdown
 //!   `glass`     毛玻璃背板策略（Mica Alt 等）
 //!   `platform`  reactor 与原生互操作的**唯一**落点（Ports & Adapters；不得反向依赖上层）
+//!
+//! 命名词汇（新代码一律照此；同义漂移的阅读税见 2026-10-07 代码审查报告 §2）：
+//! * 从一组候选中**选中的项** = `selected`（勿写 `picked` / `chosen`）
+//! * 列表中的一个**元素**   = `entry`    （勿写 `item` / `row`）
+//! * 容器 / 卡片            = `card`     （勿写 `panel`）
+//!
+//! 例外（`pick` 作**动词**，指动作而非选中项，故不收敛）：`window_picker::pick`
+//! 与 `Message::WindowPicked`（窗口拾取）、`platform::file_dialog::pick_open_file`
+//! （弹出选择对话框）、`services::plugins::pick`（按语言择一标签）。
 //!
 //! ⚠️ API 依据纪律：**一律以本机 `cargo registry/src/windows-reactor-0.100.0` 源码为准**，
 //!    不要照抄 master 文档（0.100.0 无 `window_frame` / `run_window` / `set_timeout`，

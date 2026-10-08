@@ -27,8 +27,8 @@ impl Shell {
                 self.mt_test_result = None;
                 self.mt_test.clear();
             }
-            Message::MatchTypesPick(pick) => {
-                let draft = pick.and_then(|index| {
+            Message::MatchTypesSelect(selected) => {
+                let draft = selected.and_then(|index| {
                     self.config
                         .as_ref()
                         .and_then(|config| config.match_types.get(index))

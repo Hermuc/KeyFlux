@@ -52,11 +52,11 @@ impl Shell {
             }
             // ---------------------------------------------------------- 插件页
             Message::FontBrowse => {
-                let picked = platform::file_dialog::pick_open_file(
+                let selected = platform::file_dialog::pick_open_file(
                     &i18n::t("2504"),
                     platform::file_dialog::FONT_FILTER,
                 );
-                if let Some(path) = picked
+                if let Some(path) = selected
                     && let Some(config) = self.config.as_mut()
                 {
                     config.options.command_font.source_path = path.to_string_lossy().into_owned();

@@ -105,9 +105,12 @@ impl Shell {
                     })
                 });
             }
-            Message::SaPickBehavior { match_type, pick } => match match_type {
-                MATCH_TEXT_TYPE => self.sa_text_pick = pick,
-                _ => self.sa_file_pick = pick,
+            Message::SaSelectBehavior {
+                match_type,
+                selected,
+            } => match match_type {
+                MATCH_TEXT_TYPE => self.sa_text_selected = selected,
+                _ => self.sa_file_selected = selected,
             },
             Message::SaAddBehavior { match_type } => {
                 self.add_behavior(match_type);
@@ -125,7 +128,7 @@ impl Shell {
             Message::SaEntrySwitch {
                 match_type,
                 index,
-                pick,
+                selected,
             } => {
                 let id = self.sa_selected_id(match_type).unwrap_or_default();
                 // 覆盖推导（catalog 不可变借用）→ 写回（可变借用）
@@ -141,7 +144,7 @@ impl Shell {
                     match (self.config.as_ref(), match_value) {
                         (_, Some((match_value, Some(current)))) => {
                             let covering = sa::covering(&self.catalog, match_type, &match_value);
-                            covering.get(pick).map(|pack| {
+                            covering.get(selected).map(|pack| {
                                 let behavior = pack.id.clone();
                                 SelectedEntry {
                                     action_value: if self.catalog.is_no_value(&behavior) {
@@ -233,9 +236,9 @@ impl Shell {
                     .map(|config| match_types_edit::MatchTypeDraft::new_draft(config, kind));
             }
             Message::SaAddCancel => self.sa_add = None,
-            Message::SaAddType(pick) => {
+            Message::SaAddType(selected) => {
                 if let Some(draft) = self.sa_add.as_mut() {
-                    draft.type_pick = pick;
+                    draft.type_selected = selected;
                     draft.checked.clear();
                     draft.error = None;
                 }
@@ -244,14 +247,14 @@ impl Shell {
                 let Some(draft) = self.sa_add.as_mut() else {
                     return;
                 };
-                let Some(pick) = draft.type_pick else {
+                let Some(selected) = draft.type_selected else {
                     return;
                 };
                 let Some(config) = self.config.as_ref() else {
                     return;
                 };
                 let options = sa::add_type_options(config);
-                let Some(option) = options.get(pick) else {
+                let Some(option) = options.get(selected) else {
                     return;
                 };
                 let (match_type, match_value) = sa::add_target(config, &option.id);
@@ -273,14 +276,14 @@ impl Shell {
                 let Some(draft) = self.sa_add.as_mut() else {
                     return;
                 };
-                let Some(pick) = draft.type_pick else {
+                let Some(selected) = draft.type_selected else {
                     return;
                 };
                 let Some(config) = self.config.as_ref() else {
                     return;
                 };
                 let options = sa::add_type_options(config);
-                let Some(option) = options.get(pick) else {
+                let Some(option) = options.get(selected) else {
                     return;
                 };
                 if draft.checked.is_empty() {

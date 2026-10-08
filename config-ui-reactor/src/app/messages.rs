@@ -174,9 +174,9 @@ pub enum Message {
         id: String,
     },
     /// 「添加行为」下拉选择变化。
-    SaPickBehavior {
+    SaSelectBehavior {
         match_type: &'static str,
-        pick: Option<usize>,
+        selected: Option<usize>,
     },
     /// 「添加行为」：把下拉选中的行为追加到当前类型的映射（未配置类型同时创建映射）。
     SaAddBehavior {
@@ -187,11 +187,11 @@ pub enum Message {
         match_type: &'static str,
         index: usize,
     },
-    /// 行为行：切换行为（pick = 覆盖序；切换重置默认模板，复刻 `EntryRowVm`）。
+    /// 行为行：切换行为（selected = 覆盖序；切换重置默认模板，复刻 `EntryRowVm`）。
     SaEntrySwitch {
         match_type: &'static str,
         index: usize,
-        pick: usize,
+        selected: usize,
     },
     /// 行为行上移/下移（`delta` = -1 / +1；顺序即菜单数字键）。
     SaEntryMove {
@@ -243,7 +243,7 @@ pub enum Message {
     /// 关闭（丢弃草稿）。
     MatchTypesClose,
     /// 选中既有类型（`config.match_types` 下标；`None` = 回到新建草稿）。
-    MatchTypesPick(Option<usize>),
+    MatchTypesSelect(Option<usize>),
     /// 新建草稿。
     MtNew,
     /// 名称（2523）。
@@ -281,7 +281,7 @@ pub enum Message {
     /// 关闭。
     BehaviorsClose,
     /// 选中目录项（内置在前；`None` = 未选）。
-    BhPick(Option<usize>),
+    BhSelect(Option<usize>),
     /// 新建行为草稿。
     BhNew,
     /// 名称。
@@ -437,7 +437,7 @@ pub enum OptEdit {
 #[derive(Debug, Clone, Default)]
 pub struct SaAddDraft {
     /// 类型下拉下标（`None` = 未选；候选项由 [`sa_add_type_options`] 生成）。
-    pub(super) type_pick: Option<usize>,
+    pub(super) type_selected: Option<usize>,
     /// 已勾选行为 ID（**保序** = 菜单数字键序）。
     pub(super) checked: Vec<String>,
     /// 弹窗内错误（重复条件 1115 等）。
