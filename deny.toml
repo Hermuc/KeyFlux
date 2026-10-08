@@ -1,0 +1,52 @@
+# cargo-deny 配置 —— 依赖供应链审计（多维度优化报告 #8）。
+#
+# 单一真源 = 本文件；CI 由 .github/workflows/deps-watch.yml 每周调用（见该文件注释）。
+# 本地跑法：cargo deny --config deny.toml check（在 config-ui-reactor/ 或 command-input/ 下）。
+#
+# 为什么需要：本项目是 GPL-3.0 且 vendored 了一个 fork（windows-reactor），缺自动化审计时
+# 「依赖里混入不兼容许可 / 已知漏洞 / 未知源」都不会有任何提示。
+
+[advisories]
+# RUSTSEC 漏洞库（cargo-audit 同源）。
+version = 2
+yanked = "deny"
+# ignore = [ { id = "RUSTSEC-XXXX-YYYY", reason = "…" } ]
+
+[licenses]
+version = 2
+# GPL-3.0 作品只能依赖与之兼容的许可 ⇒ allow 收窄到宽松 / 弱著佐权集合。
+# 若某依赖的新许可不在表内，CI 会红 —— 那是**有意**的：请人工确认兼容性后再加。
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "Unlicense",
+    "MPL-2.0",
+    "BSL-1.0",
+    # webpki-roots / webpki-root-certs（经 ureq 引入）的根证书数据许可，宽松、GPL-3.0 兼容。
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+# 允许清单是「已知兼容许可」的超集，未命中项（allow 里列了但依赖树没用到）不必报噪音。
+unused-allowed-license = "allow"
+# 根 crate 为 publish=false（非发布物）⇒ 不要求其自带 license 字段。
+private = { ignore = true }
+
+[bans]
+# 反模式扫描：重复版本仅告警（Windows 生态常见），通配符依赖放行（本仓未用）。
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+[sources]
+# 只允许 crates.io 官方源；出现未知 registry / git 依赖即拒绝（防供应链劫持）。
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

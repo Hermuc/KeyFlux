@@ -97,7 +97,14 @@ jobs:
       # bin/ui/KeyFlux.Settings.exe 必须各自 == 其 target/release 源, 且两者互不相等。
       # 单一真源 = tools/verify_deploy.ps1 (经 make verify-deploy)。放在打包**之前**,
       # 防止把某条腿悄悄变旧的产物打进发布包 —— 这正是历史上翻车过多次的失败面。
-      - name: Verify deploy legs (built == staged, and the two legs differ)
+      # leg C (命令框 exe) 也是随包产物, 但此前 release.yml **不构建它** —— 若仓库那份
+      # bin/KeyFlux-CommandInput.exe 不是当前源码的构建, 发布包就会带旧命令框 (Makefile
+      # `command-input` 目标注释记录过该事故)。这里显式重建, 让 verify-deploy 的 leg C
+      # 在发布链里**真正生效**(否则它是 optional leg, 缺产物只 skip)。
+      - name: Build command-input (fresh, so leg C is enforced)
+        run: make command-input
+
+      - name: Verify deploy legs (built == staged, and the legs differ)
         run: make verify-deploy
 
       - name: Stamp version into sample config
