@@ -115,6 +115,52 @@ function Assert-KfDeterministic {
 }
 
 # ---------------------------------------------------------------------------
+# Reactor staging (config-ui-reactor/target/release -> bin/ui)
+# ---------------------------------------------------------------------------
+
+# The robocopy exclude set for staging the reactor release output into bin/ui.
+#
+# WHY THIS EXISTS:
+#   The same /XD + /XF list used to be copied verbatim in THREE places -- the
+#   `buildClientReactor` recipe in the Makefile, tools/deploy_panel.ps1 and
+#   .github/workflows/release.yml -- which is exactly the "a gate copied N times
+#   drifts apart silently" failure this file was created to prevent, and which
+#   the repo has already paid for once (see the module header above). Only one
+#   of the three copies would have been updated, and the stale ones would have
+#   kept staging cargo intermediates (or worse, a second settings.exe) into the
+#   shipped bin/ui.
+#
+#   Order matters for robocopy: /XD consumes names until the next switch, so the
+#   directory list must stay immediately after /XD and the file list immediately
+#   after /XF, in this one array.
+function Get-KfReactorExcludes {
+  [CmdletBinding()]
+  param()
+  return @(
+    '/XD', '.fingerprint', 'build', 'deps', 'examples', 'incremental',
+    '/XF', '*.pdb', '*.d', '*.rlib', '*.rmeta',
+    '*.cargo-lock', '*.cargo-build-lock', '*.cargo-artifact-lock',
+    'keyflux-settings.exe', 'settings.exe', 'build-tools.exe'
+  )
+}
+
+# Stage the reactor release output into a destination directory (normally bin/ui)
+# using the shared exclude set above. Returns the robocopy exit code; callers keep
+# their own policy (0-7 = success, >= 8 = failure) and their own follow-up steps
+# (renaming keyflux-settings.exe, copying fonts, printing a file count).
+function Invoke-KfReactorStaging {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Source,
+    [Parameter(Mandatory)][string]$Destination
+  )
+  $robocopyArgs = @($Source, $Destination, '/E') + (Get-KfReactorExcludes) +
+                  @('/NFL', '/NDL', '/NJH')
+  robocopy @robocopyArgs | Out-Null
+  return $LASTEXITCODE
+}
+
+# ---------------------------------------------------------------------------
 # Engine guard
 # ---------------------------------------------------------------------------
 
