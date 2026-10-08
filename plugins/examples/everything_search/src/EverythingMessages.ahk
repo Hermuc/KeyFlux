@@ -20,8 +20,14 @@ class EverythingMessages {
     this._ready := true
     try
       this.En := !EverythingHost.IsChinese()
-    catch
+    catch as err {
+      ; 连不上 Everything 宿主 (未启动 / 版本不符) ⇒ 回退中文文案。外部表现是「英文环境下
+      ; 面板文案全空」, 既无提示也无日志 ⇒ 此处留痕。插件内不依赖引擎符号 (探针会单独
+      ; #Include 本文件), 统一写 %TEMP%\kf_plugin_warn.log, 事后与引擎 logs 一起复盘。
+      detail := "[warn][everything_search] 语言判定失败: " err.Message
+      try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " detail "`n", A_Temp "\kf_plugin_warn.log", "UTF-8")
       this.En := false
+    }
   }
 
   /** 取文案: 参数为键名。英文缺失时回落中文。 */
