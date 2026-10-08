@@ -320,6 +320,10 @@ impl Shell {
     ///
     /// 下标语义见 [`OptEdit`] 文档；全部**直接写入内存 config**，随页脚保存链路持久化
     /// （与键位图页/缩写页的编辑模式一致）。
+    #[expect(
+        clippy::too_many_lines,
+        reason = "选项编辑总分发：大 match 逐臂，每臂即一个选项"
+    )]
     pub(super) fn apply_opt(&mut self, edit: OptEdit) {
         let Some(config) = self.config.as_mut() else {
             return;

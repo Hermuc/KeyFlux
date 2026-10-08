@@ -32,6 +32,10 @@ impl Shell {
     ///
     /// 分区顺序对齐旧 `SettingsPageView.axaml`：其他设置 / 程序分组 / 自定义热键 /
     /// 鼠标参数 / 滚轮 / 键盘布局 / 触发延时 / 命令框皮肤 / 命令框字体 / 路径变量。
+    #[expect(
+        clippy::too_many_lines,
+        reason = "组合式页面渲染：整页分区顺序敏感，拆分只会碎片化"
+    )]
     pub(in crate::app) fn settings_page(&self, context: &mut ViewContext<Self>) -> View {
         let Some(config) = self.config.as_ref() else {
             return TextBlock::new().text("配置未加载").into();
@@ -149,6 +153,19 @@ impl Shell {
                         context.callback(|value: Option<usize>| {
                             Message::Opt(OptEdit::Language(value.unwrap_or(0)))
                         }),
+                    ),
+                    // 引擎可观测性闭环（报告 #14）：错误 Tip 已带日志路径，这里给一键入口。
+                    // 路径是产物字面量（非文案），故不占 i18n 键。
+                    settings_view::field_row_with_end_button(
+                        i18n::t("2600"),
+                        TextBlock::new()
+                            .text("logs\\engine_error.log")
+                            .font_size(theme::FONT_CAPTION)
+                            .foreground(theme::stone_gray())
+                            .vertical_alignment(VerticalAlignment::Center)
+                            .into(),
+                        i18n::t("2601"),
+                        context.message(Message::OpenEngineLog),
                     ),
                 ))
             }),

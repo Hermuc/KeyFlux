@@ -180,6 +180,10 @@ fn is_plugin_action(action: &str) -> bool {
 /// Go `behaviors.ValidateManifest`（**就地**校验 + 归一化：boundTypeId 与
 /// appliesTo[].value 会被改写为小写/剥前缀 —— WriteUserPack 落盘的是归一化后的
 /// manifest，响应体亦然）。`known_text` 为 `None` 时容忍悬空引用（加载链路）。
+#[expect(
+    clippy::too_many_lines,
+    reason = "manifest 逐项校验清单：校验顺序与错误文案即契约"
+)]
 pub(crate) fn validate_manifest(
     pack: &mut WirePack,
     known_text: Option<&dyn Fn(&str) -> bool>,

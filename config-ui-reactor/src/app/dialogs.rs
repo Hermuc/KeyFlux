@@ -212,6 +212,10 @@ impl Shell {
     /// 「管理匹配类型」对话框（复刻 `MatchTypesDialogWindow` + `MatchTypesDialogViewModel`）：
     /// 类型列表 + 内联表单（名称/英文名/kind 胶囊/规则行/后缀串）+「试一下」+ 双保存路径。
     /// `ContentDialog`：primary = 仅保存类型（2565），secondary = 保存并创建专属行为（2529）。
+    #[expect(
+        clippy::too_many_lines,
+        reason = "组合式对话框渲染：分区顺序敏感，拆分只会碎片化"
+    )]
     pub(super) fn sa_match_types_dialog(&self, context: &mut ViewContext<Self>) -> View {
         if !self.mt_dialog {
             return View::empty();
@@ -456,6 +460,10 @@ impl Shell {
     ///
     /// 🔴 「立即生效」按钮已移除（2026-10-02 用户定版）：行为变更经页脚
     /// 「保存配置」重启引擎后生效，不再提供绕过保存链路的即时应用入口。
+    #[expect(
+        clippy::too_many_lines,
+        reason = "组合式对话框渲染：分区顺序敏感，拆分只会碎片化"
+    )]
     pub(super) fn sa_behaviors_dialog(&self, context: &mut ViewContext<Self>) -> View {
         if !self.bh_dialog {
             return View::empty();

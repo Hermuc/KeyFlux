@@ -74,6 +74,10 @@ impl Shell {
     }
 
     /// 一张聚合卡（`match_type` 分区）：卡头 + toggle 行 + 详情编辑器。
+    #[expect(
+        clippy::too_many_lines,
+        reason = "组合式页面渲染：分区顺序敏感，拆分只会碎片化"
+    )]
     pub(in crate::app) fn sa_type_card(
         &self,
         context: &mut ViewContext<Self>,

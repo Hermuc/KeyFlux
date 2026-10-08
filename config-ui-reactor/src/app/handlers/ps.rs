@@ -7,6 +7,10 @@ use super::super::*;
 
 impl Shell {
     /// `ps` 域消息处理 (由 `update` 转发)。
+    #[expect(
+        clippy::too_many_lines,
+        reason = "消息域大 match：逐臂自 app.rs 机械迁移（2026-10-07），每臂即最小单位"
+    )]
     pub(in crate::app) fn handle_ps(&mut self, message: Message, context: &ComponentContext<Self>) {
         match message {
             Message::PsValue(index, value) => {

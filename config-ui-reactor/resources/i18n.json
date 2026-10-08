@@ -1554,5 +1554,17 @@
   "2595": {
     "zh": "修改已暂存,点击左下角「保存配置」提交",
     "en": "Changes staged; click Save (bottom-left) to commit"
+  },
+  "2600": {
+    "zh": "引擎日志",
+    "en": "Engine log"
+  },
+  "2601": {
+    "zh": "查看",
+    "en": "Open"
+  },
+  "2602": {
+    "zh": "未找到引擎日志：{0}",
+    "en": "Engine log not found: {0}"
   }
 }
