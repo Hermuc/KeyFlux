@@ -177,7 +177,8 @@ pub struct ActionDto {
     //    ⇒ 面板发的是 `runAsAdmin`，本 DTO 按 `run_as_admin` 反序列化 ⇒ serde 当未知键
     //    **静默忽略**：面板勾上「以管理员身份运行」既不落盘也不回读。
     //    真源证据：`doc/poc-archive/07-迁移对照清单.md:92` 的 Action wire 字段表、
-    //    `generator/model.rs:94` 的显式 rename、`tools/parity/corpus/synthetic/config.json:273`。
+    //    `generator/model.rs` 里 `Action` 的 `runAsAdmin` 显式 rename、
+    //    `tools/parity/corpus/synthetic/config.json:273`。
     //    既有闸门看不见：api-parity 基线里该键**从未出现**（恒 false ⇒ omitempty 省略）。
     //    护栏 = `models::contract::dto_and_models_agree_on_wire_fields`。
     #[serde(rename = "runAsAdmin", skip_serializing_if = "is_false")]

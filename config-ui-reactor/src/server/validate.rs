@@ -396,13 +396,13 @@ fn has_control_char(s: &str) -> bool {
 /// Go `script.ValidateFileGroups`（actionscheme.go:31-58）：
 /// 名称/显示名非空、名称合法、后缀列表非空且不含控制字符。
 pub(crate) fn validate_file_groups(groups: &[FileGroup]) -> Result<(), String> {
-    // Go: ^[a-z][a-z0-9_]*$（Name 升格为 type:<Name> 引用的稳定标识）
-    let name_re = regex::Regex::new(r"^[a-z][a-z0-9_]*$").expect("内置正则不应编译失败");
+    // Go: ^[a-z][a-z0-9_]*$（Name 升格为 type:<Name> 引用的稳定标识；不限长）
+    // 单一实现 = crate::ids::lower_ident(_, None)，不再每次调用现场编译 regex。
     for (index, group) in groups.iter().enumerate() {
         if group.name.trim().is_empty() {
             return Err(format!("文件分组第 {} 项缺少名称 (name)", index + 1));
         }
-        if !name_re.is_match(&group.name) {
+        if !crate::ids::lower_ident(&group.name, None) {
             return Err(format!(
                 "文件分组「{}」名称不合法 (须以小写字母开头, 仅含小写字母/数字/下划线)",
                 group.name
@@ -445,14 +445,14 @@ pub(crate) fn validate_match_types(
     groups: &[FileGroup],
 ) -> Result<(), String> {
     // Go: ^[a-z][a-z0-9_]{0,23}$（长度 1-24，非多行模式下 $ = 文本末尾，与 Go 同口径）
-    let id_re = regex::Regex::new(r"^[a-z][a-z0-9_]{0,23}$").expect("内置正则不应编译失败");
+    // 单一实现 = crate::ids::lower_ident(_, Some(24))。
     let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
     let group_names: std::collections::HashSet<&str> =
         groups.iter().map(|group| group.name.as_str()).collect();
 
     for mt in types {
         let id = mt.id.trim();
-        if !id_re.is_match(id) {
+        if !crate::ids::lower_ident(id, Some(24)) {
             // 文案取**原文**（未 trim），与 Go 一致
             return Err(format!(
                 "内部标识「{}」格式不正确（需以小写字母开头，仅含小写字母、数字与下划线，长度 1-24）",
@@ -842,17 +842,18 @@ mod tests {
         assert!(ref_values("textType", "  ").is_empty());
     }
 
-    /// Go `script.TestValidateMatchTypes` 的镜像：三类非法（重复 id / label 空 / op 非法）
-    /// 逐一断言**逐字节一致**的错误文案，另加合法形态放行 + fileExt/kind/超长等分支。
-    #[expect(clippy::too_many_lines, reason = "逐条断言 Go 相同错误文案的镜像测试")]
-    #[test]
-    fn validate_match_types_rejects_invalid_with_go_identical_messages() {
-        let groups: Vec<FileGroup> = vec![FileGroup {
+    /// Go `script.TestValidateMatchTypes` 镜像的共用夹具：文件分组（`design` → psd）。
+    fn mirror_groups() -> Vec<FileGroup> {
+        vec![FileGroup {
             name: "design".into(),
             label: "设计".into(),
             exts: vec!["psd".into()],
-        }];
-        let text_type = |id: &str, label: &str, op: &str, value: &str| MatchType {
+        }]
+    }
+
+    /// 文本匹配类型夹具：单条规则（`op` + `value`）。
+    fn mirror_text_type(id: &str, label: &str, op: &str, value: &str) -> MatchType {
+        MatchType {
             id: id.into(),
             label: label.into(),
             kind: "text".into(),
@@ -861,12 +862,21 @@ mod tests {
                 value: value.into(),
             }],
             ..Default::default()
-        };
+        }
+    }
 
-        // 合法（文本 / 文件）放行
+    /// 合法（文本 / 文件）形态放行。
+    #[test]
+    fn validate_match_types_accepts_valid_forms() {
+        let groups = mirror_groups();
         assert!(
             validate_match_types(
-                &[text_type("netdisk", "网盘", "contains", "pan.baidu.com")],
+                &[mirror_text_type(
+                    "netdisk",
+                    "网盘",
+                    "contains",
+                    "pan.baidu.com"
+                )],
                 &groups
             )
             .is_ok()
@@ -884,14 +894,20 @@ mod tests {
             )
             .is_ok()
         );
+    }
 
-        // ── 三类要求用例（与 Go 400 文案逐字节相同）──
+    /// Go `script.TestValidateMatchTypes` 的镜像：三类要求用例（重复 id / label 空 / op 非法）
+    /// 逐一断言**逐字节一致**的错误文案。
+    #[test]
+    fn validate_match_types_rejects_duplicate_label_op_with_go_messages() {
+        let groups = mirror_groups();
+
         // ① 重复 id（取重复的第二个，与 Go 一致）
         assert_eq!(
             validate_match_types(
                 &[
-                    text_type("dup", "甲", "contains", "a"),
-                    text_type("dup", "乙", "contains", "b"),
+                    mirror_text_type("dup", "甲", "contains", "a"),
+                    mirror_text_type("dup", "乙", "contains", "b"),
                 ],
                 &groups
             )
@@ -900,28 +916,42 @@ mod tests {
         );
         // ② label 为空（仅空白）
         assert_eq!(
-            validate_match_types(&[text_type("empty", "   ", "contains", "a")], &groups)
-                .unwrap_err(),
+            validate_match_types(
+                &[mirror_text_type("empty", "   ", "contains", "a")],
+                &groups
+            )
+            .unwrap_err(),
             "匹配类型「empty」缺少名称"
         );
         // ③ op 非法
         assert_eq!(
-            validate_match_types(&[text_type("badop", "算子", "regex", "a")], &groups).unwrap_err(),
+            validate_match_types(&[mirror_text_type("badop", "算子", "regex", "a")], &groups)
+                .unwrap_err(),
             "匹配类型「badop」第 1 条匹配条件的匹配方式无效「regex」（可选：包含该文字 / 完全相同 / 以该文字开头 / 以该文字结尾）"
         );
+    }
 
-        // 其余分支的文案对齐（Go 侧 matchtypes_test.go 覆盖同一集合）
+    /// 其余分支的文案对齐（Go 侧 matchtypes_test.go 覆盖同一集合）：
+    /// id 格式 / 内置特征冲突 / 与文件分组同名 / kind 非法 / 规则内容空或过长或含换行 / 无扩展名。
+    #[test]
+    fn validate_match_types_rejects_other_branches_with_go_messages() {
+        let groups = mirror_groups();
+
         assert_eq!(
-            validate_match_types(&[text_type("NetDisk", "x", "contains", "a")], &groups)
-                .unwrap_err(),
+            validate_match_types(
+                &[mirror_text_type("NetDisk", "x", "contains", "a")],
+                &groups
+            )
+            .unwrap_err(),
             "内部标识「NetDisk」格式不正确（需以小写字母开头，仅含小写字母、数字与下划线，长度 1-24）"
         );
         assert_eq!(
-            validate_match_types(&[text_type("url", "x", "contains", "a")], &groups).unwrap_err(),
+            validate_match_types(&[mirror_text_type("url", "x", "contains", "a")], &groups)
+                .unwrap_err(),
             "内部标识「url」与内置文本特征（链接／路径／磁力链接／纯文本）冲突，请更换"
         );
         assert_eq!(
-            validate_match_types(&[text_type("design", "x", "contains", "a")], &groups)
+            validate_match_types(&[mirror_text_type("design", "x", "contains", "a")], &groups)
                 .unwrap_err(),
             "内部标识「design」与文件分组同名，请更换"
         );
@@ -952,19 +982,21 @@ mod tests {
             "文本类型「a」缺少匹配条件，至少需要 1 条"
         );
         assert_eq!(
-            validate_match_types(&[text_type("a", "x", "contains", "   ")], &groups).unwrap_err(),
+            validate_match_types(&[mirror_text_type("a", "x", "contains", "   ")], &groups)
+                .unwrap_err(),
             "匹配类型「a」第 1 条匹配内容为空"
         );
         assert_eq!(
             validate_match_types(
-                &[text_type("a", "x", "contains", &"x".repeat(257))],
+                &[mirror_text_type("a", "x", "contains", &"x".repeat(257))],
                 &groups
             )
             .unwrap_err(),
             "匹配类型「a」第 1 条匹配内容过长（最多 256 个字符）"
         );
         assert_eq!(
-            validate_match_types(&[text_type("a", "x", "contains", "x\ny")], &groups).unwrap_err(),
+            validate_match_types(&[mirror_text_type("a", "x", "contains", "x\ny")], &groups)
+                .unwrap_err(),
             "匹配类型「a」第 1 条匹配内容不能包含换行符"
         );
         assert_eq!(

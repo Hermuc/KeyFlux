@@ -99,7 +99,7 @@ impl SettingsStore {
         plugin_id: &str,
         values: &BTreeMap<String, String>,
     ) -> Result<(), String> {
-        if !is_valid_plugin_id(plugin_id) {
+        if !crate::ids::lower_ident(plugin_id, Some(32)) {
             return Err(format!("插件 ID {plugin_id:?} 不合法"));
         }
         let _guard = self.mutex.lock().expect("settings 锁不应中毒");
@@ -259,15 +259,10 @@ fn indent_json(compact: &str, pad: &str) -> String {
     out
 }
 
-/// Go `plugins.idPattern` `^[a-z][a-z0-9_]{0,31}$`（与 generator::plugins 同款手写）。
+/// Go `plugins.idPattern` `^[a-z][a-z0-9_]{0,31}$` —— 单一实现见 `crate::ids::lower_ident`
+/// （此前本文件与 `generator::plugins` 各手写一份，逐字重复）。
 pub(crate) fn is_valid_plugin_id(id: &str) -> bool {
-    let bytes = id.as_bytes();
-    if bytes.is_empty() || bytes.len() > 32 || !bytes[0].is_ascii_lowercase() {
-        return false;
-    }
-    bytes[1..]
-        .iter()
-        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'_')
+    crate::ids::lower_ident(id, Some(32))
 }
 
 #[cfg(test)]

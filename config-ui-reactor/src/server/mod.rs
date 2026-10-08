@@ -6,7 +6,7 @@
 //! * `config-server/internal/server/server.go:74-115`（bind `localhost:12333` →
 //!   失败退 `localhost:0`；**bind 成功后**打印 `KEYFLUX_PORT=<port>\n`，必须是
 //!   stdout 第一行，之前不许有任何输出 —— 面板逐行匹配该前缀，
-//!   `config-ui-reactor/src/services/backend.rs:33,44-48`）；
+//!   见 `services::backend::parse_port_line`）；
 //! * 路由子集（server.go:38-43）：`GET /health`、`GET/PUT /config`、
 //!   `POST /server/command/:id`。旧静态站（NoRoute → site/）已随旧 UI 退役，
 //!   统一 404 空 body（`indexHandler` 在 `site/index.html` 缺失时即 404）。

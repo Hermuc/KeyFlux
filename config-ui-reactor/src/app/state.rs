@@ -319,12 +319,55 @@ impl Shell {
     /// 选项页字段编辑（`Message::Opt` 的落地）。
     ///
     /// 下标语义见 [`OptEdit`] 文档；全部**直接写入内存 config**，随页脚保存链路持久化
-    /// （与键位图页/缩写页的编辑模式一致）。
-    #[expect(
-        clippy::too_many_lines,
-        reason = "选项编辑总分发：大 match 逐臂，每臂即一个选项"
-    )]
+    /// （与键位图页/缩写页的编辑模式一致）。按编辑目标分组转到 `apply_opt_*` 子方法，
+    /// 本函数只做分派（2026-10-09 结构优化）。
     pub(super) fn apply_opt(&mut self, edit: OptEdit) {
+        if self.config.is_none() {
+            return;
+        }
+        match edit {
+            OptEdit::SchemeName(..)
+            | OptEdit::SchemeHotkey(..)
+            | OptEdit::SchemeEnable(..)
+            | OptEdit::SchemeAdd
+            | OptEdit::SchemeDelete(..)
+            | OptEdit::SchemeDelay(..) => self.apply_opt_scheme(edit),
+            OptEdit::CustomHotkey(..)
+            | OptEdit::CustomHotkeyAdd
+            | OptEdit::CustomHotkeyRemove(..) => self.apply_opt_custom_hotkey(edit),
+            OptEdit::MouseDelay1(..)
+            | OptEdit::MouseDelay2(..)
+            | OptEdit::MouseFastSingle(..)
+            | OptEdit::MouseFastRepeat(..)
+            | OptEdit::MouseSlowSingle(..)
+            | OptEdit::MouseSlowRepeat(..)
+            | OptEdit::MouseTipSymbol(..)
+            | OptEdit::MouseKeepMode(..)
+            | OptEdit::MouseShowTip(..)
+            | OptEdit::ScrollDelay1(..)
+            | OptEdit::ScrollDelay2(..)
+            | OptEdit::ScrollOnceLine(..)
+            | OptEdit::LayoutPreset(..)
+            | OptEdit::KeyboardLayoutSet(..) => self.apply_opt_mouse_layout(edit),
+            OptEdit::Skin(..)
+            | OptEdit::FontSource(..)
+            | OptEdit::FontWeight(..)
+            | OptEdit::FontReset => self.apply_opt_font_skin(edit),
+            OptEdit::PathVarName(..)
+            | OptEdit::PathVarValue(..)
+            | OptEdit::PathVarAdd
+            | OptEdit::PathVarRemove(..) => self.apply_opt_path_vars(edit),
+            OptEdit::GroupName(..)
+            | OptEdit::GroupValue(..)
+            | OptEdit::GroupCondition(..)
+            | OptEdit::GroupAdd
+            | OptEdit::GroupRemove(..) => self.apply_opt_groups(edit),
+            OptEdit::HideMatrix(..) | OptEdit::Language(..) => self.apply_opt_global(edit),
+        }
+    }
+
+    /// 选项编辑：快捷键方案（名称/触发键/启停/增删/延时）。
+    fn apply_opt_scheme(&mut self, edit: OptEdit) {
         let Some(config) = self.config.as_mut() else {
             return;
         };
@@ -406,13 +449,16 @@ impl Shell {
                     keymap.delay = delay;
                 }
             }
-            OptEdit::HideMatrix(value) => config.options.hide_matrix = value,
-            OptEdit::Language(index) => {
-                let value = ["zh", "en"][index.min(1)];
-                config.options.language = value.to_string();
-                i18n::apply_config_language(value);
-                self.rebuild_nav();
-            }
+            _ => {}
+        }
+    }
+
+    /// 选项编辑：自定义热键（改键/新增占位/删除）。
+    fn apply_opt_custom_hotkey(&mut self, edit: OptEdit) {
+        let Some(config) = self.config.as_mut() else {
+            return;
+        };
+        match edit {
             OptEdit::CustomHotkey(index, value) => {
                 if let Some(keymap) = config.keymaps.iter_mut().find(|km| km.id == 1) {
                     let old = keymap.hotkeys.keys().nth(index).cloned();
@@ -446,6 +492,16 @@ impl Shell {
                     keymap::remove_hotkey(keymap, &old);
                 }
             }
+            _ => {}
+        }
+    }
+
+    /// 选项编辑：鼠标参数 / 滚轮参数 / 键盘布局。
+    fn apply_opt_mouse_layout(&mut self, edit: OptEdit) {
+        let Some(config) = self.config.as_mut() else {
+            return;
+        };
+        match edit {
             OptEdit::MouseDelay1(value) => config.options.mouse.delay1 = value,
             OptEdit::MouseDelay2(value) => config.options.mouse.delay2 = value,
             OptEdit::MouseFastSingle(value) => config.options.mouse.fast_single = value,
@@ -465,6 +521,16 @@ impl Shell {
                 }
             }
             OptEdit::KeyboardLayoutSet(value) => config.options.keyboard_layout = value,
+            _ => {}
+        }
+    }
+
+    /// 选项编辑：命令框皮肤 / 字体。
+    fn apply_opt_font_skin(&mut self, edit: OptEdit) {
+        let Some(config) = self.config.as_mut() else {
+            return;
+        };
+        match edit {
             OptEdit::Skin(index, value) => {
                 if let Some(field) = settings::SKIN_FIELDS.get(index) {
                     settings::skin_set(&mut config.options.command_input_skin, field.key, &value);
@@ -477,6 +543,16 @@ impl Shell {
                 }
             }
             OptEdit::FontReset => settings::font_reset(config),
+            _ => {}
+        }
+    }
+
+    /// 选项编辑：路径变量（名称/值/增删）。
+    fn apply_opt_path_vars(&mut self, edit: OptEdit) {
+        let Some(config) = self.config.as_mut() else {
+            return;
+        };
+        match edit {
             OptEdit::PathVarName(index, value) => {
                 if let Some(row) = config.options.path_variables.get_mut(index) {
                     row.name = value;
@@ -493,6 +569,16 @@ impl Shell {
             OptEdit::PathVarRemove(index) => {
                 settings::remove_path_variable(config, index);
             }
+            _ => {}
+        }
+    }
+
+    /// 选项编辑：窗口分组（名称/值/条件/增删）。
+    fn apply_opt_groups(&mut self, edit: OptEdit) {
+        let Some(config) = self.config.as_mut() else {
+            return;
+        };
+        match edit {
             OptEdit::GroupName(row, value) => {
                 if let Some(group) = config
                     .options
@@ -558,6 +644,24 @@ impl Shell {
                     config.options.window_groups.remove(index);
                 }
             }
+            _ => {}
+        }
+    }
+
+    /// 选项编辑：全局项（隐藏矩阵 / 语言）。语言变更需重建导航。
+    fn apply_opt_global(&mut self, edit: OptEdit) {
+        let Some(config) = self.config.as_mut() else {
+            return;
+        };
+        match edit {
+            OptEdit::HideMatrix(value) => config.options.hide_matrix = value,
+            OptEdit::Language(index) => {
+                let value = ["zh", "en"][index.min(1)];
+                config.options.language = value.to_string();
+                i18n::apply_config_language(value);
+                self.rebuild_nav();
+            }
+            _ => {}
         }
     }
 

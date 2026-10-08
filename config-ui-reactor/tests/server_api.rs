@@ -2,7 +2,7 @@
 //!
 //! ## 为什么需要这一层
 //!
-//! `src/` 里的 349 个 `#[test]` 几乎全是**单元测试**：它们直接调 `dispatch`（纯函数）
+//! `src/` 里的 `#[test]` 几乎全是**单元测试**（数量随开发增长，不在此写死计数）：它们直接调 `dispatch`（纯函数）
 //! 或各 handler 的可测内核，socket 层、进程启动、端口通告、真实 HTTP 往返**从未被覆盖**。
 //! `tests/` 在此之前只有 `skin_contract.rs` 一个（跨 crate 文本对账），服务层零黑盒。
 //!
@@ -227,4 +227,60 @@ fn server_command_returns_empty_object_over_http() {
         .expect("POST /server/command/99 transport");
     assert_eq!(response.status().as_u16(), 200);
     assert_eq!(response.body_mut().read_to_string().unwrap(), "{}");
+}
+
+/// 只读端点全部真实往返：200 + 合法 JSON（黑盒面从「骨架」扩到「常用读接口」）。
+#[test]
+fn readonly_endpoints_return_json_over_http() {
+    let server = Headless::start();
+    server.wait_ready();
+    let agent = test_agent();
+    let base = server.base();
+
+    for path in ["/shortcuts", "/api/behaviors", "/api/plugins"] {
+        let mut response = agent
+            .get(&format!("{base}{path}"))
+            .call()
+            .unwrap_or_else(|error| panic!("GET {path} transport: {error}"));
+        assert_eq!(response.status().as_u16(), 200, "GET {path} 应为 200");
+        let body = response.body_mut().read_to_string().unwrap();
+        serde_json::from_str::<serde_json::Value>(&body)
+            .unwrap_or_else(|error| panic!("GET {path} 应为合法 JSON: {error}; body={body}"));
+    }
+}
+
+/// 路由边界真实往返：方法不匹配 / `:id` 段含斜杠 / 白名单命令 —— 全部走 socket 层。
+#[test]
+fn routing_boundaries_over_http() {
+    let server = Headless::start();
+    server.wait_ready();
+    let agent = test_agent();
+    let base = server.base();
+
+    // 方法不匹配 → 404（gin 只注册对应方法）
+    let put_health = agent
+        .put(&format!("{base}/health"))
+        .send_empty()
+        .expect("PUT /health transport");
+    assert_eq!(put_health.status().as_u16(), 404, "PUT /health 应为 404");
+    let post_config = agent
+        .post(&format!("{base}/config"))
+        .send_empty()
+        .expect("POST /config transport");
+    assert_eq!(post_config.status().as_u16(), 404, "POST /config 应为 404");
+
+    // `:id` 段含 '/' → 404（gin 参数段语义）
+    let nested = agent
+        .get(&format!("{base}/api/behaviors/a/b"))
+        .call()
+        .expect("GET /api/behaviors/a/b transport");
+    assert_eq!(nested.status().as_u16(), 404, "含斜杠的 :id 应为 404");
+
+    // 白名单命令 id（夹具模式 KEYFLUX_API_PARITY=1 下**不 spawn**）：200 `{}`
+    let mut command = agent
+        .post(&format!("{base}/server/command/3"))
+        .send_empty()
+        .expect("POST /server/command/3 transport");
+    assert_eq!(command.status().as_u16(), 200);
+    assert_eq!(command.body_mut().read_to_string().unwrap(), "{}");
 }

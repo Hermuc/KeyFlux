@@ -3,7 +3,7 @@
 #
 # WHY THIS EXISTS:
 #   The same three-gate sequence was copy-pasted into five places:
-#     Makefile:24 (buildClientReactor), Makefile:183 (analyzers),
+#     Makefile (`buildClientReactor` / `analyzers` targets),
 #     .github/workflows/analyzers.yml (reactor-gates), .github/workflows/release.yml,
 #     .github/workflows/release.yml (reactor UI build).
 #   Gates that exist five times drift apart: the copy nobody updates keeps reporting

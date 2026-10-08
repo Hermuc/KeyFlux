@@ -4,7 +4,7 @@
 //! * 仅作 `http://127.0.0.1:{KEYFLUX_PORT}` 的客户端；端口从后端 stdout 的
 //!   `KEYFLUX_PORT=<port>` 协议串解析（旧版 `BackendSession.cs:459`）；
 //! * 协议串 `KEYFLUX_PORT` / `KEYFLUX_GUI_READY` / `KEYFLUX_BACKEND_EXITED` 语义不变；
-//! * 12 个端点见 `server/` 路由（旧 `config-ui-avalonia/Services/SettingsApiClient.cs`
+//! * 端点清单见 `server/` 路由（旧 `config-ui-avalonia/Services/SettingsApiClient.cs`
 //!   已退役 `1f3dc9f`，仅供溯源）；
 //! * 配置真源 = 部署目录 `data/config.json`（不引入第二真源）。
 //!

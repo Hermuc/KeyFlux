@@ -1,6 +1,10 @@
 //! `app` 的 dialogs：对话框装配方法（窗口弹层）。
 //!
 //! 自原 `app.rs` 的 `impl Shell` 拆分；纯代码搬移，行为不变。
+//!
+//! 2026-10-09 结构优化：`sa_match_types_dialog` / `sa_behaviors_dialog` 原各为单函数
+//! 220 / 182 行。现抽出「下拉+新建」选择器、kind 行、字段区、试一下区、表单区等
+//! 私有方法；`rows` 的 push 顺序与下标口径（`rows.len()`）不变。
 
 use super::*;
 
@@ -212,10 +216,6 @@ impl Shell {
     /// 「管理匹配类型」对话框（复刻 `MatchTypesDialogWindow` + `MatchTypesDialogViewModel`）：
     /// 类型列表 + 内联表单（名称/英文名/kind 胶囊/规则行/后缀串）+「试一下」+ 双保存路径。
     /// `ContentDialog`：primary = 仅保存类型（2565），secondary = 保存并创建专属行为（2529）。
-    #[expect(
-        clippy::too_many_lines,
-        reason = "组合式对话框渲染：分区顺序敏感，拆分只会碎片化"
-    )]
     pub(super) fn sa_match_types_dialog(&self, context: &mut ViewContext<Self>) -> View {
         if !self.mt_dialog {
             return View::empty();
@@ -232,46 +232,7 @@ impl Shell {
             rows.push((rows.len(), plugins_view::action_error(text)));
             let _ = is_error; // 对话框内统一红字渲染（views 侧才按 is_error 分流）
         }
-
-        // 类型列表（既有自定义类型）+ 新建（405）
-        let type_labels: Vec<String> = config
-            .match_types
-            .iter()
-            .map(|mt| {
-                if mt.label.is_empty() {
-                    mt.id.clone()
-                } else {
-                    mt.label.clone()
-                }
-            })
-            .collect();
-        let pick_index = (draft.index != match_types_edit::NEW_INDEX).then_some(draft.index);
-        rows.push((
-            rows.len(),
-            Grid::new()
-                .columns([GridLength::STAR, GridLength::Auto])
-                .children((
-                    {
-                        let combo: View = ComboBox::new()
-                            .min_width(260.0)
-                            .placeholder_text(i18n::t("2519"))
-                            .items_source(type_labels)
-                            .selected_index(pick_index)
-                            .on_selection_changed(context.callback(|selected: Option<usize>| {
-                                Message::MatchTypesSelect(selected)
-                            }))
-                            .into();
-                        combo
-                    },
-                    Button::new()
-                        .grid_column(1)
-                        .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
-                        .on_click(context.message(Message::MtNew))
-                        .content(TextBlock::new().text(i18n::t("405"))),
-                )),
-        ));
-
-        // 表单
+        rows.push((rows.len(), self.mt_type_picker(context, config, draft)));
         rows.push((
             rows.len(),
             settings_view::text_field(
@@ -288,38 +249,114 @@ impl Shell {
                 context.callback(|value: String| Message::MtLabelEn(value)),
             ),
         ));
+        rows.push((rows.len(), self.mt_kind_row(context, draft)));
+        self.mt_push_fields(context, draft, &mut rows);
+        self.mt_push_test(context, &mut rows);
 
-        // kind：草稿态可切换（胶囊下拉），编辑态锁定（kind 决定引用语义）
+        ContentDialog::new()
+            .title(i18n::t("2519"))
+            .primary_button_text(i18n::t("2565"))
+            .secondary_button_text(i18n::t("2529"))
+            .close_button_text(i18n::t("611"))
+            .is_open(true)
+            .on_closed(
+                context.callback(|result: ContentDialogResult| match result {
+                    ContentDialogResult::Primary => Message::MtSave(false),
+                    ContentDialogResult::Secondary => Message::MtSave(true),
+                    _ => Message::MatchTypesClose,
+                }),
+            )
+            .content(
+                // 125% DPI 下 ContentDialog 内容区仅 ~496 DIP：min_width 520 会把
+                // 右侧（规则行 ✕ / 测试匹配钮）推出弹窗被裁 —— 收窄到 480 并开
+                // 横向滚动兜底（2026-10-02 用户截图实锤）。
+                ScrollViewer::new()
+                    .max_height(460.0)
+                    .min_width(480.0)
+                    .horizontal_scroll_bar_visibility(ScrollBarVisibility::Auto)
+                    .content(StackPanel::new().spacing(8.0).keyed_children(rows)),
+            )
+    }
+
+    /// 匹配类型对话框：类型列表（既有自定义类型）+ 新建（405）。
+    fn mt_type_picker(
+        &self,
+        context: &mut ViewContext<Self>,
+        config: &crate::models::Config,
+        draft: &match_types_edit::MatchTypeDraft,
+    ) -> View {
+        let type_labels: Vec<String> = config
+            .match_types
+            .iter()
+            .map(|mt| {
+                if mt.label.is_empty() {
+                    mt.id.clone()
+                } else {
+                    mt.label.clone()
+                }
+            })
+            .collect();
+        let pick_index = (draft.index != match_types_edit::NEW_INDEX).then_some(draft.index);
+        Grid::new()
+            .columns([GridLength::STAR, GridLength::Auto])
+            .children((
+                {
+                    let combo: View = ComboBox::new()
+                        .min_width(260.0)
+                        .placeholder_text(i18n::t("2519"))
+                        .items_source(type_labels)
+                        .selected_index(pick_index)
+                        .on_selection_changed(context.callback(|selected: Option<usize>| {
+                            Message::MatchTypesSelect(selected)
+                        }))
+                        .into();
+                    combo
+                },
+                Button::new()
+                    .grid_column(1)
+                    .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                    .on_click(context.message(Message::MtNew))
+                    .content(TextBlock::new().text(i18n::t("405"))),
+            ))
+    }
+
+    /// 匹配类型对话框：kind 行。草稿态可切换（胶囊下拉），编辑态锁定（kind 决定引用语义）。
+    fn mt_kind_row(
+        &self,
+        context: &mut ViewContext<Self>,
+        draft: &match_types_edit::MatchTypeDraft,
+    ) -> View {
         if draft.index == match_types_edit::NEW_INDEX {
-            rows.push((
-                rows.len(),
-                settings_view::combo_row(
-                    i18n::t("2556"),
-                    &[i18n::t("2556"), i18n::t("2551")],
-                    usize::from(draft.kind == "fileExt"),
-                    context
-                        .callback(|selected: Option<usize>| Message::MtKind(selected.unwrap_or(0))),
-                ),
-            ));
+            settings_view::combo_row(
+                i18n::t("2556"),
+                &[i18n::t("2556"), i18n::t("2551")],
+                usize::from(draft.kind == "fileExt"),
+                context.callback(|selected: Option<usize>| Message::MtKind(selected.unwrap_or(0))),
+            )
         } else {
-            rows.push((
-                rows.len(),
-                TextBlock::new()
-                    .text(format!(
-                        "{}: {}",
-                        i18n::t("1011"),
-                        if draft.kind == "fileExt" {
-                            i18n::t("2551")
-                        } else {
-                            i18n::t("2556")
-                        }
-                    ))
-                    .font_size(theme::FONT_CAPTION)
-                    .foreground(theme::stone_gray())
-                    .into(),
-            ));
+            TextBlock::new()
+                .text(format!(
+                    "{}: {}",
+                    i18n::t("1011"),
+                    if draft.kind == "fileExt" {
+                        i18n::t("2551")
+                    } else {
+                        i18n::t("2556")
+                    }
+                ))
+                .font_size(theme::FONT_CAPTION)
+                .foreground(theme::stone_gray())
+                .into()
         }
+    }
 
+    /// 匹配类型对话框：分 kind 的字段区 —— fileExt 走后缀串+提示；否则走规则行+新增行。
+    fn mt_push_fields(
+        &self,
+        context: &mut ViewContext<Self>,
+        draft: &match_types_edit::MatchTypeDraft,
+        rows: &mut Vec<(usize, View)>,
+    ) {
         if draft.kind == "fileExt" {
             rows.push((
                 rows.len(),
@@ -330,66 +367,69 @@ impl Shell {
                 ),
             ));
             rows.push((rows.len(), settings_view::hint_row(i18n::t("2561"))));
-        } else {
-            // 规则行：算子下拉（2512 equals / 2513 prefix / 2514 suffix / 2515 contains）+ 值 + ✕
-            let ops = [
-                i18n::t("2512"),
-                i18n::t("2513"),
-                i18n::t("2514"),
-                i18n::t("2515"),
-            ];
-            for (rule, (op, value)) in draft.rules.iter().enumerate() {
-                let op_index = ["equals", "prefix", "suffix", "contains"]
-                    .iter()
-                    .position(|candidate| candidate == op)
-                    .unwrap_or(3);
-                rows.push((
-                    rows.len(),
-                    Grid::new()
-                        .columns([GridLength::Pixel(120.0), GridLength::STAR, GridLength::Auto])
-                        .children((
-                            {
-                                let combo: View = ComboBox::new()
-                                    .items_source(ops.to_vec())
-                                    .selected_index(op_index)
-                                    .on_selection_changed(context.callback(
-                                        move |selected: Option<usize>| {
-                                            Message::MtRuleOp(rule, selected.unwrap_or(3))
-                                        },
-                                    ))
-                                    .into();
-                                combo
-                            },
-                            Border::new()
-                                .grid_column(1)
-                                .margin(Thickness::new(8.0, 0.0, 8.0, 0.0))
-                                .content(
-                                    TextBox::new()
-                                        .text(value.clone())
-                                        .min_width(200.0)
-                                        .on_text_changed(context.callback(move |value: String| {
-                                            Message::MtRuleValue(rule, value)
-                                        })),
-                                ),
-                            Border::new().grid_column(2).content(crate::ui::icon_button(
-                                "✕",
-                                15.0,
-                                theme::ERROR_CRIMSON,
-                                draft.rules.len() > 1,
-                                context.message(Message::MtRuleRemove(rule)),
-                            )),
-                        )),
-                ));
-            }
-            rows.push((
-                rows.len(),
-                Button::new()
-                    .on_click(context.message(Message::MtRuleAdd))
-                    .content(TextBlock::new().text(i18n::t("405"))),
-            ));
+            return;
         }
 
-        // 「试一下」（2560）：示例内容 + 提交 + 结果
+        // 规则行：算子下拉（2512 equals / 2513 prefix / 2514 suffix / 2515 contains）+ 值 + ✕
+        let ops = [
+            i18n::t("2512"),
+            i18n::t("2513"),
+            i18n::t("2514"),
+            i18n::t("2515"),
+        ];
+        for (rule, (op, value)) in draft.rules.iter().enumerate() {
+            let op_index = ["equals", "prefix", "suffix", "contains"]
+                .iter()
+                .position(|candidate| candidate == op)
+                .unwrap_or(3);
+            rows.push((
+                rows.len(),
+                Grid::new()
+                    .columns([GridLength::Pixel(120.0), GridLength::STAR, GridLength::Auto])
+                    .children((
+                        {
+                            let combo: View = ComboBox::new()
+                                .items_source(ops.to_vec())
+                                .selected_index(op_index)
+                                .on_selection_changed(context.callback(
+                                    move |selected: Option<usize>| {
+                                        Message::MtRuleOp(rule, selected.unwrap_or(3))
+                                    },
+                                ))
+                                .into();
+                            combo
+                        },
+                        Border::new()
+                            .grid_column(1)
+                            .margin(Thickness::new(8.0, 0.0, 8.0, 0.0))
+                            .content(
+                                TextBox::new()
+                                    .text(value.clone())
+                                    .min_width(200.0)
+                                    .on_text_changed(context.callback(move |value: String| {
+                                        Message::MtRuleValue(rule, value)
+                                    })),
+                            ),
+                        Border::new().grid_column(2).content(crate::ui::icon_button(
+                            "✕",
+                            15.0,
+                            theme::ERROR_CRIMSON,
+                            draft.rules.len() > 1,
+                            context.message(Message::MtRuleRemove(rule)),
+                        )),
+                    )),
+            ));
+        }
+        rows.push((
+            rows.len(),
+            Button::new()
+                .on_click(context.message(Message::MtRuleAdd))
+                .content(TextBlock::new().text(i18n::t("405"))),
+        ));
+    }
+
+    /// 匹配类型对话框：「试一下」（2560）——示例内容 + 提交 + 结果。
+    fn mt_push_test(&self, context: &mut ViewContext<Self>, rows: &mut Vec<(usize, View)>) {
         rows.push((
             rows.len(),
             Grid::new()
@@ -428,30 +468,6 @@ impl Shell {
                     .into(),
             ));
         }
-
-        ContentDialog::new()
-            .title(i18n::t("2519"))
-            .primary_button_text(i18n::t("2565"))
-            .secondary_button_text(i18n::t("2529"))
-            .close_button_text(i18n::t("611"))
-            .is_open(true)
-            .on_closed(
-                context.callback(|result: ContentDialogResult| match result {
-                    ContentDialogResult::Primary => Message::MtSave(false),
-                    ContentDialogResult::Secondary => Message::MtSave(true),
-                    _ => Message::MatchTypesClose,
-                }),
-            )
-            .content(
-                // 125% DPI 下 ContentDialog 内容区仅 ~496 DIP：min_width 520 会把
-                // 右侧（规则行 ✕ / 测试匹配钮）推出弹窗被裁 —— 收窄到 480 并开
-                // 横向滚动兜底（2026-10-02 用户截图实锤）。
-                ScrollViewer::new()
-                    .max_height(460.0)
-                    .min_width(480.0)
-                    .horizontal_scroll_bar_visibility(ScrollBarVisibility::Auto)
-                    .content(StackPanel::new().spacing(8.0).keyed_children(rows)),
-            )
     }
 
     /// 「管理行为」对话框（复刻 `BehaviorLibraryWindow` 的主从编辑）：
@@ -460,10 +476,6 @@ impl Shell {
     ///
     /// 🔴 「立即生效」按钮已移除（2026-10-02 用户定版）：行为变更经页脚
     /// 「保存配置」重启引擎后生效，不再提供绕过保存链路的即时应用入口。
-    #[expect(
-        clippy::too_many_lines,
-        reason = "组合式对话框渲染：分区顺序敏感，拆分只会碎片化"
-    )]
     pub(super) fn sa_behaviors_dialog(&self, context: &mut ViewContext<Self>) -> View {
         if !self.bh_dialog {
             return View::empty();
@@ -475,169 +487,11 @@ impl Shell {
             let _ = is_error; // 对话框内统一红字渲染（views 侧才按 is_error 分流）
         }
 
-        // 目录下拉 + 新建
-        let labels: Vec<String> = self
-            .catalog
-            .packs()
-            .map(|pack| {
-                let source = if pack.source.as_deref() == Some("builtin") {
-                    i18n::t("1092")
-                } else {
-                    i18n::t("1093")
-                };
-                format!("({source}) {}", self.catalog.label_for(&pack.id))
-            })
-            .collect();
-        rows.push((
-            rows.len(),
-            Grid::new()
-                .columns([GridLength::STAR, GridLength::Auto])
-                .children((
-                    {
-                        let combo: View =
-                            ComboBox::new()
-                                .min_width(280.0)
-                                .placeholder_text(i18n::t("1083"))
-                                .items_source(labels)
-                                .selected_index(self.bh_selected)
-                                .on_selection_changed(context.callback(
-                                    |selected: Option<usize>| Message::BhSelect(selected),
-                                ))
-                                .into();
-                        combo
-                    },
-                    Button::new()
-                        .grid_column(1)
-                        .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
-                        .on_click(context.message(Message::BhNew))
-                        .content(TextBlock::new().text(i18n::t("405"))),
-                )),
-        ));
+        rows.push((rows.len(), self.bh_pack_picker(context)));
 
         // 表单（草稿在位时渲染；内置包可看不可存）
         if let Some(draft) = self.bh_draft.as_ref() {
-            let is_new = draft.index == behaviors_edit::NEW_INDEX;
-            let is_builtin = !is_new && self.catalog.builtin.iter().any(|pack| pack.id == draft.id);
-            if is_builtin {
-                rows.push((rows.len(), settings_view::hint_row(i18n::t("1103_only"))));
-            }
-
-            rows.push((
-                rows.len(),
-                settings_view::text_field(
-                    "ID",
-                    &draft.id,
-                    context.callback(|value: String| Message::BhId(value)),
-                ),
-            ));
-            rows.push((
-                rows.len(),
-                settings_view::text_field(
-                    i18n::t("2568"),
-                    &draft.name,
-                    context.callback(|value: String| Message::BhName(value)),
-                ),
-            ));
-            rows.push((
-                rows.len(),
-                settings_view::text_field(
-                    i18n::t("2523"),
-                    &draft.description,
-                    context.callback(|value: String| Message::BhDescription(value)),
-                ),
-            ));
-
-            // 前提行：类型（1032 文本特征 / 1031 文件后缀）+ 值 + ✕；底部追加
-            for (row, applies) in draft.applies.iter().enumerate() {
-                let kind_labels = [i18n::t("1032"), i18n::t("1031")];
-                rows.push((
-                    rows.len(),
-                    Grid::new()
-                        .columns([GridLength::Pixel(140.0), GridLength::STAR, GridLength::Auto])
-                        .children((
-                            {
-                                let combo: View = ComboBox::new()
-                                    .items_source(kind_labels.to_vec())
-                                    .selected_index(usize::from(applies.kind == "fileExt"))
-                                    .on_selection_changed(context.callback(
-                                        move |selected: Option<usize>| {
-                                            Message::BhAppliesKind(row, selected.unwrap_or(0))
-                                        },
-                                    ))
-                                    .into();
-                                combo
-                            },
-                            Border::new()
-                                .grid_column(1)
-                                .margin(Thickness::new(8.0, 0.0, 8.0, 0.0))
-                                .content(
-                                    TextBox::new().text(applies.value.clone()).on_text_changed(
-                                        context.callback(move |value: String| {
-                                            Message::BhAppliesValue(row, value)
-                                        }),
-                                    ),
-                                ),
-                            Border::new().grid_column(2).content(crate::ui::icon_button(
-                                "✕",
-                                15.0,
-                                theme::ERROR_CRIMSON,
-                                draft.applies.len() > 1,
-                                context.message(Message::BhAppliesRemove(row)),
-                            )),
-                        )),
-                ));
-            }
-            rows.push((
-                rows.len(),
-                Button::new()
-                    .on_click(context.message(Message::BhAppliesAdd))
-                    .content(TextBlock::new().text(i18n::t("405"))),
-            ));
-
-            // 基础动作 + 模板 + 工作目录
-            let base_options = behaviors_edit::base_action_options(&self.catalog);
-            let base_index = base_options
-                .iter()
-                .position(|action| *action == draft.base_action);
-            rows.push((
-                rows.len(),
-                settings_view::combo_row(
-                    i18n::t("1011"),
-                    &base_options,
-                    base_index.unwrap_or(0),
-                    context.callback(|selected: Option<usize>| {
-                        Message::BhBaseAction(selected.unwrap_or(0))
-                    }),
-                ),
-            ));
-            rows.push((
-                rows.len(),
-                settings_view::text_field(
-                    i18n::t("2532"),
-                    &draft.template,
-                    context.callback(|value: String| Message::BhTemplate(value)),
-                ),
-            ));
-            rows.push((
-                rows.len(),
-                settings_view::text_field(
-                    i18n::t("2533"),
-                    &draft.working_dir,
-                    context.callback(|value: String| Message::BhWorkingDir(value)),
-                ),
-            ));
-            if !is_new {
-                rows.push((
-                    rows.len(),
-                    Button::new()
-                        .on_click(context.message(Message::BhDelete))
-                        .content(
-                            TextBlock::new()
-                                .text(i18n::t("967"))
-                                .foreground(theme::solid(theme::ERROR_CRIMSON)),
-                        ),
-                ));
-            }
+            self.bh_push_form(context, draft, &mut rows);
         }
 
         ContentDialog::new()
@@ -653,12 +507,196 @@ impl Shell {
                 }
             }))
             .content(
-                // 125% DPI 下内容区 ~496 DIP（同 441 行注释）：520 会把「新增」推出裁掉
+                // 125% DPI 下内容区 ~496 DIP（同 sa_match_types_dialog 注释）：
+                // 520 会把「新增」推出裁掉
                 ScrollViewer::new()
                     .max_height(460.0)
                     .min_width(480.0)
                     .content(StackPanel::new().spacing(8.0).keyed_children(rows)),
             )
+    }
+
+    /// 行为对话框：目录下拉（内置 ★ 标注）+ 新建。
+    fn bh_pack_picker(&self, context: &mut ViewContext<Self>) -> View {
+        let labels: Vec<String> = self
+            .catalog
+            .packs()
+            .map(|pack| {
+                let source = if pack.source.as_deref() == Some("builtin") {
+                    i18n::t("1092")
+                } else {
+                    i18n::t("1093")
+                };
+                format!("({source}) {}", self.catalog.label_for(&pack.id))
+            })
+            .collect();
+        Grid::new()
+            .columns([GridLength::STAR, GridLength::Auto])
+            .children((
+                {
+                    let combo: View = ComboBox::new()
+                        .min_width(280.0)
+                        .placeholder_text(i18n::t("1083"))
+                        .items_source(labels)
+                        .selected_index(self.bh_selected)
+                        .on_selection_changed(
+                            context.callback(|selected: Option<usize>| Message::BhSelect(selected)),
+                        )
+                        .into();
+                    combo
+                },
+                Button::new()
+                    .grid_column(1)
+                    .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                    .on_click(context.message(Message::BhNew))
+                    .content(TextBlock::new().text(i18n::t("405"))),
+            ))
+    }
+
+    /// 行为对话框：表单主体（ID/名称/描述 + 前提行 + 基础动作区）。
+    fn bh_push_form(
+        &self,
+        context: &mut ViewContext<Self>,
+        draft: &behaviors_edit::BehaviorDraft,
+        rows: &mut Vec<(usize, View)>,
+    ) {
+        let is_new = draft.index == behaviors_edit::NEW_INDEX;
+        let is_builtin = !is_new && self.catalog.builtin.iter().any(|pack| pack.id == draft.id);
+        if is_builtin {
+            rows.push((rows.len(), settings_view::hint_row(i18n::t("1103_only"))));
+        }
+
+        rows.push((
+            rows.len(),
+            settings_view::text_field(
+                "ID",
+                &draft.id,
+                context.callback(|value: String| Message::BhId(value)),
+            ),
+        ));
+        rows.push((
+            rows.len(),
+            settings_view::text_field(
+                i18n::t("2568"),
+                &draft.name,
+                context.callback(|value: String| Message::BhName(value)),
+            ),
+        ));
+        rows.push((
+            rows.len(),
+            settings_view::text_field(
+                i18n::t("2523"),
+                &draft.description,
+                context.callback(|value: String| Message::BhDescription(value)),
+            ),
+        ));
+
+        self.bh_push_applies_rows(context, draft, rows);
+        self.bh_push_base_rows(context, draft, rows);
+    }
+
+    /// 行为对话框：前提行 —— 类型（1032 文本特征 / 1031 文件后缀）+ 值 + ✕；底部追加。
+    fn bh_push_applies_rows(
+        &self,
+        context: &mut ViewContext<Self>,
+        draft: &behaviors_edit::BehaviorDraft,
+        rows: &mut Vec<(usize, View)>,
+    ) {
+        for (row, applies) in draft.applies.iter().enumerate() {
+            let kind_labels = [i18n::t("1032"), i18n::t("1031")];
+            rows.push((
+                rows.len(),
+                Grid::new()
+                    .columns([GridLength::Pixel(140.0), GridLength::STAR, GridLength::Auto])
+                    .children((
+                        {
+                            let combo: View = ComboBox::new()
+                                .items_source(kind_labels.to_vec())
+                                .selected_index(usize::from(applies.kind == "fileExt"))
+                                .on_selection_changed(context.callback(
+                                    move |selected: Option<usize>| {
+                                        Message::BhAppliesKind(row, selected.unwrap_or(0))
+                                    },
+                                ))
+                                .into();
+                            combo
+                        },
+                        Border::new()
+                            .grid_column(1)
+                            .margin(Thickness::new(8.0, 0.0, 8.0, 0.0))
+                            .content(TextBox::new().text(applies.value.clone()).on_text_changed(
+                                context.callback(move |value: String| {
+                                    Message::BhAppliesValue(row, value)
+                                }),
+                            )),
+                        Border::new().grid_column(2).content(crate::ui::icon_button(
+                            "✕",
+                            15.0,
+                            theme::ERROR_CRIMSON,
+                            draft.applies.len() > 1,
+                            context.message(Message::BhAppliesRemove(row)),
+                        )),
+                    )),
+            ));
+        }
+        rows.push((
+            rows.len(),
+            Button::new()
+                .on_click(context.message(Message::BhAppliesAdd))
+                .content(TextBlock::new().text(i18n::t("405"))),
+        ));
+    }
+
+    /// 行为对话框：基础动作 + 模板 + 工作目录（+ 非新建时删除按钮）。
+    fn bh_push_base_rows(
+        &self,
+        context: &mut ViewContext<Self>,
+        draft: &behaviors_edit::BehaviorDraft,
+        rows: &mut Vec<(usize, View)>,
+    ) {
+        let base_options = behaviors_edit::base_action_options(&self.catalog);
+        let base_index = base_options
+            .iter()
+            .position(|action| *action == draft.base_action);
+        rows.push((
+            rows.len(),
+            settings_view::combo_row(
+                i18n::t("1011"),
+                &base_options,
+                base_index.unwrap_or(0),
+                context.callback(|selected: Option<usize>| {
+                    Message::BhBaseAction(selected.unwrap_or(0))
+                }),
+            ),
+        ));
+        rows.push((
+            rows.len(),
+            settings_view::text_field(
+                i18n::t("2532"),
+                &draft.template,
+                context.callback(|value: String| Message::BhTemplate(value)),
+            ),
+        ));
+        rows.push((
+            rows.len(),
+            settings_view::text_field(
+                i18n::t("2533"),
+                &draft.working_dir,
+                context.callback(|value: String| Message::BhWorkingDir(value)),
+            ),
+        ));
+        if draft.index != behaviors_edit::NEW_INDEX {
+            rows.push((
+                rows.len(),
+                Button::new()
+                    .on_click(context.message(Message::BhDelete))
+                    .content(
+                        TextBlock::new()
+                            .text(i18n::t("967"))
+                            .foreground(theme::solid(theme::ERROR_CRIMSON)),
+                    ),
+            ));
+        }
     }
 
     /// 指南页底部编辑入口（复刻 `EditZoneHint` 虚线编辑区：点击打开总览编辑窗）。
@@ -720,7 +758,7 @@ impl Shell {
             .content(
                 ScrollViewer::new()
                     .max_height(480.0)
-                    // 内容区 ~496 DIP：560 会把右侧推出裁掉（同 441 行注释）
+                    // 内容区 ~496 DIP：560 会把右侧推出裁掉（同 sa_match_types_dialog 注释）
                     .min_width(480.0)
                     .content(self.action_editor_panel(context)),
             )
@@ -781,7 +819,7 @@ impl Shell {
             .content(
                 ScrollViewer::new()
                     .max_height(460.0)
-                    // 内容区 ~496 DIP：520 会把右侧裁掉（同 441 行注释）
+                    // 内容区 ~496 DIP：520 会把右侧裁掉（同 sa_match_types_dialog 注释）
                     .min_width(480.0)
                     .content(StackPanel::new().spacing(0.0).keyed_children(rows)),
             )
