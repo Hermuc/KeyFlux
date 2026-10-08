@@ -25,7 +25,9 @@ const MAX_ENTRIES_PER_MAPPING: usize = 9;
 /// Go `behaviors/textfeatures.go` 注册表的校验面投影（值 / 中文名，顺序即表序）。
 /// 仅供词表判定与错误文案拼接使用；正则命中不在保存链路（`MatchTextFeature`
 /// 不被 ValidateSelectedAction 消费），故不移植。
-const TEXT_FEATURES: [(&str, &str); 5] = [
+/// 批 R（2026-10-08）：`pub(crate)` 供 `handlers_selected_action.rs` 的「三表值名对账」
+/// 测试读取；载荷（中文标签）语义仅属于校验提示，仍是本模块的实现细节。
+pub(crate) const TEXT_FEATURES: [(&str, &str); 5] = [
     ("url", "链接"),
     ("path", "路径"),
     ("magnet", "磁力链接"),
@@ -248,23 +250,12 @@ fn display_value(match_type: &str, v: &str) -> String {
     format!("后缀 .{}", v.strip_prefix('.').unwrap_or(v))
 }
 
-/// 内置基础动作保留 ID 集。Go `behaviors.BuiltinActionIDs`（逐字搬运；
-/// 生成器侧 `BUILTIN_ACTION_IDS` 同源，此处独立成表以保持校验层自包含）。
-const BUILTIN_ACTION_IDS: [&str; 10] = [
-    "open_url",
-    "open_path",
-    "open_folder",
-    "magnet_download",
-    "open",
-    "search",
-    "run",
-    "send_keys",
-    "script",
-    "copy",
-];
-
 pub(crate) fn is_builtin_action(id: &str) -> bool {
-    BUILTIN_ACTION_IDS.contains(&id)
+    // 批 R 单源（2026-10-08）：`BUILTIN_ACTION_IDS` 是 Go `behaviors.BuiltinActionIDs`
+    // 的搬运，`generator/behaviors.rs` 是唯一真源；此处原有一份独立副本（注释自述
+    // "同源、为保持校验层自包含"），但自包含的代价是静默漂移 ⇒ 改为直接引用。
+    // 防回退护栏见本文件 tests::builtin_action_ids_have_a_single_definition。
+    crate::generator::behaviors::BUILTIN_ACTION_IDS.contains(&id)
 }
 
 /// 读单个包目录（Go `server` 场景下经 `LoadCatalog→readPack` 的容错口径）：
@@ -1127,6 +1118,23 @@ mod tests {
         assert_eq!(
             cat4.validate_delete("t", &refs4).unwrap_err(),
             "删除「文本包」后以下匹配条件将没有可用行为：文本特征 url"
+        );
+    }
+
+    /// 批 R 单源护栏（2026-10-08）：`BUILTIN_ACTION_IDS` 只允许在
+    /// `generator/behaviors.rs` 定义一份。`server/validate.rs` 曾有一份独立副本
+    /// （注释自述"同源、为保持校验层自包含"）—— 自包含的代价是静默漂移，已改引用。
+    /// 本测试防回退：再次出现本地定义即红。
+    #[test]
+    fn builtin_action_ids_have_a_single_definition() {
+        // ⚠ 自指规避：本测试经 include_str! 读到的源码**包含本测试自身**，
+        // 检测串必须用 concat! 拆开，否则 contains 永远命中自己 ⇒ 恒红（实测踩中）。
+        let needle = concat!("const BUILTIN_", "ACTION_IDS");
+        let src = include_str!("validate.rs");
+        assert!(
+            !src.contains(needle),
+            "server/validate.rs 不应自定义 BUILTIN_ACTION_IDS —— 请引用 \
+             crate::generator::behaviors::BUILTIN_ACTION_IDS（单源真值在 generator 侧）"
         );
     }
 }

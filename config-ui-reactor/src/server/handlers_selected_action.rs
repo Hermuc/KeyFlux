@@ -675,4 +675,25 @@ mod tests {
         assert_eq!(seq(&second), seq(&first) + 1, "seq 应单调递增");
         let _ = std::fs::remove_file(&path);
     }
+
+    /// 批 R 对账（2026-10-08）：三处内置文本特征表的**载荷语义不同**
+    /// （validate 的中文标签 / 本文件的 FeatureSpec 正则 / 播放白名单），整表不可合并；
+    /// 但**值名与顺序**必须一致 —— 漂移会让校验、命中、播放白名单三端对同一 id 分歧。
+    #[test]
+    fn builtin_text_feature_ids_agree_across_the_three_tables() {
+        let validate_ids: Vec<&str> = crate::server::validate::TEXT_FEATURES
+            .iter()
+            .map(|(id, _label)| *id)
+            .collect();
+        let feature_ids: Vec<&str> = FEATURES.iter().map(|f| f.value).collect();
+        assert_eq!(
+            validate_ids, feature_ids,
+            "validate::TEXT_FEATURES 与本文件 FEATURES 的值名/顺序不一致"
+        );
+        assert_eq!(
+            feature_ids,
+            PLAY_BUILTIN_TEXT_FEATURES.to_vec(),
+            "FEATURES 与播放白名单 PLAY_BUILTIN_TEXT_FEATURES 不一致"
+        );
+    }
 }
