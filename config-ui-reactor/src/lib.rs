@@ -12,8 +12,8 @@
 //!   `generator` 配置生成器（纯逻辑；零 UI 依赖，与 `settings.exe` drop-in 对齐）
 //!   `server`    内嵌 localhost HTTP 服务（Rust 版 settings.exe 的路由层）
 //!   `services`  HTTP 客户端 / 配置存取 / i18n / Markdown
-//!   `glass`     毛玻璃背板策略（Mica Alt 等）
-//!   `platform`  reactor 与原生互操作的**唯一**落点（Ports & Adapters；不得反向依赖上层）
+//!   `platform`  reactor 与原生互操作的**唯一**落点（Ports & Adapters；不得反向依赖上层），
+//!               并**托管**毛玻璃背板策略 `platform::glass`（窗口材质 = 平台决策，见其模块文档）
 //!
 //! 命名词汇（新代码一律照此；同义漂移的阅读税见 2026-10-07 代码审查报告 §2）：
 //! * 从一组候选中**选中的项** = `selected`（勿写 `picked` / `chosen`）
@@ -45,7 +45,6 @@
 
 pub mod app;
 pub mod generator;
-pub mod glass;
 pub mod models;
 pub mod platform;
 pub mod server;

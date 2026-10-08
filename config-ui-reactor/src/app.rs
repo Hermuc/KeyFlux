@@ -19,11 +19,11 @@ use std::time::Instant;
 
 use windows_reactor::*;
 
-use crate::glass;
 use crate::models::SelectedEntry;
 use crate::models::{
     Action, Config, Keymap, PluginListResponse, PluginSetting, PluginSettingsResponse,
 };
+use crate::platform::glass;
 use crate::platform::{self, WindowSpec};
 use crate::services::abbr;
 use crate::services::api::{ApiResponse, SettingsApi};

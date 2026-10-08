@@ -13,10 +13,18 @@ use windows_reactor::{WindowBackdrop, WindowTheme, WindowVisuals};
 
 /// UAC 提权启动（ShellExecuteW runas；自启计划任务命令 3/4 用）。
 pub mod elevation;
-/// Windows Job Object 封装（保证 GUI 死亡时连带回收后端子进程树）。
+/// 原生文件对话框（打开/保存；Win32 过滤器串拼接见 `single_filter`）。
 pub mod file_dialog;
 /// 随包字体（MiSans）进程内私有加载。
 pub mod fonts;
+/// 毛玻璃（材质）背板策略 —— 窗口材质的**单一决策点**（见模块文档）。
+///
+/// 2026-10-08 自 crate 根下沉至此（模块化审查 §3.4 + §4.1）：它本质是**窗口背板
+/// 策略**，与平台强相关，且唯一的下层消费者就是本模块的 [`WindowSpec::with_glass`]。
+/// 下沉前 `platform -> crate::glass` 是 `lib.rs` 分层规范明令禁止的**反向依赖**；
+/// 下沉后该引用变成同模块引用，依赖方向自然合法（`theme -> platform::glass` 不变）。
+pub mod glass;
+/// Windows Job Object 封装（保证 GUI 死亡时连带回收后端子进程树）。
 pub mod job;
 /// 窗口拾取「准星」会话（WH_MOUSE_LL/WH_KEYBOARD_LL + 高亮框 + 十字光标；移植自旧 Avalonia）。
 pub mod window_picker;
@@ -43,18 +51,18 @@ impl Default for WindowSpec {
 }
 
 impl WindowSpec {
-    /// 按「毛玻璃开关」派生窗口背板材质：开 = [`crate::glass`] 策略背板（当前
-    /// Mica Alt），关 = 保持默认 Mica。策略详情与选型依据见 `crate::glass` 模块文档。
+    /// 按「毛玻璃开关」派生窗口背板材质：开 = [`glass`] 策略背板（当前
+    /// Mica Alt），关 = 保持默认 Mica。策略详情与选型依据见 [`glass`] 模块文档。
     ///
     /// `GlassBackdrop` → reactor `WindowBackdrop` 枚举的映射只允许在本层出现
     /// （平台互操作边界），上层只传布尔语义。
     pub fn with_glass(mut self, glass_on: bool) -> Self {
         if glass_on {
-            self.backdrop = match crate::glass::current().backdrop {
-                crate::glass::GlassBackdrop::Solid => WindowBackdrop::None,
-                crate::glass::GlassBackdrop::Mica => WindowBackdrop::Mica,
-                crate::glass::GlassBackdrop::MicaAlt => WindowBackdrop::MicaAlt,
-                crate::glass::GlassBackdrop::Acrylic => WindowBackdrop::Acrylic,
+            self.backdrop = match glass::current().backdrop {
+                glass::GlassBackdrop::Solid => WindowBackdrop::None,
+                glass::GlassBackdrop::Mica => WindowBackdrop::Mica,
+                glass::GlassBackdrop::MicaAlt => WindowBackdrop::MicaAlt,
+                glass::GlassBackdrop::Acrylic => WindowBackdrop::Acrylic,
             };
         }
         self
