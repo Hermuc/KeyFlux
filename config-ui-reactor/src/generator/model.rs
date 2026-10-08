@@ -3,6 +3,12 @@
 //! 字段名 / JSON 标签 / 默认值必须与 Go 逐字一致：这些结构体既用于读 `data/config.json`，
 //! 也用于产出 `plan.json`（对账闸门内）与 AHK 代码。
 //!
+//! **孪生文件 + 同步检查清单**（多维度优化报告 #2）：本文件的 `Config` 等结构体与
+//! `models/config.rs`（面板侧 DTO）、`server/dto.rs`（HTTP wire）描述**同一份**
+//! `data/config.json` 契约，但三者**各自独立定义**。新增 / 改名 / 调序字段时三处必须
+//! **同批**修改（wire 名与顺序一致）；护栏 = `models/contract.rs` 的三条对账测试，
+//! 有意的单边差异登记进其 `GENERATOR_ONLY_WIRE` / `NON_WIRE_ONLY` 白名单。
+//!
 //! 关键口径（易错，均来自 Go 源码）：
 //! * `Action` 的 JSON 标签是 **`actionTypeID` / `actionValueID`**（不是 `typeID` / `valueID`）；
 //! * Go 缺省 JSON 字段 = 零值 ⇒ 每个结构体都 `#[serde(default)]` + `Default`；

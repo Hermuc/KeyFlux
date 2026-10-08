@@ -5,10 +5,24 @@
 //! 为移植起点，均已退役 —— Go 后端 `36ccb83`、Avalonia 客户端 `1f3dc9f`；
 //! 溯源 `git show 36ccb83^:config-server/internal/script/model/types.go`）。
 //!
+//! **孪生文件 + 同步检查清单**（多维度优化报告 #2）：
+//! 同一份契约在 reactor 里有**三处独立定义**，改任何一处都要**同批**改另两处：
+//!
+//! | 位置 | 消费方 |
+//! |---|---|
+//! | 本文件 `models/config.rs` | 面板侧（`app` / `ui` / `services`） |
+//! | `generator/model.rs` | 生成端（`generator` / `server`） |
+//! | `server/dto.rs` | HTTP wire（`tools/api-parity` 的基线快照对象） |
+//!
+//! 新增 / 改名 / 调序字段时，三处的 **wire 名与顺序** 必须一致；确实有意的单边差异
+//! 须登记进 `models/contract.rs` 的 `GENERATOR_ONLY_WIRE` / `NON_WIRE_ONLY` 白名单。
+//! **门禁**：`models/contract.rs` 的对账测试会在任一处漂移时变红（漂移 = 静默丢字段）。
+//!
 //! 铁律：
 //! 1. 字段顺序与 json 名**不得改动**；`*ID` 类键（`parentID` / `actionTypeID` /
 //!    `actionValueID` / `windowGroupID`）与 camelCase 推导不同，必须显式 `rename`。
-//! 2. 新增字段须 **Go / C# / Rust 三端同批**，否则 Go 全量落盘会静默剥掉它。
+//! 2. 新增字段须在**上述三处 Rust 定义同批**添加（wire 名 / 顺序一致）。旧「Go / C# / Rust
+//!    三端同批」的说法已失效：Go 后端与 Avalonia 客户端均已退役，现行真源只有这三份 Rust。
 //! 3. `[JsonIgnore]` 的前端专用字段（`IsNew` / `IsEmpty`）在 Rust 用 `#[serde(skip)]`。
 //! 4. C# 用「代理属性 + WhenWritingNull」实现 Go 的 `omitempty`：仅
 //!    `SelectedEntry.actionValue` / `workingDir` 两处空串需**省略键**，用
