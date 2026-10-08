@@ -20,8 +20,19 @@ indent_size = 2
 [*.go]
 indent_style = tab
 
-# AHK v2: 现有 lib 源码为制表符缩进
+# AHK v2: **2 空格**缩进。
+# 🔴 2026-10-08 订正：本段此前声明 `indent_style = tab`（依据「现有 lib 源码为制表符缩进」），
+#   但实测 `bin/lib` 44 个 .ahk 中 **43 个是 2 空格**，唯一 tab 的是 vendored 上游库
+#   `core/Monitor.ahk`（头注声明零改动）⇒ 声明与实际**相反**，编辑器/协作者的自动格式化
+#   会朝错误方向改。现按实态订正，并为 vendored 库单列例外。
+#   实测口径见 `tools/lint_ahk_style.py`（tab_indent_files 应恒为 1 = 仅 Monitor.ahk）。
 [*.{ahk,ahk2}]
+indent_style = space
+indent_size = 2
+
+# vendored 上游库（AutoHotkey 社区的 Monitor.ahk）：保持上游原样（tab），
+# 改它 = 破坏 vendor 差异基线（同 vendor/windows-reactor/PATCHES.md 的纪律）。
+[bin/lib/core/Monitor.ahk]
 indent_style = tab
 
 # Batch: Windows 批处理用 CRLF (cmd 解析历史敏感性)

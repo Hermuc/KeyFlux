@@ -1,0 +1,10 @@
+{
+  "bom_files": 9,
+  "catch_no_trace": 17,
+  "crlf_files": 5,
+  "files_scanned": 44,
+  "log_sinks": 6,
+  "spelling_drift_hits": 7,
+  "tab_indent_files": 1,
+  "try_no_catch": 34
+}

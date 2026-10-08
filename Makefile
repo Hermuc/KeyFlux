@@ -147,6 +147,15 @@ check-deploy-tree:
 lint:
 	python tools/lint_ident.py $$(find bin/lib -name '*.ahk')
 
+# lint-ahk-style: AHK 侧「风格一致性 + 静默失败面」护栏 (2026-10-08, 规范化批 G)。
+#   检查项: try 无 catch/finally、catch 无留痕、日志 sink 数、BOM/CRLF/缩进偏差、拼写分裂。
+#   判据 = **不高于基线**（tools/lint_ahk_style.baseline.json）—— 存量债分批偿还
+#   （批 L/M/N/O 各把对应数字往下压一次），每条改完重新 --write-baseline。
+#   上线首日即绿（基线就是当时的实态）；它守的是"不让它变坏"，而不是"立刻归零"。
+#   ⚠️ 有意放宽某类计数时必须显式重写基线，不得绕门禁。
+lint-ahk-style:
+	python tools/lint_ahk_style.py
+
 # check-texttypes: 内置文本特征**三端一致性**闸门 (Rust 镜像 services/selected_action.rs
 # ::TEXT_TYPES ⇄ AHK TextFeatureSpecs ⇄ 共享向量 testdata/text_types.json)。
 # 两层: ① 静态对账 (值/大小写开关/正则/顺序逐项比对, 兜底项唯一且居末);
@@ -218,7 +227,7 @@ check-ime:
 #         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
 #   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
 #       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
-check: sync-templates lint check-texttypes check-hooks check-plugins-mirror sync-plugins | check-deploy-tree $(OUT_DIR)
+check: sync-templates lint lint-ahk-style check-texttypes check-hooks check-plugins-mirror sync-plugins | check-deploy-tree $(OUT_DIR)
 	@mkdir -p "$(DEPLOY_DIR)/bin"
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
@@ -330,4 +339,4 @@ out: sync-templates buildClientReactor sync-out
 deploy: check buildClientReactor sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: ahk sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-plugins-mirror sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy parity api-parity check-deploy-tree
+.PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-plugins-mirror sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy parity api-parity check-deploy-tree
