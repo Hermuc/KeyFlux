@@ -142,6 +142,25 @@ check-deploy-tree:
 	@test -f "$(CHECK_CONFIG)" || (echo "[FAIL] deploy tree not ready: missing $(CHECK_CONFIG)"; echo "       deploy tree = the live installed app dir (OUT_DIR=$(OUT_DIR))"; echo "       fix: set OUT_DIR to the installed app, or seed the factory config first:"; echo "         mkdir -p \"$(DEPLOY_DIR)/data\" && cp data/config.json \"$(CHECK_CONFIG)\""; exit 1)
 	@echo "[ok] deploy tree ready: $(CHECK_CONFIG)"
 
+# check-freshness: 暂存产物「新鲜度」门禁 (多维度优化报告 #5)。
+#   断言 bin/settings.exe 与 bin/ui/KeyFlux.Settings.exe 的 mtime **晚于 HEAD** —— 二进制
+#   「被调包 / 没重建」时, check 会在**旧生成器**上假绿、release 会带**旧面板**; 本门禁把这种
+#   静默陈旧变成红灯。单一真源 = tools/check-freshness.ps1 (默认只查 .gitignore 的构建产物;
+#   已入库的 KeyFlux-CommandInput.exe 与 vendor 的 AutoHotkey64.exe 刻意排除 —— 见脚本头「SCOPE」)。
+#   注: 正因如此 deploy 目标已改为「先 build 再 check」(否则本门禁会在 deploy 会自行重建的情况下
+#   先一步拦下), 详见 deploy 目标注释。
+check-freshness:
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-freshness.ps1
+
+# check-upstream: 上游 windows-reactor 是否有新版 (多维度优化报告 #7)。
+#   vendored fork (vendor/windows-reactor, P1..P8) 的补丁面对编译器/测试/CI 全不可见 ⇒
+#   上游发新版时仓库不会有任何提示。本目标把"上游已往前走"变成一次可见信号, 交给人按
+#   PATCHES.md §四 的 rebase 清单重放补丁 (不自动升级)。
+#   ⚠ 需要网络 ⇒ **不并入 check** (check 是随时可跑的无副作用闸门); 每周由
+#     .github/workflows/deps-watch.yml 跑一次 (单一真源 = tools/check-upstream-reactor.ps1)。
+check-upstream:
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-upstream-reactor.ps1
+
 # lint: 标识符冲突静态闸门 (AHK 大小写不敏感, /Validate 查不出「局部变量遮蔽同名函数」类
 # 运行时崩溃; 详见阶段 0 §7.3)。扫描 bin/lib 下全部 AHK 源文件, 有 ERROR 即非零退出。
 lint:
@@ -238,7 +257,7 @@ check-fuzzy:
 #         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
 #   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
 #       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
-check: sync-templates lint lint-ahk-style check-texttypes check-hooks check-fuzzy check-plugins-mirror sync-plugins | check-deploy-tree $(OUT_DIR)
+check: sync-templates check-freshness lint lint-ahk-style check-texttypes check-hooks check-fuzzy check-plugins-mirror sync-plugins | check-deploy-tree $(OUT_DIR)
 	@mkdir -p "$(DEPLOY_DIR)/bin"
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
@@ -341,13 +360,30 @@ out: sync-templates buildClientReactor sync-out
 	@echo "------------------------- out ok -> $(OUT_DIR) -------------------------------"
 
 # deploy: 回归通过后编译并同步到部署目录, 重启实例 (robocopy 退出码 0-7 均为成功)
+# 2026-10-08 (报告 #5): 顺序由 `check buildClientReactor sync-out` 改为
+#   `buildClientReactor check sync-out` —— 两处理由:
+#   ① check 用 bin/settings.exe 生成/校验, 而 bin/settings.exe 是 buildClientReactor 的产物;
+#      旧顺序会在**上一次**的产物上 check, 再用**新**产物 sync-out (新产物未经校验即上线);
+#   ② 新增的 check-freshness 前置要求产物新于 HEAD, 若先 check 会在 deploy 本就会重建时先拦下。
+#   改为「先建后检」后: 产物新鲜 ⇒ 门禁自然通过, 且校验的正是即将上线的这一版。
 # 2026-09-17 修重启步骤的 shell 展开缺陷: 原写法用**双引号**包裹 pwsh 载荷, make 折半后的 $$d
 #   会被 /bin/sh 先按变量展开成空串 ⇒ pwsh 收到 `=(Resolve-Path ...).Path`, 报
 #   "The term '=' is not recognized" + "Join-Path: missing mandatory parameters: ChildPath"
 #   (实测 make Error 1; 此时前置步骤其实已全部成功, 只是实例没被重启)。
 #   改为**单引号**包裹载荷 (与 buildClientAvalonia 的 i18n 校验行同款): 单引号阻断 sh 展开,
 #   make 的 $$ 折半后原样送进 pwsh; 载荷内只用双引号与 ASCII。
-deploy: check buildClientReactor sync-out
+deploy: buildClientReactor check sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-fuzzy check-plugins-mirror sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy parity api-parity check-deploy-tree
+# verify-deploy: 部署「双腿」一致性机械校验 (多维度优化报告 #6)。
+#   后端 bin/settings.exe 与面板 bin/ui/KeyFlux.Settings.exe 是同一个 cargo release 的
+#   两个独立产物, 由**不同步骤**落地 (buildClientReactor / release.yml) —— 本仓库每次
+#   「部署看着没问题」的误判 (md5 四侧一致反而是错 / robocopy 假平) 都是某条腿悄悄变旧。
+#   断言 4 条: built==staged (各腿) + staged 两腿彼此 != (防一个 exe 被拷进两个槽) + 两者都在。
+#   ⚠ 比较对象是「副本 vs 源」(逐字节相同), 与 reactor「同一源码重编非逐字节可复现」无关
+#     (见 buildClientReactor 注释); deploy_panel.ps1 的第 4 步校验的是另一段 (仓库 bin/ui
+#     -> 生产部署树), 与本节互补。
+verify-deploy:
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify_deploy.ps1
+
+.PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-fuzzy check-plugins-mirror sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy verify-deploy check-freshness check-upstream parity api-parity check-deploy-tree

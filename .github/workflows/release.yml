@@ -93,6 +93,13 @@ jobs:
           if (!(Test-Path "$dst/KeyFlux.Settings.exe")) { Write-Error "missing bin/ui/KeyFlux.Settings.exe"; exit 1 }
           Write-Host ("[OK] reactor client -> bin/ui: " + (Get-ChildItem $dst -Recurse -File | Measure-Object).Count + " files")
 
+      # 部署「双腿」一致性 (多维度优化报告 #6): 后端 bin/settings.exe 与面板
+      # bin/ui/KeyFlux.Settings.exe 必须各自 == 其 target/release 源, 且两者互不相等。
+      # 单一真源 = tools/verify_deploy.ps1 (经 make verify-deploy)。放在打包**之前**,
+      # 防止把某条腿悄悄变旧的产物打进发布包 —— 这正是历史上翻车过多次的失败面。
+      - name: Verify deploy legs (built == staged, and the two legs differ)
+        run: make verify-deploy
+
       - name: Stamp version into sample config
         working-directory: bin
         # ⚠ 双份实现（Makefile:71 同款配方）—— 改任一处须同步另一处。收编为 make 目标

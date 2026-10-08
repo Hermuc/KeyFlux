@@ -1,0 +1,33 @@
+name: deps-watch
+
+# 上游依赖检测 (多维度优化报告 #7)。
+#
+# 为什么独立成 workflow（不进 analyzers.yml）：
+#   analyzers.yml 是每个 push/PR 都跑的静态闸门；而本 job **需要网络**且只关心
+#   "上游是否发了新版"，每周一次足够。放进 push 闸门只会徒增噪音与外部依赖。
+#
+# 守的是什么：
+#   `config-ui-reactor/Cargo.toml` 用 `[patch.crates-io]` 指向本地 fork
+#   `vendor/windows-reactor`（P1..P8 补丁）。补丁面对编译器/测试/CI **不可见** ——
+#   上游发新版时仓库不会有任何提示，fork 会静默过期。本 job 把"上游已经往前走"变成
+#   一次可见的红灯，人去按 `vendor/windows-reactor/PATCHES.md` §四 的 rebase 清单重放补丁。
+#
+# 注意：本 job **不**自动升版本 / 重放补丁（fork rebase 可能处处冲突，必须人工）。
+
+on:
+  schedule:
+    # 每周一 03:00 UTC（北京时间 11:00）。
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+jobs:
+  upstream-windows-reactor:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: 'Check upstream windows-reactor version (single source: tools/check-upstream-reactor.ps1)'
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-upstream-reactor.ps1

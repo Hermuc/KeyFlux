@@ -523,7 +523,19 @@ try {
       continue
     }
     if ($b64 -ne $ref.bodyBase64) {
-      $mismatch += ('step {0}: {1} {2} [body {3} bytes != baseline {4} bytes]' -f $item.step, $item.method, $item.path, $bytes.Length, $ref.bodyBase64.Length)
+      # Decode the baseline and report REAL byte counts + the first differing offset.
+      # WHY (report #5): this message used to print `$bytes.Length` vs `$ref.bodyBase64.Length`
+      # -- i.e. a byte count next to a BASE64-STRING count. Base64 is ~4/3 the source size, so
+      # "body 1372 bytes != baseline 1364 bytes" read like an 8-byte drift when the real gap
+      # was ~6 bytes. That off-by-ratio misread has cost real debugging time; the arithmetic
+      # is now done here instead of in a human's head.
+      $refBytes = [Convert]::FromBase64String($ref.bodyBase64)
+      $delta = $bytes.Length - $refBytes.Length
+      $min = [Math]::Min($bytes.Length, $refBytes.Length)
+      $at = -1
+      for ($i = 0; $i -lt $min; $i++) { if ($bytes[$i] -ne $refBytes[$i]) { $at = $i; break } }
+      $where = if ($at -ge 0) { "first diff at byte $at" } else { 'common prefix identical (length-only diff)' }
+      $mismatch += ('step {0}: {1} {2} [body mismatch: candidate {3} B vs baseline {4} B, delta {5:+0;-0;0} B; {6}]' -f $item.step, $item.method, $item.path, $bytes.Length, $refBytes.Length, $delta, $where)
       continue
     }
     $pass++
