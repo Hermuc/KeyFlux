@@ -36,6 +36,8 @@ class ActionRegistry {
       ActionRegistry._log("Register rejected: duplicate Type '" type "' (first registration wins)")
       ; 阶段 6: 重复注册广播 plugin_error (隔离兜底, 不影响注册结果)
       try EventBus.Publish("plugin_error", Map("pluginId", type, "message", "duplicate action Type (first registration wins)"))
+      catch as e
+        EngineLogWarn("ActionRegistry.Register", e.Message)
       return false
     }
     if (err := action.Validate()) {

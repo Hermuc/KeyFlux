@@ -33,6 +33,7 @@ CheckMagnetHandler() {
     return cmd != ""
   }
   catch {
+    EngineLogWarn("Handlers.CheckMagnetHandler", e.Message)
     ; 未注册 magnet: 是**正常状态** (返回 false 即正确答案), 不是故障 ⇒ 刻意不记日志。
     ; 读不到 HKCR 才会落到此处 (权限受限), 但本函数可能被高频调用, 记日志会刷屏。
     ; 2026-10-07 审查: 把「此处不记」的理由写进代码, 而不是留一个无解释的空 catch。

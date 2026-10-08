@@ -179,9 +179,13 @@ class CommandDisplay {
     ; SHOW 是跨进程 PostMessage, 命令框窗口出现有处理延迟, 先等窗口真正可见
     hwnd := 0
     try hwnd := WinWait("ahk_class MyKeymap_Command_Input ahk_exe KeyFlux-CommandInput.exe", , 0.5)
+    catch as e
+      EngineLogWarn("CommandDisplay.ActivateCommandWindow", e.Message)
     if (!hwnd)
       return false
     try WinActivate("ahk_id" hwnd)
+    catch as e
+      EngineLogWarn("CommandDisplay.ActivateCommandWindow", e.Message)
     Loop 20 {   ; 最多 ~400ms: 等激活生效 (NOACTIVATE 窗口激活可能慢一拍)
       if WinActive("ahk_id" hwnd)
         return true

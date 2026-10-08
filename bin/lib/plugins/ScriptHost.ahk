@@ -23,6 +23,7 @@ class ScriptHost {
         RunWait(cmd)
       return true
     } catch {
+      EngineLogWarn("ScriptHost.Run", e.Message)
       return false
     }
   }

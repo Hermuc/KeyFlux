@@ -60,12 +60,16 @@ class CommandResolver {
     source := (scope == "capslock") ? "caps" : "semi"
     if (!this.Table.Has(key)) {
       try EventBus.Publish("abbr_submit", Map("source", source, "command", command, "matched", false, "fuzzy", fuzzy))
+      catch as e
+        EngineLogWarn("CommandResolver.Resolve", e.Message)
       if (this.Strategy != "") {
         this.Strategy.Resolve(scope, command, hook)
       }
       return
     }
     try EventBus.Publish("abbr_submit", Map("source", source, "command", command, "matched", true, "fuzzy", fuzzy))
+    catch as e
+      EngineLogWarn("CommandResolver.Resolve", e.Message)
     for step in this.Table[key] {
       if (step.conditionType != 0) {
         if (matchWinTitleCondition(step.winTitle, step.conditionType)) {

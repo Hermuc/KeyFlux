@@ -51,6 +51,8 @@ CenterAndResizeWindow(width, height) {
   ; 在 mousemove 时需要 PER_MONITOR_AWARE (-3), 否则当两个显示器有不同的缩放比例时, mousemove 会有诡异的漂移
   ; 在 winmove 时需要 UNAWARE (-1), 这样即使写死了窗口大小为 1200x800, 系统会帮你缩放到合适的大小
   try DllCall("SetThreadDpiAwarenessContext", "ptr", -1, "ptr")
+  catch as e
+    EngineLogWarn("type3_window.CenterAndResizeWindow", e.Message)
 
   WinExist("A")
   if (WindowMaxOrMin())
@@ -70,6 +72,8 @@ CenterAndResizeWindow(width, height) {
 
   WinMove(winX, winY, winW, winH)
   try DllCall("SetThreadDpiAwarenessContext", "ptr", -3, "ptr")
+  catch as e
+    EngineLogWarn("type3_window.CenterAndResizeWindow", e.Message)
 }
 
 /**

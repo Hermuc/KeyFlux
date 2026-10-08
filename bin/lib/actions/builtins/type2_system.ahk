@@ -69,6 +69,7 @@ MuteActiveApp() {
 ShowActiveProcessInFolder() {
   try path := GetActiveProcess("path")
   catch as e {
+    EngineLogWarn("type2_system.ShowActiveProcessInFolder", e.Message)
     Tip(e.Message)
     return
   }

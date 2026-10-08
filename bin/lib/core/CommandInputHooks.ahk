@@ -78,6 +78,8 @@ class CommandInputHooks {
   static BeginSession() {
     this.BackendWindow := 0
     try this.BackendWindow := WinExist("A")
+    catch as e
+      EngineLogWarn("CommandInputHooks.BeginSession", e.Message)
     ; 复位上一会话的待收尾状态: 延后收尾的回调可能跨越会话边界返回, 会话间不泄漏
     this.PendingAbbr := ""
     this.PendingScope := ""
@@ -115,6 +117,7 @@ class CommandInputHooks {
       if (WinActive("ahk_class MyKeymap_Command_Input"))
         WinActivate(this.BackendWindow)
     } catch {
+      EngineLogWarn("CommandInputHooks.ActivateBackend", e.Message)
       return false
     }
     return true

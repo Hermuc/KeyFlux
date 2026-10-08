@@ -53,6 +53,8 @@
       this.MenuWindow := win
       hwnd := win.gui.Hwnd
       try WinSetTransparent(0, "ahk_id " hwnd)   ; 先置全透明再 Show, 淡入从 0 开始无闪现
+      catch as e
+        EngineLogWarn("Menu._RunMenu", e.Message)
       win.Show()
       this._Fade(hwnd, 0, 255, seq)
 
@@ -61,6 +63,8 @@
       this.MenuActive := true
       if (waitKey != "") {
         try ih.KeyOpt("{" waitKey "}", "SN")
+        catch as e
+          EngineLogWarn("Menu._RunMenu", e.Message)
         ih.OnKeyDown := (i, vk, sc) => (SelectedAction._IsMainKey(vk, hotkeyName) ? SelectedAction._CancelMenu() : "")
       }
 
@@ -117,6 +121,8 @@
       this.MenuActive := true
       for _, keyName in remaining {
         try ih.KeyOpt("{" keyName "}", "S")  ; 抑制剩余键, 不泄漏到前台
+        catch as e
+          EngineLogWarn("Menu._ChainWait", e.Message)
       }
       prefixKey := StrLower(Trim(StrSplit(combo, "&")[1]))
       if HotkeyHeadHasModifier(prefixKey) {
@@ -226,6 +232,8 @@
     seq := this.MenuSeq
     done() {
       try WinSetTransparent("Off", "ahk_id " hwnd)
+      catch as e
+        EngineLogWarn("Menu._CloseMenu", e.Message)
       win.Hide()
     }
     this._Fade(hwnd, 255, 0, seq, done)
@@ -249,6 +257,8 @@
         ; try 包裹防窗口已被销毁时 Hide 抛错
         if (onDone != "" && alphaTo == 0) {
           try onDone()
+          catch as e
+            EngineLogWarn("Menu._Fade", e.Message)
         }
         return
       }
@@ -257,12 +267,16 @@
       if (reached) {
         SetTimer(step, 0)
         try WinSetTransparent(alphaTo, "ahk_id " hwnd)
+        catch as e
+          EngineLogWarn("Menu._Fade", e.Message)
         if (onDone != "") {
           onDone()
         }
         return
       }
       try WinSetTransparent(alpha, "ahk_id " hwnd)
+      catch as e
+        EngineLogWarn("Menu._Fade", e.Message)
     }
     SetTimer(step, 16)
   }

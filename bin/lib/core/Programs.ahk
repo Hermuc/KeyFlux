@@ -67,6 +67,8 @@ CompleteProgramPath(target) {
     PathName := RegRead("HKLM", "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" target)
     if FileExist(PathName)
       return PathName
+  } catch as e {
+    EngineLogWarn("Programs.CompleteProgramPath", e.Message)
   }
 
   return target
@@ -124,6 +126,7 @@ RunAsAdmin(target, args, workingDir, options) {
   try {
     Run("*RunAs " target " " args, workingDir, options)
   } catch Error as e {
+    EngineLogWarn("Programs.RunAsAdmin", e.Message)
     Tip("使用管理启动失败 " target ", " e.Message)
   }
 }
@@ -166,9 +169,12 @@ RunPrograms(target, args := "", workingDir := "", admin := false, runInBackgroun
     }
 
   } catch Error as e {
+    EngineLogWarn("Programs.RunPrograms", e.Message)
     Tip(e.Message)
     ; 还原窗口焦点
     try WinActivate(currentHwnd)
+    catch as e
+      EngineLogWarn("Programs.RunPrograms", e.Message)
     return
   }
 }

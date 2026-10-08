@@ -53,6 +53,8 @@ GetCaretPos(&X?, &Y?, &W?, &H?) {
         return "uia"
       }
     }
+  } catch as e {
+    EngineLogWarn("Utils.GetCaretPos", e.Message)
   }
 
   ; Acc caret
@@ -68,6 +70,8 @@ GetCaretPos(&X?, &Y?, &W?, &H?) {
         if (X | Y) != 0
           return "acc"
     }
+  } catch as e {
+    EngineLogWarn("Utils.GetCaretPos", e.Message)
   }
 
   ; ahk caret

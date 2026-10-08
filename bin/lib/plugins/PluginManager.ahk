@@ -92,6 +92,8 @@ class PluginManager {
     this._log("plugin registered: " id)
     ; 阶段 6: 插件生命周期事件 (隔离兜底, 不影响注册结果)
     try EventBus.Publish("plugin_loaded", Map("pluginId", id))
+    catch as e
+      EngineLogWarn("PluginManager.Register", e.Message)
     return true
   }
 
@@ -171,6 +173,8 @@ class PluginManager {
     this._log(msg)
     ; 阶段 6: 插件错误事件 (隔离兜底)
     try EventBus.Publish("plugin_error", Map("pluginId", pluginId, "message", msg))
+    catch as e
+      EngineLogWarn("PluginManager._recordError", e.Message)
   }
 
   ; 日志 (与 ActionRegistry._log 同策略)。2026-10-08 收敛: 委派引擎唯一留痕入口
