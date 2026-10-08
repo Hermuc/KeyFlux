@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TypeID 4: 鼠标操作 (主体为 KeymapManager 的 MouseKeymap 方法, 此处为独立函数)
  * 拆自 Actions.ahk (模块化重构阶段 3), 函数体逐行搬运未做任何修改。
  */

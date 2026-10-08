@@ -1,4 +1,4 @@
-﻿/**
+/**
  * translation.ahk —— 界面文案多语言 (中文/英文)。
  * DefaultTranslation 为英文基类, ChineseTranslation 继承并覆写中文文案;
  * Translation() 按系统语言缓存单例 (首次调用后固定, 不随运行中变化)。

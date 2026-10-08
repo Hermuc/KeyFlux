@@ -7,3 +7,16 @@
 #   so forcing LF would break that artifact instead.
 tools/parity/reference/** -text
 tools/parity/corpus/** -text
+
+# 手写 AHK 源码统一 **LF**（2026-10-08 规范化批 N）。
+# 为什么必须显式声明：core.autocrlf=true 时 `git checkout` 会把工作树写成 CRLF，
+# 于是"行尾归一"会被任何一次 checkout 撤销；而 AHK 风格护栏（tools/lint_ahk_style.py）
+# 的 crlf_files 检查会因此在全新 clone 上**假红**（44 个文件全报 CRLF）。
+# 声明 eol=lf 后 checkout 结果跨机器确定 ⇒ 护栏的该检查才有意义。
+# 注：生成物 bin/KeyFlux.ahk **不**适用（它由生成器按设计写 CRLF，且不入库）——
+# 单独标 -text 以免将来被误入库时强行改行尾。
+bin/lib/**/*.ahk text eol=lf
+bin/*.ahk        text eol=lf
+plugins/**/*.ahk text eol=lf
+tools/*.ahk      text eol=lf
+bin/KeyFlux.ahk -text
