@@ -45,6 +45,8 @@ mod dialogs;
 mod glue;
 mod handlers;
 mod messages;
+// 页面装配（2026-10-08 自 views.rs 再拆；一个页面一个文件，见 pages/mod.rs 头注）。
+mod pages;
 mod state;
 mod views;
 
