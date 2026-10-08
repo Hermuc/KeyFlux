@@ -9,7 +9,7 @@
 //!
 //! ## 冷色化沿革（2026-10-01，两轮用户裁定，同一口径）
 //!
-//! 旧皮肤是 Claude 暖色体系，但**运行态是毛玻璃 + 冷色壁纸**：`glass::dilute` 只作用于
+//! 旧皮肤是 Claude 暖色体系，但**运行态是毛玻璃 + 冷色壁纸**：`platform::glass::dilute` 只作用于
 //! 表面（parchment / ivory / sand），页面与卡面被 Mica Alt 采样的壁纸染成冷色
 //! （截图实测页面 `(208,221,228)`、卡面 `(246,248,249)`，Lab b* ≈ −1 ~ −5），
 //! 于是残留暖相的令牌就成了「和 UI 不匹配」的那一层。两轮修法同一口径：
@@ -90,24 +90,27 @@ pub fn solid(color: Color) -> Brush {
     Brush::Solid(color)
 }
 
-// 表面画刷的透明度全部由 `crate::glass` 策略决定（毛玻璃开 = alpha 稀释，
+// 表面画刷的透明度全部由 `crate::platform::glass` 策略决定（毛玻璃开 = alpha 稀释，
 // 关 = 原色）；色板令牌与透明度参数在此解耦。
 
 pub fn parchment() -> Brush {
-    solid(crate::glass::dilute(
+    solid(crate::platform::glass::dilute(
         PARCHMENT,
-        crate::glass::current().page,
+        crate::platform::glass::current().page,
     ))
 }
 
 pub fn ivory() -> Brush {
-    solid(crate::glass::dilute(IVORY, crate::glass::current().card))
+    solid(crate::platform::glass::dilute(
+        IVORY,
+        crate::platform::glass::current().card,
+    ))
 }
 
 pub fn sand() -> Brush {
-    solid(crate::glass::dilute(
+    solid(crate::platform::glass::dilute(
         SAND,
-        crate::glass::current().secondary,
+        crate::platform::glass::current().secondary,
     ))
 }
 

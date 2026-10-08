@@ -1,5 +1,14 @@
 //! 毛玻璃（材质）策略 —— 窗口背景材质与透明度的**单一决策点**。
 //!
+//! **位置**（2026-10-08 自 crate 根 `src/glass.rs` 下沉至 `platform/glass.rs`）：
+//! 它本质是**窗口背板策略**，与平台强相关，且唯一的下层消费者就是本模块的
+//! [`super::WindowSpec::with_glass`]。下沉前 `platform -> crate::glass` 违反 `lib.rs`
+//! 声明的分层（platform「不得反向依赖上层」），此为该 crate 唯一一处反向依赖
+//! （模块化审查 §3.4 / §4.1）；下沉后引用变为同模块引用，规范与代码自然一致。
+//!
+//! ⚠️ 仍然是**进程级全局单例**（[`set_enabled`] / [`current`]）：`theme` 与 `app`
+//! 都按渲染路径无锁读取。这一点未随下沉改变，理由与代价见下方 `ENABLED` 的注释。
+//!
 //! 动机（2026-09-30 透明度重做）：此前「亚克力开关」的语义散落三处
 //! （`theme::set_acrylic` 进程级开关 / `WindowSpec::with_acrylic` /
 //! `navigation_glass_resources` 门控），背板材质选型与各层表面 alpha 互不关联。
@@ -66,6 +75,12 @@ const GLASS: GlassPolicy = GlassPolicy {
     pane: 36,      // ~14% 白：保留层次又高度透光
 };
 
+// 进程级开关（渲染路径每帧读，故用无锁原子而非 Mutex）。
+//
+// ⚠️ 已知代价（模块化审查 §3.4，**未随下沉消除**）：谁在何时调用 `set_enabled`
+// 决定了所有下游取到的令牌与窗口材质，但这条因果链不出现在任何签名里；
+// 且同进程内并发/顺序执行单测会互相污染。全仓只允许 `app` 的设置同步点写它，
+// 只允许本模块的用例读它（见文件末尾 `surface_dilution_tracks_policy`）。
 static ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// 由 UI 层同步毛玻璃开关（关闭时所有表面恢复不透明 = 与改动前逐像素一致）。
