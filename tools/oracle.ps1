@@ -44,6 +44,16 @@ $tmp = "$env:TEMP\mk_baseline"
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 Copy-Item "$repo\bin\settings.exe" "$tmp\settings.exe" -Force
 
+# 0. Regenerate $repo\bin\KeyFlux.ahk from -Config so that BOTH sides come from the SAME
+#    config. Without this the script compares a script generated from the REPO config against
+#    DumpPlan of the -Config (deploy) config => always FAIL. 2026-10-08 (batch K): a direct
+#    run reported 7 bogus "semicolon extra in AHK" purely from repo-vs-deploy config drift;
+#    the repo copy of data/config.json has an EMPTY selectedAction and different keymaps.
+#    `make check` already does this step before invoking us; repeating it here keeps the
+#    script correct when run standalone (the previous behaviour was a silent usage trap).
+& "$repo\bin\settings.exe" GenerateAHK $config "$repo\templates\keyflux.tmpl" "$repo\bin\KeyFlux.ahk"
+if ($LASTEXITCODE -ne 0) { Write-Host "ORACLE DIFF: FAIL [GenerateAHK exit $LASTEXITCODE]"; exit 1 }
+
 # 1. Extract register lines from regenerated script (-Take N for bisection)
 $take = $Take
 $gen = [IO.File]::ReadAllLines("$repo\bin\KeyFlux.ahk", [Text.Encoding]::UTF8)
@@ -56,21 +66,12 @@ $harness += '#SingleInstance Off'
 # AHK v2 default #Warn shows a blocking load-time dialog (ErrorStdOut cannot suppress it).
 # Disable warnings at top (same semantics as the commented-out line in generated script).
 $harness += ('#Warn All, ' + 'Off')
-# Full include set identical to generated script so all closure references resolve
-$harness += "#Include $repo\bin\lib\core\translation.ahk"
-$harness += "#Include $repo\bin\lib\core\IKeyEventBus.ahk"
-$harness += "#Include $repo\bin\lib\core\EventBus.ahk"
-$harness += "#Include $repo\bin\lib\core\Functions.ahk"
-$harness += "#Include $repo\bin\lib\core\Programs.ahk"
-$harness += "#Include $repo\bin\lib\core\WindowUtils.ahk"
-$harness += "#Include $repo\bin\lib\core\AbbrInput.ahk"
-$harness += "#Include $repo\bin\lib\actions\Actions.ahk"
-$harness += "#Include $repo\bin\lib\core\KeymapManager.ahk"
-$harness += "#Include $repo\bin\lib\core\InputTipWindow.ahk"
-$harness += "#Include $repo\bin\lib\core\Utils.ahk"
-$harness += "#Include $repo\bin\lib\context\SelectionContext.ahk"
-$harness += "#Include $repo\bin\lib\rules\SelectedAction.ahk"
-$harness += "#Include $repo\bin\lib\commands\CommandResolver.ahk"
+# Full include set derived from templates/keyflux.tmpl (single source) so it cannot drift.
+# 2026-10-08 (batch K): this used to be a hand-maintained 14-line list that had ALREADY
+# drifted from the template (it omitted the four command-box modules).
+foreach ($inc in (Get-KfIncludeList -TemplatePath "$repo\templates\keyflux.tmpl")) {
+  $harness += "#Include $repo\bin\" + ($inc -replace '/', '\')
+}
 $harness += 'Main()'
 $harness += 'ExitApp()'
 $harness += 'Main() {'
@@ -118,4 +119,4 @@ foreach ($scope in @('capslock', 'semicolon')) {
 }
 # 5. Cleanup transient harness artifact (keep working tree clean)
 Remove-Item "$repo\tmp_oracle_harness.ahk" -ErrorAction SilentlyContinue
-if ($bad.Count -eq 0) { echo 'ORACLE DIFF: PASS' } else { $bad | ForEach-Object { echo $_ }; echo 'ORACLE DIFF: FAIL' }
+if ($bad.Count -eq 0) { echo 'ORACLE DIFF: PASS' } else { $bad | ForEach-Object { echo $_ }; echo 'ORACLE DIFF: FAIL'; exit 1 }

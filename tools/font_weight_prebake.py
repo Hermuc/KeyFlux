@@ -60,6 +60,12 @@ import shutil
 import sys
 
 # 复用 font_embolden 的变换实现 (单一算法真源, 避免两处漂移)
+
+# 中文输出统一走 UTF-8 —— Windows 控制台默认码页 (GBK) 会把部分字符打成乱码。
+# 与 tools/lint_ahk_style.py 同款; 2026-10-08 批 K 补齐 (此前 7 个脚本缺失)。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from font_embolden import transform_path  # noqa: E402
 

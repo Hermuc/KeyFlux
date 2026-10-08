@@ -31,7 +31,7 @@ New-Item -ItemType Directory -Force -Path $dst | Out-Null
 $robocopy = Start-Process -FilePath robocopy.exe -ArgumentList @(
     $src, $dst, '/E', '/NFL', '/NDL', '/NJH', '/NJS'
 ) -Wait -PassThru -NoNewWindow
-if ($robocopy.ExitCode -ge 8) {
+if (!(Test-KfRobocopyOk $robocopy.ExitCode)) {
     Write-Error "[FAIL] robocopy exit $($robocopy.ExitCode)"
     exit 1
 }
