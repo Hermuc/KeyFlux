@@ -427,7 +427,7 @@ provider 为实现以下方法的对象(类实例), **全部可选, 缺失即视
 > 部署名不变，窗口类仍为 `MyKeymap_Command_Input` 以做 drop-in）。下列「上游 exe 绘制约束 /
 > 数据 patch」记述保持原样作为**契约演化记录**，但两点已变：
 > * **八角 keycap 抑制 patch 对 Rust 版不适用**（Rust 版自绘结果列表，无 `0x1CCA0` 白名单）
->   —— `tools/patch_command_input.py` 自动识别并跳过（exit 0）；
+>   —— `devtools patch-command-input`（原 `tools/patch_command_input.py`，2026-10-08 移植为 Rust）自动识别并跳过（exit 0）；
 > * `make sync-out` 自 2026-10-07 起以 `/XF KeyFlux-CommandInput.exe` 排除命令框，**不再调用**
 >   keycap patch（原先「白名单 `'*.exe'` 覆盖部署树 ⇒ 须重施」的路径已消失）；
 >   `bin/KeyFlux-CommandInput.exe` 现由 `make command-input` 收编（release.yml 的 `cp -r bin` 依赖它）。
@@ -502,7 +502,7 @@ class CommandDisplay {
 4. ⚠ **sync-out 会用仓库侧 (未 patch) exe 覆盖部署树** —— patch 后重跑 `make sync-out`
    会把八角框带回来。**2026-09-21 实测复现**: 一次 `make deploy` 后部署树 exe SHA 退回
    `f14bba71…` (= 官方原版), 用户看到「字母周围又有八角框」。**已自动化收口**:
-   patch 脚本固化为 `tools/patch_command_input.py` (幂等, 前置哨兵校验 + 回读复核),
+   patch 脚本固化为 `devtools patch-command-input` (原 `tools/patch_command_input.py`, 2026-10-08 移植为 Rust; 幂等, 前置哨兵校验 + 回读复核),
    并挂为 Makefile **`patch-commandinput`** 目标, 由 `sync-out` 配方**末尾自动调用**
    (先 `Stop-Process KeyFlux-CommandInput` 解锁 —— 运行中的 exe 自锁不可写; 该进程懒加载,
    下次唤起命令框时引擎重建)。**不再需要人工记忆这一步**。

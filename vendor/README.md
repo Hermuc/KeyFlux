@@ -6,7 +6,8 @@
 > 头部的告诫（`retreive` / `currentRefue` 等上游拼写属 vendored 原样特征，勿"修正"）证明这类坑
 > 真实存在过。
 >
-> 本文件把这些内容集中登记，并由 [`tools/check-vendor-hashes.ps1`](../tools/check-vendor-hashes.ps1)
+> 本文件把这些内容集中登记，并由 `devtools check-vendor-hashes`（原 `tools/check-vendor-hashes.ps1`，
+> 2026-10-08 移植为 Rust；源码 [`devtools/src/check_vendor_hashes.rs`](../devtools/src/check_vendor_hashes.rs)）
 > 在 CI 逐个 hash 校验：**任何改动都必须显式更新清单**（`-Write`），从而把"静默漂移"变成"有记录的决定"。
 
 ## 清单一览
@@ -41,11 +42,12 @@
 1. **有意变更**某个登记项后：
 
    ```powershell
-   pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-vendor-hashes.ps1 -Write
+   # 本机（cargo 不在 PATH 时先注入 MSVC 环境）：
+   pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { . ./config-ui-reactor/env.ps1 }; cargo run --quiet --release --manifest-path devtools/Cargo.toml -- check-vendor-hashes -Write'
    ```
 
    重新生成 `tools/vendor-manifest.json`；
 2. 在本次提交里说明**为什么**改（上游升版 / 批准过的清理 / 新增第三方文件）；
-3. 新增第三方文件时，先在 `tools/check-vendor-hashes.ps1` 的 `$targets` 里登记（含 kind / path /
+3. 新增第三方文件时，先在 `devtools/src/check_vendor_hashes.rs` 的 `TARGETS` 里登记（含 kind / path /
    exclude），再 `-Write`；
 4. 门禁：CI 的 `analyzers.yml` → `vendor-hashes` job（`make check-vendor`）。本地同款：`make check-vendor`。

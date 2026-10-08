@@ -1,0 +1,33 @@
+[package]
+name = "kf-devtools"
+version = "1.0.0"
+edition = "2024"
+description = "KeyFlux 开发/CI 工具集：原 tools/*.py 与部分 tools/*.ps1 脚本的 Rust 移植（逻辑 + 单测在本 crate，bin 只做 argv→退出码映射）。"
+# 非发布物（与 config-ui-reactor / command-input 同口径）：只随仓库开发使用、不上 crates.io。
+# 置 private 后由 deny.toml 的 [licenses] private = { ignore = true } 豁免。
+publish = false
+
+[[bin]]
+name = "devtools"
+path = "src/main.rs"
+
+[dependencies]
+# 仅少量轻量依赖 —— 刻意不引 windows-reactor/WinUI，令 CI 闸门 job 秒级构建。
+regex = "1.13.1"
+serde_json = "1.0.151"
+# SHA256（check-vendor-hashes / verify-deploy 用；等价 PS 侧 Get-KfSha256 = Get-FileHash）。
+# 纯 Rust、无 C 后端；HTTP 刻意改用系统 curl 外壳，避免拉入 ureq/rustls 重型 TLS 栈。
+sha2 = "0.10"
+
+[profile.release]
+strip = true
+lto = true
+
+# 与 config-ui-reactor / command-input 同口径的 clippy 门禁。
+[lints.rust]
+unsafe_code = "warn"
+
+[lints.clippy]
+all = "warn"
+# 函数长度门禁，阈值 = 默认 100（与另两个 crate 一致）。
+too_many_lines = "warn"
