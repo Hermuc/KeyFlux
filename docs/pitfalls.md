@@ -84,6 +84,19 @@
 
 ---
 
+## F. 闸门覆盖 / 口径缺口（2026-10-09）
+
+| # | 症状 | 根因 | 防线 |
+|---|---|---|---|
+| F1 | ~5800 行的 `command-input`（装着全部 Win32 `unsafe`）从未过 fmt/clippy，却产出正式发布的 `bin/KeyFlux-CommandInput.exe` | `cargo-gates.ps1` 硬编码 `config-ui-reactor`，CI 只调它一次 | `cargo-gates.ps1 -Project <dir>` 参数化；新增 `make check-command-input`（并入 `check` 前置、`command-input` 构建前置）；`make analyzers` 与 CI `reactor-gates` 都跑**两个** crate；`Cargo.toml` 加 `[lints.clippy] all + too_many_lines`（与 config-ui-reactor 同口径，不设 `unsafe_code`）——顺带把 `wndproc`/`draw` 拆到 <100 行、全库 66 处 unsafe 补 `// SAFETY:` |
+| F2 | 守卫"声称"覆盖 `bin/*.ahk` 与 `plugins/`，实际只扫 `bin/lib`（`.gitattributes` 为那几类声明了 `eol=lf` 却无人校验） | `lint_ahk_style.py` 的扫描根只指向 `bin/lib` | 文本形态检查（bom/crlf/tab/spelling）扩到与 `.gitattributes` **逐一对应**的四类 scope；静默失败面仍限引擎核心 `bin/lib`；`MIN_EXPECTED_FILES` 提到 65 |
+| F3 | 基线 `spelling_drift_hits: 7` 与实际 `0` 漂移（批 O 修好后没重录） | 压债后未重录基线 | 重录基线（`--write-baseline`）⇒ 现值 0，回退到 7 即红灯 |
+| F4 | 换机器 / 换 clone 位置后 `OUT_DIR` 失效 | `OUT_DIR ?= D:/PortableApps/KeyFlux-compiled` 是绝对路径 | 默认改**相对** `../KeyFlux-compiled`（与仓库同级，本机同值） |
+| F5 | 注释称"固定 channel 保证 CI 一致"，值却是 `stable` | 注释与取值矛盾 | 按实情订正注释（channel = stable）；锁版需本机预装该工具链 + 同步 CI —— 本机 `toolchains/` 只有 stable，硬锁会联网拉取而失败（离线实测） |
+| F6 | `make upload` 发不出去 | `createRelease` POST 到 `xianyukang/KeyFlux`，而 remote 是 `Hermuc/KeyFlux` | 仓库名改为 `Hermuc/KeyFlux` |
+
+---
+
 ## 速查：门禁 → 坑位
 
 | 门禁 | 主要守护 |
@@ -97,5 +110,7 @@
 | `make check-plugins-mirror` | E3 |
 | `make -n check`（CI `make-parse`） | D5 |
 | `make check-hooks` / `check-fuzzy` | 命令框 provider 分发 / 容错匹配（运行时契约） |
+| `make check-command-input`（`check` 前置；`make analyzers` 双工程） | F1 |
+| `make lint-ahk-style`（`tools/lint_ahk_style.py`） | F2、F3 |
 | `tools/deploy_panel.ps1` 内建门禁 | A5、A6 |
 | `tools/lib/kf-tools.ps1` | C1、C3、E4（单一真源本身） |

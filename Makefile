@@ -92,7 +92,7 @@ createRelease:
 		-H "Accept: application/vnd.github+json" \
 		-H "Authorization: Bearer $$(cat ~/gh_token)" \
 		-H "X-GitHub-Api-Version: 2022-11-28" \
-		https://api.github.com/repos/xianyukang/KeyFlux/releases \
+		https://api.github.com/repos/Hermuc/KeyFlux/releases \
 		-d '{"tag_name":"v$(version)","target_commitish":"main","name":"v$(version)","body":"Description of the release"}' 2>/dev/null | jq -r '.id' > release_id
 	curl -L \
 		-X POST \
@@ -100,7 +100,7 @@ createRelease:
 		-H "Authorization: Bearer $$(cat ~/gh_token)" \
 		-H "X-GitHub-Api-Version: 2022-11-28" \
 		-H "Content-Type: application/octet-stream" \
-		"https://uploads.github.com/repos/xianyukang/KeyFlux/releases/$$(cat release_id)/assets?name=$(zip)" \
+		"https://uploads.github.com/repos/Hermuc/KeyFlux/releases/$$(cat release_id)/assets?name=$(zip)" \
 		--data-binary "@$(zip)" | jq
 	rm release_id
 
@@ -124,11 +124,12 @@ ahk:
 	@bin/settings.exe GenerateAHK ./data/config.json ./templates/keyflux.tmpl ./bin/KeyFlux.ahk
 
 # ===== 编译输出目录 (单一真源) =====
-# 编译产物的最终落点, 固定为本机部署目录 D:\PortableApps\KeyFlux-compiled。
-# 路径用正斜杠写法 (MSYS/Git Bash 与 robocopy 均可识别); 需要临时换落点时用 make OUT_DIR=<路径> 覆盖。
+# 编译产物的最终落点, 默认 = **与仓库同级**的 KeyFlux-compiled (相对路径 ⇒ 跨机器一致;
+# 本机即 D:\PortableApps\KeyFlux-compiled)。此前硬编码绝对路径 D:/PortableApps/...,
+# 换机器/换 clone 位置即失效。需要临时换落点时用 make OUT_DIR=<路径> 覆盖。
 # 说明: bin/ 只是「暂存区」(check 回归、build 打 7z 包都要读它, 不能取消),
 #       真正对外生效的产物由 sync-out 从这里同步到 OUT_DIR, 不会留在项目目录里。
-OUT_DIR ?= D:/PortableApps/KeyFlux-compiled
+OUT_DIR ?= ../KeyFlux-compiled
 
 # 输出目录不存在时自动创建 (order-only 前置目标: 目录已存在则直接跳过, 不会误触发重建)
 $(OUT_DIR):
@@ -284,7 +285,7 @@ check-fuzzy:
 #         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
 #   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
 #       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
-check: sync-templates check-freshness lint lint-ahk-style check-texttypes check-hooks check-fuzzy check-plugins-mirror check-vendor sync-plugins | check-deploy-tree $(OUT_DIR)
+check: sync-templates check-freshness lint lint-ahk-style check-texttypes check-hooks check-fuzzy check-plugins-mirror check-vendor check-command-input sync-plugins | check-deploy-tree $(OUT_DIR)
 	@mkdir -p "$(DEPLOY_DIR)/bin"
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
@@ -315,8 +316,18 @@ api-parity:
 # analyzers: 代码风格闸门。.NET 闸门随 Avalonia 退役; Rust 侧由 clippy -D warnings 承担
 #   (与 .github/workflows/analyzers.yml 的 reactor-gates 保持一致: 同一个 tools/cargo-gates.ps1)。
 # 前置: 工具链经 config-ui-reactor/env.ps1 注入 (脚本内以 -EnvScript 传入)。
+# 🔴 两个 cargo 工程都要跑 (2026-10-09): command-input 此前**零闸门** —— 它装着全部 Win32
+#   unsafe 并产出正式发布的 bin/KeyFlux-CommandInput.exe, 却从不在 CI/本地过 fmt/clippy。
 analyzers:
-	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -NoTest -EnvScript config-ui-reactor/env.ps1
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -NoTest -Project config-ui-reactor -EnvScript config-ui-reactor/env.ps1
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -NoTest -Project command-input -EnvScript config-ui-reactor/env.ps1
+
+# check-command-input: command-input 三闸门 (fmt --check / clippy -D warnings / test)。
+#   由来 (2026-10-09): 该 crate 装着全部 Win32 unsafe 并产出正式发布的
+#   bin/KeyFlux-CommandInput.exe, 但 CI 与本地**都没有任何闸门** (cargo-gates 此前硬编码
+#   config-ui-reactor) —— 闸门覆盖漏洞。现纳入 `check` 与 `command-input` 构建前置。
+check-command-input:
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Project command-input -EnvScript config-ui-reactor/env.ps1
 
 # sync-plugins: 把官方示例插件放到部署树 data/plugins。
 #   由来 (2026-09-18): 生成端只扫 `<config.json 同级>/plugins` (generators/plugins.go),
@@ -374,7 +385,7 @@ check-commandinput-patch:
 #    源码的构建, 否则发布包带旧命令框 (2026-10-07 实测: 仓库 3A0FFCB4 (10-06 构建)
 #    vs 当前源码构建 E1E09585)。部署树那一边由人工复制本目标产物 —— sync-out 已 /XF 排除它。
 # 幂等: 同一源码 + 同一工具链在同一路径下构建字节稳定 (已实测).
-command-input:
+command-input: check-command-input
 	@pwsh -NoProfile -ExecutionPolicy Bypass -Command 'if (Test-Path ./config-ui-reactor/env.ps1) { . ./config-ui-reactor/env.ps1 }; cargo build --release --manifest-path command-input/Cargo.toml'
 	cp command-input/target/release/keyflux-command-input.exe bin/KeyFlux-CommandInput.exe
 	@pwsh -NoProfile -Command 'Write-Host ("[ok] command-input -> bin/KeyFlux-CommandInput.exe  md5=" + (Get-FileHash bin/KeyFlux-CommandInput.exe -Algorithm MD5).Hash)'
@@ -413,4 +424,4 @@ deploy: buildClientReactor check sync-out
 verify-deploy:
 	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify_deploy.ps1
 
-.PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-fuzzy check-plugins-mirror check-vendor sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy verify-deploy check-freshness check-upstream check-deps parity api-parity check-deploy-tree
+.PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-fuzzy check-plugins-mirror check-vendor check-command-input sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy verify-deploy check-freshness check-upstream check-deps parity api-parity check-deploy-tree

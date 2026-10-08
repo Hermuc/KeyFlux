@@ -1,6 +1,10 @@
 [toolchain]
-# windows-reactor 0.100 的 MSRV = 1.95；本机实测 1.98.1 可用。
-# 固定 channel 以保证 CI 与本机一致（可复现）。
+# windows-reactor 0.100 的 MSRV = 1.95；本机随 stable 通道实测 1.98.1 可用。
+# channel 取 **stable**（CI 与本机同用该通道）—— 本仓库不锁死补丁版本：
+# 锁定需本机 rustup 预装该版本（当前 toolchains/ 下只有 stable），否则 cargo 会尝试
+# 联网拉取而失败（离线环境实测）。此前注释误称"固定 channel 以保证 CI 一致"，与实际
+# 取值矛盾，故按实情订正。若确需逐版可复现：改为具体版本号（如 "1.98.1"）并同步
+# .github/workflows/analyzers.yml 的 dtolnay/rust-toolchain 引用 + 预装该工具链。
 channel = "stable"
 components = ["rustfmt", "clippy"]
 targets = ["x86_64-pc-windows-msvc"]

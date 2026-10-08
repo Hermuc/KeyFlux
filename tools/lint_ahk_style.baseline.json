@@ -2,9 +2,9 @@
   "bom_files": 0,
   "catch_no_trace": 0,
   "crlf_files": 0,
-  "files_scanned": 44,
+  "files_scanned": 70,
   "log_sinks": 1,
-  "spelling_drift_hits": 7,
+  "spelling_drift_hits": 0,
   "tab_indent_files": 1,
   "try_no_catch": 0
 }

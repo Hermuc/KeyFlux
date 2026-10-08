@@ -86,7 +86,9 @@ macro_rules! frame_state {
 fn on_create(hwnd: HWND, shell: &mut Shell) -> Result<(), String> {
     let (dx, dy) = dpi::monitor_dpi(hwnd)
         .map_err(|hr| format!("GetDpiForMonitor failed (HRESULT {hr:#X})"))?;
+    // SAFETY: GetSystemMetrics 仅查询系统度量, SM_CXSCREEN 是合法索引, 无指针参数与副作用。
     let sw = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+    // SAFETY: 同上, SM_CYSCREEN 是合法索引, 无指针参数与副作用。
     let sh = unsafe { GetSystemMetrics(SM_CYSCREEN) };
     let geom = geometry::window_rect(dx, dy, sw, sh, &shell.skin);
     shell.dpi = (dx, dy);
@@ -98,6 +100,7 @@ fn on_create(hwnd: HWND, shell: &mut Shell) -> Result<(), String> {
         .results
         .set_visible_max(geometry::max_list_rows(dx, sh, geom.y, geom.h));
     // R11: SetWindowPos(hwnd, 0, X, Y, W, H, 0x14 = NOZORDER|NOACTIVATE)
+    // SAFETY: hwnd 是本 wndproc 收到的有效窗口句柄; hwndInsertAfter=NULL 且 flags 含 SWP_NOZORDER, 该参数不被使用。
     unsafe {
         SetWindowPos(
             hwnd,
@@ -153,6 +156,7 @@ fn execute(shell: &mut Shell, hwnd: HWND, cmds: Vec<Command>) {
             Command::ShowWindow => {
                 // R14⑤: SetWindowPos(HWND_TOPMOST, 存值X/Y, cx=cy=0, 0x51) ——
                 // 重申置顶、显示、位置重设为创建期存值, 不改尺寸 (spec.md:176)
+                // SAFETY: hwnd 由消息循环传入且有效; HWND_TOPMOST 是预定义合法插入句柄。
                 unsafe {
                     let _ = SetWindowPos(
                         hwnd,
@@ -171,11 +175,13 @@ fn execute(shell: &mut Shell, hwnd: HWND, cmds: Vec<Command>) {
             }
             Command::HideWindow => {
                 // R15③/R16: ShowWindow(SW_HIDE); 随后 alpha 复原 (R10-5)
+                // SAFETY: hwnd 是当前有效窗口句柄; SW_HIDE 是合法命令, 返回值被忽略。
                 unsafe {
                     let _ = ShowWindow(hwnd, SW_HIDE);
                 }
                 shell.backend.on_hidden();
             }
+            // SAFETY: PostQuitMessage 只接受整型退出码, 无指针/线程前置条件。
             Command::Quit => unsafe { PostQuitMessage(0) }, // R18
         }
     }
@@ -187,6 +193,7 @@ fn relayout(shell: &mut Shell, hwnd: HWND) -> Result<(), BackendError> {
     let h = shell.geom.h + geometry::list_extra_px(shell.state.results.visible_rows(), shell.dpi.0);
     if h != shell.cur_h {
         shell.cur_h = h;
+        // SAFETY: hwnd 有效; 句柄 HWND_TOPMOST 合法; flags 含 SWP_NOACTIVATE 不激活窗口。
         unsafe {
             let _ = SetWindowPos(
                 hwnd,
@@ -208,6 +215,7 @@ fn relayout(shell: &mut Shell, hwnd: HWND) -> Result<(), BackendError> {
         shell.backend.pre_show(&st)?;
     }
     // R8: 区域失效 → 下一绘制周期再全量重绘一次 (保险)
+    // SAFETY: hwnd 有效; 矩形传 None 表示整个客户区, 无越界写。
     unsafe {
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
@@ -225,6 +233,7 @@ fn redraw(shell: &mut Shell, hwnd: HWND, pre_show: bool) -> Result<(), BackendEr
     }
     // R14④/R17: InvalidateRect(hwnd, NULL, FALSE) —— 下一绘制周期呈现 (R8);
     // 对预绘路径也是保险 (区域失效 → 显示后 WM_PAINT 再全量重绘一次)
+    // SAFETY: 同上: hwnd 有效, 矩形 None 表示整客户区, 无越界写。
     unsafe {
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
@@ -308,6 +317,7 @@ fn notify_engine(shell: &Shell, row_1based: usize, kind: i32) {
     if shell.notify_target.0.is_null() {
         return;
     }
+    // SAFETY: shell.notify_target 已在上方判非空, 是 0x406 发送方 (引擎脚本) 的窗口句柄。
     unsafe {
         let _ = PostMessageW(
             Some(shell.notify_target),
@@ -338,6 +348,7 @@ fn move_selection(shell: &mut Shell, hwnd: HWND, row: usize) {
 fn coalesce_mousemove(hwnd: HWND, lparam: LPARAM) -> LPARAM {
     let mut last = lparam;
     let mut msg = MSG::default();
+    // SAFETY: &mut msg 是本地栈变量, 生命周期覆盖整个循环; hwnd 有效; 过滤器常量合法。
     unsafe {
         while PeekMessageW(
             &mut msg,
@@ -354,7 +365,96 @@ fn coalesce_mousemove(hwnd: HWND, lparam: LPARAM) -> LPARAM {
     last
 }
 
+/// 9 个协议消息共用的臂：`on_event` 产出的命令序列交给 `execute`，统一返回 0。
+/// 抽出以消除「on_event + execute + LRESULT(0)」的 9 次重复（2026-10-09 结构优化）。
+fn dispatch_event(shell: &mut Shell, hwnd: HWND, event: AppEvent) -> LRESULT {
+    let cmds = on_event(event, &mut shell.state);
+    execute(shell, hwnd, cmds);
+    LRESULT(0)
+}
+
+/// 前台 + 焦点: IME 组合窗跟随本窗口, 上屏中文经 WM_CHAR 进入文本缓冲。
+/// 🔴 不改 WS_EX_NOACTIVATE —— SetWindowLongPtrW(GWL_EXSTYLE) 会重置 SetWindowRgn 窗口
+///   区域 → 42px 透明边带瞬间全部可见 (用户报障闪现)。MSDN: NOACTIVATE 仅阻止鼠标点击
+///   激活, 程序化 SetForegroundWindow 不受影响。
+fn activate_for_search(hwnd: HWND) -> LRESULT {
+    // SAFETY: hwnd 为当前有效窗口; SetFocus 要求窗口与调用线程同属一个消息队列,
+    // 本进程单窗口单线程满足。
+    unsafe {
+        let _ = SetForegroundWindow(hwnd);
+        let _ = SetFocus(Some(hwnd));
+    }
+    LRESULT(0)
+}
+
+/// 读回通道: 文本缓冲按 UTF-16 写入调用方缓冲 (系统跨进程编组), 返回拷贝码元数 (不含 NUL)。
+fn copy_text_out(shell: &Shell, cap: usize, lparam: LPARAM) -> usize {
+    let units = shell.state.text.units();
+    let n = units.len().min(cap.saturating_sub(1));
+    if n > 0 {
+        let dst = lparam.0 as *mut u16;
+        for (i, u) in units.iter().take(n).enumerate() {
+            // SAFETY: dst 是 WM_GETTEXT 调用方提供的缓冲; 循环上限 n ≤ cap-1, 写入落在容量内。
+            unsafe { *dst.add(i) = *u };
+        }
+        // SAFETY: n ≤ cap-1, dst.add(n) 仍在调用方缓冲容量内, 用于写入终止 NUL。
+        unsafe { *dst.add(n) = 0 };
+    }
+    n
+}
+
+/// 0x406 = WM_COPYDATA: dwData 必须等于载荷魔数 (自定义 tag; 拒收他方数据),
+/// lParam = 系统已编组到本进程的 COPYDATASTRUCT。
+fn on_results_data(shell: &mut Shell, hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let ptr = lparam.0 as *const COPYDATASTRUCT;
+    if ptr.is_null() {
+        return LRESULT(0);
+    }
+    // SAFETY: ptr 已判非空; lParam 是系统为 WM_COPYDATA 编组的 COPYDATASTRUCT, 在消息处理期间有效。
+    let cds = unsafe { &*ptr };
+    let size = cds.cbData as usize;
+    if (cds.dwData as u32) != results::PAYLOAD_MAGIC
+        || cds.lpData.is_null()
+        || size > results::MAX_PAYLOAD_BYTES
+    {
+        return LRESULT(0);
+    }
+    // SAFETY: cds.lpData 已判非空, size = cds.cbData 且 ≤ MAX_PAYLOAD_BYTES, 缓冲在 0x406 消息存活期内有效。
+    let bytes = unsafe { core::slice::from_raw_parts(cds.lpData as *const u8, size) };
+    let Some((items, selected)) = results::decode_payload(bytes) else {
+        return LRESULT(0); // 结构非法 → 忽略 (对端错误不得带崩命令框)
+    };
+    // 回推目标 = wParam (发送方窗口 = 引擎脚本窗口); 鼠标点选/悬停要发回它
+    let sender = HWND(wparam.0 as *mut core::ffi::c_void);
+    if !sender.0.is_null() {
+        shell.notify_target = sender;
+    }
+    let cmds = on_event(AppEvent::SetResults { items, selected }, &mut shell.state);
+    execute(shell, hwnd, cmds);
+    LRESULT(1) // 非 0 = 已处理
+}
+
+/// 滚轮换行目标行 (`None` = 空表, 交默认流程)。delta>0(上滚) = 减 3, 否则加 3, clamp 到 [0,n)。
+fn wheel_target(shell: &Shell, wparam: WPARAM) -> Option<usize> {
+    let n = shell.state.results.len();
+    if n == 0 {
+        return None;
+    }
+    let delta = ((wparam.0 >> 16) & 0xFFFF) as u16 as i16 as i32;
+    let step: i32 = if delta > 0 { -3 } else { 3 };
+    let cur = shell.state.results.selected();
+    let target = if cur < 0 {
+        0
+    } else {
+        (cur + step).clamp(0, n as i32 - 1)
+    };
+    Some(target.max(0) as usize)
+}
+
 /// 窗口过程 (R3: 类注册的 lpfnWndProc)。
+// SAFETY: 本函数注册为窗口类 lpfnWndProc, 仅由系统消息派发以合法 HWND/消息参数调用;
+// 其内将 GWLP_USERDATA 解引用为 *mut Shell, 故调用方须保证该槽要么为 NUL 要么指向
+// WM_NCCREATE 存入的、生命周期覆盖消息处理的 Shell。
 pub(crate) unsafe extern "system" fn wndproc(
     hwnd: HWND,
     msg: u32,
@@ -387,60 +487,21 @@ pub(crate) unsafe extern "system" fn wndproc(
         },
 
         // ---- 引擎消息协议 (R7 常量绝对值) ----
-        config::APP_SHOW => {
-            // R14: 0x401 = show 音效 → 清空 → 收起列表 → 预绘+重绘 → SetWindowPos 显示
-            let cmds = on_event(AppEvent::ShowClear, &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(0)
-        }
-        config::APP_HIDE => {
-            // R15: 0x402 = 阻塞淡出 → SW_HIDE → 收起列表; 不清空无音效; wParam/lParam 忽略
-            let cmds = on_event(AppEvent::HideFade, &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(0)
-        }
-        config::APP_CANCEL => {
-            // R16: 0x403 = cancel 音效 → 立即 SW_HIDE → 收起列表; 不清空; wParam/lParam 忽略
-            let cmds = on_event(AppEvent::CancelHide, &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(0)
-        }
+        // R14: 0x401 = show 音效 → 清空 → 收起列表 → 预绘+重绘 → SetWindowPos 显示
+        config::APP_SHOW => dispatch_event(shell, hwnd, AppEvent::ShowClear),
+        // R15: 0x402 = 阻塞淡出 → SW_HIDE → 收起列表; 不清空无音效; wParam/lParam 忽略
+        config::APP_HIDE => dispatch_event(shell, hwnd, AppEvent::HideFade),
+        // R16: 0x403 = cancel 音效 → 立即 SW_HIDE → 收起列表; 不清空; wParam/lParam 忽略
+        config::APP_CANCEL => dispatch_event(shell, hwnd, AppEvent::CancelHide),
+        // R17: WM_CHAR = 唯一文本写入通道; wParam 低 16 位 = 码元; lParam 无语义不读
         config::WM_CHAR_VAL => {
-            // R17: WM_CHAR = 唯一文本写入通道; wParam 低 16 位 = 码元; lParam 无语义不读
-            let ch = (wparam.0 & 0xFFFF) as u16;
-            let cmds = on_event(AppEvent::Char(ch), &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(0)
+            dispatch_event(shell, hwnd, AppEvent::Char((wparam.0 & 0xFFFF) as u16))
         }
 
         // ---- 2026-10-04 协议扩展 (Rust 版自有; 中文检索读回/激活/组合态) ----
-        config::APP_SEARCH_ACTIVATE => {
-            // 前台 + 焦点: IME 组合窗跟随本窗口, 上屏中文经 WM_CHAR 进入文本缓冲。
-            // 🔴 不改 WS_EX_NOACTIVATE —— SetWindowLongPtrW(GWL_EXSTYLE) 会重置
-            //   SetWindowRgn 窗口区域 → 42px 透明边带瞬间全部可见 (用户报障闪现)。
-            //   MSDN: NOACTIVATE 仅阻止鼠标点击激活, 程序化 SetForegroundWindow 不受影响。
-            unsafe {
-                let _ = SetForegroundWindow(hwnd);
-                let _ = SetFocus(Some(hwnd));
-            }
-            LRESULT(0)
-        }
+        config::APP_SEARCH_ACTIVATE => activate_for_search(hwnd),
         config::APP_SEARCH_STATE => LRESULT(shell.composing as isize),
-        config::WM_GETTEXT_VAL => {
-            // 读回通道: 文本缓冲按 UTF-16 写入调用方缓冲 (系统跨进程编组),
-            // 返回拷贝码元数 (不含 NUL); wParam = 容量, lParam = 缓冲
-            let cap = wparam.0;
-            let units = shell.state.text.units();
-            let n = units.len().min(cap.saturating_sub(1));
-            if n > 0 {
-                let dst = lparam.0 as *mut u16;
-                for (i, u) in units.iter().take(n).enumerate() {
-                    unsafe { *dst.add(i) = *u };
-                }
-                unsafe { *dst.add(n) = 0 };
-            }
-            LRESULT(n as isize)
-        }
+        config::WM_GETTEXT_VAL => LRESULT(copy_text_out(shell, wparam.0, lparam) as isize),
         config::WM_GETTEXTLENGTH_VAL => LRESULT(shell.state.text.len() as isize),
         config::WM_IME_START => {
             shell.composing = true;
@@ -452,59 +513,17 @@ pub(crate) unsafe extern "system" fn wndproc(
         }
 
         // ---- 2026-10-04 结果列表面板 (命令框向下延伸; 引擎对接面) ----
-        config::APP_RESULTS_DATA => {
-            // 0x406 = WM_COPYDATA: dwData 必须等于载荷魔数 (自定义 tag; 拒收他方数据),
-            // lParam = 系统已编组到本进程的 COPYDATASTRUCT。
-            let ptr = lparam.0 as *const COPYDATASTRUCT;
-            if ptr.is_null() {
-                return LRESULT(0);
-            }
-            let cds = unsafe { &*ptr };
-            let size = cds.cbData as usize;
-            if (cds.dwData as u32) != results::PAYLOAD_MAGIC
-                || cds.lpData.is_null()
-                || size > results::MAX_PAYLOAD_BYTES
-            {
-                return LRESULT(0);
-            }
-            let bytes = unsafe { core::slice::from_raw_parts(cds.lpData as *const u8, size) };
-            let Some((items, selected)) = results::decode_payload(bytes) else {
-                return LRESULT(0); // 结构非法 → 忽略 (对端错误不得带崩命令框)
-            };
-            // 回推目标 = wParam (发送方窗口 = 引擎脚本窗口); 鼠标点选/悬停要发回它
-            let sender = HWND(wparam.0 as *mut core::ffi::c_void);
-            if !sender.0.is_null() {
-                shell.notify_target = sender;
-            }
-            let cmds = on_event(AppEvent::SetResults { items, selected }, &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(1) // 非 0 = 已处理
-        }
+        config::APP_RESULTS_DATA => on_results_data(shell, hwnd, wparam, lparam),
+        // 0x407: wParam = 0 基下标 (-1 = 无高亮)
         config::APP_RESULTS_SELECT => {
-            // 0x407: wParam = 0 基下标 (-1 = 无高亮)
-            let idx = wparam.0 as i32;
-            let cmds = on_event(AppEvent::SetSelection(idx), &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(0)
+            dispatch_event(shell, hwnd, AppEvent::SetSelection(wparam.0 as i32))
         }
-        config::APP_RESULTS_CLEAR => {
-            // 0x408: 收起列表 (窗口回落基准高)
-            let cmds = on_event(AppEvent::ClearResults, &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(0)
-        }
-        config::APP_BADGE_SHOW => {
-            // 0x40A: wParam = 字形编号 (未注册编号由 on_event 忽略 —— 对端错误不带崩框)
-            let cmds = on_event(AppEvent::ShowBadge(wparam.0 as u32), &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(0)
-        }
-        config::APP_BADGE_HIDE => {
-            // 0x40B: 隐藏徽标 (wParam/lParam 忽略)
-            let cmds = on_event(AppEvent::HideBadge, &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(0)
-        }
+        // 0x408: 收起列表 (窗口回落基准高)
+        config::APP_RESULTS_CLEAR => dispatch_event(shell, hwnd, AppEvent::ClearResults),
+        // 0x40A: wParam = 字形编号 (未注册编号由 on_event 忽略 —— 对端错误不带崩框)
+        config::APP_BADGE_SHOW => dispatch_event(shell, hwnd, AppEvent::ShowBadge(wparam.0 as u32)),
+        // 0x40B: 隐藏徽标 (wParam/lParam 忽略)
+        config::APP_BADGE_HIDE => dispatch_event(shell, hwnd, AppEvent::HideBadge),
 
         // 结果区鼠标交互: 点选 (回推 1) / 悬停高亮 (回推 2) / 滚轮换行。
         // 窗口为 WS_EX_NOACTIVATE + 区域裁切 ⇒ 区域外点击本就不落在窗口上;
@@ -527,36 +546,21 @@ pub(crate) unsafe extern "system" fn wndproc(
             }
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
-        WM_MOUSEWHEEL => {
-            let n = shell.state.results.len();
-            if n == 0 {
-                return DefWindowProcW(hwnd, msg, wparam, lparam);
+        WM_MOUSEWHEEL => match wheel_target(shell, wparam) {
+            Some(row) => {
+                move_selection(shell, hwnd, row);
+                LRESULT(0)
             }
-            let delta = ((wparam.0 >> 16) & 0xFFFF) as u16 as i16 as i32;
-            let step: i32 = if delta > 0 { -3 } else { 3 };
-            let cur = shell.state.results.selected();
-            let target = if cur < 0 {
-                0
-            } else {
-                (cur + step).clamp(0, n as i32 - 1)
-            };
-            if target >= 0 {
-                move_selection(shell, hwnd, target as usize);
-            }
-            LRESULT(0)
-        }
+            None => DefWindowProcW(hwnd, msg, wparam, lparam),
+        },
 
         WM_PAINT => match on_paint(shell, hwnd) {
             Ok(()) => LRESULT(0),
             Err(e) => error::fatal(file!(), line!(), &format!("render failed: {e}"), e.hresult),
         },
 
-        WM_DESTROY => {
-            // R18: → PostQuitMessage(0) → 消息循环退出 (唯一退出路径)
-            let cmds = on_event(AppEvent::Destroy, &mut shell.state);
-            execute(shell, hwnd, cmds);
-            LRESULT(0)
-        }
+        // R18: → PostQuitMessage(0) → 消息循环退出 (唯一退出路径)
+        WM_DESTROY => dispatch_event(shell, hwnd, AppEvent::Destroy),
 
         // R19 阴性面: 其余一切消息交 DefWindowProcW (WM_CLOSE 由此默认销毁, R18)
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),

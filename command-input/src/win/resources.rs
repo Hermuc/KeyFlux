@@ -8,6 +8,8 @@ use windows::Win32::System::LibraryLoader::GetModuleFileNameW;
 /// exe 目录基点 (皮肤 / 音效 / 字体三处共用)。
 pub fn exe_dir() -> PathBuf {
     let mut buf = [0u16; 1024]; // >= PATHCCH_MAX_CCH, 单次调用足够
+                                // SAFETY: GetModuleFileNameW 向 `buf` 写入至多 buf.len() 个 UTF-16 码元并 NUL 结尾；
+                                // `buf` 是本地可写数组，长度上限由 API 自身遵守，返回值为写入码元数。
     let n = unsafe { GetModuleFileNameW(None, &mut buf) } as usize;
     let n = n.min(buf.len());
     let full = PathBuf::from(String::from_utf16_lossy(&buf[..n]));

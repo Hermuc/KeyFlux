@@ -17,6 +17,8 @@ use windows::Win32::UI::WindowsAndMessaging::SetProcessDPIAware;
 /// 三级兜底。失败不硬退 (读 awareness 已无意义, 兜底后按实得值继续 ——
 /// 若三级全失败, 进程保持 unaware, 几何公式按 96 折算, 不崩溃)。
 pub fn make_process_dpi_aware() {
+    // SAFETY: 三个 API 都是进程级、无指针入参；本函数在进程初始化最早期被调用
+    // （窗口创建之前），返回值仅用于探测哪一级可用，不构成内存安全前置条件。
     unsafe {
         // 1) Win10 1703+: PER_MONITOR_AWARE_V2 (探针实测有效)
         if SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2).is_ok() {
@@ -35,6 +37,8 @@ pub fn make_process_dpi_aware() {
 /// `GetDpiForMonitor(hmon, MDT_EFFECTIVE_DPI=0, &dpiX, &dpiY)`。
 /// 失败返回 Err(HRESULT), 调用方按 R29/R11 失败路径弹窗终止。
 pub fn monitor_dpi(hwnd: HWND) -> Result<(f64, f64), u32> {
+    // SAFETY: MonitorFromWindow 接受任意 hwnd（无效时返回无效 HMONITOR，下面显式判
+    // is_invalid）；dx/dy 是本函数持有的可写局部变量，生命周期覆盖调用期间。
     unsafe {
         let mon: HMONITOR = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
         if mon.is_invalid() {
