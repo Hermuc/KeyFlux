@@ -22,6 +22,8 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::ids;
+
 /// Go `plugins.SpecVersion`：当前插件包格式版本（manifest `specVersion` 不等即拒绝）。
 pub const SPEC_VERSION: i32 = 1;
 
@@ -143,41 +145,8 @@ pub struct ManifestCatalog {
 
 // --------------------------------------------------------------- 校验（Go plugins.go）
 
-/// Go `idPattern` `^[a-z][a-z0-9_]{0,31}$`（手写匹配，避免引入编译期正则）。
-fn is_valid_id(id: &str) -> bool {
-    let bytes = id.as_bytes();
-    if bytes.is_empty() || bytes.len() > 32 || !bytes[0].is_ascii_lowercase() {
-        return false;
-    }
-    bytes[1..]
-        .iter()
-        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'_')
-}
-
-/// Go `settingKeyPattern` `^[A-Za-z][A-Za-z0-9_]{0,31}$`。
-fn is_valid_setting_key(key: &str) -> bool {
-    let bytes = key.as_bytes();
-    if bytes.is_empty() || bytes.len() > 32 || !bytes[0].is_ascii_alphabetic() {
-        return false;
-    }
-    bytes[1..]
-        .iter()
-        .all(|b| b.is_ascii_alphanumeric() || *b == b'_')
-}
-
-/// Go `lateInitPattern` `^[A-Za-z_][A-Za-z0-9_]{0,63}$`（手写匹配，同上）。
-fn is_valid_late_init(name: &str) -> bool {
-    let bytes = name.as_bytes();
-    if bytes.is_empty() || bytes.len() > 64 {
-        return false;
-    }
-    if !(bytes[0] == b'_' || bytes[0].is_ascii_alphabetic()) {
-        return false;
-    }
-    bytes[1..]
-        .iter()
-        .all(|b| b.is_ascii_alphanumeric() || *b == b'_')
-}
+// ID / 名称词族（`idPattern` / `settingKeyPattern` / `lateInitPattern`）已收敛到
+// `crate::ids` 单一实现；本文件的校验只**调用**，不再各自手写循环。
 
 /// Go `(*Setting).ValueLimit`。
 pub(crate) fn value_limit(setting: &Setting) -> i64 {
@@ -259,7 +228,7 @@ fn validate_settings(manifest: &Manifest) -> Result<(), String> {
     }
     let mut seen: HashSet<String> = HashSet::new();
     for (index, setting) in manifest.settings.iter().enumerate() {
-        if !is_valid_setting_key(&setting.key) {
+        if !ids::mixed_ident(&setting.key, Some(32)) {
             return Err(format!(
                 "插件「{}」第 {} 个设置项的 key {:?} 不合法 (须匹配 ^[A-Za-z][A-Za-z0-9_]{{0,31}}$)",
                 manifest.id,
@@ -344,7 +313,7 @@ pub fn validate_manifest(manifest: &Manifest) -> Result<(), String> {
 
 /// Go `plugins.validateManifestBody`（目录加载路径；不含内置 ID 检查）。
 pub(crate) fn validate_manifest_body(manifest: &Manifest) -> Result<(), String> {
-    if !is_valid_id(&manifest.id) {
+    if !ids::lower_ident(&manifest.id, Some(32)) {
         return Err(format!(
             "插件 ID {:?} 不合法 (须匹配 ^[a-z][a-z0-9_]{{0,31}}$)",
             manifest.id
@@ -367,7 +336,7 @@ pub(crate) fn validate_manifest_body(manifest: &Manifest) -> Result<(), String> 
                     manifest.id
                 ));
             }
-            if !manifest.entry.late.is_empty() && !is_valid_late_init(&manifest.entry.late) {
+            if !manifest.entry.late.is_empty() && !ids::ahk_ident(&manifest.entry.late, Some(64)) {
                 return Err(format!(
                     "插件「{}」的 entry.late {:?} 不合法 (须匹配 ^[A-Za-z_][A-Za-z0-9_]{{0,63}}$)",
                     manifest.id, manifest.entry.late
@@ -407,7 +376,7 @@ fn validate_provides(manifest: &Manifest) -> Result<(), String> {
     }
     let mut seen = std::collections::HashSet::with_capacity(actions.len());
     for (index, action) in actions.iter().enumerate() {
-        if !is_valid_setting_key(&action.id) {
+        if !ids::mixed_ident(&action.id, Some(32)) {
             return Err(format!(
                 "插件「{}」第 {} 个动作的 id {:?} 不合法 (须匹配 ^[A-Za-z][A-Za-z0-9_]{{0,31}}$)",
                 manifest.id,

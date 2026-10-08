@@ -2,8 +2,8 @@
 //!
 //! 2026-10-07 自原 `app.rs` 的 `impl Shell` 拆出；2026-10-08 再把 7 个页面装配方法
 //! 迁到 [`crate::app::pages`]（模块化审查 §3.2 / 问题 #4：本文件曾达 1801 行、
-//! 单个 `impl Shell`、22 个方法承担 7 个页面，其中 `settings_page` 单函数 550 行，
-//! 体量超过 `ui/` 下任何一个完整文件）。
+//! 单个 `impl Shell`、22 个方法承担 7 个页面，其中 `settings_page` 单函数长达数百行，
+//! 体量超过 `ui/` 下任何一个完整文件；2026-10-09 又按页面内分区边界把各超长装配函数拆小）。
 //!
 //! 本文件只留**外壳**（`pane_footer` / 三态内容区 `content`）与**路由**
 //! （`page_view` / `current_title` / `placeholder_page`）；页面本身见 `app::pages`。

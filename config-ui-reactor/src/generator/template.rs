@@ -19,6 +19,11 @@
 //! 特殊：`keyflux.tmpl` 的 `.Options.Mouse.TipSymbol`、`.CapslockAbbrKeys`、
 //! `.SemicolonAbbrKeys`、`.PathVariables` 等是 Go 模板字段/方法调用，均已由
 //! [`Config`] 的同名方法提供（见 `model.rs`）。
+//!
+//! 2026-10-09 结构优化：`render_keyflux_ahk` 原为单函数（总装配 200+ 行）。现按产物
+//! 分段的天然边界抽为 `push_keyflux_{prelude,mouse_hooks,registries,epilogue}` 四个
+//! **保序** 子函数；`render_keyflux_ahk` 只保留前置读取 + 调用顺序 + 行尾归一。
+//! 分段顺序即产物字节顺序，**不可重排**。
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -45,10 +50,6 @@ fn normalize_to_crlf(text: &str) -> String {
 /// 与 Go `SaveAHK(config, "keyflux.tmpl", out)` 逐字节等价（`config` 必须已经
 /// `parse_config` 且 `preprocess`；`catalog` 供选中动作解析；`plugins_dir` =
 /// `<config.json 目录>/plugins`）。
-#[expect(
-    clippy::too_many_lines,
-    reason = "模板总装配：分段顺序即产物字节顺序，不可重排"
-)]
 pub fn render_keyflux_ahk(
     config: &mut Config,
     catalog: Option<&PackCatalog>,
@@ -60,23 +61,54 @@ pub fn render_keyflux_ahk(
     let removed: HashSet<String> = config.options.plugins.removed.iter().cloned().collect();
     let (plugin_includes, plugin_bootstrap) =
         plugins::render_plugin_blocks(plugins_dir, &disabled, &removed);
+    // 缩写触发开关（纯读，先算好供后续分段复用；见 L73/L77/L88/L98/L144 各处）。
+    let capslock_enabled = config.capslock_abbr_enabled();
+    let semicolon_enabled = config.semicolon_abbr_enabled();
 
     let mut out = String::new();
+    push_keyflux_prelude(
+        &mut out,
+        &plugin_includes,
+        &plugin_bootstrap,
+        plugins_dir,
+        &disabled,
+        &removed,
+    );
+    push_keyflux_mouse_hooks(&mut out, config, capslock_enabled, semicolon_enabled);
+    push_keyflux_registries(&mut out, config, capslock_enabled, semicolon_enabled);
+    push_keyflux_epilogue(
+        &mut out,
+        config,
+        catalog,
+        capslock_enabled,
+        semicolon_enabled,
+    );
+    normalize_to_crlf(&out)
+}
 
+/// `render_keyflux_ahk` 分段：BOM + include 列表 + 设置项 + 引擎初始化 + 插件晚初始化。
+fn push_keyflux_prelude(
+    out: &mut String,
+    plugin_includes: &str,
+    plugin_bootstrap: &str,
+    plugins_dir: &Path,
+    disabled: &HashSet<String>,
+    removed: &HashSet<String>,
+) {
     // ---- 模板首字符 BOM（keyflux.tmpl 带 U+FEFF，Go 原样渲染进产物） ----
     out.push('\u{feff}');
 
     // ---- L1-L29: 头 + include 列表，末尾到 `#Include lib/plugins/Plugins.ahk` ----
     // `{{ PLUGIN_INCLUDES }}` 是行尾拼接（非空时自带前导 `\n`），故此处紧贴。
     out.push_str(HEAD_INCLUDES);
-    out.push_str(&plugin_includes);
+    out.push_str(plugin_includes);
     // L29 末尾换行 + L30 空行
     out.push_str("\n\n");
 
     // ---- L31-L43: 设置项，末尾到 `SetWorkingDir("../")` ----
     // `{{ PLUGIN_BOOTSTRAP }}` 同样行尾拼接（自带前导 `\n`）。
     out.push_str(SETUP_AND_WORKDIR);
-    out.push_str(&plugin_bootstrap);
+    out.push_str(plugin_bootstrap);
     // L43 末尾换行
     out.push('\n');
 
@@ -86,12 +118,20 @@ pub fn render_keyflux_ahk(
     // ---- L61: `{{- PLUGIN_LATE_INIT }}`（插件晚初始化扩展点，模板用 `{{-` 吃前导
     //      换行 ⇒ 行尾拼接约定）。非空时输出对应 late-init 调用行 (首个消费方 quick_switch)（P5 起，
     //      配置由插件运行时自取，见 plugins::render_late_init）；空块 = 零字节。
-    let plugin_late_init = plugins::render_late_init(plugins_dir, &disabled, &removed);
+    let plugin_late_init = plugins::render_late_init(plugins_dir, disabled, removed);
     if !plugin_late_init.is_empty() {
         out.push_str(plugin_late_init.trim_start_matches('\n'));
         out.push('\n');
     }
+}
 
+/// `render_keyflux_ahk` 分段：mouseTip + MouseKeymap + capslock/分号 hook + 路径变量。
+fn push_keyflux_mouse_hooks(
+    out: &mut String,
+    config: &Config,
+    capslock_enabled: bool,
+    semicolon_enabled: bool,
+) {
     // ---- L62-L67: 到 `taskSwitch := ...` ----
     out.push_str(INITKEYMAP_HEAD);
 
@@ -137,8 +177,6 @@ pub fn render_keyflux_ahk(
     out.push_str("  slow.Map(\"*space\", slow.LButtonUp())\n");
 
     // ---- L73-L76: `{{ if .CapslockAbbrEnabled }}`（无 trim；L76 末尾换行被 L77 `{{-` 吃掉） ----
-    let capslock_enabled = config.capslock_abbr_enabled();
-    let semicolon_enabled = config.semicolon_abbr_enabled();
     if capslock_enabled {
         // body 以 L73 的换行开头（故先落一个空行），以 L75 的换行结尾。
         out.push_str("\n  ; hook 每会话经 MakeCapsHook() 动态创建 (见其函数注释): 透传模式 -> V, 否则历史形态\n");
@@ -164,7 +202,15 @@ pub fn render_keyflux_ahk(
     out.push_str(&config.path_variables());
     // L87 模板换行
     out.push('\n');
+}
 
+/// `render_keyflux_ahk` 分段：缩写注册表 + 窗口组 + 禁用键 + keymap 渲染。
+fn push_keyflux_registries(
+    out: &mut String,
+    config: &mut Config,
+    capslock_enabled: bool,
+    semicolon_enabled: bool,
+) {
     // ---- L88: `{{ if .CapslockAbbrEnabled }}  ; 缩写命令注册表...{{ end }}` ----
     // ⚠️ 该注释行与其**尾随换行**都在 if 体内部：capslock 关闭时 Go 整段跳过（连换行一起）。
     //    故换行必须并进 `if capslock_enabled` 分支 —— 无条件输出会多 1 空行（+2 字节 CRLF，
@@ -210,7 +256,16 @@ pub fn render_keyflux_ahk(
         out.push_str(&render_keymap(keymap, config));
     }
     out.push('\n');
+}
 
+/// `render_keyflux_ahk` 分段：选中动作 + 尾部 + abbr 定义 + 托盘菜单 + `.KeyMapping`。
+fn push_keyflux_epilogue(
+    out: &mut String,
+    config: &Config,
+    catalog: Option<&PackCatalog>,
+    capslock_enabled: bool,
+    semicolon_enabled: bool,
+) {
     // ---- L93: 选中动作 ----
     out.push_str(&selected_action_code(
         config.selected_action.as_ref(),
@@ -259,8 +314,6 @@ pub fn render_keyflux_ahk(
 
     // ---- L167: {{ .KeyMapping }}（末尾无换行；渲染期由 handle_key_remapping 写入） ----
     out.push_str(&config.key_mapping);
-
-    normalize_to_crlf(&out)
 }
 
 /// 渲染 `CommandInputSkin.tmpl` ⇒ `CommandInputSkin.txt` 的字节（CRLF，**无** BOM）。

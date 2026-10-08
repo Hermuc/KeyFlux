@@ -139,56 +139,28 @@ pub(crate) fn bind_wire_pack(body: &[u8]) -> Result<WirePack, ()> {
 
 // --------------------------------------------------------------------------- 校验（behaviors.go:366-436）
 
-/// Go `behaviors.idPattern` `^[a-z][a-z0-9_]{0,31}$`。
-fn is_valid_id(id: &str) -> bool {
-    let bytes = id.as_bytes();
-    if bytes.is_empty() || bytes.len() > 32 || !bytes[0].is_ascii_lowercase() {
-        return false;
-    }
-    bytes[1..]
-        .iter()
-        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'_')
-}
-
-/// Go `pluginActionPattern` `^plugin:[a-z][a-z0-9_]{0,31}:[A-Za-z0-9_\-]{1,64}$`
-/// （手写等价判定，语义逐字对齐；正确性由单测钉住）。
-fn is_plugin_action(action: &str) -> bool {
-    let Some(rest) = action.strip_prefix("plugin:") else {
-        return false;
-    };
-    let Some((plugin_id, action_name)) = rest.split_once(':') else {
-        return false;
-    };
-    let id_bytes = plugin_id.as_bytes();
-    if id_bytes.is_empty() || id_bytes.len() > 32 || !id_bytes[0].is_ascii_lowercase() {
-        return false;
-    }
-    if !id_bytes[1..]
-        .iter()
-        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'_')
-    {
-        return false;
-    }
-    let name = action_name.as_bytes();
-    !name.is_empty()
-        && name.len() <= 64
-        && name
-            .iter()
-            .all(|b| b.is_ascii_alphanumeric() || *b == b'_' || *b == b'-')
-}
+// `behaviors.idPattern` 与 `pluginActionPattern` 已收敛到 `crate::ids`
+// （`lower_ident` / `plugin_action`）—— 此前本文件各手写一份，含重复的 ID 循环。
 
 /// Go `behaviors.ValidateManifest`（**就地**校验 + 归一化：boundTypeId 与
 /// appliesTo[].value 会被改写为小写/剥前缀 —— WriteUserPack 落盘的是归一化后的
 /// manifest，响应体亦然）。`known_text` 为 `None` 时容忍悬空引用（加载链路）。
-#[expect(
-    clippy::too_many_lines,
-    reason = "manifest 逐项校验清单：校验顺序与错误文案即契约"
-)]
+///
+/// 2026-10-09 结构优化：按校验段拆为 `validate_manifest_header` / `normalize_bound_type`
+/// / `validate_applies` / `validate_entry` 四步，**校验顺序与错误文案不变**（即契约）。
 pub(crate) fn validate_manifest(
     pack: &mut WirePack,
     known_text: Option<&dyn Fn(&str) -> bool>,
 ) -> Result<(), String> {
-    if !is_valid_id(&pack.id) {
+    validate_manifest_header(pack)?;
+    normalize_bound_type(pack, known_text)?;
+    validate_applies(pack, known_text)?;
+    validate_entry(pack)
+}
+
+/// 头部字段：ID / specVersion / name / appliesTo 非空。
+fn validate_manifest_header(pack: &WirePack) -> Result<(), String> {
+    if !crate::ids::lower_ident(&pack.id, Some(32)) {
         return Err(format!(
             "行为 ID {:?} 不合法 (须匹配 ^[a-z][a-z0-9_]{{0,31}}$)",
             pack.id
@@ -206,6 +178,14 @@ pub(crate) fn validate_manifest(
     if pack.applies().is_empty() {
         return Err(format!("行为「{}」缺少生效前提 (appliesTo)", pack.id));
     }
+    Ok(())
+}
+
+/// boundTypeId 归一化（`type:<id>` 或裸 id → 裸 id）+ 存在性校验。
+fn normalize_bound_type(
+    pack: &mut WirePack,
+    known_text: Option<&dyn Fn(&str) -> bool>,
+) -> Result<(), String> {
     if is_custom_ref(pack.bound_type_id.trim()) {
         // 容错: 允许写 "type:<id>" 或裸 id 两种形态, 归一后校验存在性
         pack.bound_type_id = pack
@@ -224,6 +204,14 @@ pub(crate) fn validate_manifest(
             pack.id, pack.bound_type_id
         ));
     }
+    Ok(())
+}
+
+/// appliesTo[] 逐条校验（fileExt 扩展名 / textType 特征或自定义引用 / 其它分类非法）。
+fn validate_applies(
+    pack: &mut WirePack,
+    known_text: Option<&dyn Fn(&str) -> bool>,
+) -> Result<(), String> {
     for (index, entry) in pack
         .applies_to
         .get_or_insert_with(Vec::new)
@@ -288,10 +276,17 @@ pub(crate) fn validate_manifest(
             }
         }
     }
+    Ok(())
+}
+
+/// entry.kind 校验（builtin 白名单/插件引用；script 需 file+func；其它非法）。
+fn validate_entry(pack: &WirePack) -> Result<(), String> {
     match pack.entry.kind.as_str() {
         "builtin" => {
             // 内置基础动作白名单, 或插件运行时动作引用 (plugin:<id>:<name>)
-            if !is_builtin_action(&pack.entry.action) && !is_plugin_action(&pack.entry.action) {
+            if !is_builtin_action(&pack.entry.action)
+                && !crate::ids::plugin_action(&pack.entry.action)
+            {
                 return Err(format!(
                     "行为「{}」的 entry.action {:?} 不是内置基础动作或插件动作引用",
                     pack.id, pack.entry.action

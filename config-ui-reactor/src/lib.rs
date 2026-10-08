@@ -45,6 +45,8 @@
 
 pub mod app;
 pub mod generator;
+/// 契约 ID / 名称词表的**单一实现**（叶层，零依赖；`generator` 与 `server` 共用）。
+pub(crate) mod ids;
 pub mod models;
 pub mod platform;
 pub mod server;

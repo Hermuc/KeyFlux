@@ -114,7 +114,7 @@ jobs:
 
       # 注: 此处刻意**不传** -Version —— parity 的对账物是 DumpPlan / GenerateAHK 产物，
       # 不含 GET /config 的 keyfluxVersion 字段（那是 api-parity 的对账物），故与版本无关
-      # （api-parity job 则必须带 -Version，见其 135-137 行注释）。2026-10-08 批 P 复核澄清，
+      # （api-parity job 则必须带 -Version，见该 job 段注释）。2026-10-08 批 P 复核澄清，
       # 防止将来被误判为「缺版本注入的确定性缺陷」。
       - name: 'Build settings.exe (cargo gates + release)'
         shell: pwsh
@@ -192,7 +192,7 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/api-parity/run_api_parity.ps1 -Check -Exe config-ui-reactor/target/release/settings.exe
   # 断链护栏一: 「全仓 make 目标可解析」冒烟 (2026-10-07 加)。
-  #   背景: Makefile:148 的 check-hooks 说明行漏了行首 `#`, 被 make 当成前置依赖 ⇒
+  #   背景: `check-hooks` 目标的说明行曾漏了行首 `#`, 被 make 当成前置依赖 ⇒
   #   `make check-hooks` / `make check` / `make deploy` 静默停摆 5 天, 而本 workflow
   #   从不调用这些目标 ⇒ 断链在 CI 完全隐形。`-n` 只解析不执行, 成本极低,
   #   却能一次性兜住所有「目标名/依赖拼写」类断链。

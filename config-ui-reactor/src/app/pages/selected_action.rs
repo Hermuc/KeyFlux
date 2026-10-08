@@ -2,6 +2,10 @@
 //!
 //! 2026-10-08 自 `app/views.rs` 的 `impl Shell` 逐字搬移（模块化审查 #4）；
 //! 可见性 `pub(super)` -> `pub(in crate::app)`，方法体未改。
+//!
+//! 2026-10-09 结构优化：`sa_type_card` 原为单函数 236 行。现按职责抽出
+//! 后缀编辑器（`sa_exts_editor`）与详情面板（`sa_detail_panel` → `sa_detail_for_mapping`
+//! / `sa_entry_rows`）；卡内子件组装顺序不变（顺序敏感）。
 
 use super::super::*;
 
@@ -74,10 +78,6 @@ impl Shell {
     }
 
     /// 一张聚合卡（`match_type` 分区）：卡头 + toggle 行 + 详情编辑器。
-    #[expect(
-        clippy::too_many_lines,
-        reason = "组合式页面渲染：分区顺序敏感，拆分只会碎片化"
-    )]
     pub(in crate::app) fn sa_type_card(
         &self,
         context: &mut ViewContext<Self>,
@@ -128,182 +128,8 @@ impl Shell {
             })
         });
 
-        // 文件后缀卡专属：常驻可编辑后缀框（直接展示/编辑当前选中**分组**的后缀串；
-        // 数据源 = `config.file_groups`（chips 即由此渲染，预设分组出厂自带后缀）；
-        // 文本特征卡不渲染。改动经 800ms 尾随防抖归一写回内存 file_groups（chips 数据源），
-        // 落盘统一走页脚「保存配置」（无自动保存，2026-10-02 定版）。
-        // 仅「group:」chip 可编辑（自定义类型 type: / 孤儿 orphan: 无 exts 数据源）。
-        let exts_editor: View = if match_type == MATCH_FILE_EXT {
-            let group_index = sel_id
-                .strip_prefix("group:")
-                .and_then(|name| config.file_groups.iter().position(|fg| fg.name == name));
-            let dirty = match (&self.exts_edit, group_index) {
-                (Some((dirty_index, text)), Some(index)) if *dirty_index == index => {
-                    Some(text.clone())
-                }
-                _ => None,
-            };
-            let display_text = dirty.unwrap_or_else(|| {
-                group_index
-                    .and_then(|index| config.file_groups.get(index))
-                    .map(|fg| fg.exts.join(","))
-                    .unwrap_or_default()
-            });
-            // 校验错误回显（normalize_exts 后端校验失败经 mt_status）
-            let exts_status: View = match &self.mt_status {
-                Some((text, is_error)) if *is_error => selected_action_view::hint_bar(text),
-                _ => View::empty(),
-            };
-            match (group_index, exts_status) {
-                (Some(index), status) => View::fragment((
-                    selected_action_view::exts_editor(
-                        index,
-                        display_text,
-                        self.exts_edit.clone(),
-                        context.callback(move |(fg_index, value): (usize, String)| {
-                            Message::SaExtsEditValue(fg_index, value)
-                        }),
-                    ),
-                    status,
-                )),
-                (None, status) => status,
-            }
-        } else {
-            View::empty()
-        };
-
-        // 详情面板
-        let detail: View = if let Some(mapping) = mapping {
-            let covering = sa::covering(&self.catalog, match_type, &mapping.match_value);
-            let mut rows: Vec<(String, View)> = Vec::new();
-            let entry_count = mapping.entries.len();
-            for (index, entry) in mapping.entries.iter().enumerate() {
-                let behavior = entry.behavior.clone();
-                // 行为切换下拉：覆盖行为全集；当前行为不在覆盖集（脏值）时追加兜底项
-                let mut switch_items: Vec<String> = covering
-                    .iter()
-                    .map(|pack| self.catalog.label_for(&pack.id))
-                    .collect();
-                let current_in_covering = covering.iter().any(|pack| pack.id == behavior);
-                let switch_selected = if current_in_covering {
-                    covering.iter().position(|pack| pack.id == behavior)
-                } else {
-                    switch_items.push(self.catalog.label_for(&behavior));
-                    Some(switch_items.len() - 1)
-                };
-                rows.push((
-                    format!("entry-{index}"),
-                    // 旧行编辑器套 `rowEditor` 子卡（Ivory 面 + 圆角 4 + Padding 10）
-                    selected_action_view::row_editor(selected_action_view::entry_row(
-                        index,
-                        switch_items,
-                        switch_selected,
-                        &entry.action_value,
-                        &entry.working_dir,
-                        self.catalog.is_no_value(&behavior),
-                        index > 0,
-                        index + 1 < entry_count,
-                        context.callback(move |selected: Option<usize>| match selected {
-                            Some(selected) => Message::SaEntrySwitch {
-                                match_type,
-                                index,
-                                selected,
-                            },
-                            None => Message::Noop,
-                        }),
-                        context.callback(move |value: String| Message::SaEntryValue {
-                            match_type,
-                            index,
-                            value,
-                        }),
-                        context.callback(move |value: String| Message::SaEntryWorkingDir {
-                            match_type,
-                            index,
-                            value,
-                        }),
-                        context.message(Message::SaEntryMove {
-                            match_type,
-                            index,
-                            delta: -1,
-                        }),
-                        context.message(Message::SaEntryMove {
-                            match_type,
-                            index,
-                            delta: 1,
-                        }),
-                        context.message(Message::SaRemoveEntry { match_type, index }),
-                    )),
-                ));
-            }
-
-            // 「添加行为」：自动选首个未用覆盖行为（selected 为 None 时），禁用原因 1107/1119
-            let selected = self.sa_selected(match_type, covering.len());
-            let first_unused = covering.iter().position(|pack| {
-                !mapping
-                    .entries
-                    .iter()
-                    .any(|entry| entry.behavior == pack.id)
-            });
-            let effective_selected = selected.or(first_unused);
-            let full = mapping.entries.len() >= 9;
-            let exhausted = first_unused.is_none();
-            let hint = if full {
-                Some(i18n::t("1107"))
-            } else if exhausted {
-                Some(i18n::t("1119"))
-            } else {
-                None
-            };
-            let can_add = !full && !exhausted;
-            rows.push((
-                "add".to_string(),
-                selected_action_view::add_behavior_row(
-                    self.sa_covering_labels(match_type, &mapping.match_value),
-                    effective_selected,
-                    can_add,
-                    hint,
-                    context.callback(move |selected: Option<usize>| Message::SaSelectBehavior {
-                        match_type,
-                        selected,
-                    }),
-                    context.message(Message::SaAddBehavior { match_type }),
-                ),
-            ));
-
-            StackPanel::new()
-                .spacing(8.0)
-                .margin(Thickness::new(0.0, 12.0, 0.0, 0.0))
-                .keyed_children(rows)
-        } else {
-            let match_value = sa::transient_match_value(config, match_type, &sel_id);
-            let covering = sa::covering(&self.catalog, match_type, &match_value);
-            let selected = self.sa_selected(match_type, covering.len());
-            let can_add = selected.is_some();
-
-            StackPanel::new()
-                .spacing(8.0)
-                .margin(Thickness::new(0.0, 12.0, 0.0, 0.0))
-                .children((
-                    selected_action_view::pending_hint(sa::has_dedicated_behavior_for(
-                        &self.catalog,
-                        match_type,
-                        &match_value,
-                    )),
-                    selected_action_view::add_behavior_row(
-                        self.sa_covering_labels(match_type, &match_value),
-                        selected,
-                        can_add,
-                        None,
-                        context.callback(move |selected: Option<usize>| {
-                            Message::SaSelectBehavior {
-                                match_type,
-                                selected,
-                            }
-                        }),
-                        context.message(Message::SaAddBehavior { match_type }),
-                    ),
-                ))
-        };
+        let exts_editor = self.sa_exts_editor(context, config, match_type, &sel_id);
+        let detail = self.sa_detail_panel(context, config, match_type, &sel_id, mapping);
 
         // 卡内「＋ 新建匹配类型」（2553）：按卡种类预置 text/fileExt 草稿
         let new_type: View =
@@ -342,5 +168,207 @@ impl Shell {
         selected_action_view::type_card(
             StackPanel::new().spacing(8.0).keyed_children(card_children),
         )
+    }
+
+    /// 文件后缀卡专属：常驻可编辑后缀框（直接展示/编辑当前选中**分组**的后缀串；
+    /// 数据源 = `config.file_groups`（chips 即由此渲染，预设分组出厂自带后缀）；
+    /// 文本特征卡返回空视图。改动经 800ms 尾随防抖归一写回内存 file_groups（chips 数据源），
+    /// 落盘统一走页脚「保存配置」（无自动保存，2026-10-02 定版）。
+    /// 仅「group:」chip 可编辑（自定义类型 type: / 孤儿 orphan: 无 exts 数据源）。
+    fn sa_exts_editor(
+        &self,
+        context: &mut ViewContext<Self>,
+        config: &crate::models::Config,
+        match_type: &'static str,
+        sel_id: &str,
+    ) -> View {
+        if match_type != MATCH_FILE_EXT {
+            return View::empty();
+        }
+        let group_index = sel_id
+            .strip_prefix("group:")
+            .and_then(|name| config.file_groups.iter().position(|fg| fg.name == name));
+        let dirty = match (&self.exts_edit, group_index) {
+            (Some((dirty_index, text)), Some(index)) if *dirty_index == index => Some(text.clone()),
+            _ => None,
+        };
+        let display_text = dirty.unwrap_or_else(|| {
+            group_index
+                .and_then(|index| config.file_groups.get(index))
+                .map(|fg| fg.exts.join(","))
+                .unwrap_or_default()
+        });
+        // 校验错误回显（normalize_exts 后端校验失败经 mt_status）
+        let exts_status: View = match &self.mt_status {
+            Some((text, is_error)) if *is_error => selected_action_view::hint_bar(text),
+            _ => View::empty(),
+        };
+        match (group_index, exts_status) {
+            (Some(index), status) => View::fragment((
+                selected_action_view::exts_editor(
+                    index,
+                    display_text,
+                    self.exts_edit.clone(),
+                    context.callback(move |(fg_index, value): (usize, String)| {
+                        Message::SaExtsEditValue(fg_index, value)
+                    }),
+                ),
+                status,
+            )),
+            (None, status) => status,
+        }
+    }
+
+    /// 详情面板：已配置 → 行编辑器 + 添加行；未配置 → 待配置提示 + 添加行。
+    fn sa_detail_panel(
+        &self,
+        context: &mut ViewContext<Self>,
+        config: &crate::models::Config,
+        match_type: &'static str,
+        sel_id: &str,
+        mapping: Option<&crate::models::SelectedMapping>,
+    ) -> View {
+        let Some(mapping) = mapping else {
+            let match_value = sa::transient_match_value(config, match_type, sel_id);
+            let covering = sa::covering(&self.catalog, match_type, &match_value);
+            let selected = self.sa_selected(match_type, covering.len());
+            let can_add = selected.is_some();
+            return StackPanel::new()
+                .spacing(8.0)
+                .margin(Thickness::new(0.0, 12.0, 0.0, 0.0))
+                .children((
+                    selected_action_view::pending_hint(sa::has_dedicated_behavior_for(
+                        &self.catalog,
+                        match_type,
+                        &match_value,
+                    )),
+                    selected_action_view::add_behavior_row(
+                        self.sa_covering_labels(match_type, &match_value),
+                        selected,
+                        can_add,
+                        None,
+                        context.callback(move |selected: Option<usize>| {
+                            Message::SaSelectBehavior {
+                                match_type,
+                                selected,
+                            }
+                        }),
+                        context.message(Message::SaAddBehavior { match_type }),
+                    ),
+                ));
+        };
+
+        let covering = sa::covering(&self.catalog, match_type, &mapping.match_value);
+        let mut rows = self.sa_entry_rows(context, match_type, mapping, &covering);
+
+        // 「添加行为」：自动选首个未用覆盖行为（selected 为 None 时），禁用原因 1107/1119
+        let selected = self.sa_selected(match_type, covering.len());
+        let first_unused = covering.iter().position(|pack| {
+            !mapping
+                .entries
+                .iter()
+                .any(|entry| entry.behavior == pack.id)
+        });
+        let effective_selected = selected.or(first_unused);
+        let full = mapping.entries.len() >= 9;
+        let exhausted = first_unused.is_none();
+        let hint = if full {
+            Some(i18n::t("1107"))
+        } else if exhausted {
+            Some(i18n::t("1119"))
+        } else {
+            None
+        };
+        let can_add = !full && !exhausted;
+        rows.push((
+            "add".to_string(),
+            selected_action_view::add_behavior_row(
+                self.sa_covering_labels(match_type, &mapping.match_value),
+                effective_selected,
+                can_add,
+                hint,
+                context.callback(move |selected: Option<usize>| Message::SaSelectBehavior {
+                    match_type,
+                    selected,
+                }),
+                context.message(Message::SaAddBehavior { match_type }),
+            ),
+        ));
+
+        StackPanel::new()
+            .spacing(8.0)
+            .margin(Thickness::new(0.0, 12.0, 0.0, 0.0))
+            .keyed_children(rows)
+    }
+
+    /// 已配置 mapping 的 entry 行列表（行为切换下拉 + 值/工作目录 + 上移/下移/删除）。
+    fn sa_entry_rows(
+        &self,
+        context: &mut ViewContext<Self>,
+        match_type: &'static str,
+        mapping: &crate::models::SelectedMapping,
+        covering: &[&crate::models::BehaviorPack],
+    ) -> Vec<(String, View)> {
+        let mut rows: Vec<(String, View)> = Vec::new();
+        let entry_count = mapping.entries.len();
+        for (index, entry) in mapping.entries.iter().enumerate() {
+            let behavior = entry.behavior.clone();
+            // 行为切换下拉：覆盖行为全集；当前行为不在覆盖集（脏值）时追加兜底项
+            let mut switch_items: Vec<String> = covering
+                .iter()
+                .map(|pack| self.catalog.label_for(&pack.id))
+                .collect();
+            let current_in_covering = covering.iter().any(|pack| pack.id == behavior);
+            let switch_selected = if current_in_covering {
+                covering.iter().position(|pack| pack.id == behavior)
+            } else {
+                switch_items.push(self.catalog.label_for(&behavior));
+                Some(switch_items.len() - 1)
+            };
+            rows.push((
+                format!("entry-{index}"),
+                // 旧行编辑器套 `rowEditor` 子卡（Ivory 面 + 圆角 4 + Padding 10）
+                selected_action_view::row_editor(selected_action_view::entry_row(
+                    index,
+                    switch_items,
+                    switch_selected,
+                    &entry.action_value,
+                    &entry.working_dir,
+                    self.catalog.is_no_value(&behavior),
+                    index > 0,
+                    index + 1 < entry_count,
+                    context.callback(move |selected: Option<usize>| match selected {
+                        Some(selected) => Message::SaEntrySwitch {
+                            match_type,
+                            index,
+                            selected,
+                        },
+                        None => Message::Noop,
+                    }),
+                    context.callback(move |value: String| Message::SaEntryValue {
+                        match_type,
+                        index,
+                        value,
+                    }),
+                    context.callback(move |value: String| Message::SaEntryWorkingDir {
+                        match_type,
+                        index,
+                        value,
+                    }),
+                    context.message(Message::SaEntryMove {
+                        match_type,
+                        index,
+                        delta: -1,
+                    }),
+                    context.message(Message::SaEntryMove {
+                        match_type,
+                        index,
+                        delta: 1,
+                    }),
+                    context.message(Message::SaRemoveEntry { match_type, index }),
+                )),
+            ));
+        }
+        rows
     }
 }

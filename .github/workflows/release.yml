@@ -109,7 +109,8 @@ jobs:
 
       - name: Stamp version into sample config
         working-directory: bin
-        # ⚠ 双份实现（Makefile:71 同款配方）—— 改任一处须同步另一处。收编为 make 目标
+        # ⚠ 双份实现（Makefile `build` 目标内 `cd bin; ./settings.exe ChangeVersion` 同款配方）
+        # —— 改任一处须同步另一处。收编为 make 目标
         # 评估过：CI 在 bin/ 下按相对名调用、working-directory 语义不同，暂不收编。
         run: ./settings.exe ChangeVersion "${{ steps.ver.outputs.version }}"
 
