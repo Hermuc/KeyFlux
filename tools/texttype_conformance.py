@@ -8,7 +8,8 @@
   - 面板镜像:  Rust `config-ui-reactor/src/services/selected_action.rs` :: TEXT_TYPES
     (真源随 2026-10-06 Go 后端退役迁移至此 —— 原 Go 注册表
     `config-server/internal/behaviors/textfeatures.go` 的 value/顺序由本镜像继承);
-  - 运行时:    AHK `bin/lib/rules/SelectedAction.ahk` (TextFeatureSpecs 注册表 +
+  - 运行时:    AHK `bin/lib/rules/SelectedAction.ahk` 及其子模块 `SelectedAction/*.ahk`
+    (TextFeatureSpecs 注册表 +
     MatchTextType 命中逻辑, 含正则/大小写开关 —— Go 退役后正则字面量的**唯一来源**)。
 两处之间靠共享向量 `testdata/text_types.json` 钉死 (2026-10-06 自
 config-server/internal/script/testdata/ 迁出; 同日删除仅 Go 消费的 match_ops.json
@@ -55,6 +56,13 @@ for _stream in (sys.stdout, sys.stderr):
 
 RUST_SRC = os.path.join("config-ui-reactor", "src", "services", "selected_action.rs")
 AHK_SRC = os.path.join("bin", "lib", "rules", "SelectedAction.ahk")
+# 🔴 2026-10-08（模块化审查 §3.3）：SelectedAction.ahk 已拆为「门面 + 同目录子模块」。
+#   门面只用**嵌套 #Include** 引入 `SelectedAction/*.ahk`（生成物 KeyFlux.ahk 里仍只有一行
+#   `#Include lib/rules/SelectedAction.ahk`，故 parity `ahk` 基线不受影响）。
+#   本工具因此按「门面 + 子目录」**拼成一份虚拟源**再逐字抽取 —— 以后再拆/挪子文件时，
+#   只要还在该目录内就无需再改本工具（这正是当初硬编码单文件路径的脆弱点）。
+#   拼接顺序无关紧要：抽取按函数名正则定位，不做位置假设。
+AHK_SUBDIR = os.path.join("bin", "lib", "rules", "SelectedAction")
 VECTOR = os.path.join("testdata", "text_types.json")
 
 # ---------------------------------------------------------------- 两侧注册表解析
@@ -74,6 +82,20 @@ AHK_ROW = re.compile(
 def read_text(path: str) -> str:
     with io.open(path, "r", encoding="utf-8-sig") as fh:
         return fh.read()
+
+
+def ahk_source_files(repo: str):
+    """AHK 侧契约源文件清单 = 门面 + 子目录内全部 .ahk（按名排序）。"""
+    out = [os.path.join(repo, AHK_SRC)]
+    sub = os.path.join(repo, AHK_SUBDIR)
+    if os.path.isdir(sub):
+        out += [os.path.join(sub, n) for n in sorted(os.listdir(sub)) if n.endswith(".ahk")]
+    return out
+
+
+def read_ahk_virtual_source(repo: str) -> str:
+    """把门面 + 子模块拼成一份虚拟源（抽取按函数名定位，故顺序无关）。"""
+    return "\n".join(read_text(p) for p in ahk_source_files(repo))
 
 
 def parse_rust_registry(repo: str):
@@ -99,7 +121,7 @@ def extract_ahk_func(src: str, name: str):
 
 
 def parse_ahk_registry(repo: str):
-    src = read_text(os.path.join(repo, AHK_SRC))
+    src = read_ahk_virtual_source(repo)
     body = extract_ahk_func(src, "TextFeatureSpecs")
     if body is None:
         return None
@@ -154,7 +176,7 @@ def build_probe(src: str, types, cases, result_path: str) -> str:
     probe = [
         "#Requires AutoHotkey v2.0",
         "; !!! 本文件由 tools/texttype_conformance.py 生成, 请勿手工编辑 !!!",
-        "; 下列函数体从 bin/lib/rules/SelectedAction.ahk **逐字提取** (非手抄),",
+        "; 下列函数体从 bin/lib/rules/SelectedAction.ahk + SelectedAction/*.ahk **逐字提取** (非手抄),",
         "; 目的 = AHK PCRE2 命中行为与共享向量 (testdata/text_types.json) 逐条对齐。",
         "",
     ]
@@ -196,9 +218,13 @@ def main() -> int:
     args = ap.parse_args()
 
     repo = os.path.abspath(args.repo)
-    for rel in (RUST_SRC, AHK_SRC, VECTOR):
+    for rel in (RUST_SRC, VECTOR):
         if not os.path.isfile(os.path.join(repo, rel)):
             print("[FAIL] 缺少文件: %s" % rel)
+            return 2
+    for src_path in ahk_source_files(repo):
+        if not os.path.isfile(src_path):
+            print("[FAIL] 缺少文件: %s" % os.path.relpath(src_path, repo))
             return 2
 
     doc = json.loads(read_text(os.path.join(repo, VECTOR)))
@@ -249,7 +275,7 @@ def main() -> int:
     try:
         probe_path = os.path.join(work, "texttype_probe.ahk")
         result_path = os.path.join(work, "texttype_result.tsv")
-        src = read_text(os.path.join(repo, AHK_SRC))
+        src = read_ahk_virtual_source(repo)
         with io.open(probe_path, "w", encoding="utf-8", newline="\r\n") as fh:
             fh.write(build_probe(src, types, cases, result_path))
 
