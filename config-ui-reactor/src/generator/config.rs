@@ -23,8 +23,13 @@ pub const CONFIG_REL_PATH: &str = "../data/config.json";
 
 /// Go `script.DefaultCommandInputSkin`：命令输入窗口皮肤 18 字段默认值。
 ///
-/// 字面量必须与 `templates/CommandInputSkin.tmpl` 头部的 else 兜底一致
-/// （Go 侧有 `skin_defaults_test.go` 逐字段守护）。
+/// 字面量必须与另三处逐字段一致：消费端 `command-input/src/skin.rs` 的 `DEFAULT`、
+/// [`crate::generator::template::render_command_input_skin`] 的 else 兜底字面量、
+/// `templates/CommandInputSkin.tmpl` 头部的 else 兜底。
+/// 守护 = `config-ui-reactor/tests/skin_contract.rs`（跨 crate 契约测试，2026-10-08 建立）。
+/// 本注释此前写的是「Go 侧有 `skin_defaults_test.go` 逐字段守护」—— 那份 Go 单测已随
+/// Go 后端于 2026-10-06 退役（`36ccb83`），两处注释成了引用不存在文件的失真守护，
+/// 直到 `skin_contract.rs` 在 Rust 侧把这份守护重建（且面扩到键名 + 顺序 + `apply` 覆盖）。
 pub fn default_command_input_skin() -> CommandInputSkin {
     CommandInputSkin {
         background_color: "#FFFFFF".into(),
