@@ -37,18 +37,27 @@ try {
 ; 第 11/12 组会经 CommandDisplay.EchoChar / CommandInputOnChar 触发到它们 —— 桩只做
 ; Rec 记录不跑真逻辑, 借此断言「抑制态不投递 / Fuzzy 旁路 / 历史形态照常」。
 ; 被测的 _Call / DispatchChar / DispatchKey / ShouldEcho 仍是逐字引入的真身, 同源性未受影响。
-; 桩的签名必须与真身逐字一致 (`AbbrInput.ahk` 的 `PostCharToCaspAbbr(ih?, char?)`): 首参是
+; 桩的签名必须与真身逐字一致 (`AbbrInput.ahk` 的 `PostCharToCapsAbbr(ih?, char?)`): 首参是
 ; 历史遗留参数 (真身并不消费它), 且**允许不传** —— Match 分支的历史写法就是 `EchoChar(, char)`。
 ; 🔴 2026-09-20 教训: 该桩曾写成两参必填, 于是把「省略首参」误报成异常 (真身并不会), 被第 15 组
 ; 抓出 —— 桩与真身签名不一致, 探针就会把产品之外的东西当成缺陷。只记录 char (断言只数次数)。
-PostCharToCaspAbbr(ih?, char?) {
+PostCharToCapsAbbr(ih?, char?) {
     Rec.Add("PostChar", [char])
 }
 FuzzySuffixFire(ih, char, scope) {
     Rec.Add("FuzzySuffixFire", [ih, char, scope])
 }
-PostBackspaceToCaspAbbr(ih, vk, sc) {
+PostBackspaceToCapsAbbr(ih, vk, sc) {
     Rec.Add("PostBackspace", [ih, vk, sc])
+}
+; 批 M/L 后，`CommandInputHooks` 与 `CommandDisplay` 的失败留痕统一委派引擎唯一入口
+; `EngineLogWarn`（真身定义在 `core/Functions.ahk`，本探针**不** include 它）⇒ 同 `Post*`
+; 系列一样提供桩：只记录、不落盘（探针故意制造的异常不该写进真实日志）。
+; 签名与真身逐字一致: `EngineLogWarn(context, detail := "")`。
+; 🔴 2026-10-08: 缺此桩时，异常路径调用未定义函数 ⇒ AHK 错误对话框 ⇒ 探针**挂住**
+;    （零输出 + 进程存活），症状与「加载期语法错误」无法区分（批 M 引入、批 O 期间修复）。
+EngineLogWarn(context, detail := "") {
+    Rec.Add("EngineLogWarn", [context, detail])
 }
 
 ; 被测文件的入口函数经 CommandDisplay 收口回显 (反八角 keycap 策略, 见 core/CommandDisplay.ahk),

@@ -57,7 +57,7 @@ class EventBus {
           }
         }
       }
-    } catch {
+    } catch as e {
       EngineLogWarn("EventBus.Publish", e.Message)
       ; 观察层兜底: 不外抛(总线自身异常不得影响调用点), 但**留痕**
       ; (2026-10-08 批 L 起; 原先纯静默 ⇒ 订阅者回调外的总线级故障无迹可查)

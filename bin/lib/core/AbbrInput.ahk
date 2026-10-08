@@ -1,8 +1,26 @@
 /**
  * AbbrInput.ahk —— 缩写命令输入框 (KeyFlux-CommandInput) 的 InputHook 启动与消息通道
  * (从 Functions.ahk 拆分, 2026-09-03, 函数体逐行搬运未修改)。
- * 分组: InputHook 启动 (StartInputHook) | 命令框窗口消息 (PostMessageToCpasAbbr/Hide/Char/Backspace)。
+ * 分组: InputHook 启动 (StartInputHook) | 命令框窗口消息 (PostMessageToCapsAbbr/Hide/Char/Backspace)。
  */
+
+/**
+ * 命令框（`command-input/`，部署名 `KeyFlux-CommandInput.exe`）的窗口标识常量。
+ *
+ * 🔴 类名是**命令框 exe 内烧录的 Win32 窗口类名**（UTF-16，值 `MyKeymap_Command_Input`），
+ *    属其 ABI。命令框自 2026-10 起由自研 Rust 版取代闭源上游 exe（源码 `command-input/`），
+ *    但该类名按「drop-in ABI」**刻意保留** ⇒ 改名须同时改 `command-input/` 源码与这里，
+ *    **勿随品牌改名同步**（按"二进制实际值优先"）。
+ *
+ * 本 class 是命令框窗口匹配字面量的**唯一来源**（2026-10-08 批 O 收编此前散落的 3 处副本：
+ * `AbbrInput` 消息投递 / `CommandDisplay` 等待窗口 / `CommandInputHooks` 前台判定）。
+ */
+class CommandInputWin {
+  ; 仅类名（`CommandInputHooks` 判前台用：那里已确信是命令框进程）。
+  static CLASS := "ahk_class MyKeymap_Command_Input"
+  ; 类名 + exe 限定（防同名窗口类被其它进程占用）。
+  static FULL := CommandInputWin.CLASS " ahk_exe KeyFlux-CommandInput.exe"
+}
 
 /**
  * 启动InputHook，并返回EndReason
@@ -33,15 +51,12 @@ StartInputHook(ih) {
  * @param msg 消息编号
  * @param {number} wParam 消息参数
  */
-PostMessageToCpasAbbr(msg, wParam := 0) {
+PostMessageToCapsAbbr(msg, wParam := 0) {
   temp := A_DetectHiddenWindows
   DetectHiddenWindows(1)
   ; 调用 WinExist 的耗时都不超过 2ms, 没必要做缓存了
-  ; 注意: ahk_class 是命令框 exe 内烧录的 Win32 窗口类名, 属其 ABI, 值仍为
-  ; MyKeymap_Command_Input（UTF-16 烧录）。命令框自 2026-10 起由自研 Rust 版取代闭源上游 exe
-  ; (源码 command-input/, 部署名 KeyFlux-CommandInput.exe), 但该类名按「drop-in ABI」刻意保留
-  ; ⇒ 改名须同时改 command-input/ 源码与引擎这里的匹配串, 故按"二进制实际值优先"保留旧名, 勿随品牌改名同步。
-  if WinExist("ahk_class MyKeymap_Command_Input ahk_exe KeyFlux-CommandInput.exe") {
+  ; 窗口标识（类名属命令框 ABI）见本文件顶部 `CommandInputWin` 的文档。
+  if WinExist(CommandInputWin.FULL) {
     PostMessage(msg, wParam, 0)
   } else {
     Tip("无法找到命令框, 可能需要重启 KeyFlux", -3000)
@@ -52,8 +67,8 @@ PostMessageToCpasAbbr(msg, wParam := 0) {
 /**
  * 关闭顶部命令提示框
  */
-HideCaspAbbr() {
-  PostMessageToCpasAbbr(0x0400 + 0x0002)
+HideCapsAbbr() {
+  PostMessageToCapsAbbr(0x0400 + 0x0002)
 }
 
 /**
@@ -61,10 +76,10 @@ HideCaspAbbr() {
  * @param ih InputHook 对象
  * @param char 发送的字符
  */
-PostCharToCaspAbbr(ih?, char?) {
-  PostMessageToCpasAbbr(0x0102, Ord(SubStr(char, -1)))
+PostCharToCapsAbbr(ih?, char?) {
+  PostMessageToCapsAbbr(0x0102, Ord(SubStr(char, -1)))
 }
 
-PostBackspaceToCaspAbbr(ih, vk, sc) {
-  PostMessageToCpasAbbr(0x0102, 0x8)
+PostBackspaceToCapsAbbr(ih, vk, sc) {
+  PostMessageToCapsAbbr(0x0102, 0x8)
 }

@@ -1,7 +1,7 @@
 /**
  * CommandDisplay.ahk —— 命令框 (KeyFlux-CommandInput) 字符投递的唯一收口。
  *
- * 为什么需要这层 (而不是各处直接调 PostCharToCaspAbbr):
+ * 为什么需要这层 (而不是各处直接调 PostCharToCapsAbbr):
  *
  * 命令框本体 = bin/KeyFlux-CommandInput.exe（2026-10 起为自研 Rust 版, 源码 command-input/;
  * 此前为闭源上游 exe）。下列约束来自对**上游版**的反汇编与实测, Rust 重写沿用同一投递 ABI:
@@ -92,7 +92,7 @@ class CommandDisplay {
    * 投递字符到命令框 (已过 ShouldEcho 判定)。
    *
    * 🔴 **必须两个参数都传** (2026-09-20 事故记录): 全串命中分支曾按历史写法写成
-   *   `EchoChar(, char)` (首参 ih 是历史遗留参数, 只转发给 PostCharToCaspAbbr 且不被消费),
+   *   `EchoChar(, char)` (首参 ih 是历史遗留参数, 只转发给 PostCharToCapsAbbr 且不被消费),
    *   而本函数首参是必填 ⇒ 每次命中都在调用边界抛 `Missing a required parameter.`, 被
    *   紧随的 try/catch 吞掉 ⇒ **字符从未被投递** (用户实测「最后一个字母不显示」; 铁证 =
    *   部署树 `logs\engine_error.log` 连发 `EchoChar(Match) 异常`)。
@@ -103,7 +103,7 @@ class CommandDisplay {
   static EchoChar(ih, c) {
     if (!this.ShouldEcho(c))
       return false
-    PostCharToCaspAbbr(ih, c)
+    PostCharToCapsAbbr(ih, c)
     return true
   }
 
@@ -122,7 +122,7 @@ class CommandDisplay {
   static EchoTerminalChar(c) {
     if (c = "" || StrLen(c) < 1)
       return false
-    PostCharToCaspAbbr("", c)
+    PostCharToCapsAbbr("", c)
     return true
   }
 
@@ -153,7 +153,7 @@ class CommandDisplay {
    * 只能靠投递。见 CONTRACTS §3.12 硬约束 2 的订正。
    */
   static EchoBackspace(ih, vk?, sc?) {
-    PostBackspaceToCaspAbbr(ih, vk, sc)
+    PostBackspaceToCapsAbbr(ih, vk, sc)
   }
 
   /**

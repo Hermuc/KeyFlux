@@ -38,7 +38,7 @@ EnterCapslockAbbr() {
   ; 显示命令框窗口
   ; 先开会话 (记下当前前台窗口 —— 命令框显示后可能抢走前台, 插件取选中文字要切回去)
   CommandInputHooks.BeginSession()
-  PostMessageToCpasAbbr(SHOW_COMMAND_INPUT)
+  PostMessageToCapsAbbr(SHOW_COMMAND_INPUT)
 
   ; 🔴 焦点修复 (v4.1): 透传模式必须把键盘焦点显式交给命令框 (窗口 NOACTIVATE, SHOW
   ; 不带焦点, 物理键会打进原窗口 —— 探针 kf_focus_probe 实证); 激活失败降级历史形态
@@ -75,7 +75,7 @@ EnterCapslockAbbr() {
   }
 
   if (InStr(endReason, "EndKey")) {
-    PostMessageToCpasAbbr(CANCEL_COMMAND_INPUT)
+    PostMessageToCapsAbbr(CANCEL_COMMAND_INPUT)
     CommandInputHooks.ActivateBackend()
     return
   }
@@ -89,7 +89,7 @@ EnterCapslockAbbr() {
   }
 
   ; 无命中的普通收尾 (其它停止原因)
-  PostMessageToCpasAbbr(HIDE_COMMAND_INPUT)
+  PostMessageToCapsAbbr(HIDE_COMMAND_INPUT)
   ; 透传会话曾把焦点交给命令框 -> 会话结束把前台还给会话开始时的窗口 (不恢复则
   ; 用户打字继续漏进已隐藏的命令框或不响应)。历史形态会话命令框不在前台,
   ; ActivateBackend 的 WinActive 检查为 false, 零行为变更。
@@ -130,7 +130,7 @@ FinishCapslockAbbr(abbr, scope, fuzzy) {
   if (fuzzy)
     CommandInputHooks.ActivateBackend()
   if (!CommandInputHooks.SessionActive)
-    HideCaspAbbr()
+    HideCapsAbbr()
 }
 
 /**

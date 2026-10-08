@@ -255,7 +255,7 @@ class Keymap {
       try {
         Hotkey(this.rawName, this.handler, "On" this.options)
         this.enabled := true
-      } catch {
+      } catch as e {
         EngineLogWarn("KeymapManager.Enable", e.Message)
         Tip("热键无效, 已跳过: " this.rawName, -2000)
       }
@@ -658,7 +658,7 @@ ExtractWaitKey(hotkey) {
   return waitKey
 }
 
-matchWinTitleCondition(winTitle, conditionType) {
+MatchWinTitleCondition(winTitle, conditionType) {
   switch conditionType {
     case 1:
       return WinActive(winTitle)

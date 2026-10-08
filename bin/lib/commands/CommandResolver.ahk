@@ -11,7 +11,7 @@
 class CommandStep {
   call := ""
   winTitle := ""
-  conditionType := 0 ; 0 = 无守卫; 1-5 语义同 matchWinTitleCondition
+  conditionType := 0 ; 0 = 无守卫; 1-5 语义同 MatchWinTitleCondition
 
   __New(call, winTitle := "", conditionType := 0) {
     this.call := call
@@ -47,7 +47,7 @@ class CommandResolver {
   /**
    * 精确命中 → 按 steps 顺序执行 (对齐旧 switch 语义):
    *   无守卫步骤: 执行后继续下一步骤;
-   *   带守卫步骤: matchWinTitleCondition 命中 → 执行并立即返回, 未命中 → 跳过。
+   *   带守卫步骤: MatchWinTitleCondition 命中 → 执行并立即返回, 未命中 → 跳过。
    * 未命中 → 委托 Strategy (若已挂接; 见 FuzzyStrategy.ahk:
    *   子序列匹配 ∪ 编辑距离 → 唯一候选静默执行 + Tip / 多候选仅 Tip 列出不执行);
    *   未挂接 (Strategy = "") 时静默无操作, 与纯精确匹配一致。
@@ -72,7 +72,7 @@ class CommandResolver {
       EngineLogWarn("CommandResolver.Resolve", e.Message)
     for step in this.Table[key] {
       if (step.conditionType != 0) {
-        if (matchWinTitleCondition(step.winTitle, step.conditionType)) {
+        if (MatchWinTitleCondition(step.winTitle, step.conditionType)) {
           step.call.Call()
           return
         }
