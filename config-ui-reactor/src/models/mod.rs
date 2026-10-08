@@ -19,6 +19,11 @@ pub use behavior::*;
 pub use config::*;
 pub use plugins::*;
 
+// 三套模型（models / generator::model / server::dto）的 wire 字段契约对账。
+// 仅测试期编译；见文件头注（模块化审查报告 §5.1 / 问题 #2 的护栏部分）。
+#[cfg(test)]
+mod contract;
+
 #[cfg(test)]
 mod tests {
     use super::*;
