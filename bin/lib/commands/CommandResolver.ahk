@@ -136,11 +136,10 @@ class CommandResolver {
     return "`"" s "`""
   }
 
-  ; 错误日志 (与 ActionRegistry._log 同策略: 追加写, 失败静默)
+  ; 错误日志 (与 ActionRegistry._log 同策略)。2026-10-08 收敛: 委派引擎唯一留痕入口
+  ; (EngineLogWarn → logs\engine_error.log), 不再各自维护 sink 文件。
   static _log(msg) {
-    try {
-      FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " msg "`n", "logs\command_resolver.log")
-    }
+    EngineLogWarn("CommandResolver", msg)
   }
 }
 

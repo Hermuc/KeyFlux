@@ -95,7 +95,7 @@ class CommandDisplay {
    *   `EchoChar(, char)` (首参 ih 是历史遗留参数, 只转发给 PostCharToCaspAbbr 且不被消费),
    *   而本函数首参是必填 ⇒ 每次命中都在调用边界抛 `Missing a required parameter.`, 被
    *   紧随的 try/catch 吞掉 ⇒ **字符从未被投递** (用户实测「最后一个字母不显示」; 铁证 =
-   *   部署树 `logs\command_input_hooks.log` 连发 `EchoChar(Match) 异常`)。
+   *   部署树 `logs\engine_error.log` 连发 `EchoChar(Match) 异常`)。
    *   ⇒ **终止字符不走本函数, 走 `EchoTerminalChar`** (它才是唯一允许绕过 ShouldEcho 的
    *   收口点, 见其注释); 本函数的调用处一律显式传两个实参。
    * @returns {boolean} true = 确实投递了; false = 透传模式被抑制跳过 (no-op)

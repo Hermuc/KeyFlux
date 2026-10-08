@@ -140,7 +140,7 @@ class EverythingEsProvider extends EverythingProvider {
   ;
   ; 🔴 实现纪律 (v1.0.1 首版事故教训): 第一版用「类静态 Map 初始化器」做查表, 在引擎
   ;    AHK 运行时里静态属性未实例化 → 每次查询抛 PropertyError 被会话吞掉 → 无任何
-  ;    搜索结果 + 命令框退回命令匹配 (引擎日志 command_input_hooks.log 实录)。故本版:
+  ;    搜索结果 + 命令框退回命令匹配 (引擎日志 engine_error.log 实录)。故本版:
   ;    ① 不引入任何**加载期求值**的代码 (无类静态初始化器, 白名单改为方法内 switch);
   ;    ② 整体 try/catch —— 任何意外 (编码/权限/解析) 都退回 es 默认排序, 绝不让查询
   ;    路径抛异常。

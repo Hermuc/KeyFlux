@@ -88,11 +88,12 @@ class ActionRegistry {
   }
 
   /**
-   * 错误日志 (约束 4)。追加写文件, 失败静默 —— 日志不能反过来破坏运行。
+   * 错误日志 (约束 4)。**2026-10-08 日志 sink 收敛**：原先自己 `FileAppend` 到
+   * `logs\action_registry.log`，与 `EngineLogWarn` 同形重复（引擎内曾有 6 个日志文件）。
+   * 现统一委派引擎唯一留痕入口 ⇒ 落 `logs\engine_error.log`，排障不必再翻多个文件。
+   * 「失败静默」由 `EngineLogWarn` 自身保证（其内部已 try 包裹）—— 日志不能反过来破坏运行。
    */
   static _log(msg) {
-    try {
-      FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " msg "`n", "logs\action_registry.log")
-    }
+    EngineLogWarn("ActionRegistry", msg)
   }
 }
