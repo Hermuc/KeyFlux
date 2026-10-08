@@ -170,8 +170,10 @@ def line_of(raw, funcs, name, bodytext_idx):
 
 def main(paths):
     total = 0
+    collected = []
     for path in paths:
         funcs, findings, raw = analyse(path)
+        collected.append(findings)
         print("=" * 78)
         print("FILE %s  functions=%d %s" % (path, len(funcs), sorted(funcs.keys())))
         if not findings:
@@ -193,7 +195,7 @@ def main(paths):
                       "so it no longer matches the function name" % (var, var.rstrip('0123456789') or var))
     print("=" * 78)
     print("TOTAL_FINDINGS=%d" % total)
-    return 1 if any(f[0] == "ERROR" for p in paths for f in analyse(p)[1]) else 0
+    return 1 if any(f[0] == "ERROR" for fs in collected for f in fs) else 0
 
 
 if __name__ == "__main__":

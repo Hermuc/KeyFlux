@@ -176,6 +176,50 @@ function Assert-KfEngineStopped {
   $running = @(Get-Process -Name $Name -ErrorAction SilentlyContinue)
   if ($running.Count -eq 0) { return }
   $list = ($running | ForEach-Object { $_.ProcessName + '(' + $_.Id + ')' }) -join ', '
-  throw ('engine is running: ' + $list + ' -- close it/them first (robocopy retries a locked ' +
-         'exe forever, so the sync would hang instead of failing)')
-}
+    throw ('engine is running: ' + $list + ' -- close it/them first (robocopy retries a locked ' +
+           'exe forever, so the sync would hang instead of failing)')
+  }
+
+  # ---------------------------------------------------------------------------
+  # Template-derived include list
+  # ---------------------------------------------------------------------------
+
+  # Derive the engine's #Include order from templates/keyflux.tmpl -- the single source.
+  # Returns paths relative to the template's own directory (e.g. "lib/core/Functions.ahk").
+  # Lines carrying the plugin / custom-script placeholders are skipped (the generator fills
+  # those in, they are not hand-written includes).
+  # 2026-10-08 (batch K): tools/oracle.ps1 used to hand-maintain a 14-line copy of this list,
+  # which had ALREADY drifted from the template (it omitted the four command-box modules:
+  # CommandDisplay / ImeInputHost / CommandImeGuard / CommandInputHooks). Deriving it here
+  # keeps oracle in step automatically.
+  # NOTE: the AHK harnesses under tools/ keep their OWN subsets on purpose (each includes only
+  # the modules it exercises), so this helper is used by oracle.ps1 only.
+  function Get-KfIncludeList {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$TemplatePath)
+    $out = @()
+    foreach ($ln in [IO.File]::ReadAllLines($TemplatePath, [Text.Encoding]::UTF8)) {
+      if ($ln -notmatch '^\s*#include\s') { continue }
+      if ($ln -match 'PLUGIN_INCLUDES' -or $ln -match 'CUSTOM_SCRIPT') { continue }
+      $m = [regex]::Match($ln, '^\s*#include\s+(.+?)\s*$',
+            [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+      if ($m.Success) { $out += $m.Groups[1].Value }
+    }
+    return $out
+  }
+
+  # ---------------------------------------------------------------------------
+  # robocopy result convention
+  # ---------------------------------------------------------------------------
+
+  # robocopy exit codes 0-7 mean success (bit flags: 1 = copied, 2 = extra, 4 = mismatched,
+  # ...); >= 8 means at least one file or directory failed. This convention used to be
+  # re-implemented at a dozen call sites -- this is the single source of truth for PowerShell.
+  # NOTE: the Makefile still spells `[ $$? -le 7 ]` inline at five sites. Those are sh recipe
+  # lines and cannot call a PowerShell function, so they are intentionally left as-is (they
+  # carry a comment pointing here).
+  function Test-KfRobocopyOk {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][int]$ExitCode)
+    return ($ExitCode -lt 8)
+  }

@@ -61,7 +61,7 @@ $dst = Join-Path $repo 'bin/ui'
 # Exclude set + robocopy step come from tools/lib/kf-tools.ps1 (single source --
 # it used to be copied verbatim here, in the Makefile and in release.yml).
 $code = Invoke-KfReactorStaging -Source $src -Destination $dst
-if ($code -ge 8) { Write-Error "[FAIL] robocopy exit $code"; exit 1 }
+if (!(Test-KfRobocopyOk $code)) { Write-Error "[FAIL] robocopy exit $code"; exit 1 }
 Copy-Item "$src/keyflux-settings.exe" "$dst/KeyFlux.Settings.exe" -Force
 New-Item -ItemType Directory -Force -Path "$dst/fonts" | Out-Null
 Copy-Item 'config-ui-reactor/resources/fonts/*.ttf' "$dst/fonts/" -Force
@@ -79,7 +79,7 @@ Start-Sleep -Seconds 2
 # ---- 4. production sync + hash gate ----------------------------------------
 Step 4 "sync bin/ui -> $DeployRoot\bin\ui"
 robocopy "$repo\bin\ui" "$DeployRoot\bin\ui" /E /R:1 /W:1 /NFL /NDL /NJH | Out-Null
-if ($LASTEXITCODE -ge 8) { Write-Error "[FAIL] prod robocopy exit $LASTEXITCODE"; exit 1 }
+if (!(Test-KfRobocopyOk $LASTEXITCODE)) { Write-Error "[FAIL] prod robocopy exit $LASTEXITCODE"; exit 1 }
 $localHash = Get-KfSha256 "$repo\bin\ui\KeyFlux.Settings.exe"
 $prodHash  = Get-KfSha256 "$DeployRoot\bin\ui\KeyFlux.Settings.exe"
 if ($localHash -ne $prodHash) {

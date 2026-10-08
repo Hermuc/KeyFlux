@@ -203,6 +203,10 @@ deploy-panel:
 #   /Validate 与 lint 都查不出 (纯运行时语义)。本目标即该缺陷的守门人。
 #   实测: 旧实现 4 项断言红, 修复后全绿。
 # (MSYS_NO_PATHCONV: 防止 Git Bash 把 /ErrorStdOut 误转换为路径)
+# ⚠ Windows: make 用 cmd 执行配方, `VAR=1 cmd` 的 POSIX 前缀语法会报
+#   "'MSYS_NO_PATHCONV' 不是内部或外部命令" ⇒ 本机跑本目标请用 Bash 直跑同款命令
+#   (CI 的 sh 环境不受影响)。2026-10-08 批 K 注: 曾因误判此失败为环境问题而跳过
+#   check-hooks, 漏检了一个真实回归 (批 M 改 _log 委派后 harness 缺桩挂住)。
 check-hooks:
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut tools/command_input_hooks_test.ahk
 
@@ -216,6 +220,13 @@ check-hooks:
 check-ime:
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut tools/ime_input_test.ahk
 
+# check-fuzzy: FuzzyStrategy 容错匹配回归 (60/60 断言)。
+#   2026-10-08 批 K: 此前该 harness **不在任何 make 目标里** (孤儿测试) —— 批 M 改 _log
+#   委派后它缺 EngineLogWarn 桩挂住, 却无人察觉, 靠人工才发现。入闸门防再犯。
+#   Windows 跑法同 check-hooks 的 ⚠ (cmd 版 make 不认 POSIX 前缀, 用 Bash 直跑)。
+check-fuzzy:
+	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut tools/fuzzy_strategy_test.ahk
+
 # check: 一键回归 = 标识符 lint + 文本特征一致性 + 命令框拦截点契约 + Go 单测 + 重新生成产物 + AHK 语法校验 + Oracle 运行时对账
 # (MSYS_NO_PATHCONV: 防止 Git Bash 把 /ErrorStdOut /Validate 等开关误转换为路径)
 # 2026-09-17 修「生成产物落点」缺陷 (原配方只要部署配置启用了插件就**必然**失败, 实测阻断 make deploy):
@@ -227,7 +238,7 @@ check-ime:
 #         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
 #   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
 #       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
-check: sync-templates lint lint-ahk-style check-texttypes check-hooks check-plugins-mirror sync-plugins | check-deploy-tree $(OUT_DIR)
+check: sync-templates lint lint-ahk-style check-texttypes check-hooks check-fuzzy check-plugins-mirror sync-plugins | check-deploy-tree $(OUT_DIR)
 	@mkdir -p "$(DEPLOY_DIR)/bin"
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
@@ -339,4 +350,4 @@ out: sync-templates buildClientReactor sync-out
 deploy: check buildClientReactor sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-plugins-mirror sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy parity api-parity check-deploy-tree
+.PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-fuzzy check-plugins-mirror sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy parity api-parity check-deploy-tree
