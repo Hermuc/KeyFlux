@@ -58,6 +58,7 @@ class ConfigProvider {
     try {
       return FileRead(path, "UTF-8")
     } catch {
+      EngineLogWarn("ConfigProvider.Set", e.Message)
       return ""
     }
   }
@@ -68,6 +69,7 @@ class ConfigProvider {
       if FileExist(path)
         FileDelete(path)
     } catch {
+      EngineLogWarn("ConfigProvider.Set", e.Message)
       return false
     }
     ; 删除失败 (文件仍存在) 时不追加, 避免内容翻倍
@@ -77,6 +79,7 @@ class ConfigProvider {
       FileAppend(content, path, "UTF-8")
       return true
     } catch {
+      EngineLogWarn("ConfigProvider.Set", e.Message)
       return false
     }
   }

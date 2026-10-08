@@ -92,6 +92,8 @@ class CommandImeGuard {
         ; 透传接管显示, 停投递防二次显示 (与 v4 恒透传一致)
         CommandDisplay.SuppressKeycap := true
       }
+    } catch as e {
+      EngineLogWarn("CommandImeGuard.UnlockForSearch", e.Message)
     }
   }
 }

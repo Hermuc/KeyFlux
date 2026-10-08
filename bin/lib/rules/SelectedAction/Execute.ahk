@@ -14,6 +14,8 @@
    */
   static _Execute(entry, selected) {
     try EventBus.Publish("selection_action", Map("behavior", entry.behavior, "name", entry.name, "selected", selected.content))
+    catch as e
+      EngineLogWarn("Execute._Execute", e.Message)
     content := selected.content
     switch entry.action {
       case "open_url":

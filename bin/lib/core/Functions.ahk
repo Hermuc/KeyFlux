@@ -125,7 +125,8 @@ KeyFluxOpenSettings() {
   launchSettings() {
     Run('"' A_ScriptDir '\ui\KeyFlux.Settings.exe"', A_ScriptDir)
   }
-  ; 窗口在 WinWait 后被销毁时各 Win 调用抛 TargetError, try 静默吞掉竞态;
+  ; 窗口在 WinWait 后被销毁时各 Win 调用抛 TargetError —— 吞掉竞态但**留痕**
+  ; (2026-10-08 批 L 起 EngineLogWarn 记录, 原先纯静默);
   ; ahk_id 锚定消除三窗口同标题 Setting 的 re-match 错绑
   activateSettings(hwnd) {
     try {
@@ -139,6 +140,8 @@ KeyFluxOpenSettings() {
         WinSetAlwaysOnTop(false, "ahk_id " hwnd)
         WinActivate("ahk_id " hwnd)
       }
+    } catch as e {
+      EngineLogWarn("Functions.KeyFluxOpenSettings", e.Message)
     }
   }
   ; 慢冷启动兜底轮询: 500ms 一次非阻塞检查, 窗口迟到出现时补一次前台激活;

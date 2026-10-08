@@ -81,6 +81,8 @@ class KeymapManager {
       keymap.Enable(parent)
       ; 阶段 6: 慢事件广播 (薄观察层, 零订阅者时为空遍历; 隔离兜底, 不影响模式激活)
       try EventBus.Publish("mode_enter", Map("name", keymap.Name))
+      catch as e
+        EngineLogWarn("KeymapManager.Activate", e.Message)
     }
     startTick := A_TickCount
     keymap.Wait(startTick)
@@ -88,6 +90,8 @@ class KeymapManager {
       this.Stack.Pop()
       keymap.Disable()
       try EventBus.Publish("mode_exit", Map("name", keymap.Name))
+      catch as e
+        EngineLogWarn("KeymapManager.Activate", e.Message)
     }
   }
 
@@ -150,6 +154,8 @@ class KeymapManager {
       this.L.locked := this.L.toLock
       this.L.toLock := false
       try EventBus.Publish("mode_enter", Map("name", this.L.locked.Name))
+      catch as e
+        EngineLogWarn("KeymapManager._lock", e.Message)
     }
   }
 
@@ -158,6 +164,8 @@ class KeymapManager {
     if KeymapManager.L.locked {
       KeymapManager.L.locked.Disable()
       try EventBus.Publish("mode_exit", Map("name", KeymapManager.L.locked.Name))
+      catch as e
+        EngineLogWarn("KeymapManager.Unlock", e.Message)
       KeymapManager.Stack[1] := KeymapManager.GlobalKeymap
       KeymapManager.L.locked := false
     }
@@ -248,6 +256,7 @@ class Keymap {
         Hotkey(this.rawName, this.handler, "On" this.options)
         this.enabled := true
       } catch {
+        EngineLogWarn("KeymapManager.Enable", e.Message)
         Tip("热键无效, 已跳过: " this.rawName, -2000)
       }
       this.hotifContext(this.winTitle, this.conditionType, false)

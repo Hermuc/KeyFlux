@@ -332,6 +332,8 @@ class FuzzyStrategy {
       SetTimer(this._hideTimerFn, 0)   ; 撤销定时器 (不存在时为无副作用的空操作)
     if (IsObject(this.TipWindow)) {
       try this.TipWindow.Hide()
+      catch as e
+        EngineLogWarn("FuzzyStrategy.HideHints", e.Message)
     }
   }
 

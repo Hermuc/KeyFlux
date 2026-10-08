@@ -105,6 +105,7 @@ SelectedActionInit(hotkeyName, entries) {
     try {
       KeymapManager.GlobalKeymap.Map(head, chain, , , , "S")
     } catch {
+      EngineLogWarn("SelectedAction.SelectedActionInit", e.Message)
       return
     }
     return
@@ -116,6 +117,7 @@ SelectedActionInit(hotkeyName, entries) {
   try {
     KeymapManager.GlobalKeymap.Map(hotkeyName, trigger, , , , "S")
   } catch {
+    EngineLogWarn("SelectedAction.SelectedActionInit", e.Message)
     return
   }
 }
