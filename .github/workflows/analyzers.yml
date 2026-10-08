@@ -226,3 +226,14 @@ jobs:
       - uses: actions/checkout@v5
       - name: 'make check-plugins-mirror (bundled plugin trees must be byte-identical)'
         run: make check-plugins-mirror
+  # 断链护栏四: 第三方随包内容「勿改」hash 门禁 = `make check-vendor` (2026-10-08, 报告 #13)。
+  #   Monitor.ahk / AHK 运行时 / 小工具 / windows-reactor fork 逐个 SHA256 对账 —— 防"好人误修正"
+  #   上游(拼写、看似死代码的分支、格式)。清单与理由 = vendor/README.md;
+  #   有意变更后须 `tools/check-vendor-hashes.ps1 -Write` 重录并在提交里说明。
+  vendor-hashes:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: 'make check-vendor (vendored third-party content unchanged)'
+        run: make check-vendor

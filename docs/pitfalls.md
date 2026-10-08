@@ -66,6 +66,7 @@
 | D6 | `pwsh -File` 报奇怪的解析错 | `pwsh -File` 与 Windows PowerShell 5.1 会误解析**非 BOM** UTF-8 | 工具脚本 **ASCII-only** |
 | D7 | CI 里 `data/plugins` 落空（`19/23` 假红） | `Copy-Item` 把结尾的 `/.` 解析为「空拷贝」 | CI 用 `bash` 的 `cp -r src/. dst` |
 | D8 | 同一源码重编两次 md5 不同，被误判为「部署不一致」 | reactor 两个 bin **非逐字节可复现** | 只在「副本 vs 源」用 md5/sha256（`verify-deploy`），**不**拿「重编相等」当证据 |
+| D9 | 本机 `make` 「假绿」：守卫形同虚设 | PATH 上无 `sh` 时 GNU make 退回 **cmd** 执行配方，而配方是 POSIX sh 风格（`test` / `rm` / `cp` / `||` / `; exit 1`）—— `test` 报「不是内部命令」后 `; exit 1` 在 cmd 里不成立，守卫仍 `exit 0`（2026-10-08 实测 `make check-deploy-tree`） | `Makefile` 顶部**解析期** sh 守卫：`$(shell printf ok)` ≠ `ok` 即 `$(error)`（缺 sh 直接失败，而不是等配方走样） |
 
 ---
 
@@ -89,6 +90,9 @@
 |---|---|
 | `make verify-deploy` | A1、A3 |
 | `make check-freshness`（`make check` 前置） | B1、B5 |
+| `make check-vendor` | 第三方随包内容「勿改」（好人误修正上游） |
+| `make check-upstream`（`deps-watch.yml` 每周） | 上游 `windows-reactor` 新版（#7） |
+| `make check-deps`（`deps-watch.yml` 每周） | 依赖漏洞 / 许可 / 来源（#8） |
 | `make api-parity` | B2、B4、E6 |
 | `make check-plugins-mirror` | E3 |
 | `make -n check`（CI `make-parse`） | D5 |

@@ -31,3 +31,24 @@ jobs:
       - name: 'Check upstream windows-reactor version (single source: tools/check-upstream-reactor.ps1)'
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-upstream-reactor.ps1
+
+  # 依赖供应链审计（多维度优化报告 #8）：RUSTSEC 漏洞库 + 许可 / 来源 / 反模式合规。
+  #   为什么独立于 push 闸门：需要网络 + 外部 advisory DB，且"新披露漏洞"与本次改动无关，
+  #   每周一次即可（与上游版本检测同一节奏，故并入本 workflow）。
+  #   单一真源 = tools/check-deps.ps1（覆盖 config-ui-reactor 与 command-input 两个 cargo 工程）；
+  #   配置单一真源 = 仓库根 deny.toml。
+  deps-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install cargo-audit + cargo-deny (prebuilt)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit,cargo-deny
+
+      - name: 'Dependency audit (single source: tools/check-deps.ps1)'
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-deps.ps1

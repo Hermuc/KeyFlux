@@ -3,6 +3,18 @@ ahkVersion = 2.0.19
 folder = KeyFlux-$(version)
 zip = $(folder).7z
 
+# ---- 前置硬门禁: 缺 sh 时**解析期**失败 (多维度优化报告 N1 / 防假绿) ----
+# 背景: 本机 PATH 无 sh 时, GNU make 退回用 **cmd** 执行配方; 而本文件配方是 POSIX sh 风格
+#   (`test` / `rm` / `cp` / `||` / `; exit 1`)。后果**不是报错, 而是假绿** —— 2026-10-08 实测:
+#   `make check-deploy-tree` 在 cmd 下先打印 "'test' 不是内部或外部命令", 随后仍 `exit 0`,
+#   存在性守卫完全失效(同类还有 lint 的 `$(find …)` 不被展开等)。
+# 判据: `$(shell printf ok)` 在 POSIX sh 下回 "ok"; cmd 下为空 (cmd 无 printf)。
+# 正常跑法: 在 Git Bash 里运行 make, 或把 Git 的 `usr\bin` 加进 PATH(CI 的 runner 天然满足)。
+ifeq ($(shell printf ok),ok)
+else
+$(error make requires a POSIX sh on PATH (got cmd): run make from Git Bash, or add Git usr\bin to PATH -- see the comment above)
+endif
+
 # sync-templates: 模板资产 → bin/templates (运行时引擎读: Launcher.ahk 的
 # NeedsRegenerate 判定 + MiscTools.ahk 的计划任务模板)。模板真源 = 仓库根 templates/
 # (2026-10-06 自 config-server/templates 迁出, Go 后端同日退役)。
@@ -161,6 +173,13 @@ check-freshness:
 check-upstream:
 	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-upstream-reactor.ps1
 
+# check-deps: 依赖供应链审计 (多维度优化报告 #8) —— RUSTSEC 漏洞库 + 许可/来源合规。
+#   单一真源 = tools/check-deps.ps1 (覆盖两个 cargo 工程); 配置 = 仓库根 deny.toml。
+#   ⚠ 需要网络 + 预装 cargo-audit / cargo-deny (cargo install cargo-audit cargo-deny)
+#     ⇒ **不并入 check**; 每周由 .github/workflows/deps-watch.yml 跑一次。
+check-deps:
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-deps.ps1
+
 # lint: 标识符冲突静态闸门 (AHK 大小写不敏感, /Validate 查不出「局部变量遮蔽同名函数」类
 # 运行时崩溃; 详见阶段 0 §7.3)。扫描 bin/lib 下全部 AHK 源文件, 有 ERROR 即非零退出。
 lint:
@@ -196,6 +215,14 @@ check-texttypes:
 check-plugins-mirror:
 	@diff -rq --strip-trailing-cr plugins/examples data/plugins >/dev/null 2>&1 || (echo "[FAIL] bundled plugin mirror drift (plugins/examples != data/plugins):"; diff -ru --strip-trailing-cr plugins/examples data/plugins; echo "  fix: make sync-plugin-mirror   (examples 是唯一手改点)"; exit 1)
 	@echo "[ok] bundled plugin mirror in sync"
+
+# check-vendor: 第三方随包内容「勿改」hash 门禁 (多维度优化报告 #13)。
+#   守护 Monitor.ahk / AHK 运行时 / 小工具 / windows-reactor fork —— 防止好人误"修正"上游
+#   (拼写、看似死代码的分支、格式)。清单与理由见 vendor/README.md;
+#   单一真源 = tools/check-vendor-hashes.ps1 + tools/vendor-manifest.json。
+#   有意变更后跑 `pwsh -File tools/check-vendor-hashes.ps1 -Write` 重录并在提交里说明原因。
+check-vendor:
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/check-vendor-hashes.ps1
 
 # sync-plugin-mirror: 把**唯一手改点** plugins/examples 单向同步到发布源 data/plugins。
 #   让「同步」从口头约定变成一条可执行、可自验的动作（跑完立即复验门禁）。
@@ -257,7 +284,7 @@ check-fuzzy:
 #         /Validate 校验这一份; 再复制一份回仓库 bin/ 供 oracle.ps1 用 (它硬编码读 $repo\bin\KeyFlux.ahk)。
 #   注: 生成幂等 (同一 config ⇒ 同一字节, 已用 SHA256 验证), 不改变运行时行为;
 #       唯一新增约束是校验期间实例不应正持锁写入同一文件 (deploy 流程本就要求先关窗)。
-check: sync-templates check-freshness lint lint-ahk-style check-texttypes check-hooks check-fuzzy check-plugins-mirror sync-plugins | check-deploy-tree $(OUT_DIR)
+check: sync-templates check-freshness lint lint-ahk-style check-texttypes check-hooks check-fuzzy check-plugins-mirror check-vendor sync-plugins | check-deploy-tree $(OUT_DIR)
 	@mkdir -p "$(DEPLOY_DIR)/bin"
 	MSYS_NO_PATHCONV=1 bin/settings.exe GenerateAHK "$(CHECK_CONFIG)" ./templates/keyflux.tmpl "$(DEPLOY_DIR)/bin/KeyFlux.ahk"
 	cp "$(DEPLOY_DIR)/bin/KeyFlux.ahk" ./bin/KeyFlux.ahk
@@ -386,4 +413,4 @@ deploy: buildClientReactor check sync-out
 verify-deploy:
 	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify_deploy.ps1
 
-.PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-fuzzy check-plugins-mirror sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy verify-deploy check-freshness check-upstream parity api-parity check-deploy-tree
+.PHONY: ahk lint-ahk-style sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-fuzzy check-plugins-mirror check-vendor sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy verify-deploy check-freshness check-upstream check-deps parity api-parity check-deploy-tree
