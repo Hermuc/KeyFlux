@@ -21,6 +21,11 @@ config-ui-reactor/target/
 #   * bundled 插件 (plugin.json 声明 "bundled": true) 是手写源码 —— 生成端只 #Include
 #     main.ahk 入口并读 plugin.json, src/ 不参与生成, 故"运行时镜像"的说法对它们不成立;
 #     曾因下面的整目录忽略而完全无版本历史 (git ls-files data/plugins 为空)。
+#   🔴 **唯一手改点 = `plugins/examples/<id>`**（2026-10-08 定）：它入库、有版本历史，且是
+#     sync-plugins.ps1 / CI 沙箱 staging / cargo 生成器测试 / parity 语料 factory-plugins
+#     的共同取源。下面的反选放行**只是为了让发布源也在库里**（copyFiles 与 release.yml 打包
+#     data/），**不是第二个手改点** —— 改完 examples 必须跑 `make sync-plugin-mirror` 同步，
+#     否则 `make check-plugins-mirror` 会红，且部署会用旧插件覆盖生产树（已发生过一次）。
 #   * 用户经插件市场/zip 安装的插件落在同目录的新目录 => 默认继续排除。
 #   * everything_search/bin/es.exe = voidtools 官方 ES CLI 1.1.0.38 x64 (262KB), 随插件
 #     分发使 ES 查询通道开箱即用 (EverythingProviders.ResolveEs 第 3 优先级, 见插件 README)。

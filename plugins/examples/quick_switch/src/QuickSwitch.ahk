@@ -10,13 +10,37 @@
 ;   * 手动入口 (QuickSwitchRun) 内零枚举、零磁盘 IO: 只用已缓存的候选; 落盘经 SetTimer 异步。
 ;   * 浮层显示期间 Suspend(true), 隐藏时 Suspend(false) (设计 QS-P0-09, 防浮层期间热键重入);
 ;     仅当"是我们自己挂起的"才恢复, 绝不误恢复用户的「暂停 KeyFlux」。
-;   * 所有路径 try/catch, 绝不把异常抛进定时器/热键链路。
+;   * 所有路径 try/catch, 绝不把异常抛进定时器/热键链路; 吞掉的异常一律经 QSLogWarn
+;     留痕到 %TEMP%\kf_plugin_warn.log (2026-10-07 审查: 吞异常必须与留痕并存)。
 ; 依赖方向: 编排 -> DialogInspector / FolderHistory / HistoryStore / FolderRanker / QuickSwitchUI。
 ; ============================================================
 #Warn All, Off
 
 global QSCFG := 0
 global QSSTATE := 0
+
+/**
+ * 插件内**唯一的失败留痕出口** (2026-10-07 代码审查新增)。
+ *
+ * 为什么需要: 本文件按纪律「所有路径 try/catch, 绝不把异常抛进定时器/热键链路」(见文件头),
+ * 于是失败全被就地吞掉 —— 定时器/历史读写出问题时, 用户只看到「浮层不出现」, 而
+ * %TEMP%\kf_plugin_warn.log 里没有任何痕迹, 事后无法复盘。
+ *
+ * 与引擎 EngineLogWarn 的分工: 引擎错误进 logs\engine_error.log, 插件错误进
+ * %TEMP%\kf_plugin_warn.log —— 插件**不写引擎日志目录**, 保持插件与引擎解耦
+ * (删插件即删其全部痕迹; 探针单独 #Include 本文件时也无跨模块符号依赖)。
+ * 本函数自身包 try: 记录失败绝不能变成新的故障源。
+ * @param context 失败位置 (建议 "函数名")
+ * @param detail  补充信息 (路径/参数/底层错误文本等)
+ */
+QSLogWarn(context, detail := "") {
+  try {
+    line := "[warn][quick_switch] " context
+    if (detail != "")
+      line .= " | " detail
+    FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " line "`n", A_Temp "\kf_plugin_warn.log", "UTF-8")
+  }
+}
 
 ; 默认配置 (设计 §3.1 裁决: autoJumpOpen=true / autoJumpSave=false / 800ms / 200 条 / 8 行)。
 QuickSwitchDefaultConfig() {
@@ -165,8 +189,9 @@ _QuickSwitchPoll() {
 
     if (QSCFG.autoShow && !QSSTATE.overlayVisible)
       _QuickSwitchShowOverlay(QSSTATE.mode)
-  } catch {
-    ; 定时器内绝不抛出
+  } catch as err {
+    ; 定时器内绝不抛出 (抛出会中断轮询链), 但必须留痕: 否则「浮层不出现」无从排查。
+    QSLogWarn("轮询 tick 失败", "err=" err.Message)
   }
 }
 
@@ -274,7 +299,10 @@ _QuickSwitchSwitchToHistory() {
     store := HistFilterExcluded(store, QSCFG.excludedPrefixes)
     QSSTATE.histStore := store
     QSSTATE.histCands := RankByTime(store, RankNowTs())
-  } catch {
+  } catch as err {
+    ; 读历史失败: 继续用上一份缓存展示 (原语义不变), 但留痕 —— 否则「历史列表一直是空的」
+    ; 只能靠猜 (可能是文件锁/编码/权限, 症状完全一样)。
+    QSLogWarn("读取历史失败, 沿用缓存", "err=" err.Message)
   }
   QSUIShow(QSSTATE.histCands, QSUIAnchorRect(DlgWindowRect(QSSTATE.dialogHwnd)), "history")
   QSSTATE.mode := "history"
@@ -288,7 +316,8 @@ QuickSwitchClearHistory() {
     if (HistClear(QSHistoryPath())) {
       QSSTATE.histStore := HistLoad(QSHistoryPath())
     }
-  } catch {
+  } catch as err {
+    QSLogWarn("清空历史失败", "err=" err.Message)
   }
 }
 
@@ -418,7 +447,9 @@ _QuickSwitchRecord(path) {
     HistRecord(store, path, HistNowTs())
     HistSave(QSHistoryPath(), store, QSCFG.maxHistory)
     QSSTATE.histStore := store
-  } catch {
+  } catch as err {
+    ; 落盘失败 = 跳转历史不更新 (用户以为「没记下来」); 留痕以便区分「没触发」与「写失败」。
+    QSLogWarn("写入历史失败", "path=" path " err=" err.Message)
   }
 }
 

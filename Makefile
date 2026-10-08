@@ -155,15 +155,28 @@ lint:
 check-texttypes:
 	python tools/texttype_conformance.py
 
-# check-plugins-mirror: 两棵官方插件树必须逐字节一致。
-#   plugins/examples 是**规范源**（sync-plugins.ps1 / CI 沙箱 staging / cargo 生成器测试都读它）；
-#   data/plugins/<id> 下的两个 bundled 插件另被 .gitignore(27-29 行) 反选放行，是发布打包
-#   （Makefile copyFiles 与 release.yml 的 `cp -r data`）的**唯一**来源。两树历史上曾静默分叉
-#   （examples 落后 data/plugins）⇒ 本门禁把静默漂移变成显式失败。
+# check-plugins-mirror: 两棵官方插件树必须一致。
+#   🔴 **唯一手改点 = `plugins/examples/<id>`**（入库、有版本历史、sync-plugins.ps1 / CI 沙箱
+#      staging / cargo 生成器测试 / parity 语料 `factory-plugins` 都读它）；
+#   `data/plugins/<id>` 是**发布源**（Makefile copyFiles 与 release.yml 的 `cp -r data` 打包它，
+#      被 .gitignore 反选放行），改完 examples 用 `make sync-plugin-mirror` 单向同步过来。
+#   两树历史上曾静默分叉（examples 落后 data/plugins）⇒ 本门禁把静默漂移变成显式失败；
+#   漂移的后果不是「少个文件」而是**部署时用旧插件覆盖生产树**（已发生过一次）。
+#   ⚠ 比较用 `--strip-trailing-cr`：本仓库两树的行尾形态不统一（Windows 的 core.autocrlf=true
+#     会把检出写成 CRLF），逐字节比较会把纯行尾差异报成漂移 ⇒ 假红淹没真信号。
 #   ⚠ 未做「整树去重」：去重前须先让 release.yml 从 examples 补齐 data/plugins，否则发布包会丢插件。
 check-plugins-mirror:
-	@diff -rq plugins/examples data/plugins >/dev/null 2>&1 || (echo "[FAIL] bundled plugin mirror drift (plugins/examples != data/plugins):"; diff -rq plugins/examples data/plugins; exit 1)
+	@diff -rq --strip-trailing-cr plugins/examples data/plugins >/dev/null 2>&1 || (echo "[FAIL] bundled plugin mirror drift (plugins/examples != data/plugins):"; diff -ru --strip-trailing-cr plugins/examples data/plugins; echo "  fix: make sync-plugin-mirror   (examples 是唯一手改点)"; exit 1)
 	@echo "[ok] bundled plugin mirror in sync"
+
+# sync-plugin-mirror: 把**唯一手改点** plugins/examples 单向同步到发布源 data/plugins。
+#   让「同步」从口头约定变成一条可执行、可自验的动作（跑完立即复验门禁）。
+#   /MIR 是有意的：官方插件目录就该是 examples 的精确镜像。
+#   ⚠ 载荷里的 `$` 必须写成 make 的 `$$`（否则被 make 当变量吃掉，2026-10-08 实测踩到）。
+sync-plugin-mirror:
+	@pwsh -NoProfile -Command 'foreach($$id in @("everything_search","quick_switch")){ $$s=Join-Path "plugins/examples" $$id; $$d=Join-Path "data/plugins" $$id; if(!(Test-Path $$s)){Write-Error ("[FAIL] missing " + $$s); exit 1}; robocopy $$s $$d /MIR /NFL /NDL /NJH /NJS | Out-Null; if($$LASTEXITCODE -ge 8){Write-Error ("[FAIL] robocopy " + $$id + " exit " + $$LASTEXITCODE); exit 1}; Write-Host ("[ok] " + $$id + " -> data/plugins") }'
+	@diff -rq --strip-trailing-cr plugins/examples data/plugins >/dev/null || (echo "[FAIL] mirror still out of sync after sync"; exit 1)
+	@echo "[ok] plugin mirror synced (examples -> data/plugins)"
 
 # # deploy-panel: guarded manual deploy of the settings panel (probe-marker gate +
 # cargo-gates single source + staging + prod hash gate + relaunch). Replaces the
@@ -317,4 +330,4 @@ out: sync-templates buildClientReactor sync-out
 deploy: check buildClientReactor sync-out
 	@pwsh -NoProfile -Command '$$d=(Resolve-Path "$(OUT_DIR)").Path; Stop-Process -Name KeyFlux,KeyFlux-CommandInput -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Start-Process (Join-Path $$d "KeyFlux.exe") -WorkingDirectory $$d'
 
-.PHONY: ahk sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-plugins-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy parity api-parity check-deploy-tree
+.PHONY: ahk sync-templates buildClientReactor copyFiles upload build check check-texttypes check-hooks check-ime check-plugins-mirror sync-plugin-mirror analyzers lint sync-out sync-plugins patch-commandinput check-commandinput-patch command-input out deploy parity api-parity check-deploy-tree
