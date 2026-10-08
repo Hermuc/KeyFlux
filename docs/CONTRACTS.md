@@ -211,7 +211,7 @@ class CommandResolver {
 class CommandStep {
   call := ""                           ; Funcref, 无参闭包 () => <原 case 体语句>
   winTitle := ""                       ; 窗口组守卫 (仅 WindowGroupID != 0 的动作有)
-  conditionType := 0                   ; 0 = 无守卫; 1-5 语义同 matchWinTitleCondition
+  conditionType := 0                   ; 0 = 无守卫; 1-5 语义同 MatchWinTitleCondition
 }
 ```
 
@@ -483,8 +483,8 @@ class CommandDisplay {
 
 **硬约束**:
 
-1. 🔴 **所有命令框回显必须经本模块收口** —— 不得再直接调 `PostCharToCaspAbbr` /
-   `PostBackspaceToCaspAbbr`(插件侧亦然)。散落直调会让「抑制」出现漏洞: 有的字符被拦、
+1. 🔴 **所有命令框回显必须经本模块收口** —— 不得再直接调 `PostCharToCapsAbbr` /
+   `PostBackspaceToCapsAbbr`(插件侧亦然)。散落直调会让「抑制」出现漏洞: 有的字符被拦、
    有的漏过去, 症状是**部分字母仍带八角框**, 且静态检查查不出。
    当前调用点: `CommandInputHooks.CommandInputOnChar/OnKeyDown`、
    `type9_keyflux.EnterCapslockAbbr`(Match 分支)、`everything_search` 的 `EverythingSession`;
@@ -954,7 +954,7 @@ class ImeInputHost {                    ; 注册为 CommandInputHooks provider (
    两条命中路径都经它: 全串命中 (`EnterCapslockAbbr` Match 分支, **无条件**投) 与模糊命中
    (`FuzzySuffixFire`, **仅透传模式**投 —— 历史形态那边已由 OnChar 的 EchoChar 投过, 再补会双显)。
    ⚠ **`EchoChar(ih, c)` 两个实参都必须传**: 首参是历史遗留参数 (只转发给
-   `PostCharToCaspAbbr`, 后者并不消费), 曾因按历史写法省成 `EchoChar(, char)` 而每次命中都抛
+   `PostCharToCapsAbbr`, 后者并不消费), 曾因按历史写法省成 `EchoChar(, char)` 而每次命中都抛
    `Missing a required parameter.` 并被 catch 吞掉 (铁证 = 部署树 `logs\command_input_hooks.log`
    连发 `EchoChar(Match) 异常`) —— 这是本缺陷的**第一层**成因 (第二层 = 透传模式把它兑停)。
    ⚠ 命中后的执行/隐藏**延后** `CommandInputHooks.FinishDelayMs`(现 30ms ≈ 2 帧) —— 让刚投递的

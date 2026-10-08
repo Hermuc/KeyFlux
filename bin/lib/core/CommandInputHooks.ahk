@@ -116,7 +116,7 @@ class CommandInputHooks {
     try {
       if (WinActive("ahk_class MyKeymap_Command_Input"))
         WinActivate(this.BackendWindow)
-    } catch {
+    } catch as e {
       EngineLogWarn("CommandInputHooks.ActivateBackend", e.Message)
       return false
     }
@@ -246,7 +246,7 @@ CommandInputOnChar(ih, char, scope) {
  *   拦停即「文字已删但命令框还显示」。用户真机报障即此因。
  *
  * 先给 provider 机会消费, 未消费则由本处补投退格。历史实现是无条件调
- * PostBackspaceToCaspAbbr, 但当时只有 {Backspace} 被 KeyOpt("{Backspace}", "N") 通知到,
+ * PostBackspaceToCapsAbbr, 但当时只有 {Backspace} 被 KeyOpt("{Backspace}", "N") 通知到,
  * 等价于「只有退格会走到这里」; 现在 Up/Down/Enter 也参与通知 (供插件下拉列表导航),
  * 故必须按 vk 分流, 避免方向键被当成退格投递。
  */

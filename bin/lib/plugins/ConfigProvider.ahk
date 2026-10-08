@@ -57,7 +57,7 @@ class ConfigProvider {
       return ""
     try {
       return FileRead(path, "UTF-8")
-    } catch {
+    } catch as e {
       EngineLogWarn("ConfigProvider.Set", e.Message)
       return ""
     }
@@ -68,7 +68,7 @@ class ConfigProvider {
     try {
       if FileExist(path)
         FileDelete(path)
-    } catch {
+    } catch as e {
       EngineLogWarn("ConfigProvider.Set", e.Message)
       return false
     }
@@ -78,7 +78,7 @@ class ConfigProvider {
     try {
       FileAppend(content, path, "UTF-8")
       return true
-    } catch {
+    } catch as e {
       EngineLogWarn("ConfigProvider.Set", e.Message)
       return false
     }

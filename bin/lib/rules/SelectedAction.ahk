@@ -104,7 +104,7 @@ SelectedActionInit(hotkeyName, entries) {
     }
     try {
       KeymapManager.GlobalKeymap.Map(head, chain, , , , "S")
-    } catch {
+    } catch as e {
       EngineLogWarn("SelectedAction.SelectedActionInit", e.Message)
       return
     }
@@ -116,7 +116,7 @@ SelectedActionInit(hotkeyName, entries) {
   ; 无效热键(如反引号)注册失败时跳过该方案, 避免单个方案拖垮整个脚本 (与旧 InitActionScheme 同策略)
   try {
     KeymapManager.GlobalKeymap.Map(hotkeyName, trigger, , , , "S")
-  } catch {
+  } catch as e {
     EngineLogWarn("SelectedAction.SelectedActionInit", e.Message)
     return
   }

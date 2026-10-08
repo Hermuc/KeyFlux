@@ -23,7 +23,8 @@
    注：插件**源码**不在 `bin/lib` 下（在仓库根 `plugins/examples/`），故本项即引擎侧口径。
 4. `bom_files` / `crlf_files` / `tab_indent_files` —— 文本形态漂移。
    `core/Monitor.ahk` 是 vendored 上游库（头注声明零改动）⇒ 缩进检查豁免。
-5. `spelling_drift` —— 同概念拼写分裂（首版：`Cpas` vs `Casp`）。
+5. `spelling_drift` —— 同概念拼写分裂（`Cpas` / `Casp` 均为 `Caps` 的字母错位；
+   2026-10-08 批 O 已统一，此处保留检查以防回退）。
 
 🔴 四个**必须**处理的形态（首版全踩过，逐个留证）
    ① `try { … } catch { … }` 里 try 的收尾 `}` 与 catch **同行**（`} catch {`）
@@ -71,8 +72,11 @@ BASELINE = os.path.join("tools", "lint_ahk_style.baseline.json")
 # （先例见 vendor/windows-reactor/PATCHES.md）。
 VENDORED = {"core/Monitor.ahk"}
 
-# 「同概念拼写分裂」：键 = 规范写法，值 = 应归零的误拼。
-SPELLING_CANON = {"Cpas": "Casp"}
+# 「同概念拼写分裂」：键 = 应归零的误拼，值 = 正解（仅用于提示）。
+# 首版把 `Casp` 当规范、只查 `Cpas`；实测**两者都是错**——`Caps`(CapsLock 命令框) 的
+# 字母错位，且上游 fork 快照(`dbf0aca`)即已两种混用。2026-10-08 批 O 统一为 `Caps`，
+# 这里把两个旧拼写**都**登记为误拼（防回退）。
+SPELLING_WRONG = {"Cpas": "Caps", "Casp": "Caps"}
 
 # 留痕调用：出现任一即视为「catch 有留痕」。
 # `_recordError` 是 PluginManager 的插件错误记录设施（面向插件错误面板/日志），
@@ -321,7 +325,7 @@ def scan_file(path: str, rel: str, f: dict, verbose: bool):
 
 
 def scan_naming(files: dict, f: dict, verbose: bool):
-    for _canon, wrong in SPELLING_CANON.items():
+    for wrong, canon in SPELLING_WRONG.items():
         hits = []
         for rel, path in files.items():
             text = read_bytes(path).decode("utf-8-sig", errors="replace")
@@ -330,7 +334,7 @@ def scan_naming(files: dict, f: dict, verbose: bool):
                     hits.append("%s:%d" % (rel, idx))
         f["spelling_drift"][wrong] = hits
         if verbose and hits:
-            print("  [spelling] %r: %s" % (wrong, ", ".join(hits[:8])))
+            print("  [spelling] %r (应为 %r): %s" % (wrong, canon, ", ".join(hits[:8])))
 
 
 def scan(repo: str, verbose: bool) -> dict:

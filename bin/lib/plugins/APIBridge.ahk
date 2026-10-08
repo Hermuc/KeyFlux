@@ -84,7 +84,7 @@ class APIView {
     try {
       WinActivate(winTitle)
       return true
-    } catch {
+    } catch as e {
       EngineLogWarn("APIBridge.ActivateWindow", e.Message)
       return false
     }
@@ -168,7 +168,7 @@ class APIView {
     try {
       Run('"' target '"' (args != "" ? " " args : ""), workingDir)
       return true
-    } catch {
+    } catch as e {
       EngineLogWarn("APIBridge.RunProgram", e.Message)
       return false
     }
@@ -186,7 +186,7 @@ class APIView {
     try {
       ActivateOrRun(winTitle, target, args, workingDir)
       return true
-    } catch {
+    } catch as e {
       EngineLogWarn("APIBridge.ActivateOrRun", e.Message)
       return false
     }

@@ -32,7 +32,7 @@ CheckMagnetHandler() {
     cmd := RegRead("HKCR\magnet\shell\open\command")
     return cmd != ""
   }
-  catch {
+  catch as e {
     EngineLogWarn("Handlers.CheckMagnetHandler", e.Message)
     ; 未注册 magnet: 是**正常状态** (返回 false 即正确答案), 不是故障 ⇒ 刻意不记日志。
     ; 读不到 HKCR 才会落到此处 (权限受限), 但本函数可能被高频调用, 记日志会刷屏。

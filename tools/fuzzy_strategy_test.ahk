@@ -41,14 +41,23 @@ try {
 ; ---- 依赖桩 ----
 ; CommandDisplay 收口回显消费的 Post* 系列 (真身在 bin/lib/core/AbbrInput.ahk, 本探针
 ; 不触发透传补投, 桩仅为签名完备); Tip 桩供 Resolve 未命中路径断言提示内容。
-PostCharToCaspAbbr(ih?, char?) {
+PostCharToCapsAbbr(ih?, char?) {
     Rec.Add("PostChar", [char])
 }
-PostBackspaceToCaspAbbr(ih, vk, sc) {
+PostBackspaceToCapsAbbr(ih, vk, sc) {
     Rec.Add("PostBackspace", [ih, vk, sc])
 }
 Tip(message, time := -1500) {
     Rec.Add("Tip", [message])
+}
+; 批 M/L 后，被 include 的 `CommandDisplay` / `CommandInputHooks` / `CommandResolver` /
+; `FuzzyStrategy` / `EventBus` 的失败留痕统一委派引擎唯一入口 `EngineLogWarn`
+; （真身定义在 `core/Functions.ahk`，本探针**不** include 它）⇒ 同 `Post*` / `Tip` 一样提供桩：
+; 只记录、不落盘。签名与真身逐字一致: `EngineLogWarn(context, detail := "")`。
+; 🔴 2026-10-08: 缺此桩时异常路径调用未定义函数 ⇒ AHK 错误对话框 ⇒ 探针**挂住**
+;    （零输出 + 进程存活；批 M 引入、批 O 期间修复）。
+EngineLogWarn(context, detail := "") {
+    Rec.Add("EngineLogWarn", [context, detail])
 }
 
 #Include ..\bin\lib\core\IKeyEventBus.ahk
