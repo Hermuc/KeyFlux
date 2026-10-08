@@ -24,6 +24,7 @@ pub mod backend;
 pub mod behaviors_edit;
 pub mod build_tools;
 pub mod cli_api;
+pub mod devlog;
 pub mod http;
 pub mod i18n;
 pub mod keymap;

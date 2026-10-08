@@ -36,7 +36,7 @@ fn quote_arg(arg: &str) -> String {
 /// 不等子进程退出）。
 pub fn spawn_elevated(exe: &Path, args: &[&str], working_dir: &Path) -> bool {
     let (Some(file), Some(directory)) = (exe.to_str(), working_dir.to_str()) else {
-        eprintln!("spawnElevated: 路径非 UTF-16 可表示: {exe:?}");
+        crate::devlog!("spawnElevated: 路径非 UTF-16 可表示: {exe:?}");
         return false;
     };
     let verb = to_wide("runas");
@@ -64,7 +64,7 @@ pub fn spawn_elevated(exe: &Path, args: &[&str], working_dir: &Path) -> bool {
         )
     } as isize;
     if result <= 32 {
-        eprintln!(
+        crate::devlog!(
             "spawnElevated: 提权启动 {} 失败: SE_ERR {result}",
             exe.display()
         );

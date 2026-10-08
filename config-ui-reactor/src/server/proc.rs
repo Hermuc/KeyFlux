@@ -61,7 +61,7 @@ fn spawn_normal(exe: &str, args: &[&str], dir: &Path) -> bool {
     {
         Ok(_) => true,
         Err(error) => {
-            eprintln!("execCmd: breakaway 启动 {exe} 失败: {error}");
+            crate::devlog!("execCmd: breakaway 启动 {exe} 失败: {error}");
             false
         }
     }
@@ -71,7 +71,7 @@ fn spawn_normal(exe: &str, args: &[&str], dir: &Path) -> bool {
 pub(crate) fn exec_cmd(exe: &str, args: &[&str]) -> bool {
     // Go 用 cmd.Dir 指定子进程工作目录，避免修改全局 cwd；路径为词法 abs("../") = Join+Clean
     let Ok(cwd) = std::env::current_dir() else {
-        eprintln!("execCmd: 获取项目根目录失败");
+        crate::devlog!("execCmd: 获取项目根目录失败");
         return false;
     };
     let dir = clean_path(&cwd.join(".."));
@@ -95,7 +95,7 @@ pub(crate) fn exec_cmd(exe: &str, args: &[&str]) -> bool {
 /// （提权后的 MiscTools 看到 `A_IsAdmin` 即真，跳过自身 `*RunAs`）。
 pub(crate) fn exec_cmd_elevated(exe: &str, args: &[&str]) -> bool {
     let Ok(cwd) = std::env::current_dir() else {
-        eprintln!("execCmdElevated: 获取项目根目录失败");
+        crate::devlog!("execCmdElevated: 获取项目根目录失败");
         return false;
     };
     let dir = clean_path(&cwd.join(".."));
@@ -128,12 +128,12 @@ fn fallback_exec_cmd(dir: &Path, exe: &str, args: &[&str]) -> bool {
             Some(abs_exe) => match Command::new("explorer.exe").arg(&abs_exe).spawn() {
                 Ok(_) => return true,
                 Err(error) => {
-                    eprintln!("execCmd: explorer 中转启动 {exe} 失败: {error}");
+                    crate::devlog!("execCmd: explorer 中转启动 {exe} 失败: {error}");
                 }
             },
             None => {
                 // 目标不存在：绝不调用 explorer（否则会打开默认目录「文档」），按启动失败返回。
-                eprintln!("execCmd: 未找到 {exe}，跳过 explorer 中转");
+                crate::devlog!("execCmd: 未找到 {exe}，跳过 explorer 中转");
                 return false;
             }
         }
@@ -145,7 +145,7 @@ fn fallback_exec_cmd(dir: &Path, exe: &str, args: &[&str]) -> bool {
     {
         Ok(_) => true,
         Err(error) => {
-            eprintln!("execCmd: 启动 {exe} 失败: {error}");
+            crate::devlog!("execCmd: 启动 {exe} 失败: {error}");
             false
         }
     }
@@ -158,14 +158,14 @@ pub(crate) fn stop_process_by_name(name: &str) -> bool {
         Ok(status) if status.success() => true,
         Ok(status) if status.code() == Some(128) => true, // 无此进程，幂等成功
         Ok(status) => {
-            eprintln!(
+            crate::devlog!(
                 "StopProcessByName: {name} 结束失败: exit code {:?}",
                 status.code()
             );
             false
         }
         Err(error) => {
-            eprintln!("StopProcessByName: {name} 结束失败: {error}");
+            crate::devlog!("StopProcessByName: {name} 结束失败: {error}");
             false
         }
     }
@@ -209,7 +209,7 @@ mod tests {
         // 此时 CREATE_BREAKAWAY_FROM_JOB 会 os error 5 —— 生产链路的 Job 设有
         // BREAKAWAY_OK（platform::job），不受此限，故失败只记日志不误报。
         if !spawn_normal("./cmd.exe", &["/c", "exit 0"], &system32) {
-            eprintln!("spawn 冒烟被环境 Job 策略限制，解析断言已覆盖修复口径");
+            crate::devlog!("spawn 冒烟被环境 Job 策略限制，解析断言已覆盖修复口径");
         }
     }
 

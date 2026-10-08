@@ -115,7 +115,7 @@ mod tests {
             Ok(job) => job,
             // 极少数受限环境不允许创建 Job：此处显式跳过而非误报失败
             Err(error) => {
-                eprintln!("skip: CreateJobObjectW unavailable: {error}");
+                crate::devlog!("skip: CreateJobObjectW unavailable: {error}");
                 return;
             }
         };

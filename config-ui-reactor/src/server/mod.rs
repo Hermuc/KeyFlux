@@ -324,7 +324,11 @@ pub fn run_headless() -> std::process::ExitCode {
     // （不打印任何装饰文本）。bind 成功后才打印。
     {
         let mut stdout = std::io::stdout().lock();
-        let _ = writeln!(stdout, "KEYFLUX_PORT={port}");
+        // 批 S（2026-10-08）：写失败原先被 `let _ =` 吞掉 —— 面板靠这行取端口，失败
+        // 意味着启动必然连不上，至少要留诊断（控制流保持原样，由上游超时兜底）。
+        if let Err(error) = writeln!(stdout, "KEYFLUX_PORT={port}") {
+            crate::devlog!("KEYFLUX_PORT 握手行写入失败: {error}");
+        }
         let _ = stdout.flush();
     }
 
