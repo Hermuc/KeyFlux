@@ -53,6 +53,10 @@ mod views;
 use glue::*;
 use messages::*;
 
+/// 批 W（2026-10-08）：测试专用 `Default` —— `Shell` 是纯数据（无窗口句柄；
+/// `session` 为 `Arc<Mutex<Option<_>>>`，None 即可），测试可先构造空白实例再按需
+/// 置字段。`cfg_attr` 保证 release 构建零影响。
+#[cfg_attr(test, derive(Default))]
 pub struct Shell {
     nav: Vec<NavEntry>,
     page_index: usize,

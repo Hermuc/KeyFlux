@@ -459,3 +459,33 @@ pub enum ActionField {
     RunInBackground(bool),
     DetectHiddenWindow(bool),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 批 W（2026-10-08）：静态页的字形映射是导航折叠窄轨的契约 —— 字形改错会静默
+    /// 渲染成方框（字体缺字形），/Validate 与现有 UI 测试都看不见，故逐值锁定。
+    #[test]
+    fn page_kind_glyphs_are_the_nav_contract() {
+        use PageKind::*;
+        assert_eq!(Guide.glyph(), "\u{E8E9}"); // Read（使用指南）
+        assert_eq!(SelectedAction.glyph(), "\u{E73E}"); // CheckMark（选中动作）
+        assert_eq!(Plugins.glyph(), "\u{E8C8}"); // Puzzle（插件）
+        assert_eq!(Settings.glyph(), "\u{E713}"); // Setting（选项）
+        assert_eq!(Abbr(2).glyph(), "\u{E8C1}"); // Link（缩写）
+        assert_eq!(Keymap(5).glyph(), "\u{E765}"); // Keyboard（按键矩阵）
+    }
+
+    /// 标题契约：静态页走 i18n（非空）；键位/缩写页标题为空（标题由页内热键名提供）。
+    /// 隐性验证：i18n 词表在测试环境下可加载（CWD = crate 根）。
+    #[test]
+    fn page_kind_titles_follow_the_i18n_contract() {
+        use PageKind::*;
+        for page in [Guide, SelectedAction, Plugins, Settings] {
+            assert!(!page.title().is_empty(), "{page:?} 的标题不应为空");
+        }
+        assert!(Abbr(2).title().is_empty());
+        assert!(Keymap(5).title().is_empty());
+    }
+}
