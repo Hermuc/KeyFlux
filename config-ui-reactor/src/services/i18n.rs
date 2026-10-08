@@ -45,15 +45,15 @@ impl Lang {
 
 /// 一条文案（任一侧可为 `null`，旧版模型即 `(string? Zh, string? En)`）。
 #[derive(Debug, Clone, Default, Deserialize)]
-pub struct Entry {
+pub struct I18nEntry {
     #[serde(default)]
     pub zh: Option<String>,
     #[serde(default)]
     pub en: Option<String>,
 }
 
-fn table() -> &'static HashMap<String, Entry> {
-    static TABLE: OnceLock<HashMap<String, Entry>> = OnceLock::new();
+fn table() -> &'static HashMap<String, I18nEntry> {
+    static TABLE: OnceLock<HashMap<String, I18nEntry>> = OnceLock::new();
     TABLE.get_or_init(|| {
         serde_json::from_str(I18N_JSON).expect("resources/i18n.json must be valid UTF-8 JSON")
     })

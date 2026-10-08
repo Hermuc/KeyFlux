@@ -26,7 +26,7 @@ use std::path::Path;
 use crate::generator::actions::{
     abbr_registry_code, group_disable_keyflux, render_keymap, selected_action_code,
 };
-use crate::generator::behaviors::Catalog;
+use crate::generator::behaviors::PackCatalog;
 use crate::generator::model::Config;
 use crate::generator::plugins;
 
@@ -47,7 +47,7 @@ fn normalize_to_crlf(text: &str) -> String {
 /// `<config.json 目录>/plugins`）。
 pub fn render_keyflux_ahk(
     config: &mut Config,
-    catalog: Option<&Catalog>,
+    catalog: Option<&PackCatalog>,
     plugins_dir: &Path,
 ) -> String {
     // 停用/墓碑插件集（Go `disabledPluginSet` / `removedPluginSet` 读
@@ -478,7 +478,7 @@ mod tests {
     use std::path::PathBuf;
 
     /// 内置行为包目录（与部署树 `settings.exe` 同层的 `bin/behaviors`）。
-    fn builtin_catalog() -> behaviors::Catalog {
+    fn builtin_catalog() -> behaviors::PackCatalog {
         behaviors::load_catalog(
             &PathBuf::from("../bin/behaviors"),
             &PathBuf::from("../data/no-user-behaviors"),

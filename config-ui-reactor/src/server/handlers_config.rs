@@ -150,12 +150,12 @@ struct CommandBoxAppearance {
 fn command_box_appearance_from_file(config_path: &std::path::Path) -> CommandBoxAppearance {
     #[derive(Deserialize, Default)]
     #[serde(default)]
-    struct Probe {
-        options: ProbeOptions,
+    struct ConfigFileProbe {
+        options: ConfigFileProbeOptions,
     }
     #[derive(Deserialize, Default)]
     #[serde(default)]
-    struct ProbeOptions {
+    struct ConfigFileProbeOptions {
         #[serde(rename = "commandFont")]
         command_font: CommandFontOption,
         #[serde(rename = "commandInputSkin")]
@@ -171,7 +171,7 @@ fn command_box_appearance_from_file(config_path: &std::path::Path) -> CommandBox
         return CommandBoxAppearance::default();
     };
     crate::generator::model::strip_null_fields(&mut value);
-    match serde_json::from_value::<Probe>(value) {
+    match serde_json::from_value::<ConfigFileProbe>(value) {
         Ok(probe) => CommandBoxAppearance {
             font: probe.options.command_font,
             skin: probe.options.command_input_skin,
@@ -263,17 +263,17 @@ mod tests {
 
     /// 测试沙箱：temp 下的伪部署树（`bin/` = 进程 cwd，`data/` = ../data），
     /// 用后由调用方清理。
-    struct Sandbox {
+    struct ConfigSandbox {
         root: std::path::PathBuf,
     }
 
-    impl Sandbox {
+    impl ConfigSandbox {
         fn new(tag: &str) -> Self {
             let root = std::env::temp_dir().join(format!("kf-server-{}-{tag}", std::process::id()));
             let _ = std::fs::remove_dir_all(&root);
             std::fs::create_dir_all(root.join("bin")).unwrap();
             std::fs::create_dir_all(root.join("data")).unwrap();
-            Sandbox { root }
+            ConfigSandbox { root }
         }
 
         fn paths(&self) -> ServerPaths {
@@ -286,7 +286,7 @@ mod tests {
         }
     }
 
-    impl Drop for Sandbox {
+    impl Drop for ConfigSandbox {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.root);
         }
@@ -315,7 +315,7 @@ mod tests {
     /// GET /config：合法配置 → 200，startup 回填、空集合恒 []、keyfluxVersion 注入。
     #[test]
     fn get_config_returns_dto_with_startup_backfill() {
-        let sandbox = Sandbox::new("get-ok");
+        let sandbox = ConfigSandbox::new("get-ok");
         sandbox.write_config(r#"{"keymaps":[],"options":{"hideMatrix":true}}"#);
         let reply = build_get_config(&sandbox.paths(), false);
         assert_eq!(reply.status, 200);
@@ -345,13 +345,13 @@ mod tests {
     /// GET /config：配置缺失/损坏 → 500 空 body（Go panic → Recovery 口径）。
     #[test]
     fn get_config_returns_500_on_broken_config() {
-        let sandbox = Sandbox::new("get-bad");
+        let sandbox = ConfigSandbox::new("get-bad");
         std::fs::write(sandbox.root.join("data").join("config.json"), b"{oops").unwrap();
         let reply = build_get_config(&sandbox.paths(), false);
         assert_eq!(reply.status, 500);
         assert!(reply.body.is_empty());
 
-        let sandbox = Sandbox::new("get-missing");
+        let sandbox = ConfigSandbox::new("get-missing");
         let reply = build_get_config(&sandbox.paths(), false);
         assert_eq!(reply.status, 500);
     }
@@ -359,7 +359,7 @@ mod tests {
     /// PUT /config：校验失败 → 400 `{"message":"保存失败: …"}`，且**不落盘**。
     #[test]
     fn put_config_rejects_invalid_file_groups_with_400() {
-        let sandbox = Sandbox::new("put-bad-groups");
+        let sandbox = ConfigSandbox::new("put-bad-groups");
         sandbox.write_config(r#"{"keymaps":[]}"#);
         let (hooks, calls) = counting_hooks(true);
         let ctx = super::super::ServerContext::with_hooks(sandbox.paths(), hooks);
@@ -405,7 +405,7 @@ mod tests {
             ),
         ];
         for (index, (tag, body, want)) in cases.into_iter().enumerate() {
-            let sandbox = Sandbox::new(&format!("put-bad-mt-{index}"));
+            let sandbox = ConfigSandbox::new(&format!("put-bad-mt-{index}"));
             sandbox.write_config(r#"{"keymaps":[]}"#);
             let (hooks, calls) = counting_hooks(true);
             let ctx = super::super::ServerContext::with_hooks(sandbox.paths(), hooks);
@@ -425,7 +425,7 @@ mod tests {
     /// PUT /config：合法 matchTypes（文本 + 文件类型）仍可保存成功（不误伤）。
     #[test]
     fn put_config_accepts_valid_match_types() {
-        let sandbox = Sandbox::new("put-good-mt");
+        let sandbox = ConfigSandbox::new("put-good-mt");
         sandbox.write_config(r#"{"keymaps":[]}"#);
         let (hooks, calls) = counting_hooks(true);
         let ctx = super::super::ServerContext::with_hooks(sandbox.paths(), hooks);
@@ -444,7 +444,7 @@ mod tests {
     /// PUT /config：selectedAction 组合非法（重复 mapping）→ 400。
     #[test]
     fn put_config_rejects_duplicate_mapping_with_400() {
-        let sandbox = Sandbox::new("put-bad-sa");
+        let sandbox = ConfigSandbox::new("put-bad-sa");
         sandbox.write_config(r#"{"keymaps":[]}"#);
         let (hooks, _) = counting_hooks(true);
         let ctx = super::super::ServerContext::with_hooks(sandbox.paths(), hooks);
@@ -467,7 +467,7 @@ mod tests {
     /// 外观未变不结束命令框。
     #[test]
     fn put_config_saves_and_restarts_without_touching_command_input() {
-        let sandbox = Sandbox::new("put-ok");
+        let sandbox = ConfigSandbox::new("put-ok");
         sandbox.write_config(r#"{"keymaps":[],"options":{"commandFont":{"sourcePath":"C:/old.ttf","weight":"regular"}}}"#);
         let (hooks, calls) = counting_hooks(true);
         let ctx = super::super::ServerContext::with_hooks(sandbox.paths(), hooks);
@@ -497,7 +497,7 @@ mod tests {
     /// PUT /config：字体外观变化 → 结束命令框进程；皮肤变化同理（合并判断）。
     #[test]
     fn put_config_stops_command_input_when_appearance_changes() {
-        let sandbox = Sandbox::new("put-appearance");
+        let sandbox = ConfigSandbox::new("put-appearance");
         sandbox.write_config(r#"{"keymaps":[]}"#);
         let stops = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let sink = std::sync::Arc::clone(&stops);
@@ -524,7 +524,7 @@ mod tests {
     /// PUT /config：绑定失败（类型不匹配）→ 500 空 body（Go panic → Recovery）。
     #[test]
     fn put_config_returns_500_on_bind_failure() {
-        let sandbox = Sandbox::new("put-bind");
+        let sandbox = ConfigSandbox::new("put-bind");
         let (hooks, _) = counting_hooks(true);
         let ctx = super::super::ServerContext::with_hooks(sandbox.paths(), hooks);
         let reply = super::put_config(&ctx, br#"{"keymaps":"oops"}"#);
@@ -535,7 +535,7 @@ mod tests {
     /// 外观探针：读旧值生效；文件缺失 → 零值（判成「变了」的保守口径）。
     #[test]
     fn appearance_probe_reads_file_or_defaults_to_zero() {
-        let sandbox = Sandbox::new("appearance");
+        let sandbox = ConfigSandbox::new("appearance");
         let path = sandbox.root.join("data").join("config.json");
         sandbox.write_config(
             r##"{"keymaps":[],"options":{"commandFont":{"sourcePath":"C:/f.ttf","weight":"bold"},
@@ -577,7 +577,7 @@ mod tests {
     /// 配置解析经由 generator::parse_config（null 容错口径），此处冒烟确认接线。
     #[test]
     fn get_config_uses_null_tolerant_parse() {
-        let sandbox = Sandbox::new("get-null");
+        let sandbox = ConfigSandbox::new("get-null");
         sandbox.write_config(r#"{"keymaps":null,"options":{"plugins":{"disabled":null}}}"#);
         let reply = build_get_config(&sandbox.paths(), false);
         assert_eq!(reply.status, 200);

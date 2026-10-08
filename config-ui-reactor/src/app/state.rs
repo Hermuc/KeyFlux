@@ -126,7 +126,7 @@ impl Shell {
             let api = crate::services::transport::new_settings_api(port);
             let response = api.get_behaviors();
             match response.value {
-                Some(value) => Message::BehaviorsLoaded(Ok(Box::new(sa::Catalog {
+                Some(value) => Message::BehaviorsLoaded(Ok(Box::new(sa::SaCatalog {
                     builtin: value.builtin,
                     user: value.user,
                 }))),

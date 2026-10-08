@@ -67,20 +67,20 @@ pub(crate) fn get_shortcuts(_ctx: &ServerContext) -> HttpReply {
 mod tests {
     use super::*;
 
-    struct Sandbox {
+    struct ShortcutsSandbox {
         root: std::path::PathBuf,
     }
 
-    impl Sandbox {
+    impl ShortcutsSandbox {
         fn new(tag: &str) -> Self {
             let root =
                 std::env::temp_dir().join(format!("kf-shortcuts-{tag}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&root);
-            Sandbox { root }
+            ShortcutsSandbox { root }
         }
     }
 
-    impl Drop for Sandbox {
+    impl Drop for ShortcutsSandbox {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.root);
         }
@@ -89,7 +89,7 @@ mod tests {
     /// 空目录/缺目录 ⇒ `null`（4 字节）；有文件 ⇒ 相对路径数组，按名排序。
     #[test]
     fn glob_covers_null_and_sorted_relative_paths() {
-        let sandbox = Sandbox::new("null");
+        let sandbox = ShortcutsSandbox::new("null");
         // 缺目录
         assert_eq!(glob_shortcuts(&sandbox.root).unwrap().len(), 0);
         let empty = shortcuts_body(&glob_shortcuts(&sandbox.root).unwrap());

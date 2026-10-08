@@ -5,7 +5,7 @@
 //!
 //! 未移植（对 `plan` / AHK 渲染无影响）：
 //! * `ValidateManifest`（只影响"坏包被拒"的路径；内置包均合法）；
-//! * CRUD / `Catalog.Covers` / 应用规则等。
+//! * CRUD / `PackCatalog.Covers` / 应用规则等。
 //!
 //! 目录口径与 Go 一致：
 //! * 内置包 = `<settings.exe 所在目录>/behaviors`，用户包 = `<config.json 所在目录>/behaviors`，
@@ -43,7 +43,7 @@ pub struct EntryParams {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
-pub struct Entry {
+pub struct PackEntry {
     pub kind: String,
     pub action: String,
     pub params: EntryParams,
@@ -63,17 +63,17 @@ pub struct Pack {
     #[serde(rename = "specVersion")]
     pub spec_version: i32,
     pub description: String,
-    pub entry: Entry,
+    pub entry: PackEntry,
     #[serde(skip)]
     pub source: String,
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Catalog {
+pub struct PackCatalog {
     pub packs: Vec<Pack>,
 }
 
-impl Catalog {
+impl PackCatalog {
     /// Go `(*Catalog).Get`：线性按 ID 查找（包数量很小，无需索引）。
     pub fn get(&self, id: &str) -> Option<&Pack> {
         self.packs.iter().find(|pack| pack.id == id)
@@ -123,7 +123,7 @@ pub fn load_catalog(
     builtin_dir: &Path,
     user_dir: &Path,
     plugin_behaviors_dirs: &[PathBuf],
-) -> Catalog {
+) -> PackCatalog {
     let mut builtin = load_dir(builtin_dir, "builtin");
     let mut user = load_dir(user_dir, "user");
     sort_packs(&mut builtin);
@@ -143,13 +143,13 @@ pub fn load_catalog(
         }
     }
 
-    Catalog { packs }
+    PackCatalog { packs }
 }
 
 /// Go `behaviors.ResolveRuleAction`：内置动作 ID **直通**；用户行为包展开为基础动作 +
 /// 包默认模板（规则的 actionValue/workingDir 非空时覆盖之）。
 pub fn resolve_rule_action(
-    catalog: Option<&Catalog>,
+    catalog: Option<&PackCatalog>,
     action_type: &str,
     action_value: &str,
     working_dir: &str,
@@ -187,7 +187,7 @@ pub fn resolve_rule_action(
 }
 
 /// Go `generators.behaviorName`：目录里查不到 ⇒ 回退显示 id。
-pub fn behavior_name(catalog: Option<&Catalog>, id: &str) -> String {
+pub fn behavior_name(catalog: Option<&PackCatalog>, id: &str) -> String {
     catalog
         .and_then(|catalog| catalog.get(id))
         .map(|pack| pack.name.clone())
@@ -200,7 +200,7 @@ pub fn behavior_name(catalog: Option<&Catalog>, id: &str) -> String {
 /// * 内置包：`<exe_dir>/behaviors`（部署树里即 `bin/behaviors`）；
 /// * 用户包：`<config 文件所在目录>/behaviors`（即 `<deploy>/data/behaviors`）；
 /// * 插件贡献包：`<config 文件所在目录>/plugins/<id>/behaviors`。
-pub fn load_catalog_for_config(config_path: &Path, exe_dir: &Path) -> Catalog {
+pub fn load_catalog_for_config(config_path: &Path, exe_dir: &Path) -> PackCatalog {
     let config_dir = config_path.parent().unwrap_or(Path::new("."));
     let plugin_root = config_dir.join("plugins");
     let mut plugin_dirs = Vec::new();
@@ -265,11 +265,11 @@ mod tests {
         );
 
         // 用户包（非内置 ID）⇒ 展开为基础动作 + 包默认模板；显式值优先
-        let mut user = Catalog::default();
+        let mut user = PackCatalog::default();
         user.packs.push(Pack {
             id: "my_pack".into(),
             name: "我的包".into(),
-            entry: Entry {
+            entry: PackEntry {
                 kind: "builtin".into(),
                 action: "run".into(),
                 params: EntryParams {
