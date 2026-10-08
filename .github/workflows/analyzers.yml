@@ -112,6 +112,10 @@ jobs:
             config-ui-reactor/target
           key: cargo-${{ runner.os }}-${{ hashFiles('config-ui-reactor/Cargo.lock') }}
 
+      # 注: 此处刻意**不传** -Version —— parity 的对账物是 DumpPlan / GenerateAHK 产物，
+      # 不含 GET /config 的 keyfluxVersion 字段（那是 api-parity 的对账物），故与版本无关
+      # （api-parity job 则必须带 -Version，见其 135-137 行注释）。2026-10-08 批 P 复核澄清，
+      # 防止将来被误判为「缺版本注入的确定性缺陷」。
       - name: 'Build settings.exe (cargo gates + release)'
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -Release

@@ -14,9 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (不含前缀 v, 如 2.0-beta34)'
+        description: '版本号 (不含前缀 v; 留空 = 自动取 Makefile 的 version —— 单一真源。批 P 前这里写死 1.0-beta1-dev, 与 Makefile 的 1.0-beta1 分裂)'
         required: false
-        default: '1.0-beta1-dev'
+        default: ''
       skip_release:
         description: '只构建验证, 不发布 Release'
         type: boolean
@@ -36,14 +36,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Derive version (tag v2.0-beta34 -> 2.0-beta34)
+      - name: Derive version (tag v2.0-beta34 -> 2.0-beta34; 手动触发留空则取 Makefile 单一真源)
         id: ver
         shell: bash
         run: |
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          else
+          elif [[ -n "${{ inputs.version }}" ]]; then
             echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            # 单一真源 = Makefile:version（与 analyzers.yml api-parity job 的 sed 同口径）
+            VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*//p' Makefile | head -1)"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "version from Makefile: ${VERSION}"
           fi
 
       # (2026-10-06 Go 后端退役) settings.exe 由 cargo 直接产出 (config-ui-reactor
@@ -69,10 +74,10 @@ jobs:
           bin/settings.exe GenerateAHK ./data/config.json ./templates/keyflux.tmpl ./bin/KeyFlux.ahk
           MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate ./bin/KeyFlux.ahk
 
+      # 单一真源 = Makefile sync-templates（批 P：此前这里内联 `rm -rf` + `cp -r`，与
+      # Makefile 配方逐字重复 —— 同步口径一旦变化必然漏改这一份；analyzers.yml 早已走 make）
       - name: Sync templates
-        run: |
-          rm -rf bin/templates
-          cp -r templates bin/templates
+        run: make sync-templates
 
       - name: Deploy reactor UI to bin/ui (self-contained, renamed)
         shell: pwsh
@@ -90,6 +95,8 @@ jobs:
 
       - name: Stamp version into sample config
         working-directory: bin
+        # ⚠ 双份实现（Makefile:71 同款配方）—— 改任一处须同步另一处。收编为 make 目标
+        # 评估过：CI 在 bin/ 下按相对名调用、working-directory 语义不同，暂不收编。
         run: ./settings.exe ChangeVersion "${{ steps.ver.outputs.version }}"
 
       - name: Assemble release folder
