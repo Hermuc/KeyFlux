@@ -22,7 +22,7 @@ config-ui-reactor/target/
 #     main.ahk 入口并读 plugin.json, src/ 不参与生成, 故"运行时镜像"的说法对它们不成立;
 #     曾因下面的整目录忽略而完全无版本历史 (git ls-files data/plugins 为空)。
 #   🔴 **唯一手改点 = `plugins/examples/<id>`**（2026-10-08 定）：它入库、有版本历史，且是
-#     sync-plugins.ps1 / CI 沙箱 staging / cargo 生成器测试 / parity 语料 factory-plugins
+#     sync-plugins（devtools 子命令；原 tools/sync-plugins.ps1）/ CI 沙箱 staging / cargo 生成器测试 / parity 语料 factory-plugins
 #     的共同取源。下面的反选放行**只是为了让发布源也在库里**（copyFiles 与 release.yml 打包
 #     data/），**不是第二个手改点** —— 改完 examples 必须跑 `make sync-plugin-mirror` 同步，
 #     否则 `make check-plugins-mirror` 会红，且部署会用旧插件覆盖生产树（已发生过一次）。
@@ -32,12 +32,13 @@ config-ui-reactor/target/
 data/plugins/*
 !data/plugins/everything_search
 !data/plugins/quick_switch
-# Python 工具字节码缓存 (lint_ident.py 等运行生成)
+# Python 工具字节码缓存 (tools/font_*.py 等运行生成)
 __pycache__/
 # 命令框字重的 5 档变体副本 (font.thin/light/semibold/bold.ttf), 不入库 (4 个约 59MB)。
 # 理由: 生成端**只**读写 bin/font/font.ttf (命令框 exe 内烧录的唯一样式源); 档位变体由
-#   Go VariantPath 从**源字体所在目录**推导 (<源名>.<档位>.ttf, 见 script/font.go), 从不
-#   读 bin/font/。故这些副本对流水线毫无作用, 提交它们只会让仓库虚胖。
+#   生成器的 `variant_path` 从**源字体所在目录**推导 (<源名>.<档位>.ttf,
+#   见 config-ui-reactor/src/generator/font.rs), 从不读 bin/font/。
+#   故这些副本对流水线毫无作用, 提交它们只会让仓库虚胖。
 # 需要重建时: python tools/font_weight_prebake.py <源字体> (烘焙到源字体同目录)。
 bin/font/font.*.ttf
 

@@ -29,7 +29,7 @@ Core(bin/lib/core/*)  <- 各层只读依赖
   当前默认配置**不绑定热键** (2026-09-23 移除 ^g): 触发依赖轮询自动路径 (对话框出现
   即自动跳转/浮层), 本入口保留供将来非热键通道 (托盘等) 复用。
 
-## 命名前缀 (避免全局函数冲突, 交由 tools/lint_ident.py 静态闸门守护)
+## 命名前缀 (避免全局函数冲突, 交由 devtools lint-ident 静态闸门守护)
 
 `Rank*` / `Hist*` (Store) / `HistCollect*`·`HistLast*`·`HistNote*` (FolderHistory) /
 `Dlg*` / `QSUI*` / `QuickSwitch*`·`InitQuickSwitch`·`_QuickSwitch*`。

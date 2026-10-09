@@ -22,7 +22,7 @@ from fontTools.ttLib import TTFont, newTable
 
 
 # 中文输出统一走 UTF-8 —— Windows 控制台默认码页 (GBK) 会把部分字符打成乱码。
-# 与 tools/lint_ahk_style.py 同款; 2026-10-08 批 K 补齐 (此前 7 个脚本缺失)。
+# 与 tools/ 其余字体工具同款; 2026-10-08 批 K 补齐 (此前 7 个脚本缺失)。
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         _stream.reconfigure(encoding="utf-8", errors="replace")

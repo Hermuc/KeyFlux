@@ -320,11 +320,14 @@ api-parity:
 # analyzers: 代码风格闸门。.NET 闸门随 Avalonia 退役; Rust 侧由 clippy -D warnings 承担
 #   (与 .github/workflows/analyzers.yml 的 reactor-gates 保持一致: 同一个 tools/cargo-gates.ps1)。
 # 前置: 工具链经 config-ui-reactor/env.ps1 注入 (脚本内以 -EnvScript 传入)。
-# 🔴 两个 cargo 工程都要跑 (2026-10-09): command-input 此前**零闸门** —— 它装着全部 Win32
-#   unsafe 并产出正式发布的 bin/KeyFlux-CommandInput.exe, 却从不在 CI/本地过 fmt/clippy。
+# 🔴 三个 cargo 工程都要跑 (2026-10-09): command-input 此前**零闸门** —— 它装着全部 Win32
+#   unsafe 并产出正式发布的 bin/KeyFlux-CommandInput.exe, 却从不在 CI/本地过 fmt/clippy;
+#   devtools 是 2026-10-08 新增的第三个 crate (原 tools/*.py 的 Rust 移植), CI 的 reactor-gates
+#   已含它, 本目标此前漏配 ⇒ 本地 analyzers 与 CI 口径不一致 (同一个 cargo-gates.ps1, 只是少一项目)。
 analyzers:
 	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -NoTest -Project config-ui-reactor -EnvScript config-ui-reactor/env.ps1
 	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -NoTest -Project command-input -EnvScript config-ui-reactor/env.ps1
+	@pwsh -NoProfile -ExecutionPolicy Bypass -File tools/cargo-gates.ps1 -NoTest -Project devtools -EnvScript config-ui-reactor/env.ps1
 
 # check-command-input: command-input 三闸门 (fmt --check / clippy -D warnings / test)。
 #   由来 (2026-10-09): 该 crate 装着全部 Win32 unsafe 并产出正式发布的
