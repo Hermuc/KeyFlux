@@ -9,6 +9,12 @@
 > 本文件把这些内容集中登记，并由 `devtools check-vendor-hashes`（原 `tools/check-vendor-hashes.ps1`，
 > 2026-10-08 移植为 Rust；源码 [`devtools/src/check_vendor_hashes.rs`](../devtools/src/check_vendor_hashes.rs)）
 > 在 CI 逐个 hash 校验：**任何改动都必须显式更新清单**（`-Write`），从而把"静默漂移"变成"有记录的决定"。
+>
+> 🔴 **树哈希对行尾敏感 ⇒ 该树已在 `.gitattributes` 声明 `-text`**（2026-10-09）。树哈希是
+> 对每个文件的**原始字节** SHA256 再拼接哈希；`core.autocrlf=true` 的 checkout 会把 `.rs`
+> 写成 CRLF，而本地工作树可能仍是 LF ⇒ 同一提交本地绿、CI 红（实测混合态 `B3B32DA1…` vs
+> CI 全新检出 `847116EC…`）。`-text` 后工作树字节恒等于库中字节（LF，即
+> `D6FF2914…`），哈希跨机器确定。**改该树前先确认工作树是 LF**，否则你会录进一个本地专属值。
 
 ## 清单一览
 
