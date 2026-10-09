@@ -1,8 +1,8 @@
 //! 发布运维 CLI —— 原 Go `scripts/build_tools.go` 的 Rust 等价物（Go 工具链已退役）。
 //!
 //! 本 bin 是**薄壳**：逻辑在 lib（`config_ui_reactor::services::build_tools`，带单测），
-//! 这里只做 argv → 退出码映射与契约文案（`--quiet` 由 `tools/build-tools.ps1` 保证
-//! cargo 自身不往 stdout 写东西）。
+//! 这里只做 argv → 退出码映射与契约文案（`--quiet` 由调用方（Makefile 的 `cargo run`）
+//! 保证 cargo 自身不往 stdout 写东西）。
 //!
 //! 用法（**cwd 必须是仓库根** —— 两个子命令都用相对路径，与 Go 版一致）：
 //! ```text

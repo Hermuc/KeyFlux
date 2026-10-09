@@ -329,7 +329,7 @@ es.exe 查询会读取 Everything.ini 的 `sort=` / `sort_ascending=`（便携�
 审计方法：逐功能点对照本文 §1 的「文档声称」与源码现实（逐文件读码对账 + 引擎侧依赖只读核对），
 动态验证以三道门禁为准（全部在 worktree 根目录执行，命令与结果如下）：
 
-- `python tools/lint_ident.py <main + src 七文件>` → `TOTAL_FINDINGS=0`（exit 0）
+- `devtools lint-ident <main + src 七文件>` → `TOTAL_FINDINGS=0`（exit 0）
 - `MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut /Validate plugins/examples/everything_search/main.ahk` → exit 0
 - `MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut plugins/examples/everything_search/tests/open_guard_probe.ahk` → **31/31 PASS**（exit 0；
   本次扩第 11 组后由 27 项增至 31 项，反向敏感度已实测：把 OnPick 退回旧的无条件 Close

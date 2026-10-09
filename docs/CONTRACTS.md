@@ -76,7 +76,6 @@ bin/ui/Resources/i18n.json                  (松散部署物, 由 csproj Content
 scripts/                                    (维护者脚本, 不随发布包出货, 与出货的 tools/ 区分;
                                              构建/运维 CLI 已 Rust 化: build-tools.go 于 2026-10-07
                                              迁入 config-ui-reactor/src/bin/build_tools.rs, 此处只剩 lanzou_client.py)
-├── build_tools.go     发布前 AHK 版本闸 (checkForAHKUpdate) + 回写分享链接 (updateShareLink)
 └── lanzou_client.py   蓝奏云上传 (make uploadLanZou 调用)
 ```
 

@@ -10,7 +10,7 @@ tools/parity/corpus/** -text
 
 # 手写 AHK 源码统一 **LF**（2026-10-08 规范化批 N）。
 # 为什么必须显式声明：core.autocrlf=true 时 `git checkout` 会把工作树写成 CRLF，
-# 于是"行尾归一"会被任何一次 checkout 撤销；而 AHK 风格护栏（tools/lint_ahk_style.py）
+# 于是"行尾归一"会被任何一次 checkout 撤销；而 AHK 风格护栏（devtools lint-ahk-style）
 # 的 crlf_files 检查会因此在全新 clone 上**假红**。该护栏现按下面四类 scope 全量检查
 # （2026-10-09 补齐；此前只扫 bin/lib，其余三类声明形同虚设）⇒ 本处声明各有着落。
 # 注：生成物 bin/KeyFlux.ahk **不**适用（它由生成器按设计写 CRLF，且不入库）——

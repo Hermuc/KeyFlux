@@ -8,7 +8,7 @@
    * 执行一条 entry (8 列契约, action 为生成端展开后的基础动作)
    * textType 特征的专用行为 (open_url 等) 直接作用于选中内容, 不接受命令模板;
    * 特征与行为的合法组合由共享向量 testdata/text_types.json +
-   * tools/texttype_conformance.py 守护 (生成端 = config-ui-reactor 生成器)。
+   * devtools texttype-conformance 守护 (生成端 = config-ui-reactor 生成器)。
    * 执行前广播 selection_action 慢事件 (薄观察层, 隔离兜底, 不影响动作执行;
    * 方案 D 后事件字段由 schemeId/ruleIndex 调整为 behavior/name/selected)。
    */

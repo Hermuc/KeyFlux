@@ -3,7 +3,7 @@
 ;
 ; 由门面 SelectedAction.ahk 在**顶层** #Include。内容 = 内置文本特征注册表、
 ; 自定义匹配类型求值、文件后缀/分组匹配、ASCII 大小写折叠。
-; 🔴 texttype 闸门 (tools/texttype_conformance.py) 逐字抽取本文件的
+; 🔴 texttype 闸门 (devtools texttype-conformance) 逐字抽取本文件的
 ;    TextFeatureSpecs / TextFeatureHit / MatchTextType —— 改名或迁移须同步该工具。
 ; ============================================================
 
@@ -179,7 +179,7 @@ MatchFileExt(matchValue, content) {
  * 内置文本特征注册表 —— AHK 侧唯一真源。
  *
  * 组织方式 (与面板镜像 config-ui-reactor/src/services/selected_action.rs :: TEXT_TYPES
- * **同构** 且同序, 由 tools/texttype_conformance.py 对账):
+ * **同构** 且同序, 由 devtools texttype-conformance 对账):
  *   - 表的顺序 = 界面顺序 (「添加映射」类型下拉 / 映射行特征 Toggle), **兜底特征恒居末位**;
  *   - named=true  具名特征: 各持一条**锚定**正则, 命中即"属于该特征";
  *   - named=false 兜底特征 (目前仅 plain): **不持正则**, 命中条件由具名集**派生** ——
@@ -187,7 +187,7 @@ MatchFileExt(matchValue, content) {
  *     (2026-09-17 之前这里是硬编码的 `not (isURL or isPath or isMagnet or isBilibili)`,
  *      加第 5 个特征时靠人肉改 —— 正是本次重构要消灭的失败模式);
  *   - ignoreCase 与 pattern 分离: 正则源串与 Go 端**逐字相同**, 大小写开关运行时施加
- *     (AHK 加 "i)" 前缀 / Go 编译期加 (?i)) ⇒ 可工具化比对 (tools/texttype_conformance.py)。
+ *     (AHK 加 "i)" 前缀 / Go 编译期加 (?i)) ⇒ 可工具化比对 (devtools texttype-conformance)。
  *
  * 为什么 plain 必须排除全部具名特征: 映射按数组行序取**首个**命中, 而「添加映射」恒追加到末尾
  * ⇒ 若 plain 也命中某具名特征的样例, 先建的「纯文本」映射会恒遮蔽后建的具名映射 (配了却不生效)。
