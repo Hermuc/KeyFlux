@@ -59,7 +59,7 @@ pub struct NavEntry {
 /// 使用指南 + 选中动作 + 插件 + **所有 `enable && id != 1` 的 keymap**。
 ///
 /// `id == 1`（自定义热键）不入导航 —— 2026-09-08 起迁入设置页「其他设置」卡片。
-pub fn build_nav(config: &Config) -> Vec<NavEntry> {
+pub fn build_nav(keymaps: &[Keymap]) -> Vec<NavEntry> {
     let mut entries = vec![
         NavEntry {
             tag: "home".to_string(),
@@ -78,7 +78,7 @@ pub fn build_nav(config: &Config) -> Vec<NavEntry> {
         },
     ];
 
-    for keymap in config.keymaps.iter().filter(|km| km.enable && km.id != 1) {
+    for keymap in keymaps.iter().filter(|km| km.enable && km.id != 1) {
         let label = if keymap.id == 4 {
             // id=4（设置页入口）标题固定取 i18n：config 里的 name 是数据字段
             // （会被 generators.go 写进生成的 AHK），改它会连带 golden/oracle 与用户 live config。

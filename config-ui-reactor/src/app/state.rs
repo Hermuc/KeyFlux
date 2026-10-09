@@ -396,8 +396,7 @@ impl Shell {
                     .unwrap_or(false);
                 // 启停改变导航构成 ⇒ 重建导航（与保存后 BuildNav 同语义）
                 if changed {
-                    let next = config.clone();
-                    self.nav = build_nav(&next);
+                    self.nav = build_nav(&config.keymaps);
                 }
             }
             OptEdit::SchemeAdd => {
@@ -437,8 +436,7 @@ impl Shell {
                     .flatten();
                 if let Some(id) = removed {
                     config.keymaps.retain(|km| km.id != id);
-                    let next = config.clone();
-                    self.nav = build_nav(&next);
+                    self.nav = build_nav(&config.keymaps);
                 }
             }
             OptEdit::SchemeDelay(index, value) => {
@@ -806,7 +804,7 @@ impl Shell {
         let Some(config) = self.config.as_ref() else {
             return;
         };
-        let nav = build_nav(config);
+        let nav = build_nav(&config.keymaps);
         let current_tag = self.nav.get(self.page_index).map(|entry| entry.tag.clone());
         self.nav = nav;
         if let Some(tag) = current_tag

@@ -186,7 +186,7 @@ impl Shell {
         context: &ComponentContext<Self>,
     ) {
         self.acrylic = ui_prefs.acrylic;
-        self.nav = build_nav(&config);
+        self.nav = build_nav(&config.keymaps);
         self.config = Some(*config);
         self.port = Some(port);
         self.doc_md = doc_md;

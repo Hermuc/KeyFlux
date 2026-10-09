@@ -457,7 +457,7 @@ mod tests {
     #[test]
     fn nav_starts_with_three_fixed_entries() {
         let config = Config::default();
-        let nav = build_nav(&config);
+        let nav = build_nav(&config.keymaps);
         assert_eq!(nav.len(), 3);
         assert_eq!(nav[0].tag, "home");
         assert_eq!(nav[1].tag, "action");
@@ -479,7 +479,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let nav = build_nav(&config);
+        let nav = build_nav(&config.keymaps);
         let tags: Vec<&str> = nav.iter().map(|entry| entry.tag.as_str()).collect();
         assert_eq!(
             tags,
@@ -500,7 +500,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let nav = build_nav(&config);
+        let nav = build_nav(&config.keymaps);
         assert_eq!(nav[3].kind, PageKind::Abbr(2));
         assert_eq!(nav[4].kind, PageKind::Abbr(3));
         assert_eq!(nav[5].kind, PageKind::Settings);
@@ -514,6 +514,6 @@ mod tests {
             keymaps: vec![keymap(5, "A", "j", false), keymap(6, "B", "k", false)],
             ..Default::default()
         };
-        assert_eq!(build_nav(&config).len(), 3);
+        assert_eq!(build_nav(&config.keymaps).len(), 3);
     }
 }
