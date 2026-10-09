@@ -8,6 +8,15 @@
 tools/parity/reference/** -text
 tools/parity/corpus/** -text
 
+# 第三方随包内容的「勿改」hash 门禁（devtools check-vendor-hashes）对
+# `config-ui-reactor/vendor/windows-reactor` 按**原始字节**算树哈希（逐文件 SHA256 拼接再哈希）
+# ⇒ 必须禁止 EOL 转换：core.autocrlf=true 时 checkout 会把 .rs 写成 CRLF，而本地工作树可能
+# 仍是 LF（本仓实况是**混合**：5 个 patch 过的 .rs 为 CRLF、其余 42 个为 LF），树哈希于是随
+# 「检出状态」漂移 —— 实测同一提交：本地混合态 = B3B32DA1…，CI 全新检出 = 847116EC… ⇒
+# 本地绿、CI 红（2026-10-09 修复）。`-text` ⇒ 工作树字节恒等于库中字节（LF）⇒ 哈希跨机器确定。
+# 用 `-text` 而非 `text eol=lf`：该树含二进制 `.cargo-ok`，显式 `text` 会误当文本处理。
+config-ui-reactor/vendor/windows-reactor/** -text
+
 # 手写 AHK 源码统一 **LF**（2026-10-08 规范化批 N）。
 # 为什么必须显式声明：core.autocrlf=true 时 `git checkout` 会把工作树写成 CRLF，
 # 于是"行尾归一"会被任何一次 checkout 撤销；而 AHK 风格护栏（devtools lint-ahk-style）
