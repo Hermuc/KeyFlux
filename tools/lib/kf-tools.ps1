@@ -141,7 +141,7 @@ function Get-KfReactorExcludes {
     '/XD', '.fingerprint', 'build', 'deps', 'examples', 'incremental',
     '/XF', '*.pdb', '*.d', '*.rlib', '*.rmeta',
     '*.cargo-lock', '*.cargo-build-lock', '*.cargo-artifact-lock',
-    'keyflux-settings.exe', 'settings.exe', 'build-tools.exe'
+    'keyflux-settings.exe', 'settings.exe', 'build-tools.exe', 'devtools.exe'
   )
 }
 
@@ -149,14 +149,24 @@ function Get-KfReactorExcludes {
 # using the shared exclude set above. Returns the robocopy exit code; callers keep
 # their own policy (0-7 = success, >= 8 = failure) and their own follow-up steps
 # (renaming keyflux-settings.exe, copying fonts, printing a file count).
+#
+# Locale pruning: the staged Windows App Runtime ships ~83 language dirs that
+# contain only .mui resources (~3.2 MB); keep zh-CN/zh-TW/en-US, /XD the rest.
 function Invoke-KfReactorStaging {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$Source,
     [Parameter(Mandatory)][string]$Destination
   )
+  $keepLocales = @('zh-cn', 'zh-tw', 'en-us')
+  $prunedLocales = @(Get-ChildItem -LiteralPath $Source -Directory -EA SilentlyContinue |
+    Where-Object { $_.Name -match '^[a-zA-Z]{2,3}-[a-zA-Z]{2,4}(-[a-zA-Z]{1,8})?$' -and
+                  $keepLocales -notcontains $_.Name.ToLowerInvariant() } |
+    ForEach-Object { $_.FullName })
+  $localeArgs = @()
+  if ($prunedLocales.Count -gt 0) { $localeArgs = @('/XD') + $prunedLocales }
   $robocopyArgs = @($Source, $Destination, '/E') + (Get-KfReactorExcludes) +
-                  @('/NFL', '/NDL', '/NJH')
+                  $localeArgs + @('/NFL', '/NDL', '/NJH')
   robocopy @robocopyArgs | Out-Null
   return $LASTEXITCODE
 }
