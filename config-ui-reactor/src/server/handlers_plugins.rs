@@ -339,7 +339,11 @@ fn extract_zip(data: &[u8], dest: &Path) -> Result<(), String> {
     let mut total: u64 = 0;
     for index in 0..archive.len() {
         let mut file = archive.by_index(index).map_err(|error| error.to_string())?;
-        let raw_name = file.name().to_string();
+        // zip 9 起 `name()` 返回 Result（非 UTF-8 名不再静默替换为 lossy 串）。
+        let raw_name = file
+            .name()
+            .map_err(|error| format!("插件包含非法文件名: {error}"))?
+            .to_string();
         let name = raw_name.replace('\\', "/"); // Go filepath.ToSlash
         if !safe_zip_name(&name) {
             return Err(format!("插件包含不安全路径: {raw_name:?}"));
