@@ -63,6 +63,8 @@ pub struct Shell {
     pub composing: bool,
     /// 结果交互回推目标 = 0x406 的 wParam (引擎脚本窗口); 空 = 从未收到过结果
     pub notify_target: HWND,
+    /// 0x40C 查询桥 (T0'): Everything IPC 客户端缓存 + 共享内存镜像段
+    pub ipc: crate::search::bridge::Bridge,
 }
 
 /// FrameState 构造 (字段级借用 —— 宏原地展开, 保证只借 state/skin/dpi/geom,
@@ -434,6 +436,68 @@ fn on_results_data(shell: &mut Shell, hwnd: HWND, wparam: WPARAM, lparam: LPARAM
     LRESULT(1) // 非 0 = 已处理
 }
 
+/// WM_COPYDATA 分流: dwData = 'KFC1' → 0x40C 查询桥; 其余交 0x406 流程
+/// (内部再验 'KFR2', 不符即拒收)。
+fn on_copydata(shell: &mut Shell, hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let ptr = lparam.0 as *const COPYDATASTRUCT;
+    if ptr.is_null() {
+        return LRESULT(0);
+    }
+    // SAFETY: ptr 已判非空; lParam 是系统为 WM_COPYDATA 编组的 COPYDATASTRUCT, 在消息处理期间有效。
+    let cds = unsafe { &*ptr };
+    if (cds.dwData as u32) == crate::search::bridge::QUERY_MAGIC {
+        return on_ipc_query(shell, hwnd, wparam, lparam);
+    }
+    on_results_data(shell, hwnd, wparam, lparam)
+}
+
+/// 0x40C = WM_COPYDATA (dwData='KFC1', T0'): 引擎把查询交给本进程执行。
+///
+/// 成功路径: Everything 管道查询 → 写共享内存镜像 (引擎读回 items 供打开/导航) →
+/// 本体渲染 (`AppEvent::SetResults`) → 返回 1。任何失败返回 0 —— 引擎侧据此
+/// **自动回落 es.exe 旧通道** (旧版命令框 exe 不认识 'KFC1', 混布亦兼容)。
+fn on_ipc_query(shell: &mut Shell, hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let ptr = lparam.0 as *const COPYDATASTRUCT;
+    if ptr.is_null() {
+        return LRESULT(0);
+    }
+    // SAFETY: 同 on_copydata。
+    let cds = unsafe { &*ptr };
+    let size = cds.cbData as usize;
+    if (cds.dwData as u32) != crate::search::bridge::QUERY_MAGIC
+        || cds.lpData.is_null()
+        || size > 64 * 1024
+    {
+        return LRESULT(0);
+    }
+    // SAFETY: cds.lpData 已判非空, size = cds.cbData 且 ≤ 64KiB, 缓冲在消息存活期内有效。
+    let bytes = unsafe { core::slice::from_raw_parts(cds.lpData as *const u8, size) };
+    let Some(req) = crate::search::bridge::decode_query(bytes) else {
+        return LRESULT(0); // 结构非法 → 忽略 (对端错误不得带崩命令框)
+    };
+    let hits = match shell.ipc.query(&req) {
+        Some(hits) => hits,
+        None => return LRESULT(0), // Everything 未运行/超时/断连 → 引擎回落旧通道
+    };
+    if !shell.ipc.write_mirror(&hits) {
+        return LRESULT(0); // 镜像段失败 → 引擎拿不到 items, 同样整体回落
+    }
+    // 回推目标 = wParam (发送方窗口 = 引擎脚本窗口); 与 0x406 同一登记口径
+    let sender = HWND(wparam.0 as *mut core::ffi::c_void);
+    if !sender.0.is_null() {
+        shell.notify_target = sender;
+    }
+    let items = crate::search::bridge::hits_to_items(&hits);
+    let selected = if items.is_empty() {
+        results::NO_SELECTION
+    } else {
+        0
+    };
+    let cmds = on_event(AppEvent::SetResults { items, selected }, &mut shell.state);
+    execute(shell, hwnd, cmds);
+    LRESULT(1) // 非 0 = 已处理且镜像就绪
+}
+
 /// 滚轮换行目标行 (`None` = 空表, 交默认流程)。delta>0(上滚) = 减 3, 否则加 3, clamp 到 [0,n)。
 fn wheel_target(shell: &Shell, wparam: WPARAM) -> Option<usize> {
     let n = shell.state.results.len();
@@ -513,7 +577,8 @@ pub(crate) unsafe extern "system" fn wndproc(
         }
 
         // ---- 2026-10-04 结果列表面板 (命令框向下延伸; 引擎对接面) ----
-        config::APP_RESULTS_DATA => on_results_data(shell, hwnd, wparam, lparam),
+        // WM_COPYDATA 按 dwData 魔数分流: 'KFR2' = 0x406 结果推送 / 'KFC1' = 0x40C 查询
+        config::APP_RESULTS_DATA => on_copydata(shell, hwnd, wparam, lparam),
         // 0x407: wParam = 0 基下标 (-1 = 无高亮)
         config::APP_RESULTS_SELECT => {
             dispatch_event(shell, hwnd, AppEvent::SetSelection(wparam.0 as i32))

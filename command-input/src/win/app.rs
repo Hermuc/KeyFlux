@@ -74,6 +74,7 @@ pub fn run() -> i32 {
         inited: false,
         composing: false,
         notify_target: HWND::default(), // 0x406 的 wParam (结果交互回推目标)
+        ipc: crate::search::bridge::Bridge::new(), // 0x40C 查询桥 (T0')
     });
 
     // SAFETY: GetModuleHandleW(None) 取本进程主模块句柄，无指针入参；失败返回 Err 已处理。
