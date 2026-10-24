@@ -847,6 +847,40 @@ CFF→glyf 转换 + 元数据改造 + 轮廓膨胀三步。
 覆盖到该路径 —— 此时"三方一致"仅指**仓库与部署树在未被配置覆盖时**相同; 用户配置生效后
 部署树字体为**用户所选文件的字节**, 与仓库副本可能不同 (这是预期行为)。
 
+### 3.11.2 命令框结果面板与查询桥协议 (0x406-0x40C; 2026-10-24 登记)
+
+命令框 (`command-input/`, 窗口类 `MyKeymap_Command_Input`) 与引擎/插件之间的扩展消息族。
+**只加不改**: 0x401-0x405 语义冻结不动; 本族消息全部为追加。魔数即版本号 —— 格式变更
+必须换魔数字节, 旧对端自然拒收。
+
+| 消息 | 方向 | 语义 |
+|---|---|---|
+| 0x406 WM_COPYDATA (dwData='KFR2') | 引擎→框 | 整表推送结果列表 (渲染 + 高亮) |
+| 0x407 (wParam=0 基下标; -1 无) | 引擎→框 | 只移动高亮 (单向, 不回推 —— 防回声环) |
+| 0x408 | 引擎→框 | 收起列表 (窗口回落基准高) |
+| 0x409 (wParam=1 基行, lParam=1 点选/2 悬停) | 框→引擎 | 结果行鼠标交互回推 (目标 = 0x406/0x40C 的 wParam) |
+| 0x40A/0x40B (wParam=字形编号) | 引擎→框 | 搜索徽标显示/隐藏 |
+| **0x40C WM_COPYDATA (dwData='KFC1')** | 引擎→框 | **查询桥 (2026-10-24)**: 框进程内代查 Everything 并自渲染 |
+
+**0x40C 载荷** (全小端): `[magic 'KFC1' u32][max_results u32][sort_property u32]
+[sort_descending u32][query_len u32][query UTF-8]`。排序规格由插件镜像 Everything GUI
+当前排序 (Everything.ini 的 sort= / sort_ascending=), 与 es-cli 通道的 `-sort` 镜像同语义。
+
+**返回值即握手**: 框在查询成功、写好共享内存镜像、完成本体渲染后返回非 0; 任何失败
+(框未运行 / 旧版 exe 不认识 'KFC1' / Everything 未运行 / 超时 / 镜像段失败) 返回 0 ——
+插件据此**自动回落 es-cli 旧通道**, 行为与升级前一致 (新旧 exe 可混布)。
+
+**共享内存镜像** `Local\KeyFlux-CommandInput-Search-v1` (框写引擎读, 单写单读无锁;
+引擎仅在 0x40C 返回非 0 后读, 时序天然同步 —— AHK 线程在 SendMessage 期间不泵消息,
+故不能用回发消息携带数据): `[magic 'KFM1' u32][count u32]` + 每条
+`[flags u8 (bit0=目录)][nlen u32][name UTF-8][NUL][plen u32][path UTF-8][NUL]`
+(path = 完整路径; NUL 不计入长度 —— AHK `StrGet` 按指针读时以 NUL 停)。
+容量 256KiB, 超限截断; 引擎侧解析上限 100000 条 (双端同值)。
+
+**协议源文件** (逐字节格式由两端单测锁定): 框侧 `command-input/src/search/bridge.rs` +
+`results.rs::encode_payload`; 引擎侧 `plugins/examples/everything_search/src/EverythingHost.ahk`;
+探针 `tests/open_guard_probe.ahk` 组 15/19。
+
 ### 3.12 ImeInputHost —— 命令框透传模式开关 / 恒可见 hook (2026-09-19 v4.2 冻结, 焦点修复 + 缩写执行恢复)
 
 **根因 (实证修正, 覆盖 v3 表述)**: capsHook 以 `InputHook("", ...)` 创建, 无 V 选项 ⇒

@@ -14,6 +14,9 @@
 //!     - `compose`   逐像素合成数学 (白边/填充/阴影 → 预乘 RGBA)
 //!     - `sound`     R24 触发点枚举 + SoundBackend trait
 //!     - `render`    RenderBackend trait (唯一渲染缝; 零 Win32 类型)
+//!   自包含子系统 (纯逻辑 + 自带系统粘合, 可整目录拆走):
+//!     - `search`    Everything 1.5 管道 IPC 客户端 (T0' 第一步; 本步只提供
+//!                   连接/查询/解析能力, 不触碰现有行为与协议)
 //!   系统粘合 (windows crate 唯一出口):
 //!     - `win`       dpi / error / resources / single_instance / audio /
 //!                   backend_gdi (v1 渲染后端) / wndproc (协议翻译层) / app (装配壳)
@@ -31,6 +34,7 @@ pub mod geometry;
 pub mod protocol;
 pub mod render;
 pub mod results;
+pub mod search;
 pub mod skin;
 pub mod sound;
 pub mod textbuf;

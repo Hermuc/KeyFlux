@@ -28,6 +28,11 @@ windows = { version = "=0.62.2", features = [
     "Win32_Storage_FileSystem",
     "Win32_System_Com",
     "Win32_System_DataExchange",
+    # search/ipc: overlapped 管道 IO（OVERLAPPED / ReadFile / WriteFile /
+    # GetOverlappedResult / CancelIoEx 的类型与函数都挂在这个 feature 下）
+    "Win32_System_IO",
+    # search/bridge: 共享内存镜像段（CreateFileMappingW / MapViewOfFile）
+    "Win32_System_Memory",
     "Win32_System_LibraryLoader",
     "Win32_System_Threading",
     "Win32_UI_Controls",
