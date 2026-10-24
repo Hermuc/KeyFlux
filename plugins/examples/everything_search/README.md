@@ -151,8 +151,8 @@ everything.exe -startup
 | `main.ahk` | 入口：读设置 → 建控制器 → 注册到命令框拦截点 |
 | `src/EverythingMessages.ahk` | 中英文案（复用引擎 `SysLangIsChinese`） |
 | `src/EverythingSettings.ahk` | 设置读取与归一（不做 IO） |
-| `src/EverythingProviders.ahk` | 查询通道抽象：`es-cli`（首选）/ `gui-launch`（降级） |
-| `src/EverythingSearch.ahk` | 编排：拉起 Everything + 选通道 + 失败重试 |
+| `src/EverythingProviders.ahk` | 查询通道抽象：`box-ipc`（0x40C 查询桥，首选）/ `es-cli`（回落）/ `gui-launch`（降级） |
+| `src/EverythingSearch.ahk` | 编排：拉起 Everything + 选通道 + 失败重试与回落 |
 | `src/EverythingHost.ahk` | 引擎依赖的**唯一端口**（引擎 API 演进只改此文件；结果推送 0x406/0x407/0x408 与搜索徽标 0x40A/0x40B 也在这里） |
 | `src/EverythingResults.ahk` | 结果列表**视图端口**：只把行文本推给命令框（渲染/几何在命令框内），并接收 0x409 回推 |
 | `src/EverythingSession.ahk` | 命令框会话状态机 + 控制器（`CommandInputHooks` provider） |
@@ -232,16 +232,23 @@ until you provide one when you call or bind the function"*。故 `obj.Method` �
 
 ---
 
-## 5. 通道选型（为什么不直接用 IPC / SDK DLL）
+## 5. 通道选型（2026-10-24 T0' 起：查询桥优先，下列为回落链）
 
-Everything 有四条可编程通道，可用性与可移植性差异很大：
+当前通道优先级：**`box-ipc`（0x40C 查询桥）→ `es.exe` → `everything.exe -search`**，
+任一级失败自动回落下一级，用户无感。0x40C = 把整次查询交给**命令框进程内**执行
+（它内嵌 Everything 1.5 管道客户端，见 `command-input/src/search/`），结果经共享内存
+镜像段回读本层 —— 零 spawn / 零落盘 / 零逐行解析，实测生产形态 ~11.5ms vs es.exe
+~115ms；排序与 GUI 同序（Everything.ini 镜像为 IPC3 属性 ID，与下述 es 版同语义）。
+契约见 `docs/CONTRACTS.md` §3.11.2。
+
+Everything 本身的四条可编程通道（es 回落级的选型依据，历史记录）：
 
 | 通道 | 结论 | 依据 |
 |---|---|---|
-| **`es.exe` 官方 CLI** | **首选** | 官方命令行工具，自带 `-ipc1/-ipc2/-ipc3` 自适应 Everything 1.4/1.5；结果可 `-export-txt` 落文件读取（AHK 读不了子进程 stdout，这是最稳的一条）；退出码有语义（`8` = 找不到 IPC 窗口 ⇒ Everything 未运行；`5` = 无法创建导出文件） |
-| WM_COPYDATA IPC | **弃用** | 实测 Everything **1.5.0.1418** 上回复不稳定（同一个查询一次有回复、一次空回复）；回复数据在对端进程地址空间（要 `ReadProcessMemory`）；发送线程阻塞时无法处理回复而 AHK 是单线程模型 |
+| **`es.exe` 官方 CLI** | **回落级**（2026-10-24 前为首选） | 官方命令行工具，自带 `-ipc1/-ipc2/-ipc3` 自适应 Everything 1.4/1.5；结果可 `-export-txt` 落文件读取（AHK 读不了子进程 stdout，这是最稳的一条）；退出码有语义（`8` = 找不到 IPC 窗口 ⇒ Everything 未运行；`5` = 无法创建导出文件）。缺点 = 每次查询 spawn 进程（实测 ~115ms，其中查询本体仅 5–15ms） |
+| WM_COPYDATA 直连 Everything | **弃用**（指 AHK 直连） | 实测 Everything **1.5.0.1418** 上回复不稳定（同一个查询一次有回复、一次空回复）；回复数据在对端进程地址空间（要 `ReadProcessMemory`）；发送线程阻塞时无法处理回复而 AHK 是单线程模型。（T0' 的 0x40C 不属此列 —— 管道客户端在 Rust 命令框进程内，无这些限制） |
 | `Everything64.dll`（SDK2） | **弃用** | 需随插件分发 dll；且官方文档明确 1.5 alpha 分支不支持 —— Flow Launcher 走的就是这条路线，其文档标注「仅支持 1.4.x」，与本机实测相互印证 |
-| `everything.exe -search` | **降级** | 只能把 Everything 界面打开到搜索结果，结果**不在**本插件下拉列表里 —— 仅在 es 缺失且前两条不可用时使用，并明确告知用户 |
+| `everything.exe -search` | **降级** | 只能把 Everything 界面打开到搜索结果，结果**不在**本插件下拉列表里 —— 仅在 es 缺失且查询桥不可用时使用，并明确告知用户 |
 
 本机 Everything 版本：**1.5.0.1418**。
 
@@ -307,8 +314,28 @@ es.exe 查询会读取 Everything.ini 的 `sort=` / `sort_ascending=`（便携�
 - 触发键只在**本次命令框会话的第一个字符**位置生效（前置键语义）；一旦输入过别的字符，
   本会话就不再触发 —— 避免与命令框自身的缩写模糊匹配抢键。
 - 检索词全部走 `es.exe` 的一次性调用，**不**做增量/防抖；单次含子进程启动与全库查询，
-  本机实测约 **141ms**（以 `config-server` 一词计时，含 `-timeout 4000` 与导出落盘），在命令框
-  输入期**同步**执行 —— 每次追加/退格字符都会重查一次。
+  本机实测约 **141ms**（2026-09-2x，以 `config-server` 一词计时，含导出落盘），
+  **2026-10-20 复测拆分**：`es.exe -version`（纯启动，无查询）= 121~135ms、
+  `-n 1000 -export-txt` 全量查询 = 126~136ms、`-n 50` 仍 128~142ms ⇒
+  **查询本体只有 5~15ms，约 90% 是进程启动的固定成本**。同机基线：`whoami` 33~37ms、
+  `where.exe` 62~69ms。输入期**同步**执行（每次追加/退格都会重查一次），属有意取舍
+  （简化状态机）。
+- **首搜延迟（2026-10-20）**：会话开始即预热 `es.exe`（`src/EverythingPrewarm.ahk`，
+  只在 Everything **已运行**时热身、不落盘、TTL 30s 内不重复），把进程启动成本从
+  "触发键之后的第一拍"挪到"命令框刚显示"；同时种子采集 (`capturing`) **不再让轮询让位**
+  —— 让位窗口收窄成注入期 (`injecting`)，故"按空格 → 立刻打字"的首查不再被
+  `ClipWait(0.4)`（无选中态必吃满）顶到后面（分解见下面两条实测记录）。
+  `-timeout` 也随之分级：会话首查 3000ms（可能正等 DB 加载）、之后 1000ms（旧值恒 4000）。
+- **预热只对"冷"有效（本机 A/B 实测，2026-10-20）**：真实插件路径（`EverythingSearch.Run`）
+  用 `log`（1000 条）测得 nowarm 235/234/235ms vs warm 235/234/219ms —— **系统文件缓存
+  已热时预热无收益**（es.exe 的 ~155ms 启动成本不会因为提前跑一次而变短）；收益只在
+  冷路径（镜像/安全软件首扫实测 209~229ms → 126~136ms）与"Everything 刚被拉起、DB 仍在
+  加载"的竞态上。故 `WarmUp` 增加了"最近 5 分钟内有查询则跳过"的闸门，避免活跃使用期白 spawn。
+- **AHK 侧解析也是成本（2026-10-20 实测，同一进程/同一查询 `log`）**：
+  `-n 12` = 156ms、`-n 50` = 157ms、`-n 200` = 203ms、`-n 1000` = 265ms ⇒ 每行 ≈0.13ms、
+  1000 行比 12 行多付 ≈110ms（`ParseExport` 建 1000 个对象 + 逐行 `FileExist`）。
+  `MAX_RESULTS` 保持 1000（列表可滚动的产品决策）；若日后要压这一项，方向是**降条数或改
+  轻量行结构**，而不是继续雕 es 调用参数。
 - 检索词里的双引号会被替换为空格、连续空白折叠为一个空格（AHK 的 `Run` 无法表达嵌套引号，
   而引号在 Everything 语法里只是短语包裹）；以 `-` 开头的词会前置 `--` 关闭开关解析。
 - 列表不是独立窗口，而是命令框窗口**向下长高的同一块白框**（2026-10-04 起）：因此它天然跟随

@@ -15,8 +15,10 @@
 ;                                引擎 API 演进只改此文件; 探针经 Impl 整缝替换)
 ;   src/EverythingMessages.ahk   文案 (中/英, 语言判定经 EverythingHost)
 ;   src/EverythingSettings.ahk   设置读写与归一 (plugin-settings.json, 经 api.GetSetting)
-;   src/EverythingProviders.ahk  查询通道抽象: es-cli (首选) / gui-launch (降级)
-;   src/EverythingSearch.ahk     编排: 拉起 Everything + 通道选择 + 失败重试
+;   src/EverythingProviders.ahk  查询通道抽象: box-ipc (0x40C 查询桥, 首选) /
+;                                es-cli (回落) / gui-launch (降级)
+;   src/EverythingSearch.ahk     编排: 拉起 Everything + 通道选择 + 失败重试 + 预热入口
+;   src/EverythingPrewarm.ahk    会话前预热 (把首查才付的 es.exe 启动成本提前付掉)
 ;   src/EverythingResults.ahk    结果列表视图端口: 只把数据推给命令框 (渲染/几何在命令框内)
 ;   src/EverythingSession.ahk    命令框会话状态机 + 控制器 (CommandInputHooks provider)
 ;
@@ -46,6 +48,7 @@
 #Include src/EverythingSettings.ahk
 #Include src/EverythingProviders.ahk
 #Include src/EverythingSearch.ahk
+#Include src/EverythingPrewarm.ahk
 #Include src/EverythingResults.ahk
 #Include src/EverythingSession.ahk
 
@@ -63,6 +66,9 @@ EverythingSearchMain(api) {
   }
   ; 命令框鼠标交互 (点选/悬停) 回推通道: 只在安装时注册一次, 重载插件仅换目标 (见 InstallNotify)
   EverythingResults.InstallNotify(ctrl)
+  ; 预热 (2026-10-20 首搜延迟批): 引擎启动即热身一次, 让**第一个**会话也享受 (否则要等到
+  ; 第二个会话) —— 预热本体在定时器里跑, 不拖慢插件加载。
+  EverythingPrewarm.Kick()
   ; 存活性: CommandInputHooks.Providers (静态数组) 与 EverythingResults._target (静态类变量)
   ; 已持有 ctrl 引用, 无需额外全局 (曾有的 __everythingSearchController 只写不读, 2026-10-04 移除)
 }

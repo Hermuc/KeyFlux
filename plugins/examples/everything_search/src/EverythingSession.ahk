@@ -81,6 +81,12 @@ class EverythingController {
     ; 重读 plugin-settings.json; 只有值真的变了才让通道探测缓存失效 (见 Load 的注释)。
     if (EverythingSettings.Load(this.api))
       EverythingProviders.Reset()
+    ; 新会话复位会话内查询计数 (决定 -timeout 首查/稳态分级, 见 EverythingSearch.Run)
+    EverythingSearch.ResetSession()
+    ; 预热 (2026-10-20 首搜延迟批): 命令框刚显示、用户通常还要 150~400ms 才按触发键,
+    ; 正好把"首查才付"的 es.exe 启动成本 (~125ms, 其中查询本体仅 5~15ms) 提前付掉。
+    ; Kick 只挂一拍定时器就返回, 不阻塞本回调 (会话开始是命令框显示的关键路径)。
+    EverythingPrewarm.Kick()
     ; 上一会话残留 (正常流程 EndSession 已 Close; 兜底防定时器/列表跨会话泄漏)
     if (this.session != 0)
       this.session.Close()
@@ -137,7 +143,8 @@ class EverythingSession {
   chars := 0              ; 本次会话已收到的普通字符数 (0 = 触发键仍处「前置」位置)
   active := false         ; 是否已触发 (检索中)
   closed := false
-  capturing := false      ; 取选中文字期间为 true: 吞掉自身 Send 注入的按键
+  capturing := false      ; 种子采集期 (取选中文字) 为 true: 吞掉自身 Send 注入的按键
+  injecting := false      ; **仅**种子注入命令框期间为 true: 轮询让位, 防读到半截文本
   lastOpenTick := 0       ; 上次**成功**启动 explorer 的 A_TickCount (去抖用; 0 = 尚未打开)
   query := ""
   items := []
@@ -191,7 +198,8 @@ class EverythingSession {
       ;   现改为 SetTimer(-1) 延一拍执行: 命令框先立现 (0x404/前台/徽标全部就位), 种子
       ;   在下一拍采集并经 BoxSendText 逐码元注入命令框 (框内文本 = 检索词唯一真源,
       ;   _SyncQuery 轮询拾取; 修复种子结果只进 this.query、40ms 后被空文本轮询撤掉的
-      ;   白闪 bug)。采集期间 capturing=true, _SyncQuery 让位 (防读到部分注入的文本)。
+      ;   白闪 bug)。采集期间 capturing=true 只负责吞键 —— **不再让 _SyncQuery 让位**
+      ;   (2026-10-20), 故"延后一拍"不再等于"首查延后 400ms"。
       SetTimer(ObjBindMethod(this, "_SeedFromSelectionAsync"), -1)
       SetTimer(ObjBindMethod(this, "_SyncQuery"), EverythingSession.QUERY_SYNC_MS)
       this.Refresh()
@@ -250,19 +258,27 @@ class EverythingSession {
    *   - 选中文件 (type=file) -> 首个文件名 (资源管理器里选中文件时, 用户意图通常是「找同名/同类」);
    *   - 未取到 -> 什么都不做 (命令框保持初始样式, 用户直接输入检索词)。
    *
-   * 与旧同步版的差异 (2026-10-07):
-   *   1. 不再把种子写进 this.query 了事 —— 种子经 EverythingHost.BoxSendText 逐码元
-   *      **注入命令框** (每码元 10ms, 框侧原生追加+键音), 之后由 _SyncQuery 轮询拾取,
-   *      「框内文本 = 检索词唯一真源」的定版语义首次对种子成立 (旧版种子只进会话字段,
-      *      40ms 后即被空文本轮询撤掉, 列表白闪)。
-   *   2. 注入/采集期间 capturing=true, _SyncQuery 让位 —— 防止轮询读到**部分注入**的
-   *      文本触发中间态查询。
+   * 与旧同步版的差异 (2026-10-07): 种子不再写进 this.query 了事 —— 经 BoxSendText
+   *   逐码元**注入命令框** (每码元 10ms, 框侧原生追加+键音), 之后由 _SyncQuery 轮询拾取,
+   *   「框内文本 = 检索词唯一真源」的定版语义对种子同样成立 (旧版种子只进会话字段,
+   *   40ms 后即被空文本轮询撤掉, 列表白闪)。
+   *
+   * 🔴 2026-10-20 首搜延迟批: **采集不再阻塞首查** (旧版在采集全程让 _SyncQuery 让位,
+   *   等于把首查推迟到 ClipWait 超时之后)。现在:
+   *     ① capturing 只负责"吞键" (防 ^C 注入的按键污染会话), 采集一结束立即释放;
+   *     ② 让位窗口收窄成 injecting (仅 BoxSendText 期间, 防轮询读到半截文本);
+   *     ③ 两个提前退出 —— 采集前框内已有文本 (用户已在打字的路上) 就直接放弃种子,
+   *        采集期间用户开始打字则连注入也放弃 (不抢前台、不覆盖用户已输入的内容)。
+   *   于是用户按空格后立刻打字 ⇒ 首查照常在 ~40ms 轮询拍上发生, 与采集并行。
    *
    * 取文字前先把前台切回会话开始时的窗口 (命令框可能抢了前台, 否则 Ctrl+C 发不到目标程序);
    * 取完把焦点还给命令框 (2026-09-19 v4.1 透传补丁: 焦点不还原则后续字符全部漏进原窗口)。
    */
   _SeedFromSelectionAsync() {
     if (this.closed || !this.active)
+      return
+    ; 用户已在打字 (框内已有文本) ⇒ 放弃种子: 抢前台去按 ^C 只会打断输入
+    if (EverythingHost.BoxGetText() != "")
       return
     this.capturing := true
     seed := ""
@@ -273,20 +289,36 @@ class EverythingSession {
     } catch {
       seed := ""
     }
+    ; 采集结束即放行轮询 —— 采集期间用户若已打字, 首查要能立刻跑 (见上方 🔴 ③)
+    this.capturing := false
     seed := Trim(seed, " `t`r`n")
-    if (seed != "") {
-      EverythingHost.BoxSendText(seed)
-      this.query := seed
-      this.Refresh()          ; 种子结果立现 (不等 40ms 轮询拍)
+    if (seed != "" && EverythingHost.BoxGetText() = "") {
+      ; 注入期: 逐码元 10ms, 此刻轮询必须让位 (否则读到半截文本触发中间态查询)
+      this.injecting := true
+      try {
+        EverythingHost.BoxSendText(seed)
+        this.query := seed
+        this.Refresh()          ; 种子结果立现 (不等 40ms 轮询拍)
+      } finally {
+        ; 只负责复位让位开关; 异常**照常向上抛**给引擎的 OnError(EngineOnError) 落盘留痕
+        ; (2026-10-20: 曾在此 catch 吞掉, 会把 BoxSendText 的类型串缺陷变成完全静默 ——
+        ;  实测该缺陷正是靠引擎日志里的 Return 栈才被抓到, 见 EverythingHost.BoxSendText)。
+        this.injecting := false
+      }
     }
-    this.capturing := false   ; 放行 _SyncQuery (此刻框内文本 == this.query, 轮询幂等)
     ; 焦点还原: 搜索模式下命令框自取前台+焦点 (0x404), 种子已在框内
     EverythingHost.BoxActivateForSearch()
   }
 
   /** 按当前检索词刷新结果列表。空词 = 初始态: **不出任何列表** (2026-10-03 需求:
    *  「尚未输入文字时命令框保持初始样式」), 此前会弹一行引导提示框 —— 那正是
-   *  「框下另挂一个独立框」观感的来源之一。 */
+   *  「框下另挂一个独立框」观感的来源之一。
+   *
+   * via = "ipc" (2026-10-24 T0'): 命令框已在 0x40C 处理时**自行渲染**这批结果,
+   *  本层只更新 items/index 镜像 (供 ↑↓/回车/鼠标回推用), 不再经 0x406 重推
+   *  (对 IPC 结果是纯冗余)。判据用**每次调用的 res.via**而非会话字段: 空词与失败
+   *  分支必须无条件发 0x408 —— 框无法自知词已清空, 且 IPC 失败回落时框里可能
+   *  残留上一次 IPC 结果。旧通道无 via 字段 ⇒ 缺省走原有分支, 行为不变。 */
   Refresh() {
     if (Trim(this.query, " `t`r`n") = "") {
       this.items := []
@@ -306,11 +338,13 @@ class EverythingSession {
     this.items := res.items
     if (res.items.Length = 0) {
       this.index := 0
-      EverythingResults.Hide()
+      if (res.via != "ipc")
+        EverythingResults.Hide()   ; IPC 空结果框已自行收起; es 空结果需显式收
       return
     }
     this.index := 1
-    EverythingResults.Show(res.items, this.index)
+    if (res.via != "ipc")
+      EverythingResults.Show(res.items, this.index)   ; IPC 已渲染; es 需推 0x406
   }
 
   /** 移动高亮 (环形)。 */
@@ -409,6 +443,8 @@ class EverythingSession {
       return
     this.closed := true
     this.active := false
+    this.capturing := false
+    this.injecting := false
     try SetTimer(ObjBindMethod(this, "_SyncQuery"), 0)
     EverythingResults.Hide()
     EverythingHost.HideBadge()   ; 0x40B: 徽标与搜索模式同生命周期 (命令框侧另有会话兜底)
@@ -421,8 +457,15 @@ class EverythingSession {
       SetTimer(ObjBindMethod(this, "_SyncQuery"), 0)
       return
     }
-    if (this.capturing)
-      return    ; 种子注入中: 框内是逐码元部分文本, 轮询此刻读到的是中间态 (见 _SeedFromSelectionAsync)
+    ; 🔴 只让位**注入期** (2026-10-20 首搜延迟批):
+    ;   旧实现按 `capturing` 让位, 而 capturing 覆盖「切前台 → 清空剪贴板 → ^C →
+    ;   ClipWait(0.4) → 恢复剪贴板」整条采集链 —— 无选中时实测固定吃满 400ms, 于是
+    ;   用户按空格后打的第一批字符要等采集结束才出结果, 这正是「首次搜索明显延迟」的
+    ;   主体。采集与"读框内文本"互不干扰 (采集读的是剪贴板), 让位毫无必要。
+    ;   注入期 (BoxSendText 逐码元 10ms) 仍必须让位: 否则轮询会读到**部分注入**的文本
+    ;   并触发一串中间态查询 (白闪)。
+    if (this.injecting)
+      return
     t := EverythingHost.BoxGetText()
     if (t = this.query)
       return
