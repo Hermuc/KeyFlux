@@ -94,9 +94,18 @@ class EverythingSettings {
 
 class EverythingSearch {
     static RunCount := 0
+    static WarmUpCount := 0
     static Run(query) {
         EverythingSearch.RunCount += 1
         return {ok: false, error: 0, items: []}
+    }
+    ; 2026-10-20 首搜延迟批: 会话开始调 ResetSession / 预热调 WarmUp —— stub 只为不抛错,
+    ; 真实语义 (探活缓存 / 通道判定 / 结果丢弃) 在 EverythingSearch.ahk, 由单点读码对账。
+    static ResetSession() {
+    }
+    static WarmUp() {
+        EverythingSearch.WarmUpCount += 1
+        return true
     }
 }
 
@@ -147,6 +156,7 @@ class StubInputHook {
 #Include ../src/EverythingMessages.ahk
 #Include ../src/EverythingResults.ahk
 #Include ../src/EverythingSession.ahk
+#Include ../src/EverythingPrewarm.ahk
 
 ; ============================================================
 ; explorer 调用缝的记录实现
@@ -708,22 +718,24 @@ Verify(r21 = 0 && NotifyRecorder.Rows.Length = 1 && NotifyRecorder.Rows[1] = 3 &
 ; 15g/h: 0x406 载荷 (二版 'KFR2') = 12B 头 (魔数 u32 / selected i32 / count u32)
 ;   + 逐项 [t_len u32][t UTF-8][s_len u32][s UTF-8] —— 全小端; selected 在此处完成
 ;   1 基 → 0 基 换算 (0 = 无高亮 → -1); 与 Rust 侧 decode_payload 字段序/宽度逐项相同。
-bufG := EverythingHost.BuildResultsPayload([{t: "ab", s: "c"}], 2)
-okG := IsObject(bufG) && bufG.Size = 23
-    && NumGet(bufG, 0, "UInt") = 0x3252464B && NumGet(bufG, 4, "Int") = 1 && NumGet(bufG, 8, "UInt") = 1
-    && NumGet(bufG, 12, "UInt") = 2 && NumGet(bufG, 16, "UChar") = 0x61 && NumGet(bufG, 17, "UChar") = 0x62
-    && NumGet(bufG, 18, "UInt") = 1 && NumGet(bufG, 22, "UChar") = 0x63
+;   (2026-10-24: builder 返回 {buf, size} —— Buffer 多分配 1 字节给 StrPut 尾部 NUL,
+;    发送长度 = size; 见 BuildResultsPayload 注释的越界 1 字节修复。)
+pkgG := EverythingHost.BuildResultsPayload([{t: "ab", s: "c"}], 2)
+okG := IsObject(pkgG) && pkgG.size = 23 && pkgG.buf.Size = 24
+    && NumGet(pkgG.buf, 0, "UInt") = 0x3252464B && NumGet(pkgG.buf, 4, "Int") = 1 && NumGet(pkgG.buf, 8, "UInt") = 1
+    && NumGet(pkgG.buf, 12, "UInt") = 2 && NumGet(pkgG.buf, 16, "UChar") = 0x61 && NumGet(pkgG.buf, 17, "UChar") = 0x62
+    && NumGet(pkgG.buf, 18, "UInt") = 1 && NumGet(pkgG.buf, 22, "UChar") = 0x63
 Verify(okG,
     "15g 0x406 载荷 KFR2: 魔数 / selected(1基2→0基1) / count / [t_len][t][s_len][s] 小端布局正确",
-    "实际 size=" (IsObject(bufG) ? bufG.Size : "非 Buffer"))
+    "实际 size=" (IsObject(pkgG) ? pkgG.size : "非对象"))
 
-bufH := EverythingHost.BuildResultsPayload([{t: "中", s: ""}], 0)
-okH := IsObject(bufH) && bufH.Size = 23 && NumGet(bufH, 4, "Int") = -1 && NumGet(bufH, 12, "UInt") = 3
-    && NumGet(bufH, 16, "UChar") = 0xE4 && NumGet(bufH, 17, "UChar") = 0xB8 && NumGet(bufH, 18, "UChar") = 0xAD
-    && NumGet(bufH, 20, "UChar") = 0 && NumGet(bufH, 21, "UChar") = 0
+pkgH := EverythingHost.BuildResultsPayload([{t: "中", s: ""}], 0)
+okH := IsObject(pkgH) && pkgH.size = 23 && pkgH.buf.Size = 24 && NumGet(pkgH.buf, 4, "Int") = -1 && NumGet(pkgH.buf, 12, "UInt") = 3
+    && NumGet(pkgH.buf, 16, "UChar") = 0xE4 && NumGet(pkgH.buf, 17, "UChar") = 0xB8 && NumGet(pkgH.buf, 18, "UChar") = 0xAD
+    && NumGet(pkgH.buf, 20, "UChar") = 0 && NumGet(pkgH.buf, 21, "UChar") = 0
 Verify(okH,
     "15h 0x406 载荷: 中文 UTF-8 (3 字节) + 空 s (len 0); index 0 → selected -1 (无高亮)",
-    "实际 size=" (IsObject(bufH) ? bufH.Size : "非 Buffer") " selected=" (IsObject(bufH) ? NumGet(bufH, 4, "Int") : "n/a"))
+    "实际 size=" (IsObject(pkgH) ? pkgH.size : "非对象") " selected=" (IsObject(pkgH) ? NumGet(pkgH.buf, 4, "Int") : "n/a"))
 
 ; --- 断言 16: 搜索徽标与搜索模式同生命周期 (2026-10-04 新增: 0x40A/0x40B) ---
 ;     16a 触发 (进入搜索模式) => ShowBadge 恰 1 次 (查询区右侧放大镜 = 搜索模式可视标识);
@@ -745,6 +757,127 @@ s19.Close()
 Verify(HostRecorder.Count("HideBadge") = 1,
     "16c Close 幂等: 重复收尾不重复发 0x40B (closed 短路)",
     "实际 HideBadge=" HostRecorder.Count("HideBadge"))
+
+; --- 断言 17: 首搜不被种子采集阻塞 (2026-10-20 首搜延迟批) ---
+;     17a 采集期 (capturing=true) 轮询**照常**跑 => 首查不再被采集链 (ClipWait 0.4 无选中时
+;         吃满) 顶到后面。反向对照: 把 _SyncQuery 的让位条件改回 `capturing` 时 17a 必红
+;         (RunCount 停在 0)。
+;     17b 注入期 (injecting=true) 让位 => 不读半截文本、不触发中间态查询。
+;     17c 采集前框内已有文本 => 放弃种子 (不切前台、不发 ^C —— 那条链会打断用户输入)。
+;     17d 预热 Kick 节流 => TTL 内第二次不重复安排 (每次热身 = 一个 es.exe 进程)。
+ResetObservers()
+s20 := NewSession([], 1)
+s20.query := ""
+s20.capturing := true
+HostRecorder.SetSimText("ab")
+s20._SyncQuery()                                      ; 生产由 SetTimer 驱动
+Verify(s20.query = "ab" && EverythingSearch.RunCount = 1,
+    "17a 采集期 (capturing) 轮询照跑: 首次搜索不被种子采集阻塞",
+    "实际 query=" s20.query " Run=" EverythingSearch.RunCount)
+
+ResetObservers()
+s20.injecting := true
+HostRecorder.SetSimText("abc")
+s20._SyncQuery()
+Verify(s20.query = "ab" && EverythingSearch.RunCount = 0,
+    "17b 注入期 (injecting) 轮询让位: 不读半截文本, 不触发中间态查询",
+    "实际 query=" s20.query " Run=" EverythingSearch.RunCount)
+s20.injecting := false
+
+ResetObservers()
+HostRecorder.SetSimText("已在打字")
+s21 := NewSession([], 1)
+s21.query := ""
+s21._SeedFromSelectionAsync()
+Verify(HostRecorder.Count("GetSelection") = 0 && HostRecorder.Count("ActivateBackend") = 0,
+    "17c 框内已有文本: 放弃种子 (不切前台、不发 ^C, 不打断用户输入)",
+    "实际 GetSel=" HostRecorder.Count("GetSelection") " ActBackend=" HostRecorder.Count("ActivateBackend"))
+HostRecorder.SetSimText("")
+
+EverythingPrewarm.LastTick := 0
+k1 := EverythingPrewarm.Kick()
+k2 := EverythingPrewarm.Kick()
+Verify(k1 = true && k2 = false,
+    "17d 预热节流: TTL 内第二次 Kick 不重复安排",
+    "实际 k1=" k1 " k2=" k2)
+
+; --- 断言 18: 种子注入的码元读取 (2026-10-20 修缺陷) ---
+;     BoxSendText 原用 `NumGet(..., "u16")` —— AHK v2 的**非法类型串**, 每次调用抛
+;     ValueError, 且只在"确实取到种子"时才走到 ⇒ 长期表现为种子静默丢失 (只有引擎日志
+;     logs\engine_error.log 能看到)。今抽成 EverythingHost.CodeUnitAt 纯函数, 由此断言锁死。
+;     18a ASCII; 18b 中文 (UTF-16 码元, 不是 UTF-8 字节)。
+;     ⚠ 取码元一律经 CuAt() 包一层: 非法类型串会**抛异常**, 裸调会让探针中途中止
+;       (负向对照时表现为挂死而不是干净的 [FAIL])。
+CuAt(text, i) {
+    try
+        return EverythingHost.CodeUnitAt(text, i)
+    catch as e
+        return "ERR:" e.Message
+}
+Verify(CuAt("A", 0) = 65,
+    "18a CodeUnitAt: ASCII 'A' = 65 (类型串合法, 不再抛 ValueError)",
+    "实际 " CuAt("A", 0))
+Verify(CuAt("中", 0) = 0x4E2D && CuAt("A中", 1) = 0x4E2D,
+    "18b CodeUnitAt: 中文按 UTF-16 码元取 (0x4E2D), 且下标 1 命中第二码元",
+    "实际 " CuAt("中", 0) " / " CuAt("A中", 1))
+
+; --- 断言 19: 0x40C 查询桥的载荷与镜像格式 (2026-10-24 T0') ---
+;     与 command-input/src/search/bridge.rs 逐字节对齐 (decode_query / encode_mirror)。
+;     19a 请求载荷 golden: 魔数/max/sort_prop/sort_desc/q_len/UTF-8 小端布局;
+;     19b 尾部 NUL 落在分配内且不计入发送长度 (StrPut 越界 1 字节缺陷的修法锁定);
+;     19c 镜像解析: 自造 'KFM1' 段 → items[{path,name,isFolder}] (含 NUL 跳位);
+;     19d 镜像魔数不符 → 返回 0 (拒收不抛)。
+pkgI := EverythingHost.BuildIpcQueryPayload("ab", 300, 5, true)
+okI := IsObject(pkgI) && pkgI.size = 22 && pkgI.buf.Size = 23
+    && NumGet(pkgI.buf, 0, "UInt") = 0x3143464B && NumGet(pkgI.buf, 4, "UInt") = 300
+    && NumGet(pkgI.buf, 8, "UInt") = 5 && NumGet(pkgI.buf, 12, "UInt") = 1
+    && NumGet(pkgI.buf, 16, "UInt") = 2
+    && NumGet(pkgI.buf, 20, "UChar") = 0x61 && NumGet(pkgI.buf, 21, "UChar") = 0x62
+Verify(okI,
+    "19a 0x40C 载荷 'KFC1': 魔数 / max / sort_prop / sort_desc / q_len / UTF-8 小端布局正确",
+    "实际 size=" (IsObject(pkgI) ? pkgI.size : "非对象"))
+
+Verify(IsObject(pkgI) && NumGet(pkgI.buf, 22, "UChar") = 0,
+    "19b 尾部 NUL 在分配内且 size 不含它 (框侧 decode_query 要求 20+q_len 严格相等)",
+    "实际 buf.Size=" (IsObject(pkgI) ? pkgI.buf.Size : "n/a"))
+
+; 自造镜像段: 'KFM1' + 2 条 (目录 D:\Code\src + 文件 C:\a.txt); path = 完整路径 (与
+; bridge.rs encode_mirror 的 h.full_path() 同约定), 字符串各带不计入长度的 NUL
+mir := Buffer(8 + (1 + 4 + 3 + 1 + 4 + 11 + 1) + (1 + 4 + 5 + 1 + 4 + 8 + 1), 0)
+NumPut("UInt", 0x314D464B, mir, 0)
+NumPut("UInt", 2, mir, 4)
+offM := 8
+NumPut("UChar", 1, mir, offM)
+offM += 1
+NumPut("UInt", 3, mir, offM)
+offM += 4
+StrPut("src", mir.Ptr + offM, "UTF-8")
+offM += 3 + 1
+NumPut("UInt", 11, mir, offM)
+offM += 4
+StrPut("D:\Code\src", mir.Ptr + offM, "UTF-8")
+offM += 11 + 1
+NumPut("UChar", 0, mir, offM)
+offM += 1
+NumPut("UInt", 5, mir, offM)
+offM += 4
+StrPut("a.txt", mir.Ptr + offM, "UTF-8")
+offM += 5 + 1
+NumPut("UInt", 8, mir, offM)
+offM += 4
+StrPut("C:\a.txt", mir.Ptr + offM, "UTF-8")
+itemsM := EverythingHost.ParseIpcMirrorAt(mir.Ptr)
+Verify(IsObject(itemsM) && itemsM.Length = 2
+    && itemsM[1].path = "D:\Code\src" && itemsM[1].name = "src" && itemsM[1].isFolder = true
+    && itemsM[2].path = "C:\a.txt" && itemsM[2].name = "a.txt" && itemsM[2].isFolder = false,
+    "19c 镜像解析: flags / 名称 / 完整路径 / NUL 跳位逐字段正确 (与 bridge.rs encode_mirror 对齐)",
+    "实际 " (IsObject(itemsM) ? itemsM.Length " 条 [1]=" (IsObject(itemsM) && itemsM.Length >= 2 ? itemsM[2].path : "?") : "0"))
+
+mirBad := Buffer(8, 0)
+NumPut("UInt", 0x3143464B, mirBad, 0)   ; 错魔数 ('KFC1' ≠ 'KFM1')
+Verify(EverythingHost.ParseIpcMirrorAt(mirBad.Ptr) = 0,
+    "19d 镜像魔数不符 → 返回 0 (拒收不抛)",
+    "实际非 0")
 
 ; ============================================================
 ; 汇总

@@ -58,15 +58,17 @@ class EverythingHost {
     hwnd := this._FindBoxWindow()
     if (!hwnd)
       return false
-    buf := EverythingHost.BuildResultsPayload(entries, index)
-    if (!IsObject(buf))
+    pkg := EverythingHost.BuildResultsPayload(entries, index)
+    if (!IsObject(pkg))
       return false
     ; COPYDATASTRUCT 布局 (x64 有对齐填充): dwData@0, cbData@A_PtrSize, lpData@(对齐后)。
     ; 🔴 不能用 A_PtrSize+4 当 lpData 偏移 —— 64 位下 cbData(4B) 后补 4B 填充, lpData 在 16。
     cds := Buffer((A_PtrSize = 8) ? 24 : 12, 0)
     NumPut("Ptr", EverythingHost.PAYLOAD_MAGIC, cds, 0)
-    NumPut("UInt", buf.Size, cds, A_PtrSize)
-    NumPut("Ptr", buf.Ptr, cds, (A_PtrSize = 8) ? 16 : 8)
+    ; 🔴 发送长度用 pkg.size (不含 StrPut 尾部 NUL): Buffer 实际多分配 1 字节给 NUL
+    ;   (StrPut 写地址时恒追加 NUL, 按裸长度分配会让最后一个字符串越界 1 字节 —— 2026-10-24 修)。
+    NumPut("UInt", pkg.size, cds, A_PtrSize)
+    NumPut("Ptr", pkg.buf.Ptr, cds, (A_PtrSize = 8) ? 16 : 8)
     ; wParam = 本脚本窗口 (A_ScriptHwnd) —— 命令框记录它作为鼠标交互的回推目标;
     ; 用 SendMessageTimeout (限时 800ms): 命令框侧解码/重排极快, 超时说明它卡住,
     ; 此时插件不该被拖住 (返回 0 ⇒ false)。
@@ -139,12 +141,142 @@ class EverythingHost {
     return true
   }
 
+  ; ---- 0x40C 查询桥 (T0'; 2026-10-24) ----
+  ;
+  ; 语义: 引擎把整次查询交给命令框进程执行 (它内嵌 Everything 1.5 管道客户端), 取代
+  ; "spawn es.exe → 导出文件 → 逐行解析 → 0x406 回推"的旧搬运链。
+  ;   引擎 → 命令框: WM_COPYDATA, dwData = 'KFC1', 载荷 = [max u32][sort_prop u32]
+  ;                 [sort_desc u32][q_len u32][q UTF-8]; wParam = A_ScriptHwnd (回推目标)。
+  ;   命令框 → 引擎: **返回值** (非 0 = 成功) + 共享内存镜像段 (items 数据)。
+  ; 为什么镜像走共享内存而不是回发消息: AHK 线程在 DllCall(SendMessage) 期间不泵消息,
+  ; 命令框若同步 SendMessage 回推会死锁; PostMessage 又不能携带跨进程内存。命令框在
+  ; 返回非 0 前已写好镜像段, 时序天然同步 (单写单读, 无需锁)。
+  ; 降级: 任何失败 (框未运行/旧版 exe 不认识 KFC1/Everything 未运行/超时) 返回值 = 0
+  ;   ⇒ 通道层报 ES_ERR_IPC ⇒ 编排层回落 es-cli/gui 旧通道, 行为与升级前一致。
+
+  static IPC_QUERY_MAGIC := 0x3143464B    ; 'K','F','C','1' 的小端 u32 (与 command-input search/bridge.rs 同值)
+  static IPC_MIRROR_MAGIC := 0x314D464B   ; 'K','F','M','1' 的小端 u32
+  static IPC_MIRROR_NAME := "Local\KeyFlux-CommandInput-Search-v1"
+  static IPC_SEND_TIMEOUT_MS := 3500      ; > 命令框内部 IO 超时 (3s); 正常查询 ~12ms
+  static IPC_MAX_ITEMS := 100000          ; 镜像解析防御上限 (与 bridge.rs MAX_ITEMS 同值)
+
   /**
-   * 构造 0x406 载荷 (Buffer)。二版 'KFR2' (2026-10-04 Flow Launcher 双行版式), 全小端:
+   * 执行一次 0x40C 查询。
+   * @param query 检索词; @param maxResults 条数上限
+   * @param sortProp IPC3 排序属性 ID (EverythingProviders.IpcSortSpec 产出)
+   * @param sortDesc 是否降序
+   * @returns {Array|0} items[{path,name,isFolder}]; 0 = 失败 (调用方回落旧通道)
+   */
+  static IpcQuery(query, maxResults, sortProp, sortDesc) {
+    impl := EverythingHost.Impl
+    if (IsObject(impl))
+      return impl.IpcQuery(query, maxResults, sortProp, sortDesc)
+    hwnd := this._FindBoxWindow()
+    if (!hwnd)
+      return 0
+    pkg := EverythingHost.BuildIpcQueryPayload(query, maxResults, sortProp, sortDesc)
+    if (!IsObject(pkg))
+      return 0
+    cds := Buffer((A_PtrSize = 8) ? 24 : 12, 0)
+    NumPut("Ptr", EverythingHost.IPC_QUERY_MAGIC, cds, 0)
+    NumPut("UInt", pkg.size, cds, A_PtrSize)   ; 发送长度不含尾部 NUL (见 builder 注释)
+    NumPut("Ptr", pkg.buf.Ptr, cds, (A_PtrSize = 8) ? 16 : 8)
+    r := 0
+    try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", 0x004A
+        , "ptr", A_ScriptHwnd, "ptr", cds, "uint", 0x0008
+        , "uint", EverythingHost.IPC_SEND_TIMEOUT_MS, "ptr*", &r := 0)
+    if (r = 0)
+      return 0
+    return EverythingHost.ReadIpcMirror()
+  }
+
+  /**
+   * 构造 0x40C 载荷 (纯函数, 探针可测)。全小端:
+   *   [0..4) 'KFC1' ; [4..8) max ; [8..12) sort_prop ; [12..16) sort_desc(0/1)
+   *   [16..20) q_len ; [20..) query UTF-8
+   * @returns {{buf:Buffer, size:Integer}|0} 0 = 编码失败。
+   *   🔴 size 才是发送长度 (不含 StrPut 尾部 NUL; Buffer 多分配 1 字节)。
+   */
+  static BuildIpcQueryPayload(query, maxResults, sortProp, sortDesc) {
+    try {
+      qb := StrPut(query, "UTF-8") - 1
+      buf := Buffer(20 + qb + 1, 0)
+      NumPut("UInt", EverythingHost.IPC_QUERY_MAGIC, buf, 0)
+      NumPut("UInt", maxResults, buf, 4)
+      NumPut("UInt", sortProp, buf, 8)
+      NumPut("UInt", sortDesc ? 1 : 0, buf, 12)
+      NumPut("UInt", qb, buf, 16)
+      if (qb > 0)
+        StrPut(query, buf.Ptr + 20, "UTF-8")
+      return {buf: buf, size: 20 + qb}
+    } catch {
+      return 0
+    }
+  }
+
+  /** 打开并读取镜像段; @returns {Array|0} (段不存在/解析失败 = 0)。 */
+  static ReadIpcMirror() {
+    h := 0
+    try h := DllCall("kernel32\OpenFileMappingW", "uint", 0x0004, "int", false
+        , "wstr", EverythingHost.IPC_MIRROR_NAME, "ptr")
+    if (!h)
+      return 0
+    items := 0
+    p := 0
+    try p := DllCall("kernel32\MapViewOfFile", "ptr", h, "uint", 0x0004
+        , "uint", 0, "uint", 0, "usize", 0, "ptr")
+    if (p)
+      items := EverythingHost.ParseIpcMirrorAt(p)
+    if (p)
+      DllCall("kernel32\UnmapViewOfFile", "ptr", p)
+    DllCall("kernel32\CloseHandle", "ptr", h)
+    return items
+  }
+
+  /**
+   * 解析镜像段 (纯函数, 探针可测 —— 传入自造 Buffer 的 Ptr)。
+   * 格式 (全小端; 与 command-input search/bridge.rs encode_mirror 逐字节一致):
+   *   [0..4) 'KFM1' ; [4..8) count u32
+   *   重复 count 次: [flags UChar (bit0=目录)][nlen u32][name UTF-8][NUL][plen u32][path UTF-8][NUL]
+   *   (字符串带不计入长度的 NUL 终止 —— AHK StrGet 按指针读时以 NUL 停)
+   * @returns {Array|0} items[{path,name,isFolder}]
+   */
+  static ParseIpcMirrorAt(ptr) {
+    try {
+      if (NumGet(ptr, 0, "UInt") != EverythingHost.IPC_MIRROR_MAGIC)
+        return 0
+      count := NumGet(ptr, 4, "UInt")
+      if (count > EverythingHost.IPC_MAX_ITEMS)
+        return 0
+      items := []
+      off := 8
+      loop count {
+        flags := NumGet(ptr, off, "UChar")
+        off += 1
+        nlen := NumGet(ptr, off, "UInt")
+        off += 4
+        name := StrGet(ptr + off, "UTF-8")
+        off += nlen + 1
+        plen := NumGet(ptr, off, "UInt")
+        off += 4
+        path := StrGet(ptr + off, "UTF-8")
+        off += plen + 1
+        items.Push({path: path, name: name, isFolder: (flags & 1) = 1})
+      }
+      return items
+    } catch {
+      return 0
+    }
+  }
+
+  /**
+   * 构造 0x406 载荷。二版 'KFR2' (2026-10-04 Flow Launcher 双行版式), 全小端:
    *   [0..4) 魔数 'KFR2' ; [4..8) selected i32 ; [8..12) count u32 ;
    *   重复 count 次: [t_len u32][t UTF-8][s_len u32][s UTF-8]
    *   (t = 标题/文件名, s = 副标题/路径 —— 兼作命令框的图标提取键)
-   * @returns {Buffer|0} 0 = 构造失败 (超限 / 编码异常) —— 调用方据此拒绝发送
+   * @returns {{buf:Buffer, size:Integer}|0} 0 = 构造失败 (超限 / 编码异常)。
+   *   🔴 size 才是发送长度: Buffer 多分配 1 字节给 StrPut 恒追加的尾部 NUL
+   *   (2026-10-24 修: 原按裸长度分配, 最后一个字符串的 NUL 会越界写 1 字节)。
    */
   static BuildResultsPayload(entries, index) {
     try {
@@ -159,7 +291,7 @@ class EverythingHost {
       }
       if (total > EverythingHost.MAX_PAYLOAD_BYTES)
         return 0
-      buf := Buffer(total, 0)
+      buf := Buffer(total + 1, 0)
       NumPut("UInt", EverythingHost.PAYLOAD_MAGIC, buf, 0)
       NumPut("Int", (index >= 1) ? index - 1 : EverythingHost.NO_SELECTION, buf, 4)
       NumPut("UInt", n, buf, 8)
@@ -178,7 +310,7 @@ class EverythingHost {
         off += 4 + sb
         i += 1
       }
-      return buf
+      return {buf: buf, size: total}
     } catch {
       return 0
     }
@@ -286,7 +418,15 @@ class EverythingHost {
     return (r != 0)
   }
 
-  /** 种子文本推入命令框 (WM_CHAR 逐码元, 框原生追加+显示; 每字符播键音 = 原版行为)。 */
+  /** 种子文本推入命令框 (WM_CHAR 逐码元, 框原生追加+显示; 每字符播键音 = 原版行为)。
+   *
+   * 🔴 2026-10-20 修类型串缺陷: 原写法 `NumGet(StrPtr(text), …, "u16")` 在 AHK v2 里是
+   *   **非法类型串** ⇒ 每次调用都抛 `ValueError: Invalid parameter(s).`（实测：
+   *   `"u16"` 抛错、`"UShort"` 返回 65）。它只在"确实取到种子"（有选中文字/文件）时
+   *   才走到，故长期表现为"种子静默丢失"，仅引擎日志 logs\engine_error.log 里有
+   *   `[EverythingHost.BoxSendText] … NumGet` 的 Return 栈可查（本机 2026-10-20 22:11
+   *   一条实录即此因）。v2 的合法类型串是 "UChar"/"UShort"/"UInt"…，不存在 "u16"。
+   */
   static BoxSendText(text) {
     impl := EverythingHost.Impl
     if (IsObject(impl))
@@ -296,11 +436,23 @@ class EverythingHost {
       return false
     len := StrLen(text)
     Loop len {
-      u := NumGet(StrPtr(text), (A_Index - 1) * 2, "u16")   ; UTF-16 码元
+      u := EverythingHost.CodeUnitAt(text, A_Index - 1)   ; UTF-16 码元 (0 基)
       try PostMessage(0x0102, u, 0, hwnd)
       Sleep 10
     }
     return true
+  }
+
+  /**
+   * 取字符串第 i 个 UTF-16 码元 (0 基)。
+   * 单独抽出是为了**可测**: BoxSendText 需要真实命令框窗口，无窗口环境下测不了；而 2026-10-20
+   * 那个长期静默的缺陷 (非法类型串 "u16") 恰恰只出在这一行 —— 抽成纯函数后由
+   * tests/open_guard_probe.ahk 的组 18 直接断言码元值。
+   * @param text 源串; @param i 0 基码元下标
+   * @returns {Integer} 0..0xFFFF
+   */
+  static CodeUnitAt(text, i) {
+    return NumGet(StrPtr(text), i * 2, "UShort")
   }
 
   ; ---- 引擎全局访问端口 ----

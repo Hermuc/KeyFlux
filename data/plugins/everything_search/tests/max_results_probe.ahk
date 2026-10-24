@@ -37,6 +37,17 @@
 #Include ../src/EverythingSettings.ahk
 #Include ../src/EverythingSearch.ahk
 
+; EverythingHost 最小桩 (2026-10-24 T0'): 真源 Providers 的首选通道 (EverythingIpcProvider)
+; 经 EverythingHost.IpcQuery 发 0x40C —— 本探针不 include Host 真源 (无命令框窗口可发),
+; 桩返回 0 = "查询桥失败" ⇒ Run 的回落链改走 es-cli —— 组 6 因此**同时回归**了
+; 「IPC 失败自动回落 es」这一新行为 (与 open_guard_probe 的「stub 引擎全局」同口径)。
+class EverythingHost {
+  static Impl := 0
+  static IpcQuery(query, maxResults, sortProp, sortDesc) {
+    return 0
+  }
+}
+
 global OUT_FILE := A_Temp "\kf_max_results_probe.txt"
 try FileDelete(OUT_FILE)
 SetWorkingDir(A_ScriptDir)

@@ -27,6 +27,32 @@ class EverythingSearch {
   ;   正确动作是细化检索词, 而不是滚动千行列表。
   static MAX_RESULTS := 1000
 
+  ; ---- 会话状态缓存 (2026-10-20 首搜延迟批) ----
+  ;
+  ; 探活缓存: `ProcessExist` 每次都是 CreateToolhelp32Snapshot 全量快照 (本机 300+ 进程),
+  ;   而「Everything 是否在跑」在数百毫秒内不会变 —— 每击键一次的全量快照纯属浪费。
+  ;   TTL 取 2s: 长于单次输入节奏, 短于人工感知的进程启停间隔; 且**任何一次** es 返回
+  ;   ES_ERR_NOT_RUNNING 都会立即让缓存失效 (见 Run 的重试分支) ⇒ 不存在"进程已死仍判活"。
+  static RunningTTL := 2000
+  static RunningCache := -1        ; -1 = 未知 / 1 = 运行中 / 0 = 未运行
+  static RunningTick := 0
+
+  ; 会话内查询计数: 只决定 `-timeout` 的取值, 不影响结果语义 (见 TimeoutFor)。
+  static Queries := 0
+  ; 首查宽松 (仍在等 DB 加载), 后续收紧 —— 稳态下 es 根本不会等, 这两个值只在
+  ; "DB 正在加载/Everything 正在重启" 时决定我们最多陪它等多久 (旧值 4000 恒定)。
+  static FirstQueryTimeoutMs := 3000
+  static SteadyQueryTimeoutMs := 1000
+
+  ; 最近一次预热异常 (仅内存留痕, 不写日志文件 —— 见 EverythingPrewarm 文件头纪律②)
+  static WarmError := ""
+
+  ; 最近一次真实查询的时刻 (A_TickCount); 0 = 本进程内还没查过
+  static LastQueryTick := 0
+  ; 预热只在「冷」的时候做 (见 WarmUp): 距上次查询 < 5min 说明 es.exe 刚跑过、
+  ; 镜像/安全软件缓存都热着 —— 此时再热身纯属白 spawn 一个进程 (实测零收益, 见 README §8)。
+  static ColdIdleMs := 300000
+
   ; 静默启动开关: 官方文档 "Run Everything in the background without showing any search windows"。
   ; 必须带它 —— 裸跑 everything.exe 会弹出主窗口并抢走前台焦点, 打断命令框里正在进行的输入。
   ; 见 README 「未启动时静默拉起」与 docs/CONTRACTS 的插件章节。
@@ -35,9 +61,61 @@ class EverythingSearch {
   static HideCheckMs := 1200       ; 给主窗口留出创建时间再检查/隐藏
   static HidePollMs := 250         ; 隐藏检查的轮询步长
 
-  /** Everything 进程是否在运行 (不依赖 IPC 窗口, 避免版本差异)。 */
-  static IsRunning() {
-    return ProcessExist(this.ProcessName) ? true : false
+  /**
+   * Everything 进程是否在运行 (不依赖 IPC 窗口, 避免版本差异)。
+   * @param force 忽略缓存强制重探 (拉起进程后 / 收到"未运行"错误后必须传 true)
+   */
+  static IsRunning(force := false) {
+    if (!force && this.RunningCache != -1
+        && (A_TickCount - this.RunningTick) < this.RunningTTL)
+      return this.RunningCache = 1
+    running := ProcessExist(this.ProcessName) ? true : false
+    this.RunningCache := running ? 1 : 0
+    this.RunningTick := A_TickCount
+    return running
+  }
+
+  /** 新会话开始: 复位会话内计数 (只有 `-timeout` 分级读它)。 */
+  static ResetSession() {
+    this.Queries := 0
+  }
+
+  /**
+   * 预热 (2026-10-20 首搜延迟批; 由 EverythingPrewarm.Kick 在会话开始/插件入口触发)。
+   *
+   * 复用生产同一条查询路径, 只把结果丢弃 —— 于是「预热返回 true」等价于
+   * 「首查要付的三笔固定成本已经付过」:
+   *   ① es.exe 落点解析 (EverythingProviders.ResolveEs, 含 4 次 FileExist);
+   *   ② es.exe 进程镜像 + 首次执行 (实测 121~135ms, 其中查询本体仅 5~15ms);
+   *   ③ Everything 数据库加载竞态 (由这里的 -timeout 承担, 而不是首查)。
+   *
+   * 🔴 只在 Everything **已在运行** 时预热: 未运行时不替你拉起进程 (绿色纪律①, 见
+   *    EverythingPrewarm 文件头)。降级通道 (gui-launch) 也不预热 —— 那次调用会弹出
+   *    Everything 主窗口, 是"预热"最不该产生的副作用。
+   * 🔴 只在**冷**的时候预热 (2026-10-20 实测校准): es.exe 进程启动的固定成本 ~155ms 在
+   *    系统文件缓存已热时并不会因为"提前跑一次"而变短 —— 本机 A/B (各 3 轮) 显示
+   *    nowarm 235/234/235ms vs warm 235/234/219ms, **无差异**; 收益只在冷路径
+   *    (镜像/安全软件首扫, 实测 209~229ms → 126~136ms) 与"Everything 刚被拉起、DB 仍在
+   *    加载"的竞态上。故最近 5 分钟内有查询则跳过预热, 把白跑的 spawn 留在门外。
+   *
+   * @returns {Boolean} 是否真的热身了 es.exe 通道
+   */
+  static WarmUp() {
+    if (this.LastQueryTick != 0 && (A_TickCount - this.LastQueryTick) < this.ColdIdleMs)
+      return false
+    if (!this.IsRunning())
+      return false
+    es := EverythingProviders.ResolveEs()
+    if (es = "")
+      return false
+    ; 🔴 预热必须**直连 es-cli** (2026-10-24 修隐藏 bug): 首选通道已是 0x40C 查询桥,
+    ;   而它会使命令框**渲染**查询结果 —— 预热在会话开始时跑, 经 Create() 走 IPC 会让
+    ;   刚打开的空命令框闪现 "KeyFlux-Prewarm" 结果列表。IPC 通道零冷启动成本 (管道
+    ;   连接亚毫秒) 无需预热; 预热的对象本就是**回落通道** es.exe 的固定启动成本。
+    try EverythingEsProvider(es).Search("KeyFlux-Prewarm", 1, this.FirstQueryTimeoutMs)
+    catch as e
+      this.WarmError := e.Message   ; 仅内存留痕 (不写日志文件)
+    return true
   }
 
   /**
@@ -66,11 +144,12 @@ class EverythingSearch {
     }
 
     ; 进程探活 (必要条件): 拉起后轮询等待进程出现。
+    ; 🔴 这里必须 force 重探: 缓存里刚写下的还是"未运行"(0), 走缓存会一直等到超时。
     waited := 0
     while (waited < this.LaunchWaitMs) {
       Sleep this.LaunchPollMs
       waited += this.LaunchPollMs
-      if (this.IsRunning()) {
+      if (this.IsRunning(true)) {
         this.HideMainWindowIfAny()
         return true
       }
@@ -136,9 +215,8 @@ class EverythingSearch {
 
   /**
    * 执行一次搜索 (同步; 调用方在命令框输入期, 每次追加/退格都会重跑本方法)。
-   * 耗时: 单次 es 调用本机实测约 141ms (含 -timeout 4000 与导出落盘, 见 README §8) ——
-   * 输入期同步执行是有意为之 (简化状态机), 不做增量/防抖。
-   * 结果条数按 MAX_RESULTS 封顶 (见其注释; 2026-10-05 修订 2026-10-04 的「不设上限」)。
+   * 通道优先级 (2026-10-24 T0'): 0x40C 查询桥 (命令框进程内查 Everything, ~11.5ms)
+   *   → 失败自动回落 es-cli (spawn, ~115ms) → gui-launch。会话/打开/导航逻辑不变。
    * @param query 检索词
    * @returns {{ok:Boolean, error:String, items:Array<{path,name,isFolder}>}}
    */
@@ -152,14 +230,30 @@ class EverythingSearch {
       return {ok: false, error: err, items: []}
     }
 
-    provider := EverythingProviders.Create()
-    res := provider.Search(query, this.MAX_RESULTS)
+    ; -timeout 分级 (2026-10-20): 首查宽松 (可能正等 DB 加载), 之后收紧 —— 稳态下 es
+    ; 不会真等, 该值只在"DB 加载中/Everything 重启中"决定最多陪它等多久 (旧值恒 4000)。
+    timeout := (this.Queries = 0) ? this.FirstQueryTimeoutMs : this.SteadyQueryTimeoutMs
+    this.Queries += 1
 
-    ; 冷启动竞态: Everything 进程已在但数据库仍在加载, es 可能返回空/失败 —— 重试一次
-    if (!res.ok && (res.error = ES_ERR_NOT_RUNNING || res.error = ES_ERR_QUERY)) {
-      Sleep this.RetryDelayMs
-      res := provider.Search(query, this.MAX_RESULTS)
+    active := EverythingProviders.Create()
+    res := active.Search(query, this.MAX_RESULTS, timeout)
+
+    ; 0x40C 桥失败 (框未更新/Everything 未运行/超时) ⇒ 回落旧通道, 行为与升级前一致。
+    if (!res.ok && res.error = ES_ERR_IPC) {
+      es := EverythingProviders.ResolveEs()
+      active := (es != "") ? EverythingEsProvider(es)
+                           : EverythingGuiProvider(EverythingSettings.EverythingPath)
+      res := active.Search(query, this.MAX_RESULTS, timeout)
     }
+
+    ; 冷启动竞态: Everything 进程已在但数据库仍在加载, es 可能返回空/失败 —— 重试一次。
+    ; 同时让探活缓存失效: 报"未运行"说明缓存(可能刚被预热写成"运行中")已过时。
+    if (!res.ok && (res.error = ES_ERR_NOT_RUNNING || res.error = ES_ERR_QUERY)) {
+      this.RunningCache := -1
+      Sleep this.RetryDelayMs
+      res := active.Search(query, this.MAX_RESULTS, this.SteadyQueryTimeoutMs)
+    }
+    this.LastQueryTick := A_TickCount   ; 供 WarmUp 判定"是否已经热着" (见其注释)
     return res
   }
 

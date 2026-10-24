@@ -25,6 +25,7 @@ global ES_ERR_NO_ES_LAUNCHED := "gui-launched"    ; 已降级为打开 Everythin
 global ES_ERR_LAUNCH_FAILED := "launch-failed"    ; 降级也失败
 global ES_ERR_EMPTY := "empty-query"
 global ES_ERR_NO_PATH := "no-everything-path"     ; 未配置 everything.exe 路径
+global ES_ERR_IPC := "box-ipc-failed"             ; 0x40C 查询桥失败 (编排层据此回落旧通道)
 
 /**
  * 查询通道基类 (接口契约, 见文件头)。
@@ -32,6 +33,9 @@ global ES_ERR_NO_PATH := "no-everything-path"     ; 未配置 everything.exe 路
  * Search 契约 (2026-10-05): `maxResults` = 结果条数上限, `0` = 不限制。
  * 上限数值是**编排层的策略** (EverythingSearch.MAX_RESULTS), 通道只落机制 ——
  * 通道实现不得自定数值, 保证换通道时策略仍单点可控。
+ *
+ * Search 契约 (2026-10-20): `timeoutMs` = 等对端就绪的上限 (es 的 `-timeout`), 同样是
+ * **编排层的策略** (EverythingSearch 的首查/稳态分级), 通道只把它落成命令行参数。
  */
 class EverythingProvider {
   Name := "base"
@@ -39,9 +43,10 @@ class EverythingProvider {
   /**
    * @param query 检索词 (已归一)
    * @param maxResults 结果条数上限 (0 = 不限制)
+   * @param timeoutMs 等对端就绪的上限 (通道不支持则忽略)
    * @returns {{ok:Boolean, error:String, items:Array}}
    */
-  Search(query, maxResults := 0) {
+  Search(query, maxResults := 0, timeoutMs := 4000) {
     return {ok: false, error: ES_ERR_QUERY, items: []}
   }
 }
@@ -62,13 +67,19 @@ class EverythingEsProvider extends EverythingProvider {
   ; 临时导出目录 (测试可注入; 运行期默认系统临时目录)
   static TempDir := ""
 
+  ; 排序参数缓存 (2026-10-20 首搜延迟批): ini 实测 108,877 字符, 原先**每次查询**都
+  ; FileRead + 2 次 RegExMatch; 而它只在用户点 GUI 列头/改设置时才变。
+  ; 失效键 = 路径 + 修改时间 + 大小 ⇒ 改排序后下一次查询自动跟随 (语义与"每次重读"一致)。
+  static SortCacheKey := ""
+  static SortCacheVal := ""
+
   __New(exe) {
     this.exe := exe
   }
 
-  Search(query, maxResults := 0) {
+  Search(query, maxResults := 0, timeoutMs := 4000) {
     out := this._OutFile()
-    cmd := '"' this.exe '" -timeout 4000' this._MaxResultsArgs(maxResults) this._SortArgs()
+    cmd := '"' this.exe '" -timeout ' timeoutMs this._MaxResultsArgs(maxResults) this._SortArgs()
          . ' -export-txt "' out '"' this._QuerySuffix(query)
     code := 0
     try {
@@ -146,17 +157,36 @@ class EverythingEsProvider extends EverythingProvider {
   ;    路径抛异常。
 
   /**
-   * 组装 -sort 参数 (镜像 GUI 当前排序):
+   * 组装 -sort 参数 (镜像 GUI 当前排序)。
    * ini 位置: 便携版在 everything.exe 旁 (本机 app_data=0); 安装版在 %APPDATA%\Everything。
    * 方向: sort_ascending=0 → -sort-descending (本机 Date Modified 即此档 = 最近修改优先),
    *       否则 -sort-ascending; ini/键缺失 → 返回 "" (es 默认名称升序)。
-   * 每次查询重读 ini: 用户在 GUI 点列头改排序后无需重启, 下一次查询即跟随。
+   *
+   * 缓存口径 (2026-10-20): 按 `路径|修改时间|大小` 做失效键 —— 用户在 GUI 点列头改排序后
+   * ini 的 mtime 变化 ⇒ 下一次查询重算, 与旧"每次重读"的可见语义完全一致; 未变化时
+   * 省掉 108KB FileRead + 2 次 RegExMatch (实测 1.44ms/次, 输入期每击键一次)。
+   * ""(无 ini / 无 sort 键 / 键不认识) 也进缓存 —— 否则最常见的"读不到"分支反而每次重读。
    */
   _SortArgs() {
     try {
       ini := this._EverythingIni()
       if (ini = "")
         return ""
+      key := ini "|" FileGetTime(ini, "M") "|" FileGetSize(ini)
+      if (key = EverythingEsProvider.SortCacheKey)
+        return EverythingEsProvider.SortCacheVal
+      val := this._ComputeSortArgs(ini)
+      EverythingEsProvider.SortCacheKey := key
+      EverythingEsProvider.SortCacheVal := val
+      return val
+    } catch {
+      return ""  ; FileGetTime/FileGetSize 失败 (权限/消失) 等意外: 退回 es 默认排序
+    }
+  }
+
+  /** `_SortArgs` 的实际计算 (只做解析, 不碰缓存)。 */
+  _ComputeSortArgs(ini) {
+    try {
       text := FileRead(ini, "UTF-8")
       if (!RegExMatch(text, "m)^sort=(.*)$", &m))
         return ""
@@ -245,8 +275,8 @@ class EverythingGuiProvider extends EverythingProvider {
     this.exe := exe
   }
 
-  Search(query, maxResults := 0) {
-    ; 降级通道无结果列表, maxResults 无意义 (签名对齐基类契约)
+  Search(query, maxResults := 0, timeoutMs := 4000) {
+    ; 降级通道无结果列表, maxResults / timeoutMs 均无意义 (签名对齐基类契约)
     if (this.exe = "" || !FileExist(this.exe))
       return {ok: false, error: ES_ERR_NOT_FOUND, items: []}
     if (!EverythingGuiProvider.AllowLaunch)
@@ -263,10 +293,40 @@ class EverythingGuiProvider extends EverythingProvider {
   }
 }
 
+/**
+ * 命令框查询桥通道 (T0'; 2026-10-24 首选) —— 0x40C。
+ *
+ * 与 es-cli 的差异: 查询在**命令框进程内**执行 (其内嵌 Everything 1.5 管道客户端),
+ * 零 spawn / 零落盘 / 零逐行解析 —— 本通道只做"发送 + 读共享内存镜像"。
+ * 实测 (memory-export-2026-10-24 §4.7): 生产形态 300 行 ~11.5ms vs es.exe ~115ms。
+ * 结果 items 直接来自镜像段 (含 isFolder 位), 无 FileExist 复核 (es-cli 有) ——
+ * 路径校验在打开时刻由会话层守卫链兜底 (OpenSelected 第④道闸)。
+ *
+ * 排序对齐 (2026-09-25 报障的 IPC 版): Everything GUI 当前排序经 IpcSortSpec 镜像成
+ * IPC3 属性 ID + 方向, 与 es-cli 的 -sort 镜像同语义。
+ */
+class EverythingIpcProvider extends EverythingProvider {
+  Name := "box-ipc"
+
+  Search(query, maxResults := 0, timeoutMs := 4000) {
+    ; timeoutMs 忽略: 命令框内部自带 3s IO 上限, 引擎侧只需 ≥ 它的发送超时 (Host 常量)
+    spec := EverythingProviders.IpcSortSpec()
+    items := EverythingHost.IpcQuery(query, maxResults, spec.prop, spec.desc)
+    if (!IsObject(items))
+      return {ok: false, error: ES_ERR_IPC, items: []}
+    ; via = "ipc": 命令框**已在本进程内渲染**这批结果 (0x40C 语义), 会话层无需再经
+    ; 0x406 重推一遍 (省一次 300 条量级的编组/发送/解码) —— 见 Session.Refresh。
+    return {ok: true, error: "", items: items, via: "ipc"}
+  }
+}
+
 /** 通道探测: 决定用哪条通道 (纯函数 + 一次缓存, 便于单测)。 */
 class EverythingProviders {
   static ResolvedEs := ""
   static ResolvedDone := false
+  ; IPC 排序规格缓存 (失效口径与 EsProvider.SortCache* 一致, 见 IpcSortSpec)
+  static IpcSortCacheKey := ""
+  static IpcSortCacheVal := ""
 
   /**
    * 按优先级探测 es.exe 落点 (结果缓存, 只在首次查询时探测一次):
@@ -317,13 +377,79 @@ class EverythingProviders {
   static Reset() {
     this.ResolvedDone := false
     this.ResolvedEs := ""
+    this.IpcSortCacheKey := ""
+    this.IpcSortCacheVal := ""
   }
 
-  /** 构造本次查询要用的通道实例。 */
+  /**
+   * IPC3 排序规格: 镜像 Everything GUI 当前排序 (Everything.ini 的 sort= / sort_ascending=)。
+   * 与 EsProvider._SortArgs 同源同语义 (es 版产出 -sort 参数, 本版产出 IPC3 属性 ID + 方向),
+   * 缓存口径也一致 (路径|mtime|size 失效键)。无 ini / 键缺失 / 键不认识 → 名称升序
+   * (es.exe 不传 -sort 时的默认, 两端默认值一致)。
+   * @returns {{prop:Integer, desc:Boolean}}
+   */
+  static IpcSortSpec() {
+    try {
+      ini := this._EverythingIniPath()
+      if (ini = "")
+        return {prop: 0, desc: false}
+      key := ini "|" FileGetTime(ini, "M") "|" FileGetSize(ini)
+      if (key = this.IpcSortCacheKey)
+        return this.IpcSortCacheVal
+      val := this._ComputeIpcSortSpec(ini)
+      this.IpcSortCacheKey := key
+      this.IpcSortCacheVal := val
+      return val
+    } catch {
+      return {prop: 0, desc: false}
+    }
+  }
+
+  /** `IpcSortSpec` 的实际计算 (只做解析, 不碰缓存)。 */
+  static _ComputeIpcSortSpec(ini) {
+    try {
+      text := FileRead(ini, "UTF-8")
+      if (!RegExMatch(text, "m)^sort=(.*)$", &m))
+        return {prop: 0, desc: false}
+      sortKey := StrLower(Trim(m[1]))
+      prop := 0
+      switch sortKey {
+        case "name": prop := 0
+        case "path": prop := 1
+        case "size": prop := 2
+        case "extension": prop := 3
+        case "type": prop := 4
+        case "date modified": prop := 5
+        case "date created": prop := 6
+        case "attributes": prop := 8
+        case "run count": prop := 10
+        case "date run": prop := 11
+        case "date recently changed": prop := 0   ; IPC3 无独立 ID → 名称 (与 es 不传 -sort 同后果)
+        case "file list filename": prop := 0
+        case "availability": prop := 0
+      }
+      asc := RegExMatch(text, "m)^sort_ascending=(.*)$", &a) ? Trim(a[1]) : "1"
+      return {prop: prop, desc: (asc = "0")}
+    } catch {
+      return {prop: 0, desc: false}
+    }
+  }
+
+  /** Everything.ini 落点 (与 EsProvider._EverythingIni 同口径, 独立成方法避免通道间耦合)。 */
+  static _EverythingIniPath() {
+    exe := EverythingSettings.EverythingPath
+    if (exe != "") {
+      SplitPath(exe, , &dir)
+      cand := dir "\Everything.ini"
+      if FileExist(cand)
+        return cand
+    }
+    cand := A_AppData "\Everything\Everything.ini"
+    return FileExist(cand) ? cand : ""
+  }
+
+  /** 构造本次查询要用的通道实例 (0x40C 查询桥优先; 其失败由编排层回落 es/gui)。 */
   static Create() {
-    es := this.ResolveEs()
-    if (es != "")
-      return EverythingEsProvider(es)
-    return EverythingGuiProvider(EverythingSettings.EverythingPath)
+    return EverythingIpcProvider()
   }
 }
