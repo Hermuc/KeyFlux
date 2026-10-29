@@ -36,6 +36,7 @@ use crate::geometry::{self, FrameGeom};
 use crate::protocol::{on_event, AppEvent, AppState, Command};
 use crate::render::{BackendError, FrameState, RenderBackend};
 use crate::results;
+use crate::search::bridge::note_channel;
 use crate::skin::Skin;
 use crate::sound::SoundBackend;
 use crate::win::dpi;
@@ -468,20 +469,35 @@ fn on_ipc_query(shell: &mut Shell, hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -
         || cds.lpData.is_null()
         || size > 64 * 1024
     {
+        note_channel(
+            "down",
+            &format!(
+                "precheck: dwData={:#x} lpDataNull={} cbData={size}",
+                cds.dwData,
+                cds.lpData.is_null()
+            ),
+        );
         return LRESULT(0);
     }
     // SAFETY: cds.lpData 已判非空, size = cds.cbData 且 ≤ 64KiB, 缓冲在消息存活期内有效。
     let bytes = unsafe { core::slice::from_raw_parts(cds.lpData as *const u8, size) };
     let Some(req) = crate::search::bridge::decode_query(bytes) else {
+        note_channel("down", &format!("decode_query 失败: cbData={size}"));
         return LRESULT(0); // 结构非法 → 忽略 (对端错误不得带崩命令框)
     };
-    let hits = match shell.ipc.query(&req) {
+    let mut hits = match shell.ipc.query(&req) {
         Some(hits) => hits,
         None => return LRESULT(0), // Everything 未运行/超时/断连 → 引擎回落旧通道
     };
+    // 排序（唯一真源在 search::ranking）：Everything 只按列排、结果平权，启动器要的是
+    // "最可能的那条在第 1 行"。排完再写镜像 —— 保证 AHK 侧的行号与框内显示一致。
+    // 失败回落到 es.exe 通道时不经这里，顺序与该通道升级前一致（有意）。
+    crate::search::ranking::rank(&mut hits, &req.text);
     if !shell.ipc.write_mirror(&hits) {
+        note_channel("down", "write_mirror 失败（共享内存段）");
         return LRESULT(0); // 镜像段失败 → 引擎拿不到 items, 同样整体回落
     }
+    note_channel("ok", &format!("query+mirror ok: hits={}", hits.len()));
     // 回推目标 = wParam (发送方窗口 = 引擎脚本窗口); 与 0x406 同一登记口径
     let sender = HWND(wparam.0 as *mut core::ffi::c_void);
     if !sender.0.is_null() {

@@ -13,6 +13,12 @@ const COMMAND_IS_DB_LOADED: u32 = 8;
 
 /// 搜索标志（ES ipc3.h IPC3_SEARCH_FLAG_*，节选）。
 const FLAG_MATCH_PATH: u32 = 0x0000_0004;
+/// 忽略标点 / 忽略空白（Everything 1.5）：`myfile` 可命中 `my-file.txt` / `my file.txt`。
+/// 启动器场景下用户不会去敲连字符或空白，这两个开关是"少打字也能搜到"的关键
+/// （2026-10-27，依据 ipc3.h:76-77）。默认常开，不做成设置项：多两个 bit 的收益
+/// 不值得我们再加一层设置管线。
+const FLAG_IGNORE_PUNCTUATION: u32 = 0x0000_0080;
+const FLAG_IGNORE_WHITESPACE: u32 = 0x0000_0100;
 const FLAG_TOTAL_SIZE: u32 = 0x0000_0800;
 const FLAG_64BIT: u32 = 0x0000_4000;
 /// 排序标志（ES ipc3.h IPC3_SEARCH_SORT_FLAG_DESCENDING）。
@@ -21,6 +27,9 @@ const SORT_FLAG_DESCENDING: u32 = 0x0000_0001;
 /// 属性 ID（ES Everything3.h EVERYTHING3_PROPERTY_ID_*）。
 const PROPERTY_NAME: u32 = 0;
 const PROPERTY_PATH: u32 = 1;
+/// 运行次数（`Everything3.h:139`，值类型 DWORD）。作为排序权重来源请求，
+/// 代价只是属性数组多一项 —— 不需要单独的 `GET_RUN_COUNT` 命令往返。
+const PROPERTY_RUN_COUNT: u32 = 10;
 
 /// 属性值类型（ES ipc3.h IPC3_PROPERTY_VALUE_TYPE_*，此处仅列需要分派的族）。
 const VALUE_BYTE: u8 = 1;
@@ -146,6 +155,12 @@ pub struct Hit {
     pub path: String,
     /// 是否文件夹。
     pub is_dir: bool,
+    /// Everything 记录的"被打开次数"（属性 ID 10，DWORD）。
+    ///
+    /// 2026-10-27：它是**排序权重**的数据源——不是额外命令，而是 SEARCH 的属性请求
+    /// 里多带一项（见 `PROPERTY_RUN_COUNT`），所以取它零额外往返。
+    /// 未请求/不可用时为 0（排序侧据此退化为次级权重）。
+    pub run_count: u32,
 }
 
 impl Hit {
@@ -181,7 +196,8 @@ impl Client {
 /// 构造 SEARCH 请求包（64 位 SIZE_T 口径）。
 fn build_request(req: &SearchRequest) -> Vec<u8> {
     let text = req.text.as_bytes();
-    let mut flags = FLAG_64BIT;
+    // IGNORE_PUNCTUATION / IGNORE_WHITESPACE 常开（见常量注释）。
+    let mut flags = FLAG_64BIT | FLAG_IGNORE_PUNCTUATION | FLAG_IGNORE_WHITESPACE;
     if req.match_path {
         flags |= FLAG_MATCH_PATH;
     }
@@ -203,11 +219,14 @@ fn build_request(req: &SearchRequest) -> Vec<u8> {
         })
         .to_le_bytes(),
     );
-    // 属性请求：NAME 与 PATH 的原始值（flags=0，不带 FORMAT/HIGHLIGHT）。
-    write_vlq(&mut packet, 2);
+    // 属性请求：NAME / PATH 的原始值 + RUN_COUNT（排序权重）；flags=0（不带 FORMAT/HIGHLIGHT）。
+    // 每项 = [property_id u32][flags u32]；value_type 由服务器决定并在响应头回显。
+    write_vlq(&mut packet, 3);
     packet.extend_from_slice(&PROPERTY_NAME.to_le_bytes());
     packet.extend_from_slice(&0u32.to_le_bytes());
     packet.extend_from_slice(&PROPERTY_PATH.to_le_bytes());
+    packet.extend_from_slice(&0u32.to_le_bytes());
+    packet.extend_from_slice(&PROPERTY_RUN_COUNT.to_le_bytes());
     packet.extend_from_slice(&0u32.to_le_bytes());
     packet
 }
@@ -279,13 +298,17 @@ fn parse_reply<R: StreamRead + ?Sized>(reader: &mut R) -> Result<SearchReply, Er
             name: String::new(),
             path: String::new(),
             is_dir: item_flags & ITEM_FLAG_FOLDER != 0,
+            run_count: 0,
         };
         for (id, flags, value_type) in &preqs {
             let value = read_value(reader, *flags, *value_type, is64)?;
-            match *id {
-                PROPERTY_NAME => hit.name = value,
-                PROPERTY_PATH => hit.path = value,
-                _ => {} // 未来扩展属性：读出但暂不使用。
+            match (*id, value) {
+                (PROPERTY_NAME, PropValue::Text(s)) => hit.name = s,
+                (PROPERTY_PATH, PropValue::Text(s)) => hit.path = s,
+                (PROPERTY_RUN_COUNT, PropValue::Num(n)) => {
+                    hit.run_count = n.min(u64::from(u32::MAX)) as u32
+                }
+                _ => {} // 未请求或非预期类型的属性：已读出，不使用。
             }
         }
         items.push(hit);
@@ -302,42 +325,39 @@ fn read_sizet<R: StreamRead + ?Sized>(reader: &mut R, is64: bool) -> Result<u64,
     }
 }
 
-/// 按值类型读取一个属性值：字符串值返回内容，其余类型读出并丢弃。
+/// 属性值：字符串（NAME/PATH）或数值（RUN_COUNT 等）。
+///
+/// 2026-10-27：原实现把非字符串属性"读出即丢"并统一返回 `String::new()`，
+/// 导致 RUN_COUNT 这类数值属性无法参与排序。改为带回数值，调用方按 ID 取用。
+enum PropValue {
+    Text(String),
+    Num(u64),
+}
+
+/// 按值类型读取一个属性值。
 fn read_value<R: StreamRead + ?Sized>(
     reader: &mut R,
     flags: u32,
     value_type: u8,
     is64: bool,
-) -> Result<String, Error> {
+) -> Result<PropValue, Error> {
     if flags & PREQUEST_FORMATTED != 0 {
-        return read_pstring(reader);
+        return read_pstring(reader).map(PropValue::Text);
     }
     match value_type {
         VALUE_PSTRING
         | VALUE_PSTRING_MULTI
         | VALUE_PSTRING_REF
         | VALUE_PSTRING_FOLDER_REF
-        | VALUE_PSTRING_FILE_REF => read_pstring(reader),
-        VALUE_BYTE | VALUE_BYTE_TEXT => {
-            reader.read_u8()?;
-            Ok(String::new())
-        }
-        VALUE_WORD | VALUE_WORD_TEXT => {
-            reader.read_u32().map(|_| ())?;
-            Ok(String::new())
-        }
+        | VALUE_PSTRING_FILE_REF => read_pstring(reader).map(PropValue::Text),
+        VALUE_BYTE | VALUE_BYTE_TEXT => Ok(PropValue::Num(u64::from(reader.read_u8()?))),
+        // WORD 族按 4 字节读取：与 ES 侧落盘宽度一致（保持既有行为，勿改窄）。
+        VALUE_WORD | VALUE_WORD_TEXT => Ok(PropValue::Num(u64::from(reader.read_u32()?))),
         VALUE_DWORD | VALUE_Q1K | VALUE_Q1K_I32 | VALUE_Q1M_I32 => {
-            reader.read_u32()?;
-            Ok(String::new())
+            Ok(PropValue::Num(u64::from(reader.read_u32()?)))
         }
-        VALUE_UINT64 => {
-            reader.read_u64()?;
-            Ok(String::new())
-        }
-        VALUE_SIZE_T => {
-            read_sizet(reader, is64)?;
-            Ok(String::new())
-        }
+        VALUE_UINT64 => Ok(PropValue::Num(reader.read_u64()?)),
+        VALUE_SIZE_T => Ok(PropValue::Num(read_sizet(reader, is64)?)),
         _ => Err(Error::BadResponse),
     }
 }
@@ -445,19 +465,21 @@ mod tests {
             sort_descending: true,
         };
         let packet = build_request(&req);
-        let parts: [&[u8]; 12] = [
-            &0x0000_4004u32.to_le_bytes()[..], // flags = 64BIT | MATCH_PATH
+        let parts: [&[u8]; 14] = [
+            &0x0000_4184u32.to_le_bytes()[..], // flags = 64BIT | MATCH_PATH | IGNORE_PUNCT | IGNORE_WS
             &[0x02, b'a', b'b'],               // VLQ(2) + "ab"
             &1u64.to_le_bytes()[..],           // offset
             &12u64.to_le_bytes()[..],          // max_results
             &[0x01],                           // 排序数 = 1
             &5u32.to_le_bytes()[..],           //   按修改时间
             &1u32.to_le_bytes()[..],           //   降序
-            &[0x02],                           // 属性请求数 = 2
+            &[0x03],                           // 属性请求数 = 3
             &0u32.to_le_bytes()[..],
             &0u32.to_le_bytes()[..], // NAME, raw
             &1u32.to_le_bytes()[..],
             &0u32.to_le_bytes()[..], // PATH, raw
+            &10u32.to_le_bytes()[..],
+            &0u32.to_le_bytes()[..], // RUN_COUNT, raw
         ];
         let expected: Vec<u8> = parts.concat();
         assert_eq!(packet, expected);
@@ -511,7 +533,7 @@ mod tests {
     fn live_search_against_running_everything() {
         let client = match Client::connect() {
             Ok(client) => client,
-            Err(Error::NotRunning) => return,
+            Err(Error::NotRunning) => return, // 未运行，或普通权限被管道 ACL 拒绝
             Err(e) => panic!("connect: {e}"),
         };
         assert!(client.is_db_loaded().expect("is_db_loaded"));
@@ -540,5 +562,11 @@ mod tests {
             .search(&SearchRequest::new("a", 12))
             .expect("wide search");
         assert_eq!(wide.items.len(), 12);
+
+        // RUN_COUNT 属性（排序权重来源，2026-10-27）：服务器若回显了额外的属性项而
+        // 解析没跟着走，path/name 会立刻错位 —— 上面的 keyflux 断言就是错位探测器。
+        // ⚠️ 本测试只在**提升权限**的进程里真正执行：实测普通权限连接
+        // `\\.\pipe\Everything IPC` 会得到 ERROR_ACCESS_DENIED（管道 ACL 只放行
+        // 提升进程），此时 connect 失败，本函数在上面就 return 了。
     }
 }

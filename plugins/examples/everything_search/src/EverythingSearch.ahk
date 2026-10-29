@@ -22,10 +22,12 @@ class EverythingSearch {
   ;     ② 0x406 载荷 = 条目×(标题+路径+长度头), 7 万条约 9-11MB > MAX_PAYLOAD_BYTES (4MiB,
   ;        插件与命令框两侧同值) ⇒ BuildResultsPayload 构造失败**静默拒绝** ⇒ 不出列表;
   ;     ③ 即使载荷侥幸 < 4MiB, 数万条目的编组/解码也是无谓开销。
-  ;   取值 1000: 列表可滚动 (命令框按总数画滚动条), 1000 条远超人工浏览范围; 载荷 ≈
-  ;   150KB, 通道导出 + 解析 (1000 次 FileExist) 均在几十毫秒级。真要找「第 1000 条以后」,
-  ;   正确动作是细化检索词, 而不是滚动千行列表。
-  static MAX_RESULTS := 1000
+  ;   取值 50 (2026-10-27 修订, 原 1000): 可视区只有 12 行, 其余靠 ↑↓/滚轮跟随;
+  ;   而 1000 条对 AHK 侧意味着 1000 次镜像解析 + 对象构造 (~150KB), 其中真正会被
+  ;   使用的只有高亮那一行的 path (OpenSelected) ⇒ 多取的 950 条是纯搬运。
+  ;   50 = 可视 12 行 + 近 4 屏缓冲, 足够覆盖「滚动看看」的手感; 需要更多时正确动作
+  ;   是细化检索词, 而不是搬千行。命中总数改由镜像头部的 total 提供 (2026-10-27)。
+  static MAX_RESULTS := 50
 
   ; ---- 会话状态缓存 (2026-10-20 首搜延迟批) ----
   ;
@@ -240,10 +242,13 @@ class EverythingSearch {
 
     ; 0x40C 桥失败 (框未更新/Everything 未运行/超时) ⇒ 回落旧通道, 行为与升级前一致。
     if (!res.ok && res.error = ES_ERR_IPC) {
+      this._NoteChannel("down", "0x40C box-ipc 失败 ⇒ 回落 es-cli")
       es := EverythingProviders.ResolveEs()
       active := (es != "") ? EverythingEsProvider(es)
                            : EverythingGuiProvider(EverythingSettings.EverythingPath)
       res := active.Search(query, this.MAX_RESULTS, timeout)
+    } else if (res.ok && res.via = "ipc") {
+      this._NoteChannel("ok", "0x40C box-ipc 正常")
     }
 
     ; 冷启动竞态: Everything 进程已在但数据库仍在加载, es 可能返回空/失败 —— 重试一次。
@@ -255,6 +260,25 @@ class EverythingSearch {
     }
     this.LastQueryTick := A_TickCount   ; 供 WarmUp 判定"是否已经热着" (见其注释)
     return res
+  }
+
+  ; ---- 通道状态诊断 (2026-10-27) ----
+  ;
+  ; 为什么需要它：IPC 桥成功与回落 es-cli 在 UI 上**看不出区别**（都是 50 条列表），
+  ;   而两者的延迟差 10 倍。排查"到底走的哪条"时，这是唯一可靠的证据。
+  ; 为什么只在状态变化时写：每次查询都写会把文件刷爆（一次输入 ≈ 每键一行）。
+  ;   状态机保证"失败一行、恢复一行"，文件天然有界。
+  static ChannelState := ""
+
+  static _NoteChannel(state, msg) {
+    if (this.ChannelState = state)
+      return
+    this.ChannelState := state
+    ; 路径用 A_Temp 而不是 A_ScriptDir：A_ScriptDir 随「谁在运行」漂移 ——
+    ; 引擎里是插件根目录，探针里是 tests/ 子目录（实测把日志写进仓库、并让
+    ; check-plugins-mirror 报 "Only in .../tests: ipc_channel.log" 而变红）。
+    try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " [" state "] " msg "`n"
+        , A_Temp "\kf-everything-channel.log", "UTF-8")
   }
 
   /** 供 UI 提示: 当前生效的通道名。 */

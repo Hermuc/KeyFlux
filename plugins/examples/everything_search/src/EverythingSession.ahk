@@ -336,14 +336,21 @@ class EverythingSession {
       return
     }
     this.items := res.items
+    ; 🔴 用 HasOwnProp 取 via，不要直接 `res.via`（2026-10-27 实测崩过一次）：
+    ;   AHK v2 访问不存在的属性抛 PropertyError 而不是返回空 —— 旧通道（es-cli）
+    ;   的成功返回曾漏掉 via 字段，于是只要 IPC 桥失败回落到 es，每次搜索都会
+    ;   抛 "This value of type Object has no property named via" 并被全局处理器
+    ;   弹成"KeyFlux 内部错误已记录"。缺省语义 = ""（非 ipc ⇒ 需显式推 0x406），
+    ;   与旧行为一致。provider 侧也已补齐 via（双保险，另有探针守）。
+    via := res.HasOwnProp("via") ? res.via : ""
     if (res.items.Length = 0) {
       this.index := 0
-      if (res.via != "ipc")
+      if (via != "ipc")
         EverythingResults.Hide()   ; IPC 空结果框已自行收起; es 空结果需显式收
       return
     }
     this.index := 1
-    if (res.via != "ipc")
+    if (via != "ipc")
       EverythingResults.Show(res.items, this.index)   ; IPC 已渲染; es 需推 0x406
   }
 

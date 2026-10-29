@@ -9,7 +9,7 @@
 ;     ① ParseExport 逐行 FileExist × 7 万+ ⇒ 引擎线程阻塞数秒 = 「卡死」;
 ;     ② 0x406 载荷 9-11MB > MAX_PAYLOAD_BYTES (4MiB, 两端同值) ⇒ BuildResultsPayload
 ;        构造失败被静默拒绝 ⇒ 「不出列表」。
-;   修复 = EverythingSearch.MAX_RESULTS (1000) 作为条数策略, 经 Search(query, maxResults)
+;   修复 = EverythingSearch.MAX_RESULTS 作为条数策略 (2026-10-05 定 1000, 2026-10-27 降至 50), 经 Search(query, maxResults)
 ;   传入通道层, es.exe 以 `-n` 落实 (实测 -n 在**排序之后**截断, 不破坏 GUI 同序)。
 ;
 ; 被测对象 = 真源 ../src/Everything{Providers,Search,Settings}.ahk (直接 #Include, 不复制不改写)。
@@ -124,7 +124,9 @@ if (!haveEs) {
 
 if (haveEs && haveEverything) {
     ; ---- 3) 上限在通道出口生效 ----
-    res := p.Search("ge", EverythingSearch.MAX_RESULTS)
+    ; 🔴 用字面量 1000 而非产品常量: 本组验的是"通道层 -n 是否在出口生效"这个**机制**,
+    ;    与产品策略常量解耦 —— 策略从 1000 调到 50 (2026-10-27) 后本组仍成立。
+    res := p.Search("ge", 1000)
     Check("3a Search('ge', 1000) ok=true", (res.ok = true))
     Check("3b 条数恰好 1000 (got " res.items.Length ")", (res.items.Length = 1000))
 
@@ -141,7 +143,8 @@ if (haveEs && haveEverything) {
     }
 
     ; ---- 5) 策略常量 ----
-    Check("5 EverythingSearch.MAX_RESULTS = 1000", (EverythingSearch.MAX_RESULTS = 1000))
+    Check("5 EverythingSearch.MAX_RESULTS = 50 (2026-10-27: 1000→50)",
+        (EverythingSearch.MAX_RESULTS = 50))
 
     ; ---- 6) 端到端 (生产调用链: Run → EnsureRunning → Create → Search(query, MAX)) ----
     runRes := EverythingSearch.Run("ge")
@@ -161,6 +164,14 @@ if (haveEs && haveEverything) {
         }
     }
     Check("7 全部条目含 path/name/isFolder", okFields)
+
+    ; ---- 8) 通道返回契约: 成功返回必须带 via ----
+    ; 🔴 2026-10-27 崩过一次: EsProvider 的成功返回漏了 via 字段, 而 Session 直接读
+    ;    res.via (AHK v2 访问不存在属性抛 PropertyError) ⇒ 只要 IPC 桥回落 es-cli,
+    ;    每次搜索都弹"KeyFlux 内部错误已记录"。此断言锁住"成功返回必带 via"。
+    Check("8a es 通道成功返回带 via 字段", runRes.HasOwnProp("via"))
+    Check("8b via = es-cli (got " (runRes.HasOwnProp("via") ? runRes.via : "<缺>") ")",
+        (runRes.HasOwnProp("via") && runRes.via = "es-cli"))
 }
 
 Emit("------")

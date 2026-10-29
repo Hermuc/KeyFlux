@@ -172,11 +172,15 @@ class EverythingHost {
     if (IsObject(impl))
       return impl.IpcQuery(query, maxResults, sortProp, sortDesc)
     hwnd := this._FindBoxWindow()
-    if (!hwnd)
+    if (!hwnd) {
+      EverythingHost._NoteIpcFail("找不到命令框窗口")
       return 0
+    }
     pkg := EverythingHost.BuildIpcQueryPayload(query, maxResults, sortProp, sortDesc)
-    if (!IsObject(pkg))
+    if (!IsObject(pkg)) {
+      EverythingHost._NoteIpcFail("载荷编码失败")
       return 0
+    }
     cds := Buffer((A_PtrSize = 8) ? 24 : 12, 0)
     NumPut("Ptr", EverythingHost.IPC_QUERY_MAGIC, cds, 0)
     NumPut("UInt", pkg.size, cds, A_PtrSize)   ; 发送长度不含尾部 NUL (见 builder 注释)
@@ -185,9 +189,33 @@ class EverythingHost {
     try DllCall("user32\SendMessageTimeoutW", "ptr", hwnd, "uint", 0x004A
         , "ptr", A_ScriptHwnd, "ptr", cds, "uint", 0x0008
         , "uint", EverythingHost.IPC_SEND_TIMEOUT_MS, "ptr*", &r := 0)
-    if (r = 0)
+    if (r = 0) {
+      ; lastError=5 是 UIPI(权限不对等); 0 常见于对端没处理/超时/崩溃。
+      EverythingHost._NoteIpcFail("发送失败 hwnd=" hwnd " lastError=" A_LastError
+          " size=" pkg.size)
       return 0
-    return EverythingHost.ReadIpcMirror()
+    }
+    items := EverythingHost.ReadIpcMirror()
+    if (!IsObject(items))
+      EverythingHost._NoteIpcFail("已收到应答(非0)但镜像段读不出")
+    return items
+  }
+
+  /**
+   * IPC 失败原因埋点 (2026-10-27)。只在**原因变化**时写一行, 避免逐键刷屏。
+   *
+   * 为什么需要: 0x40C 失败在会话层只表现为"回落 es-cli", 而失败点有四段
+   * (找窗/编码/发送/读镜像), 不埋点就只能靠猜。日志与命令框侧的
+   * kf-commandinput-ipc.log 配对使用 —— 一边记"哪一步没走通", 一边记"查询本身报了什么"。
+   */
+  static _LastIpcFail := ""
+
+  static _NoteIpcFail(reason) {
+    if (EverythingHost._LastIpcFail = reason)
+      return
+    EverythingHost._LastIpcFail := reason
+    try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " [ipc-fail] " reason "`n"
+        , A_Temp "\kf-everything-ipc-fail.log", "UTF-8")
   }
 
   /**
@@ -217,19 +245,37 @@ class EverythingHost {
   /** 打开并读取镜像段; @returns {Array|0} (段不存在/解析失败 = 0)。 */
   static ReadIpcMirror() {
     h := 0
-    try h := DllCall("kernel32\OpenFileMappingW", "uint", 0x0004, "int", false
-        , "wstr", EverythingHost.IPC_MIRROR_NAME, "ptr")
-    if (!h)
+    try {
+      h := DllCall("kernel32\OpenFileMappingW", "uint", 0x0004, "int", false
+          , "wstr", EverythingHost.IPC_MIRROR_NAME, "ptr")
+    } catch as e {
+      EverythingHost._NoteIpcFail("OpenFileMapping 抛异常: " e.Message)
       return 0
+    }
+    errOpen := A_LastError
+    if (!h) {
+      EverythingHost._NoteIpcFail("OpenFileMapping 失败 lastError=" errOpen
+          " name=" EverythingHost.IPC_MIRROR_NAME)
+      return 0
+    }
     items := 0
     p := 0
+    ; 🔴 末参数类型必须写 "UPtr"，不能写 "usize"（那是 Rust 的写法）：
+    ;   AHK 的类型串白名单里没有 usize，DllCall 会**在调用前**抛异常；
+    ;   由于外层有 try，异常被吞成"p=0 且 lastError=0"——看起来像系统拒绝映射，
+    ;   实际一行代码都没执行到内核（2026-10-27 实测踩到，排查了两轮）。
     try p := DllCall("kernel32\MapViewOfFile", "ptr", h, "uint", 0x0004
-        , "uint", 0, "uint", 0, "usize", 0, "ptr")
+        , "uint", 0, "uint", 0, "UPtr", 0, "ptr")
+    errMap := A_LastError
     if (p)
       items := EverythingHost.ParseIpcMirrorAt(p)
+    else
+      EverythingHost._NoteIpcFail("MapViewOfFile 失败 lastError=" errMap)
     if (p)
       DllCall("kernel32\UnmapViewOfFile", "ptr", p)
     DllCall("kernel32\CloseHandle", "ptr", h)
+    if (!IsObject(items) && p)
+      EverythingHost._NoteIpcFail("镜像解析失败 (魔数/count 不符, 见 ParseIpcMirrorAt)")
     return items
   }
 
@@ -243,11 +289,17 @@ class EverythingHost {
    */
   static ParseIpcMirrorAt(ptr) {
     try {
-      if (NumGet(ptr, 0, "UInt") != EverythingHost.IPC_MIRROR_MAGIC)
+      magic := NumGet(ptr, 0, "UInt")
+      if (magic != EverythingHost.IPC_MIRROR_MAGIC) {
+        EverythingHost._NoteIpcFail("镜像魔数不符: got=" Format("{:#x}", magic)
+            " expect=" Format("{:#x}", EverythingHost.IPC_MIRROR_MAGIC))
         return 0
+      }
       count := NumGet(ptr, 4, "UInt")
-      if (count > EverythingHost.IPC_MAX_ITEMS)
+      if (count > EverythingHost.IPC_MAX_ITEMS) {
+        EverythingHost._NoteIpcFail("镜像 count 超限: " count)
         return 0
+      }
       items := []
       off := 8
       loop count {

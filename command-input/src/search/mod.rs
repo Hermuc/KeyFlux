@@ -9,3 +9,6 @@
 pub mod ipc;
 
 pub mod bridge;
+
+/// 结果排序（唯一真源）。命令框在渲染前调用；AHK 侧不参与排序。
+pub mod ranking;
