@@ -12,6 +12,8 @@
 //! 携带跨进程内存。引擎在 0x40C 调用**返回后**读本进程已写好的镜像段，
 //! 时序天然同步 (单写单读，无需锁)。
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
 use windows::Win32::System::Memory::{
@@ -120,6 +122,58 @@ pub fn encode_mirror(hits: &[Hit]) -> Vec<u8> {
     out
 }
 
+/// 通道状态日志（**仅在状态变化时**写一行）。
+///
+/// 为什么需要：0x40C 失败在引擎侧只表现为"回落 es-cli"——UI 看不出、引擎错误日志里
+/// 也没有，排查时无法区分"连不上 Everything"与"查询被服务器拒绝/超时"。
+/// 本函数把原因落到 `%TEMP%\kf-commandinput-ipc.log`，与 AHK 侧
+/// `kf-everything-channel.log` 对称（一边记谁在查，一边记查的时候出了什么错）。
+///
+/// 为什么只在变化时写：命中失败时每一键都会重试一次，逐次写会刷爆文件。
+static LAST_STATE_DOWN: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn note_channel(state: &str, msg: &str) {
+    let down = state == "down";
+    if LAST_STATE_DOWN.swap(down, Ordering::Relaxed) == down {
+        return; // 状态未变化，不重复写
+    }
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let line = format!("[{state}] unix={ts} {msg}\n");
+    append_log(&line);
+}
+
+/// 落盘（两级候选）：先 `%TEMP%`，失败退到 exe 所在目录。
+///
+/// 为什么要 fallback：本机实测计划任务（Highest/Interactive）拉起的进程里
+/// `std::env::temp_dir()` 不可写，日志**静默消失**——诊断代码写着却不产出任何东西，
+/// 比没有更糟（排查时会误以为"这条分支没走到"）。exe 目录（部署树 bin/）是同用户可写的。
+fn append_log(line: &str) {
+    use std::io::Write;
+    const NAME: &str = "kf-commandinput-ipc.log";
+
+    let mut candidates: Vec<std::path::PathBuf> = vec![std::env::temp_dir().join(NAME)];
+    if let Some(dir) = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(std::path::Path::to_path_buf))
+    {
+        candidates.push(dir.join(NAME));
+    }
+    for path in candidates {
+        let ok = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .and_then(|mut f| f.write_all(line.as_bytes()))
+            .is_ok();
+        if ok {
+            return;
+        }
+    }
+}
+
 /// 桥: 缓存 IPC 客户端 + 惰性创建镜像段 (单线程 UI 线程持有, 无锁)。
 #[derive(Debug)]
 pub struct Bridge {
@@ -141,7 +195,16 @@ impl Bridge {
     /// 调用方据此让引擎回落旧通道; 出错的连接按约定丢弃, 下次重连。
     pub fn query(&mut self, req: &QueryReq) -> Option<Vec<Hit>> {
         if self.client.is_none() {
-            self.client = Some(Client::connect().ok()?);
+            match Client::connect() {
+                Ok(c) => {
+                    note_channel("ok", "connected");
+                    self.client = Some(c);
+                }
+                Err(e) => {
+                    note_channel("down", &format!("connect: {e:?}"));
+                    return None;
+                }
+            }
         }
         let search = SearchRequest {
             text: req.text.clone(),
@@ -153,7 +216,10 @@ impl Bridge {
         };
         match self.client.as_ref()?.search(&search) {
             Ok(reply) => Some(reply.items),
-            Err(_) => {
+            Err(e) => {
+                // 记下失败原因：connect 失败 / 服务器拒绝 / 超时 / 断连 在引擎侧
+                // 只表现为"回落 es"，不写日志则无从区分（2026-10-27 实测卡在这里）。
+                note_channel("down", &format!("search: {e:?}"));
                 self.client = None; // Err 后连接不可复用 (见 ipc/mod.rs 约定)
                 None
             }
@@ -252,6 +318,7 @@ mod tests {
             name: name.into(),
             path: path.into(),
             is_dir,
+            run_count: 0,
         }
     }
 

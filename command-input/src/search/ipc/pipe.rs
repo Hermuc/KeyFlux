@@ -29,8 +29,14 @@ const INSTANCE_SUFFIXES: [&str; 3] = ["", " (1.5a)", " (1.5)"];
 /// 单次 IO 等待上限：一次查询完整往返的保守上界（活体实测 ~12ms，见 §4.7）。
 const IO_TIMEOUT_MS: u32 = 3000;
 /// 管道忙时的重试节奏。
-const BUSY_RETRIES: u32 = 2;
-const BUSY_RETRY_DELAY: Duration = Duration::from_millis(50);
+///
+/// 2026-10-27 由 2×50ms（总 100ms）放宽到 5×100ms（总 500ms）：Everything 同一时刻
+/// 只服务一个查询，当它正被 GUI 或其他程序占用时管道会返回 ERROR_PIPE_BUSY，原预算
+/// 太短，会把"对方暂时忙"误判成 `NotRunning` 而直接回落到 es.exe。
+/// 参考 `ib-everything` 的默认 10s/100ms；我们保守取 500ms —— 本查询跑在 AHK 的
+/// 同步路径上，等太久会直接表现成输入卡顿，宁可早回落也不要把命令框冻住。
+const BUSY_RETRIES: u32 = 5;
+const BUSY_RETRY_DELAY: Duration = Duration::from_millis(100);
 /// 单条消息数据段的内存上限（防异常响应撑爆内存）。
 const MAX_MESSAGE: usize = 64 * 1024 * 1024;
 /// 分块读写的块大小。

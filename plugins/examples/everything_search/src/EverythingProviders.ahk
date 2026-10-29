@@ -103,7 +103,9 @@ class EverythingEsProvider extends EverythingProvider {
       return {ok: false, error: ES_ERR_EXPORT, items: []}
     }
     try FileDelete(out)   ; 结果已读入内存; 删除失败不影响功能 (临时目录可回收)
-    return {ok: true, error: "", items: this.ParseExport(text)}
+    ; via = "es-cli": 结果需由会话层经 0x406 推给命令框（与 box-ipc 的"框已自渲染"相反）。
+    ; 🔴 2026-10-27 补：此前漏了本字段，导致 IPC 回落时 Session 读 res.via 抛 PropertyError。
+    return {ok: true, error: "", items: this.ParseExport(text), via: "es-cli"}
   }
 
   /**
