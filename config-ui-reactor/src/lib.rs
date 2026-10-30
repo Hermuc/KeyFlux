@@ -4,7 +4,8 @@
 //! 边界原则：**换实现，不换边界** —— Go 后端 / AHK 引擎 / `data/config.json` 真源 /
 //! HTTP 协议串（KEYFLUX_PORT 等）全部不动，风险限制在「一个 HTTP 客户端 + 一套 UI」。
 //!
-//! 分层（规范原文归档在仓内 `doc/poc-archive/01-项目规范.md`）：
+//! 分层（规范见本目录 `README.md`；POC 期规范原文已清理，需要时从 git 历史
+//! `c44ddb1:doc/poc-archive/01-项目规范.md` 取回）：
 //!   `app`       组件与导航（根组件 + 视图 + 弹窗 + 状态）
 //!   `ui`        可复用视图构件（卡片/行/按钮/指示字等纯渲染单元）
 //!   `theme`     主题令牌（Color/Brush/CornerRadius/Thickness）
