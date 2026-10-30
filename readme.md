@@ -57,7 +57,7 @@
 - 🖱️ **滚动条交互**：悬停即时加粗、移开立即变细（Fluent 默认 0.5s/2s 延迟 → 0），Thumb 两端胶囊圆角，宽度 14px → 13px
 - 🔧 **其他**：设置页菜单高亮跟随页面、快捷键输入框对齐、保存按钮常驻、导航图标换回 MDI 风格
 
-> 🔧 开发者如需逐条修改记录（涉及文件、原因、技术细节），见 [变更记录 CHANGELOG](./docs/CHANGELOG.md) 与 [架构契约](./docs/CONTRACTS.md)（2026-09-05 起，当前权威）。
+> 🔧 开发者：先看 [文档总索引](./docs/README.md)（全部文档按用途分类，含「为什么有些文档不在这里」）；逐条修改记录见 [CHANGELOG](./docs/CHANGELOG.md)，行为契约见 [CONTRACTS](./docs/CONTRACTS.md)（2026-09-05 起，当前权威）。
 
 </details>
 
