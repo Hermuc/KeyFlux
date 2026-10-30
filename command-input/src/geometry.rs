@@ -59,6 +59,14 @@ pub fn font_height_px(dpi: f64) -> i32 {
     (config::FONT_HEIGHT_DIP * dpi / config::DIP_BASE_DPI).round() as i32
 }
 
+/// 搜索模式字号像素 (2026-10-30): 与 [`font_height_px`] 同构, 只是 DIP 来源不同。
+///
+/// 两者共用 `dip_px` ⇒ 缩放口径不会分叉; 单测锁"严格小于常态字号",
+/// 保证任何调参都不会把搜索模式渲染得比常态更大。
+pub fn search_font_height_px(dpi: f64) -> i32 {
+    dip_px(config::SEARCH_FONT_HEIGHT_DIP, dpi).max(8)
+}
+
 /// 原版文字排版 (2026-10-04 活体定案, probe_diag.py): 每字形占**固定步距**
 /// = 4×网格步距 DIP (80 DIP → 100px @125%; 原版 8 字符 pitch 总和 700.5px/7 = 100.07px),
 /// 字形居中于各自单元格, 整串以白框中心为轴 (单字符中心 463 vs 框中心 462.5)。
@@ -67,6 +75,16 @@ pub const TEXT_PITCH_GRID_CELLS: f64 = 4.0;
 /// 文字步距像素 = round(4 × 20 DIP × dpi / 96) (@125% = 100px)。
 pub fn text_pitch_px(dpi: f64) -> i32 {
     (TEXT_PITCH_GRID_CELLS * config::GRID_STEP_DIP * dpi / config::DIP_BASE_DPI).round() as i32
+}
+
+/// 搜索模式文字步距像素 (2026-10-30): 与 [`text_pitch_px`] 同构, 只换格数来源。
+///
+/// 格数取自 `config::SEARCH_TEXT_PITCH_GRID_CELLS` (3.0) ⇒ 与字号/颜色三个搜索态参数
+/// 集中在 config 一处, 便于整体开关。**调用方须知**: 结果必须大于搜索态字形宽,
+/// 否则 `DrawTextW` 会把字裁掉 (无 DT_NOCLIP); 该不变量由下方单测锁定。
+pub fn search_text_pitch_px(dpi: f64) -> i32 {
+    (config::SEARCH_TEXT_PITCH_GRID_CELLS * config::GRID_STEP_DIP * dpi / config::DIP_BASE_DPI)
+        .round() as i32
 }
 
 /// 参考实现 :69 口径: 文字水平内边距 = round(白框高 × 0.14)。
@@ -321,11 +339,50 @@ mod tests {
         assert_eq!(font_height_px(96.0), 44);
     }
 
+    /// 搜索模式字号必须**严格小于**常态字号, 且在常见 DPI 下不塌成 8px 下限。
+    #[test]
+    fn search_font_is_smaller_than_normal() {
+        for dpi in [96.0, 120.0, 144.0, 168.0, 192.0] {
+            let normal = font_height_px(dpi);
+            let search = search_font_height_px(dpi);
+            assert!(
+                search < normal,
+                "dpi {dpi}: search {search} >= normal {normal}"
+            );
+            assert!(search > 8, "dpi {dpi}: search {search} 触到下限");
+        }
+        // @125% 定案值: 30 DIP → 38px
+        assert_eq!(search_font_height_px(120.0), 38);
+    }
+
     /// 原版排版活体定案: 步距 100px @125% (=4×20 DIP; 实测 pitch 100.07px)。
     #[test]
     fn text_pitch_matches_calibration() {
         assert_eq!(text_pitch_px(120.0), 100);
         assert_eq!(text_pitch_px(96.0), 80);
+    }
+
+    /// 搜索态字距: 必须**小于**常态 (才有"收紧"效果), 且必须**大于搜索态字形高**。
+    ///
+    /// 后者是裁剪红线: DrawTextW 未设 DT_NOCLIP, 默认裁剪到单元格 rect;
+    /// pitch < 字形宽时中文方块字左右会被切掉。中文字宽 ≈ 字高, 故用字高做下界。
+    #[test]
+    fn search_text_pitch_shrinks_but_stays_above_glyph() {
+        for dpi in [96.0, 120.0, 144.0, 168.0, 192.0] {
+            let normal = text_pitch_px(dpi);
+            let search = search_text_pitch_px(dpi);
+            let glyph = search_font_height_px(dpi);
+            assert!(
+                search < normal,
+                "dpi {dpi}: 搜索态 {search} 未小于常态 {normal}"
+            );
+            assert!(
+                search > glyph,
+                "dpi {dpi}: 搜索态 pitch {search} <= 字形高 {glyph} 会裁剪"
+            );
+        }
+        // @125% 定案值: 2.0 格 × 20 DIP = 40 DIP → 50px
+        assert_eq!(search_text_pitch_px(120.0), 50);
     }
 
     /// 参考实现 :69: pad = round(框高 × 0.14) → 116×0.14 = 16.24 → 16。
