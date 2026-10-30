@@ -81,6 +81,8 @@ macro_rules! frame_state {
             base_height_px: $shell.geom.h,
             results: &$shell.state.results,
             badge: $shell.state.badge,
+            // 搜索模式 = 徽标在显 (插件 0x40A/0x40B 驱动; 见 render::FrameState 注释)
+            search_mode: $shell.state.badge.is_some(),
         }
     };
 }

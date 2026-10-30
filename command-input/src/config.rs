@@ -181,6 +181,32 @@ pub const GRID_STEP_DIP: f64 = 20.0;
 pub const GRID_STEP_MIN_PX: i32 = 8;
 /// R23/R28: 文字 = 粗体 44.0 DIP (DWRITE_FONT_WEIGHT_BOLD 44.0f)。
 pub const FONT_HEIGHT_DIP: f64 = 44.0;
+/// 搜索模式下的查询区字号 (2026-10-30)。
+///
+/// 进入搜索模式 (插件发 0x40A) 后查询区文字改用本字号 —— 目的是降低"常驻大字"
+/// 的存在感, 让搜索词退居次要视觉层级。
+/// 绿色开关: 改回与 `FONT_HEIGHT_DIP` 相同的值即等于关闭字号变化, 无需改其它代码。
+pub const SEARCH_FONT_HEIGHT_DIP: f64 = 30.0;
+/// 搜索模式下文字向面板底色的混合比例 (0 = 原色, 1 = 完全融进底色)。
+///
+/// 只做"变浅"这一个语义, 不引入新的颜色键: 实际色由 `skin::search_text_color`
+/// 从现有 18 键派生 ⇒ 皮肤文件、生成端、parity 基线全部零改动。
+/// 绿色开关: 设为 0.0 即等于关闭变浅。
+pub const SEARCH_TEXT_FADE: f64 = 0.45;
+/// 搜索模式下的查询区字距（格数；常态 = `geometry::TEXT_PITCH_GRID_CELLS` = 4，两者互不影响）。
+///
+/// **与 `SEARCH_FONT_HEIGHT_DIP` 联动**：pitch 固定时字变小 ⇒ 净间隙反而变大
+/// （75−43=32px → 75−38=37px），松紧比 pitch/字高 从 1.74 升到 1.97，观感更散。
+/// 故字号 34→30 时同步 3→2.5 格，维持"略紧于常态"的比值。
+///
+/// **裁剪下限按「墨迹宽」而非「em 高」算**（2026-10-30 修正）：
+/// `DrawTextW` 无 DT_NOCLIP、默认裁剪到单元格 rect，但 CJK 字形墨迹只占 em 的 ~0.9
+/// ⇒ @125% 字号 38px 时墨迹约 34px，pitch 只要 > 34px 就不会切。
+/// 2.0 格 = 50px（余量 16px，当前取值，净间隙 12px）；
+/// 1.8 格 = 45px（余量 11px，仍可用）；1.6 格 = 40px 是极限；1.4 格以下开始切边。
+///
+/// 绿色开关: 设为 4.0 即恢复原字距（单测锁定"必须小于常态"且"大于搜索态字号"）。
+pub const SEARCH_TEXT_PITCH_GRID_CELLS: f64 = 2.0;
 /// R23/参考实现 :69: 文字水平内边距 = round(白框高 × 0.14)。
 pub const TEXT_PAD_RATIO: f64 = 0.14;
 /// 参考实现 :48: bin/font/font.ttf 实测家族名 (用户更换命令字体后需同步)。

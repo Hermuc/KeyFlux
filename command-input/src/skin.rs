@@ -374,6 +374,25 @@ pub fn list_sub_color(s: &Skin) -> Rgb {
     over(title, 0.55, base)
 }
 
+/// 查询区**常态**文字色: keyColor@keyOpacity 向面板内容色混 (2026-10-30 从后端上收)。
+///
+/// 为什么上收到这里: 搜索模式的浅色版 (`search_text_color`) 必须与常态同源 —— 两处
+/// 各写一份混色公式迟早分叉 (后端曾内联此式)。混色基准是 `panel_content_color`
+/// 而非皮肤原色: 面板底色已折到内容色空间, 基准必须同空间。
+pub fn query_text_color(s: &Skin) -> Rgb {
+    over(s.key_color, s.key_opacity, panel_content_color(s))
+}
+
+/// 搜索模式下的查询区文字色 (2026-10-30): 常态文字色再向面板内容色混 `SEARCH_TEXT_FADE`。
+///
+/// 只表达"变浅"一个语义, **不新增皮肤键** ⇒ 皮肤文件、生成端、parity 基线零改动;
+/// 换任何皮肤都自动协调 (因为基准取的是该皮肤自己的底色)。
+/// `SEARCH_TEXT_FADE = 0.0` 时与 [`query_text_color`] 逐通道相等 (单测锁定)。
+pub fn search_text_color(s: &Skin) -> Rgb {
+    let fade = config::SEARCH_TEXT_FADE.clamp(0.0, 1.0);
+    over(query_text_color(s), 1.0 - fade, panel_content_color(s))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -473,6 +492,32 @@ mod tests {
         assert!((net(c.0) - 222.6).abs() <= 1.0, "R 净 {}", net(c.0));
         assert!((net(c.1) - 223.7).abs() <= 1.0, "G 净 {}", net(c.1));
         assert!((net(c.2) - 227.9).abs() <= 1.0, "B 净 {}", net(c.2));
+    }
+
+    /// 搜索模式文字必须比常态更靠近面板底色（"变浅"的可判定定义），
+    /// 但仍需保留可见对比 —— 否则等于把输入内容藏起来。
+    #[test]
+    fn search_text_is_lighter_than_query_text() {
+        let base = panel_content_color(&DEFAULT);
+        let normal = query_text_color(&DEFAULT);
+        let faded = search_text_color(&DEFAULT);
+        let dist = |c: Rgb| -> f64 {
+            let d = |a: u8, b: u8| (a as f64 - b as f64).powi(2);
+            d(c.0, base.0) + d(c.1, base.1) + d(c.2, base.2)
+        };
+        assert!(
+            dist(faded) < dist(normal),
+            "faded={faded:?} normal={normal:?} base={base:?}"
+        );
+        assert!(dist(faded) > 100.0, "变浅后与底色过近: {faded:?}");
+    }
+
+    /// 关闭开关的语义保证：`SEARCH_TEXT_FADE = 0` 时浅色版必须**逐通道等于**常态色。
+    /// 测的是 `over(c, 1.0, bg)` 的恒等性（不依赖常量当前取值）。
+    #[test]
+    fn search_text_color_is_identity_when_fade_is_zero() {
+        let c = query_text_color(&DEFAULT);
+        assert_eq!(over(c, 1.0, panel_content_color(&DEFAULT)), c);
     }
 
     /// R28: 整窗 alpha = round(0.9×255) = 230 (参考实现 :159 同口径)。

@@ -191,6 +191,9 @@ impl Drop for Dib {
 /// 懒创建的 GDI 资源 (R23: 首次 WM_PAINT 才创建) + 自合成面与合成计划。
 struct Resources {
     font: HFONT,
+    /// 搜索模式下的查询区字体 (2026-10-30): 同一 TTF 的小字号, **不新增字体文件**。
+    /// 与 `font` 并存 (两枚 HFONT 各建一次), 绘制时按 `FrameState::search_mode` 二选一。
+    search_font: HFONT,
     /// 结果行**标题**字体 (常规字重, Flow 版式上行)
     list_title_font: HFONT,
     /// 结果行**副标题**字体 (常规字重, 小一号灰)
@@ -214,6 +217,7 @@ impl Drop for Resources {
         unsafe {
             for h in [
                 HGDIOBJ(self.font.0),
+                HGDIOBJ(self.search_font.0),
                 HGDIOBJ(self.list_title_font.0),
                 HGDIOBJ(self.list_sub_font.0),
                 HGDIOBJ(self.bg_brush.0),
@@ -238,6 +242,8 @@ pub struct GdiBackend {
     gain: u8,
     /// 框内文字色 COLORREF (keyColor@keyOpacity 向背景混色)
     text_color: COLORREF,
+    /// 搜索模式下的框内文字色 COLORREF (常态色再向面板内容色混 `SEARCH_TEXT_FADE`; 2026-10-30)
+    search_text_color: COLORREF,
     /// 结果行文字色 COLORREF (当前与查询区同色, 独立字段便于后续分层调优)
     list_text_color: COLORREF,
     /// 结果行副标题 (路径) 色 COLORREF (主文字色向面板内容色混 45%, Flow 灰)
@@ -259,6 +265,7 @@ impl GdiBackend {
             hwnd: HWND::default(),
             gain: 255,
             text_color: COLORREF(0),
+            search_text_color: COLORREF(0),
             list_text_color: COLORREF(0),
             list_sub_color: COLORREF(0),
             icons: IconCache::new(),
@@ -382,6 +389,10 @@ impl GdiBackend {
         };
         // 查询区: 粗体 44.0 DIP → -55px @125% (负值 = 字符高度; R23)
         let font = make_font(geometry::font_height_px(dpi), FW_BOLD.0 as i32)?;
+        // 查询区搜索模式: 同族同字重的小字号 34.0 DIP → -43px @125% (2026-10-30)。
+        // 只换像素高度, 不引入新字体文件/新 family; 字重请求不变 ⇒ 仍精确匹配
+        // Sarasa semibold(700), 不会退化成 DirectWrite 合成粗体。
+        let search_font = make_font(geometry::search_font_height_px(dpi), FW_BOLD.0 as i32)?;
         // 结果行标题: 常规字重 14.0 DIP → -18px @125% (Flow Launcher 标定)
         let list_title_font = make_font(geometry::list_title_font_px(dpi), FW_NORMAL)?;
         // 结果行副标题: 常规字重 11.0 DIP → -14px @125%
@@ -425,6 +436,7 @@ impl GdiBackend {
 
         Ok(Resources {
             font,
+            search_font,
             list_title_font,
             list_sub_font,
             bg_brush,
@@ -640,11 +652,30 @@ impl GdiBackend {
             return;
         }
         let fw = rect.right - rect.left;
-        // SAFETY: hdc 为调用方传入的有效 DIB DC; res.font 有效; units 为本地 Vec, CharUpperW 前已 push(0) 保证 NUL 结尾且独占可变; 退出前还原字体。
+        // 搜索模式视觉降级 (2026-10-30): 三个渲染参数在此**集中选一次** —— 字号/颜色/字距。
+        //   · 字号 + 颜色: 让常驻大字退居次要视觉层级;
+        //   · 字距: pitch 由 4 格降到 3 格 (约 -25%), 整串仍以查询区中心为轴 ⇒ 向心收拢,
+        //     不会整体左移; 格子仍是逐个 DT_CENTER 居中, 字不会错位。
+        // 三者都只是渲染参数: 网格线走 `grid_step`、命中与锚点用 frame/band 几何, 都不依赖
+        // pitch ⇒ 布局零重算。裁剪约束 (pitch 必须大于字形宽) 见 geometry 的对应单测。
+        let (font, color, pitch) = if state.search_mode {
+            (
+                res.search_font,
+                self.search_text_color,
+                geometry::search_text_pitch_px(state.dpi),
+            )
+        } else {
+            (
+                res.font,
+                self.text_color,
+                geometry::text_pitch_px(state.dpi),
+            )
+        };
+        // SAFETY: hdc 为调用方传入的有效 DIB DC; font 有效 (常态/搜索态二选一); units 为本地 Vec, CharUpperW 前已 push(0) 保证 NUL 结尾且独占可变; 退出前还原字体。
         unsafe {
-            let old = SelectObject(hdc, HGDIOBJ(res.font.0));
+            let old = SelectObject(hdc, HGDIOBJ(font.0));
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, self.text_color);
+            SetTextColor(hdc, color);
             // 显示层大写化 (原版观感 'abc'→'A B C', CharUpperW 同源; NUL 结尾就地变换)
             units.push(0);
             CharUpperW(PWSTR(units.as_mut_ptr()));
@@ -664,7 +695,6 @@ impl GdiBackend {
                 cells.push((i, len));
                 i += len;
             }
-            let pitch = geometry::text_pitch_px(state.dpi);
             let n = cells.len() as i32;
             let center_x = rect.left + fw / 2;
             for (idx, &(start, len)) in cells.iter().enumerate() {
@@ -1026,16 +1056,11 @@ impl RenderBackend for GdiBackend {
             }
         }
 
-        // 文字色 = keyColor @keyOpacity 向**面板内容色**混 (不是皮肤原色: 面板底色已被
-        // `panel_content_color` 折到内容色空间, 混色基准必须同在内容色空间)。
-        let text_col = skin::over(
-            state.skin.key_color,
-            state.skin.key_opacity,
-            skin::panel_content_color(state.skin),
-        )
-        .as_colorref();
-        self.text_color = COLORREF(text_col);
-        self.list_text_color = COLORREF(text_col);
+        // 文字色 = 常态色 (keyColor@keyOpacity 向面板内容色混) 与搜索模式浅色版;
+        // 两者同源派生 (见 skin::query_text_color / search_text_color), 后端只做二选一。
+        self.text_color = COLORREF(skin::query_text_color(state.skin).as_colorref());
+        self.search_text_color = COLORREF(skin::search_text_color(state.skin).as_colorref());
+        self.list_text_color = self.text_color; // 结果行标题与查询区同色 (留独立字段便于后续分层)
         self.list_sub_color = COLORREF(skin::list_sub_color(state.skin).as_colorref());
         let res = Self::create_resources(state)?;
         let plan = res.plan.clone();
