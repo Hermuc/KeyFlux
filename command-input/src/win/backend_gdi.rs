@@ -902,7 +902,7 @@ impl GdiBackend {
             let row = RECT {
                 left: inner_l,
                 top,
-                right: lay.inner_r.max(inner_l),
+                right: lay.sel_right.max(inner_l),
                 bottom: top + row_h,
             };
             FillRect(hdc, &row, res.select_brush);
@@ -1090,6 +1090,8 @@ struct ListLayout {
     inner_r: i32,
     /// 文字右缘 (有滚动条时让出滑块列)
     text_right: i32,
+    /// 选中底色右缘 (有滑块时裁到滑块左缘, 不垫在滑块下方)
+    sel_right: i32,
     /// 文字内边距 / 强调条宽 / 图标盒尺寸与间距
     pad: i32,
     accent_w: i32,
@@ -1121,6 +1123,7 @@ impl ListLayout {
         let vis = state.results.visible_rows();
         let has_bar = total > vis && vis > 0;
         let text_right = inner_r - pad - if has_bar { sb_w + sb_m } else { 0 };
+        let sel_right = geometry::list_select_right_px(inner_r, has_bar, dpi);
         let icon_sz = geometry::list_icon_px(dpi);
         let icon_gap = geometry::list_icon_gap_px(dpi);
         Self {
@@ -1128,6 +1131,7 @@ impl ListLayout {
             inner_l,
             inner_r,
             text_right,
+            sel_right,
             pad,
             accent_w,
             icon_sz,

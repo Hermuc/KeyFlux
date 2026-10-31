@@ -103,8 +103,12 @@ pub const LIST_TEXT_PAD_DIP: f64 = 16.0;
 pub const LIST_ACCENT_DIP: f64 = 3.0;
 /// 滚动条宽 (DIP)。
 pub const LIST_SCROLLBAR_DIP: f64 = 3.0;
-/// 滚动条距内缘 (DIP)。
-pub const LIST_SCROLLBAR_MARGIN_DIP: f64 = 8.0;
+/// 滚动条距内缘 (DIP)。贴近右缘 (@125% = 5px)。
+pub const LIST_SCROLLBAR_MARGIN_DIP: f64 = 4.0;
+/// 选中底色与滚动条滑块之间的空隙 (DIP): 高光裁到滑块左缘后**再退**这一线,
+/// 两者之间留一段面板底色 (@125% = 5px, 与滑块距内缘对称; 2026-10-31 用户定版
+/// 「有一点空白」)。见 `geometry::list_select_right_px`。
+pub const LIST_SELECT_SCROLLBAR_GAP_DIP: f64 = 4.0;
 /// 可视行数上限 (兜底; 实际值按屏幕高度收敛, 见 `geometry::max_list_rows`)。
 pub const LIST_MAX_ROWS: usize = 12;
 
