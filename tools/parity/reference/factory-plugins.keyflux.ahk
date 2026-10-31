@@ -20,6 +20,9 @@
 #Include lib/context/SelectionContext.ahk
 #Include lib/rules/SelectedAction.ahk
 #Include lib/commands/CommandResolver.ahk
+#Include lib/core/ResultList.ahk
+#Include lib/core/AbbrHints.ahk
+#Include lib/commands/AbbrSuggest.ahk
 #Include lib/plugins/Plugins.ahk
 #Include ../data/plugins/everything_search/main.ahk
 #Include ../data/plugins/quick_switch/main.ahk

@@ -28,6 +28,14 @@ class CommandResolver {
   ; 空串 = 未设置 (部署版 AHK v2.0.19 无 null 关键字)
   static Strategy := ""
 
+  ; 建议层插槽, 可插拔: 精确层全部未命中时**先**问它, 它返回 true = 已接管本次输入
+  ; 变化 (显示候选列表), 则不再进容错层 (Strategy)。
+  ; 契约 (由挂接方实现, 本文件不认识具体类 —— 与 Strategy 同款的插槽写法):
+  ;   OnInput(ih, scope, input) -> bool    true = 已接管
+  ;   Hide()                              幂等收起
+  ; 空串 = 未挂接 ⇒ 行为与改动前完全一致 (部署里没有该文件时零影响)。
+  static Suggest := ""
+
   /**
    * 注册缩写命令。重复命令: 记日志, 不覆盖先到者 (约束 4)。
    * @param scope "capslock" | "semicolon"
@@ -179,6 +187,12 @@ FuzzySuffixFire(ih, char, scope) {
         catch as e
           CommandInputHooks._log("Strategy.OnExactHit 异常: " e.Message)
       }
+      ; 建议层 (若已挂接): 命令即将执行, 候选列表不得残留。
+      if (CommandResolver.Suggest != "") {
+        try CommandResolver.Suggest.Hide()
+        catch as e
+          CommandInputHooks._log("Suggest.Hide 异常: " e.Message)
+      }
       ; 只记录 + 停钩 (EndReason="Stopped" -> EnterCapslockAbbr 走「待收尾」分支);
       ; 不在回调里执行命令 —— 见函数头注释 (终止字符需要绘制时间)
       ;
@@ -198,7 +212,18 @@ FuzzySuffixFire(ih, char, scope) {
       return
     }
   }
-  ; 全部精确后缀未命中 → 委托模糊策略 (编辑距离容错 + 候选提示, 见 FuzzyStrategy.ahk)。
+  ; 全部精确后缀未命中 → 先问**建议层** (CommandResolver.Suggest: 前缀/包含候选列表,
+  ; 只显示不执行)。它说"接了"就到此为止 —— 有候选列表时不再进容错层, 免得两个显示
+  ; 通道打架。未挂接 ("" = "") 时本段零影响。
+  if (CommandResolver.Suggest != "") {
+    took := false
+    try took := CommandResolver.Suggest.OnInput(ih, scope, input)
+    catch as e
+      CommandInputHooks._log("Suggest.OnInput 异常: " e.Message)
+    if (took)
+      return
+  }
+  ; 再委托容错策略 (编辑距离容错 + 候选提示, 见 FuzzyStrategy.ahk)。
   ; 衔接关系: 精确层恒有最高优先级, 容错层只在精确层零命中时被咨询 —— dfc→fc、全串
   ; MatchList 命中两条既有通道不受影响。未挂接策略 ("" = "") 时到此为止, 静默无操作。
   if (CommandResolver.Strategy != "") {

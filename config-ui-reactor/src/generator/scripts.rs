@@ -33,6 +33,8 @@ pub fn generate_scripts(config: &mut Config, exe_dir: &Path) -> io::Result<()> {
 
     let keyflux = render_keyflux_ahk(config, Some(&catalog), Path::new("../data/plugins"));
     std::fs::write(Path::new("../bin/KeyFlux.ahk"), keyflux)?;
+    // 伴生产物: 缩写备注侧车 (引擎候选列表的说明文字; 见 generator/hints.rs)
+    crate::generator::hints::write(config, Path::new("../bin"))?;
     let skin = render_command_input_skin(config);
     std::fs::write(Path::new("../bin/CommandInputSkin.txt"), skin)?;
     Ok(())

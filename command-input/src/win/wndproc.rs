@@ -418,7 +418,9 @@ fn on_results_data(shell: &mut Shell, hwnd: HWND, wparam: WPARAM, lparam: LPARAM
     // SAFETY: ptr 已判非空; lParam 是系统为 WM_COPYDATA 编组的 COPYDATASTRUCT, 在消息处理期间有效。
     let cds = unsafe { &*ptr };
     let size = cds.cbData as usize;
-    if (cds.dwData as u32) != results::PAYLOAD_MAGIC
+    // 魔数即版本号: 收 KFR3 (带 style) 与 KFR2 (everything_search 插件仍在发)。
+    let magic = cds.dwData as u32;
+    if (magic != results::PAYLOAD_MAGIC && magic != results::PAYLOAD_MAGIC_V2)
         || cds.lpData.is_null()
         || size > results::MAX_PAYLOAD_BYTES
     {
@@ -426,7 +428,7 @@ fn on_results_data(shell: &mut Shell, hwnd: HWND, wparam: WPARAM, lparam: LPARAM
     }
     // SAFETY: cds.lpData 已判非空, size = cds.cbData 且 ≤ MAX_PAYLOAD_BYTES, 缓冲在 0x406 消息存活期内有效。
     let bytes = unsafe { core::slice::from_raw_parts(cds.lpData as *const u8, size) };
-    let Some((items, selected)) = results::decode_payload(bytes) else {
+    let Some((items, selected, style)) = results::decode_payload(bytes) else {
         return LRESULT(0); // 结构非法 → 忽略 (对端错误不得带崩命令框)
     };
     // 回推目标 = wParam (发送方窗口 = 引擎脚本窗口); 鼠标点选/悬停要发回它
@@ -434,7 +436,14 @@ fn on_results_data(shell: &mut Shell, hwnd: HWND, wparam: WPARAM, lparam: LPARAM
     if !sender.0.is_null() {
         shell.notify_target = sender;
     }
-    let cmds = on_event(AppEvent::SetResults { items, selected }, &mut shell.state);
+    let cmds = on_event(
+        AppEvent::SetResults {
+            items,
+            selected,
+            style,
+        },
+        &mut shell.state,
+    );
     execute(shell, hwnd, cmds);
     LRESULT(1) // 非 0 = 已处理
 }
@@ -511,7 +520,14 @@ fn on_ipc_query(shell: &mut Shell, hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -
     } else {
         0
     };
-    let cmds = on_event(AppEvent::SetResults { items, selected }, &mut shell.state);
+    let cmds = on_event(
+        AppEvent::SetResults {
+            items,
+            selected,
+            style: results::RowStyle::Stacked, // 0x40C = 文件搜索结果, 双行 + 图标
+        },
+        &mut shell.state,
+    );
     execute(shell, hwnd, cmds);
     LRESULT(1) // 非 0 = 已处理且镜像就绪
 }

@@ -105,6 +105,27 @@ pub fn t(key: &str) -> String {
     k.to_string()
 }
 
+/// 双语同时取出（生成期落盘用）。返回 `(zh, en)`：
+/// 某侧缺失时回退另一侧；两侧都缺则原样返回 key（去掉 `label:`）。
+///
+/// 为什么不是连调两次 [`t`] 并切换当前语言：生成物要**同时**带上两种语言
+/// （切界面语言不触发重新生成），而 `t` 依赖全局语言标记，来回切换会污染
+/// 同期其它调用方。
+pub fn both(key: &str) -> (String, String) {
+    if key.is_empty() {
+        return (String::new(), String::new());
+    }
+    let k = key.strip_prefix("label:").unwrap_or(key);
+    let Some(entry) = table().get(k) else {
+        return (k.to_string(), k.to_string()); // 纯文本备注（非 label: 键）两侧同文
+    };
+    let zh = entry.zh.clone().filter(|s| !s.is_empty());
+    let en = entry.en.clone().filter(|s| !s.is_empty());
+    let zh = zh.or_else(|| en.clone()).unwrap_or_else(|| k.to_string());
+    let en = en.unwrap_or_else(|| zh.clone());
+    (zh, en)
+}
+
 /// 翻译 + 占位符填充（`{0}` `{1}`…）。占位符缺失或数量不匹配时**不抛异常**，
 /// 返回未填充的模板 —— 旧版用 `catch (FormatException) return template`，此处天然无异常。
 pub fn t_fmt(key: &str, args: &[&str]) -> String {

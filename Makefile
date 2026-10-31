@@ -261,6 +261,14 @@ deploy-panel:
 check-hooks:
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut tools/command_input_hooks_test.ahk
 
+# check-abbr: 候选建议层 (AbbrSuggest + ResultList + AbbrHints) 的离线契约探针。
+# 锁两件最容易两端漂移的事: ① 0x406 载荷**逐字节** (对端 = command-input/src/results.rs);
+# ② 候选排序口径 (前缀 > 包含, 同级按长度/字典序, 等值不入列, 截断 MaxItems)。
+# 纯离线: 不建窗口、不注入按键、不需要命令框/引擎在跑 ⇒ 可随时并入 check。
+# 证据落 %TEMP%\kf-abbr-suggest-probe.txt (AHK 的 stdout 在部分宿主下拿不到)。
+check-abbr:
+	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut tools/abbr_suggest_probe.ahk
+
 # check-ime: ImeInputHost 的存在理由回归闸门 —— 断言 InputHook **无 V 时**确实无法承载 IME 输入
 # (该事实正是 §3.12 动态可见性方案的理论基础: IME 开启的会话由 MakeCapsHook 建为 V 透传)。
 # ⚠ 本目标需要**按键注入**, 且 KeyFlux 必须已退出 (其 #UseHook 独占键盘钩子会让全部用例收 0 字符)。
@@ -368,7 +376,10 @@ sync-out: sync-plugins | check-deploy-tree $(OUT_DIR)
 	MSYS_NO_PATHCONV=1 robocopy bin/ui $(OUT_DIR)/bin/ui /MIR /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
 	# 文件模式必须加引号: 否则在 make 工作目录(仓库根)被 shell 展开, *.exe 会变成根目录下的 KeyFlux.exe,
 	# 导致 bin/settings.exe 等永远同步不到部署目录 (历史遗留缺陷)
-	MSYS_NO_PATHCONV=1 robocopy bin $(OUT_DIR)/bin '*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll' /XF KeyFlux.ahk KeyFlux-CommandInput.exe /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
+	# /XF 追加 abbr-hints.gen.txt: 它是**按本机 config 生成**的派生物 (缩写备注), 仓库里那份
+	# 对应仓库配置 —— 一并推过去会把部署树的备注覆盖成仓库的 (条数都对不上)。
+	# 正确来源是部署树的 settings.exe GenerateAHK (见 hints.rs), 故与 KeyFlux.ahk 同列排除。
+	MSYS_NO_PATHCONV=1 robocopy bin $(OUT_DIR)/bin '*.ahk' '*.exe' '*.ps1' '*.txt' '*.dll' /XF KeyFlux.ahk KeyFlux-CommandInput.exe abbr-hints.gen.txt /NFL /NDL /NJH /NJS; [ $$? -le 7 ]
 
 # patch-commandinput: 对**闭源上游**命令框 exe 重施「抑制八角 keycap」数据 patch (契约 §3.11)。
 # 🔴 现状 (2026-10-07): 命令框已是自研 Rust 产物 (command-input/), 不含上游那段 0x1CCA0

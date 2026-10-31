@@ -4,6 +4,7 @@ KeyFlux
 bin/site
 bin/ui/
 bin/KeyFlux.ahk
+bin/abbr-hints.gen.txt
 bin/templates
 bin/keyflux-settings-server
 bin/keyflux-settings-server.exe

@@ -38,14 +38,56 @@ impl Item {
     }
 }
 
-/// 0x406 载荷魔数: 字节序 = `K` `F` `R` `2` (小端 u32 → 0x3252_464B)。
+/// 0x406 载荷魔数: 字节序 = `K` `F` `R` `3` (小端 u32 → 0x3352_464B)。
 ///
-/// 二版 (双行 + 路径图标键): 与一版 `KFR1` (单字符串/项) **不兼容** —— 魔数即版本号,
-/// 旧框收到 KFR2 一律拒收 (静默忽略), 新框收到 KFR1 同样拒收; 两端同批部署。
-pub const PAYLOAD_MAGIC: u32 = 0x3252_464B;
+/// 三版 = 二版 + 头里的 `style` (行版式)。魔数即版本号:
+/// 旧框收到 KFR3 一律拒收 (静默忽略), 新框收到 KFR3/KFR2 都收。
+pub const PAYLOAD_MAGIC: u32 = 0x3352_464B;
 
-/// 载荷头字节数 = 魔数(4) + selected(4) + count(4)。
-pub const HEADER_BYTES: usize = 12;
+/// 二版魔数 `KFR2` —— **仍然接收**。
+///
+/// 为什么保留: `everything_search` 插件仍按二版发 (双行 + 路径图标键), 且它是随包
+/// 分发的独立文件, 不该为命令框的一次内部演进同步改。旧版=无 style 字段 ⇒ 按
+/// [`RowStyle::Stacked`] 解释即可, 语义完全等价于加字段之前。
+pub const PAYLOAD_MAGIC_V2: u32 = 0x3252_464B;
+
+/// 载荷头字节数 = 魔数(4) + selected(4) + count(4) + style(4)。
+pub const HEADER_BYTES: usize = 16;
+
+/// 二版载荷头字节数 (无 style 字段; 解码兼容用)。
+pub const HEADER_BYTES_V2: usize = 12;
+
+/// 结果行的版式。同一次 0x406 内所有行共用一种 —— 版式是**这一批结果**的属性,
+/// 不是单行属性 (混排会让行高/基线各自为政, 视觉上必然散)。
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum RowStyle {
+    /// 双行 + 左侧图标 (Flow Launcher 版式): 标题在上、副标题在下。
+    /// 副标题同时是**图标提取键** (路径) —— 文件搜索结果用这一档。
+    #[default]
+    Stacked,
+    /// 单行: 标题靠左、副标题(=备注)靠右并右对齐、无图标。
+    /// 缩写候选用这一档: 候选词只有 2~3 字符, 双行会把行高浪费在空白上;
+    /// 且备注不是路径, 交给 `SHGetFileInfoW` 只会白留一块图标位。
+    Inline,
+}
+
+impl RowStyle {
+    pub fn as_u32(self) -> u32 {
+        match self {
+            RowStyle::Stacked => 0,
+            RowStyle::Inline => 1,
+        }
+    }
+
+    /// 未知值返回 `None` —— 由调用方整体拒收该消息 (协议带版本, 不猜)。
+    pub fn from_u32(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(RowStyle::Stacked),
+            1 => Some(RowStyle::Inline),
+            _ => None,
+        }
+    }
+}
 
 /// selected 字段的「无高亮」哨兵 (提示行: 有内容但不可选)。
 pub const NO_SELECTION: i32 = -1;
@@ -63,6 +105,8 @@ pub struct ResultsState {
     scroll: usize,
     /// 可视行数上限 (创建期按屏幕高度定案, 见 `geometry::max_list_rows`)
     visible_max: usize,
+    /// 这一批结果的行版式 (见 [`RowStyle`])
+    style: RowStyle,
 }
 
 impl Default for ResultsState {
@@ -78,7 +122,13 @@ impl ResultsState {
             selected: NO_SELECTION,
             scroll: 0,
             visible_max,
+            style: RowStyle::default(),
         }
+    }
+
+    /// 当前批次的版式 (渲染层据此选行内布局)。
+    pub fn style(&self) -> RowStyle {
+        self.style
     }
 
     /// 可视行数上限 (创建期定案)。
@@ -129,8 +179,18 @@ impl ResultsState {
     }
 
     /// 整表替换 (0x406)。高亮越界时收敛; `-1` 保留为「无高亮」。
+    ///
+    /// 版式固定为 [`RowStyle::Stacked`] (双行) —— 仅测试与「未带 style」的旧协议路径用;
+    /// 生产入口是 [`ResultsState::set_with`]。
     pub fn set(&mut self, items: Vec<Item>, selected: i32) {
+        self.set_with(items, selected, RowStyle::Stacked);
+    }
+
+    /// 整表替换 + 指定版式 (0x406 KFR3)。`style` 与项集同批生效, 不单独存储 ——
+    /// 避免「版式是上一批的、项是这一批的」这种半新半旧状态。
+    pub fn set_with(&mut self, items: Vec<Item>, selected: i32, style: RowStyle) {
         self.items = items;
+        self.style = style;
         self.scroll = 0;
         self.selected = NO_SELECTION; // select() 会按新项集收敛
         self.select(selected);
@@ -184,21 +244,23 @@ impl ResultsState {
     }
 }
 
-/// 0x406 载荷编码 (引擎侧 AHK 的 `EverythingHost.BuildResultsPayload` 是本函数的镜像;
+/// 0x406 载荷编码 (引擎侧 AHK 的 `ResultList.BuildPayload` 是本函数的镜像;
 /// 两端**逐字节**必须一致 —— 单测锁定格式)。
 ///
 /// 布局 (全小端):
 /// ```text
-///   [0..4)   魔数 'KFR2'
+///   [0..4)   魔数 'KFR3'
 ///   [4..8)   selected  i32  (-1 = 无高亮; 0 基)
 ///   [8..12)  count     u32
+///   [12..16) style     u32  (0 = 双行+图标 / 1 = 单行+右注)
 ///   重复 count 次: [title_len u32][title UTF-8][sub_len u32][sub UTF-8]
 /// ```
-pub fn encode_payload(items: &[Item], selected: i32) -> Vec<u8> {
+pub fn encode_payload(items: &[Item], selected: i32, style: RowStyle) -> Vec<u8> {
     let mut out = Vec::with_capacity(HEADER_BYTES + 48 * items.len());
     out.extend_from_slice(&PAYLOAD_MAGIC.to_le_bytes());
     out.extend_from_slice(&selected.to_le_bytes());
     out.extend_from_slice(&(items.len() as u32).to_le_bytes());
+    out.extend_from_slice(&style.as_u32().to_le_bytes());
     for it in items {
         let t = it.title.as_bytes();
         let s = it.subtitle.as_bytes();
@@ -210,19 +272,28 @@ pub fn encode_payload(items: &[Item], selected: i32) -> Vec<u8> {
     out
 }
 
-/// 0x406 载荷解码。任何结构问题 (魔数不符 / 截断 / 超限) 一律 `None` ——
-/// 调用方忽略该消息, 绝不让对端数据把命令框带崩。
-pub fn decode_payload(bytes: &[u8]) -> Option<(Vec<Item>, i32)> {
-    if bytes.len() < HEADER_BYTES || bytes.len() > MAX_PAYLOAD_BYTES {
+/// 0x406 载荷解码 (KFR3 + KFR2)。任何结构问题 (魔数不符 / 截断 / 超限 / 未知版式)
+/// 一律 `None` —— 调用方忽略该消息, 绝不让对端数据把命令框带崩。
+pub fn decode_payload(bytes: &[u8]) -> Option<(Vec<Item>, i32, RowStyle)> {
+    if bytes.len() < HEADER_BYTES_V2 || bytes.len() > MAX_PAYLOAD_BYTES {
         return None;
     }
     let magic = u32::from_le_bytes(bytes[0..4].try_into().ok()?);
-    if magic != PAYLOAD_MAGIC {
-        return None;
-    }
+    // 二版没有 style 字段 ⇒ 按双行解释 (与加字段前完全等价)。
+    let (style, header) = match magic {
+        PAYLOAD_MAGIC => {
+            if bytes.len() < HEADER_BYTES {
+                return None;
+            }
+            let raw = u32::from_le_bytes(bytes[12..16].try_into().ok()?);
+            (RowStyle::from_u32(raw)?, HEADER_BYTES)
+        }
+        PAYLOAD_MAGIC_V2 => (RowStyle::Stacked, HEADER_BYTES_V2),
+        _ => return None,
+    };
     let selected = i32::from_le_bytes(bytes[4..8].try_into().ok()?);
     let count = u32::from_le_bytes(bytes[8..12].try_into().ok()?) as usize;
-    let mut off = HEADER_BYTES;
+    let mut off = header;
     let mut items: Vec<Item> = Vec::with_capacity(count.min(1024));
     for _ in 0..count {
         // title
@@ -249,7 +320,7 @@ pub fn decode_payload(bytes: &[u8]) -> Option<(Vec<Item>, i32)> {
         off += slen;
         items.push(Item { title, subtitle });
     }
-    Some((items, selected))
+    Some((items, selected, style))
 }
 
 #[cfg(test)]
@@ -262,7 +333,7 @@ mod tests {
             .collect()
     }
 
-    /// 载荷往返: 项集/高亮逐字节一致 (AHK 侧镜像的格式锁定)。
+    /// 载荷往返: 项集/高亮/版式逐字节一致 (AHK 侧镜像的格式锁定)。
     #[test]
     fn payload_round_trip() {
         let src = vec![
@@ -270,8 +341,8 @@ mod tests {
             Item::new("路径.txt", "C:\\中文\\路径.txt"),
             Item::hint(""),
         ];
-        let bytes = encode_payload(&src, 1);
-        assert_eq!(&bytes[0..4], b"KFR2");
+        let bytes = encode_payload(&src, 1, RowStyle::Inline);
+        assert_eq!(&bytes[0..4], b"KFR3");
         // 空提示项贡献 = 两个长度头 (title "" + subtitle ""), 无内容字节
         const HINT_ITEM_BYTES: usize = 8;
         assert_eq!(
@@ -281,17 +352,48 @@ mod tests {
                 + (4 + "路径.txt".len() + 4 + "C:\\中文\\路径.txt".len())
                 + HINT_ITEM_BYTES
         );
-        let (items, sel) = decode_payload(&bytes).expect("decode");
+        let (items, sel, style) = decode_payload(&bytes).expect("decode");
         assert_eq!(items, src);
         assert_eq!(sel, 1);
+        assert_eq!(style, RowStyle::Inline);
+    }
+
+    /// 二版载荷 (`KFR2`, everything_search 插件仍在发) 必须继续被接收,
+    /// 且版式按双行解释 —— 这是"插件零改动"的前提。
+    #[test]
+    fn decode_accepts_v2_payload() {
+        let items = vec![Item::new("a.txt", "C:\\a.txt")];
+        // 手工拼 KFR2: 头 12 字节 (无 style) + 项
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"KFR2");
+        bytes.extend_from_slice(&0i32.to_le_bytes());
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        for it in &items {
+            bytes.extend_from_slice(&(it.title.len() as u32).to_le_bytes());
+            bytes.extend_from_slice(it.title.as_bytes());
+            bytes.extend_from_slice(&(it.subtitle.len() as u32).to_le_bytes());
+            bytes.extend_from_slice(it.subtitle.as_bytes());
+        }
+        let (decoded, sel, style) = decode_payload(&bytes).expect("v2 必须可解");
+        assert_eq!(decoded, items);
+        assert_eq!(sel, 0);
+        assert_eq!(style, RowStyle::Stacked);
+    }
+
+    /// 未知版式 (协议扩展位) ⇒ 整体拒收, 不猜、不降级成双行。
+    #[test]
+    fn decode_rejects_unknown_style() {
+        let mut bytes = encode_payload(&[Item::hint("a")], 0, RowStyle::Stacked);
+        bytes[12..16].copy_from_slice(&7u32.to_le_bytes());
+        assert!(decode_payload(&bytes).is_none());
     }
 
     /// 空表 + 无高亮: 合法载荷 (收起指令仍走 0x408, 但空表必须可解)。
     #[test]
     fn payload_empty_and_no_selection() {
-        let bytes = encode_payload(&[], NO_SELECTION);
+        let bytes = encode_payload(&[], NO_SELECTION, RowStyle::Stacked);
         assert_eq!(bytes.len(), HEADER_BYTES);
-        let (items, sel) = decode_payload(&bytes).expect("decode");
+        let (items, sel, _) = decode_payload(&bytes).expect("decode");
         assert!(items.is_empty());
         assert_eq!(sel, NO_SELECTION);
     }
@@ -301,14 +403,14 @@ mod tests {
     fn decode_rejects_malformed() {
         assert!(decode_payload(&[]).is_none());
         assert!(decode_payload(b"XXXX").is_none());
-        let mut bad = encode_payload(&[Item::hint("abc")], 0);
+        let mut bad = encode_payload(&[Item::hint("abc")], 0, RowStyle::Stacked);
         bad[0] = b'X';
         assert!(decode_payload(&bad).is_none());
         // 旧版一版载荷 (单字符串布局) 必须被拒 —— KFR1 魔数不符
-        let mut old = encode_payload(&[Item::hint("abc")], 0);
+        let mut old = encode_payload(&[Item::hint("abc")], 0, RowStyle::Stacked);
         old[3] = b'1';
         assert!(decode_payload(&old).is_none());
-        let good = encode_payload(&[Item::hint("abc")], 0);
+        let good = encode_payload(&[Item::hint("abc")], 0, RowStyle::Stacked);
         assert!(decode_payload(&good[..good.len() - 1]).is_none()); // 截断
         assert!(decode_payload(&good[..8]).is_none()); // 头不全
         let huge = vec![0u8; MAX_PAYLOAD_BYTES + 1];
@@ -318,7 +420,7 @@ mod tests {
     /// 解码: count 声明大于实际数据 ⇒ None (不做部分接受)。
     #[test]
     fn decode_rejects_count_overflow() {
-        let mut b = encode_payload(&[Item::hint("a")], 0);
+        let mut b = encode_payload(&[Item::hint("a")], 0, RowStyle::Stacked);
         b[8..12].copy_from_slice(&9u32.to_le_bytes());
         assert!(decode_payload(&b).is_none());
     }

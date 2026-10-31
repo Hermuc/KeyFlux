@@ -46,9 +46,10 @@ use windows::Win32::Graphics::Gdi::{
     CreateSolidBrush, DeleteDC, DeleteObject, DrawTextW, FillRect, GdiFlush, GetDC, ReleaseDC,
     SelectClipRgn, SelectObject, SetBkMode, SetTextColor, SetWindowRgn, ValidateRect, AC_SRC_ALPHA,
     AC_SRC_OVER, ANTIALIASED_QUALITY, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION,
-    CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DIB_RGB_COLORS, DRAW_TEXT_FORMAT, DT_CENTER,
-    DT_END_ELLIPSIS, DT_NOPREFIX, DT_PATH_ELLIPSIS, DT_SINGLELINE, DT_VCENTER, FR_PRIVATE, FW_BOLD,
-    HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HRGN, OUT_DEFAULT_PRECIS, RGBQUAD, TRANSPARENT,
+    CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DIB_RGB_COLORS, DRAW_TEXT_FORMAT, DT_CALCRECT, DT_CENTER,
+    DT_END_ELLIPSIS, DT_NOPREFIX, DT_PATH_ELLIPSIS, DT_RIGHT, DT_SINGLELINE, DT_VCENTER,
+    FR_PRIVATE, FW_BOLD, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HRGN, OUT_DEFAULT_PRECIS, RGBQUAD,
+    TRANSPARENT,
 };
 use windows::Win32::System::Threading::Sleep;
 use windows::Win32::UI::Controls::MARGINS;
@@ -62,6 +63,7 @@ use crate::config;
 use crate::easing::accelerate_decelerate;
 use crate::geometry;
 use crate::render::{BackendError, FrameState, RenderBackend};
+use crate::results::RowStyle;
 use crate::skin::{self, Rgb};
 use crate::win::resources;
 
@@ -78,6 +80,20 @@ const LIST_TITLE_FORMAT: DRAW_TEXT_FORMAT =
 /// `TextTrimming="CharacterEllipsis"` + 完整路径语义)。
 const LIST_SUB_FORMAT: DRAW_TEXT_FORMAT =
     DRAW_TEXT_FORMAT(DT_SINGLELINE.0 | DT_VCENTER.0 | DT_NOPREFIX.0 | DT_PATH_ELLIPSIS.0);
+
+/// 单行版式的**右侧备注**格式: 右对齐 + 尾部省略 (与 Clink 的 `right_justify` 同观感 ——
+/// 备注右缘贴齐, 读起来是一列而不是一串参差的长短句)。
+const LIST_NOTE_FORMAT: DRAW_TEXT_FORMAT = DRAW_TEXT_FORMAT(
+    DT_SINGLELINE.0 | DT_VCENTER.0 | DT_NOPREFIX.0 | DT_END_ELLIPSIS.0 | DT_RIGHT.0,
+);
+
+/// 度量用格式: `DT_CALCRECT` 只算不画 (单行时返回整串宽度, 不受 rect 右缘约束)。
+///
+/// 🔴 **不能带 `DT_END_ELLIPSIS`**: `DT_CALCRECT` 与省略号互斥 (MSDN 明示该组合未定义)。
+/// 实测 (2026-10-30) 一起用会返回 26px 这种无意义宽度 ⇒ "备注放得下吗" 的判断恒为否,
+/// 屏幕上一条备注都画不出来。**度量与绘制必须是两套格式位**, 别为省常量合并。
+const LIST_MEASURE_FORMAT: DRAW_TEXT_FORMAT =
+    DRAW_TEXT_FORMAT(DT_SINGLELINE.0 | DT_NOPREFIX.0 | DT_CALCRECT.0);
 
 /// 常规字重 (FW_NORMAL = 400; 查询区用 FW_BOLD 与其分层)。
 const FW_NORMAL: i32 = 400;
@@ -198,6 +214,10 @@ struct Resources {
     list_title_font: HFONT,
     /// 结果行**副标题**字体 (常规字重, 小一号灰)
     list_sub_font: HFONT,
+    /// 单行版式 (缩写候选) 的候选词字体: 与 `list_title_font` 同 TTF、大一号
+    list_inline_title_font: HFONT,
+    /// 单行版式的备注字体: 与 `list_sub_font` 同 TTF、大一号
+    list_inline_note_font: HFONT,
     bg_brush: HBRUSH,     // 背景刷 (backgroundColor)
     grid_brush: HBRUSH,   // 网格刷 (grid_content_color 反解色)
     shadow_brush: HBRUSH, // 框外带底色 = 阴影色 (预乘后只留 alpha)
@@ -220,6 +240,8 @@ impl Drop for Resources {
                 HGDIOBJ(self.search_font.0),
                 HGDIOBJ(self.list_title_font.0),
                 HGDIOBJ(self.list_sub_font.0),
+                HGDIOBJ(self.list_inline_title_font.0),
+                HGDIOBJ(self.list_inline_note_font.0),
                 HGDIOBJ(self.bg_brush.0),
                 HGDIOBJ(self.grid_brush.0),
                 HGDIOBJ(self.shadow_brush.0),
@@ -397,6 +419,10 @@ impl GdiBackend {
         let list_title_font = make_font(geometry::list_title_font_px(dpi), FW_NORMAL)?;
         // 结果行副标题: 常规字重 11.0 DIP → -14px @125%
         let list_sub_font = make_font(geometry::list_sub_font_px(dpi), FW_NORMAL)?;
+        // 单行版式 (缩写候选) 的两枚: 同一 TTF, 只换像素高度 —— **不新增字体文件**
+        let list_inline_title_font =
+            make_font(geometry::list_inline_title_font_px(dpi), FW_NORMAL)?;
+        let list_inline_note_font = make_font(geometry::list_inline_note_font_px(dpi), FW_NORMAL)?;
 
         // 网格内容色 (反解) 与结果区派生色 (R28; 见 skin 模块注)
         let grid = skin::grid_content_color(s);
@@ -439,6 +465,8 @@ impl GdiBackend {
             search_font,
             list_title_font,
             list_sub_font,
+            list_inline_title_font,
+            list_inline_note_font,
             bg_brush,
             grid_brush,
             shadow_brush,
@@ -891,6 +919,14 @@ impl GdiBackend {
             return;
         };
 
+        // ---- 单行版式 (RowStyle::Inline, 2026-10-30): [候选词 | 右侧备注] ----
+        // 版式是**这一批结果**的属性 (ResultsState.style), 不是单行属性;
+        // 绘制细节与"为什么缩写候选不用双行"见 `paint_inline_row`。
+        if state.results.style() == RowStyle::Inline {
+            self.paint_inline_row(hdc, state, res, lay, item, top);
+            return;
+        }
+
         // ---- Flow Launcher 版式 (2026-10-04): [图标 | 标题(黑) / 路径(灰)] ----
         if item.subtitle.is_empty() {
             // 单行提示 (ShowHint): 无图标, 整行垂直居中 (与旧观感连续)
@@ -954,6 +990,93 @@ impl GdiBackend {
             SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
             SetTextColor(hdc, self.list_text_color);
         }
+    }
+
+    /// 单行版式 (`RowStyle::Inline`): [候选词 | 右侧备注], 无图标。
+    ///
+    /// 为什么缩写候选不走双行 (两条都不是审美):
+    ///   ① 候选词只有 2~3 字符, 双行会把 46 DIP 行高的一半留给空白;
+    ///   ② 双行版式把 subtitle 当**图标提取键**交给 SHGetFileInfoW —— 备注是文案不是路径,
+    ///      取不到图标就白留一块图标位, 文字被推右, 看起来像莫名缩进。
+    ///
+    /// 布局策略 (对端先例: Clink 的 right_justify 档 / Neovim 的 extra 列):
+    ///   备注贴右缘 ⇒ 所有行构成**一列**, 扫读时眼睛不用左右追; 放不下则从候选词右侧起
+    ///   省略; 余量小于 `LIST_NOTE_MIN_DIP` 整条不画 (只剩省略号的备注比没有更糟)。
+    // SAFETY: 调用方须传入有效的 DIB DC 与已选入标题字体/主文字色的 res 集合; 本函数只绘制。
+    unsafe fn paint_inline_row(
+        &self,
+        hdc: HDC,
+        state: &FrameState,
+        res: &Resources,
+        lay: &ListLayout,
+        item: &crate::results::Item,
+        top: i32,
+    ) {
+        let left = lay.inner_l + lay.pad;
+        let right = lay.text_right.max(left + 1);
+        let row_h = lay.row_h;
+        // 单行版式用大一号的两枚字体 (同一 TTF, 不新增字体文件)。退出时**必须**把调用方
+        // 选入的标题字体/文字色还原 —— 下一行与增量重绘 (repaint_rows) 都依赖该状态。
+        SelectObject(hdc, HGDIOBJ(res.list_inline_title_font.0));
+        let mut tu: Vec<u16> = item.title.encode_utf16().collect();
+        let mut nu: Vec<u16> = item.subtitle.encode_utf16().collect();
+        if tu.is_empty() && nu.is_empty() {
+            return;
+        }
+        // 1) 量候选词宽度 (DT_CALCRECT 只算不画; 单行时返回整串宽) —— 用于给备注让起点
+        let mut title_w = 0;
+        if !tu.is_empty() {
+            let mut mr = RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            };
+            let mut probe = tu.clone();
+            DrawTextW(hdc, &mut probe, &mut mr, LIST_MEASURE_FORMAT);
+            title_w = (mr.right - mr.left).max(0);
+        }
+        // 2) 候选词 (主文字色; 超长时尾部省略, 不会盖住备注)
+        if !tu.is_empty() {
+            let mut tr = RECT {
+                left,
+                top,
+                right,
+                bottom: top + row_h,
+            };
+            DrawTextW(hdc, &mut tu, &mut tr, LIST_TITLE_FORMAT);
+        }
+        // 3) 备注: 放得下就贴右缘 (一列对齐); 放不下就从候选词右侧起省略;
+        //    余量不足 LIST_NOTE_MIN_DIP 则整条不画 (Clink 同款判据)。
+        let note_floor = left + title_w + geometry::list_note_gap_px(state.dpi);
+        if nu.is_empty() || note_floor >= right {
+            SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
+            return;
+        }
+        SelectObject(hdc, HGDIOBJ(res.list_inline_note_font.0));
+        SetTextColor(hdc, self.list_sub_color);
+        let mut mr = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        let mut probe = nu.clone();
+        DrawTextW(hdc, &mut probe, &mut mr, LIST_MEASURE_FORMAT);
+        let note_w = (mr.right - mr.left).max(0);
+        let note_left = (right - note_w).max(note_floor);
+        if right - note_left >= geometry::list_note_min_px(state.dpi) {
+            let mut nr = RECT {
+                left: note_left,
+                top,
+                right,
+                bottom: top + row_h,
+            };
+            DrawTextW(hdc, &mut nu, &mut nr, LIST_NOTE_FORMAT);
+        }
+        // 还原调用方选入的字体/文字色 (下一行要用)
+        SelectObject(hdc, HGDIOBJ(res.list_title_font.0));
+        SetTextColor(hdc, self.list_text_color);
     }
 }
 

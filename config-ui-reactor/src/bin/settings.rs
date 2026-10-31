@@ -181,5 +181,21 @@ fn generate_ahk(args: &[String]) -> ExitCode {
         eprintln!("{error}");
         return ExitCode::from(1);
     }
+
+    // 生成脚本的伴生产物: 缩写备注侧车 (`abbr-hints.gen.txt`, 与 KeyFlux.ahk 同目录)。
+    // 引擎 (AHK) 运行时读不到 config.json, 候选列表的备注只能由生成期落盘;
+    // 放在这里而不是塞进生成脚本, 是为了不动 `CommandResolver.Register` 的冻结签名、
+    // 也不让 parity 基线跟着漂 (见 generator/hints.rs 的说明)。
+    if template_name == "keyflux.tmpl" {
+        let dir = if out_dir.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            out_dir
+        };
+        if let Err(error) = config_ui_reactor::generator::hints::write(&config, dir) {
+            // 备注缺失只影响"候选没有说明", 不该让整个生成失败
+            eprintln!("abbr-hints: {error}");
+        }
+    }
     ExitCode::SUCCESS
 }

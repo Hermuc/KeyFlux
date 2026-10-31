@@ -43,10 +43,12 @@ pub enum AppEvent {
     /// WM_CHAR, 码元已按 wParam 低 16 位截取 (R17)
     Char(u16),
     /// 0x406 (WM_COPYDATA): 结果列表整表替换; `selected` 0 基, `-1` = 无高亮。
-    /// 项 = {title 文件名, subtitle 路径} 双行 (KFR2, 2026-10-04 Flow Launcher 版式)。
+    /// 项 = {title, subtitle}; 版式由 `style` 决定 (KFR3, 2026-10-30):
+    /// `Stacked` = 双行 + 图标 (文件搜索), `Inline` = 单行 + 右侧备注 (缩写候选)。
     SetResults {
         items: Vec<crate::results::Item>,
         selected: i32,
+        style: crate::results::RowStyle,
     },
     /// 0x407: 移动高亮 (0 基; `-1` = 无高亮)
     SetSelection(i32),
@@ -111,6 +113,21 @@ impl AppState {
     }
 }
 
+/// 0x406 的落地: 整表替换 (版式随批生效) + 重排窗口。
+///
+/// 抽成独立函数而不是内联在 `on_event` 的 match 臂里 —— `on_event` 已接近
+/// `clippy::too_many_lines` 上限, 再加一条臂就破线; 顺带让「一批结果如何落地」
+/// 有一个可单独阅读的名字。
+fn apply_set_results(
+    st: &mut AppState,
+    items: Vec<crate::results::Item>,
+    selected: i32,
+    style: crate::results::RowStyle,
+) -> Vec<Command> {
+    st.results.set_with(items, selected, style);
+    vec![Command::Relayout]
+}
+
 /// 纯函数事件分派: R14-R19/R22 的全部语义在此实现并单测。
 pub fn on_event(ev: AppEvent, st: &mut AppState) -> Vec<Command> {
     match ev {
@@ -152,10 +169,11 @@ pub fn on_event(ev: AppEvent, st: &mut AppState) -> Vec<Command> {
             }
             // 注意: Char 分支无任何显示指令 —— 隐藏态照常累积、窗口保持隐藏 (R17/R20)
         }
-        AppEvent::SetResults { items, selected } => {
-            st.results.set(items, selected);
-            vec![Command::Relayout]
-        }
+        AppEvent::SetResults {
+            items,
+            selected,
+            style,
+        } => apply_set_results(st, items, selected, style),
         AppEvent::SetSelection(index) => {
             let prev = st.results.selected();
             let prev_window = st.results.window();
@@ -384,17 +402,39 @@ mod tests {
             .collect()
     }
 
+    /// 0x406 事件的默认构造 (双行版式) —— 版式不是这些用例的考察点。
+    fn set_results(items: Vec<crate::results::Item>, selected: i32) -> AppEvent {
+        AppEvent::SetResults {
+            items,
+            selected,
+            style: crate::results::RowStyle::Stacked,
+        }
+    }
+
+    /// 0x406 的 `style` 必须真的进状态 —— 渲染层只读 `results.style()`。
+    #[test]
+    fn set_results_keeps_style() {
+        let mut st = state();
+        on_event(
+            AppEvent::SetResults {
+                items: results(&["cw", "ca"]),
+                selected: 0,
+                style: crate::results::RowStyle::Inline,
+            },
+            &mut st,
+        );
+        assert_eq!(st.results.style(), crate::results::RowStyle::Inline);
+        // 同一批里换版式 = 换渲染布局, 必须重排
+        let cmds = on_event(set_results(results(&["cw"]), 0), &mut st);
+        assert_eq!(cmds, vec![Command::Relayout]);
+        assert_eq!(st.results.style(), crate::results::RowStyle::Stacked);
+    }
+
     /// 0x406: 整表替换 + 重排窗口; 高亮为 0 基。
     #[test]
     fn set_results_relayouts() {
         let mut st = state();
-        let cmds = on_event(
-            AppEvent::SetResults {
-                items: results(&["a", "b", "c"]),
-                selected: 1,
-            },
-            &mut st,
-        );
+        let cmds = on_event(set_results(results(&["a", "b", "c"]), 1), &mut st);
         assert_eq!(cmds, vec![Command::Relayout]);
         assert_eq!(st.results.len(), 3);
         assert_eq!(st.results.selected(), 1);
@@ -405,13 +445,7 @@ mod tests {
     #[test]
     fn set_selection_only_redraws_on_change() {
         let mut st = state();
-        on_event(
-            AppEvent::SetResults {
-                items: results(&["a", "b"]),
-                selected: 0,
-            },
-            &mut st,
-        );
+        on_event(set_results(results(&["a", "b"]), 0), &mut st);
         assert_eq!(on_event(AppEvent::SetSelection(0), &mut st), vec![]);
         assert_eq!(
             on_event(AppEvent::SetSelection(1), &mut st),
@@ -425,13 +459,7 @@ mod tests {
     #[test]
     fn set_selection_with_scroll_falls_back_to_full_redraw() {
         let mut st = state();
-        on_event(
-            AppEvent::SetResults {
-                items: results(&["a", "b", "c", "d"]),
-                selected: 0,
-            },
-            &mut st,
-        );
+        on_event(set_results(results(&["a", "b", "c", "d"]), 0), &mut st);
         st.results.set_visible_max(2); // 可视 2 行, 共 4 项
         assert_eq!(
             on_event(AppEvent::SetSelection(1), &mut st),
@@ -447,13 +475,7 @@ mod tests {
     fn clear_results_is_idempotent() {
         let mut st = state();
         assert_eq!(on_event(AppEvent::ClearResults, &mut st), vec![]);
-        on_event(
-            AppEvent::SetResults {
-                items: results(&["a"]),
-                selected: 0,
-            },
-            &mut st,
-        );
+        on_event(set_results(results(&["a"]), 0), &mut st);
         assert_eq!(
             on_event(AppEvent::ClearResults, &mut st),
             vec![Command::Relayout]
@@ -468,25 +490,13 @@ mod tests {
     fn results_never_survive_a_session() {
         for end in [AppEvent::HideFade, AppEvent::CancelHide] {
             let mut st = state();
-            on_event(
-                AppEvent::SetResults {
-                    items: results(&["a", "b"]),
-                    selected: 0,
-                },
-                &mut st,
-            );
+            on_event(set_results(results(&["a", "b"]), 0), &mut st);
             assert_eq!(st.results.len(), 2);
             on_event(end, &mut st);
             assert!(st.results.is_empty(), "隐藏必须收起列表");
 
             let mut st2 = state();
-            on_event(
-                AppEvent::SetResults {
-                    items: results(&["x"]),
-                    selected: 0,
-                },
-                &mut st2,
-            );
+            on_event(set_results(results(&["x"]), 0), &mut st2);
             on_event(AppEvent::ShowClear, &mut st2);
             assert!(st2.results.is_empty(), "0x401 显示必须清列表");
         }
