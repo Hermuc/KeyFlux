@@ -173,9 +173,28 @@ pub fn list_scrollbar_px(dpi: f64) -> i32 {
     dip_px(config::LIST_SCROLLBAR_DIP, dpi).max(2)
 }
 
-/// 滚动条距内缘像素 (@125% = 10px)。
+/// 滚动条距内缘像素 (@125% = 5px)。
 pub fn list_scrollbar_margin_px(dpi: f64) -> i32 {
     dip_px(config::LIST_SCROLLBAR_MARGIN_DIP, dpi).max(0)
+}
+
+/// 选中底色与滑块之间的空隙像素 (@125% = 5px)。
+pub fn list_select_scrollbar_gap_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_SELECT_SCROLLBAR_GAP_DIP, dpi).max(0)
+}
+
+/// 选中行底色右缘像素: 有滚动条时**裁到滑块左缘再让出一线空隙** (底色不垫在
+/// 滑块下方, 且与滑块之间留白), 无滚动条时仍到内容右缘。`inner_r` = 内容区右缘。
+pub fn list_select_right_px(inner_r: i32, has_bar: bool, dpi: f64) -> i32 {
+    if has_bar {
+        (inner_r
+            - list_scrollbar_margin_px(dpi)
+            - list_scrollbar_px(dpi)
+            - list_select_scrollbar_gap_px(dpi))
+        .max(0)
+    } else {
+        inner_r
+    }
 }
 
 /// 列表面板附加高度 (px)。`0` 行 = 无列表 = 不加高 (窗口保持基准几何, R11 不变)。
@@ -425,11 +444,21 @@ mod tests {
         assert_eq!(list_text_pad_px(120.0), 20); // round(16 × 1.25)
         assert_eq!(list_accent_px(120.0), 4); // round(3 × 1.25)
         assert_eq!(list_scrollbar_px(120.0), 4); // round(3 × 1.25)
-                                                 // 100% 下即为 DIP 原值
-        assert_eq!(list_row_h_px(96.0), 46);
+        assert_eq!(list_scrollbar_margin_px(120.0), 5); // round(4 × 1.25)
+        assert_eq!(list_select_scrollbar_gap_px(120.0), 5); // round(4 × 1.25)
+        assert_eq!(list_row_h_px(96.0), 46); // 100% 下即为 DIP 原值
         assert_eq!(list_title_font_px(96.0), 14);
         assert_eq!(list_sub_font_px(96.0), 11);
         assert_eq!(list_icon_px(96.0), 28);
+    }
+
+    /// 选中底色右缘: 有滑块时裁到滑块左缘再让出空隙 (@125% 距内缘 5+4+5=14px,
+    /// 滑块两侧各 5px), 无滑块时到内容右缘; 极窄内容区兜底不为负。
+    #[test]
+    fn select_right_clips_at_scrollbar() {
+        assert_eq!(list_select_right_px(800, true, 120.0), 800 - 5 - 4 - 5);
+        assert_eq!(list_select_right_px(800, false, 120.0), 800);
+        assert_eq!(list_select_right_px(3, true, 120.0), 0);
     }
 
     /// 列表附加高度: 0 行 = 不加高 (基准几何逐字节不变); N 行 = 分隔 + N×行高 + 留白。
