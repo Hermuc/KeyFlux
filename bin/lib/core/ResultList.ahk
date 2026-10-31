@@ -50,8 +50,6 @@ class ResultList {
   ; everything_search 插件同款取值 (那里已实测可用), 不自创。
   static SMTO_FLAGS := 0x0008
 
-  ; ---- 可注入点 (探针用; 0 = 自动找窗口) ----
-  static HwndOverride := 0
   ; 行交互回调 (可选): (row1based, kind) => ...  kind: 1 点选 / 2 悬停
   static Handler := 0
   static _notifyWired := false
@@ -204,8 +202,6 @@ class ResultList {
 
   /** 命令框窗口句柄 (隐藏态也算)。0 = 找不到 (未启动/已退出)。 */
   static Hwnd() {
-    if (this.HwndOverride)
-      return this.HwndOverride
     temp := A_DetectHiddenWindows
     DetectHiddenWindows(true)
     h := 0
