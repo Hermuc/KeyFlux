@@ -128,6 +128,26 @@ pub fn list_icon_gap_px(dpi: f64) -> i32 {
     dip_px(config::LIST_ICON_GAP_DIP, dpi).max(0)
 }
 
+/// 单行版式: 候选词字号像素 (@125% = 23px; CreateFontW 取负值)。
+pub fn list_inline_title_font_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_INLINE_TITLE_FONT_DIP, dpi).max(8)
+}
+
+/// 单行版式: 备注字号像素 (@125% = 16px)。
+pub fn list_inline_note_font_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_INLINE_NOTE_FONT_DIP, dpi).max(8)
+}
+
+/// 单行版式: 候选词与右侧备注的最小间隙像素 (@125% = 15px)。
+pub fn list_note_gap_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_NOTE_GAP_DIP, dpi).max(0)
+}
+
+/// 单行版式: 备注列的最小可用宽度像素 (@125% = 60px); 不足则不画备注。
+pub fn list_note_min_px(dpi: f64) -> i32 {
+    dip_px(config::LIST_NOTE_MIN_DIP, dpi).max(1)
+}
+
 /// 查询区/结果区分隔线高像素 (@125% = 1px)。
 pub fn list_separator_px(dpi: f64) -> i32 {
     dip_px(config::LIST_SEPARATOR_DIP, dpi).max(1)

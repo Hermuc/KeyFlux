@@ -107,6 +107,29 @@ pub const LIST_SCROLLBAR_DIP: f64 = 3.0;
 pub const LIST_SCROLLBAR_MARGIN_DIP: f64 = 8.0;
 /// 可视行数上限 (兜底; 实际值按屏幕高度收敛, 见 `geometry::max_list_rows`)。
 pub const LIST_MAX_ROWS: usize = 12;
+
+// ---- 单行版式 (RowStyle::Inline) 的备注列 (DIP; 与上面 LIST_* 同口径) ----
+
+/// 候选词与右侧备注之间的**最小**间隙。
+///
+/// 为什么按"最小"而不是固定列: 备注宽度差异大 (实测中位 10.5 字符、最长 38 字符),
+/// 固定列会让短备注离得很远、长备注被压扁。这里让每行各自贴着右缘对齐 ——
+/// 即 Clink 的 `right_justify` 档 (`display_matches.cpp`: `col_max - desc_w`)。
+pub const LIST_NOTE_GAP_DIP: f64 = 12.0;
+
+/// 单行版式的**候选词**字号 (DIP)。比双行版式的 14 大一档: 单行行里只有它和一个
+/// 备注, 放大后视线更快落在"我要选哪条"上; 仍是同一套 Sarasa TTF, 只换像素高度。
+pub const LIST_INLINE_TITLE_FONT_DIP: f64 = 18.0;
+
+/// 单行版式的**备注**字号 (DIP)。比双行的 11 大一档, 且与候选词保持约 1.4 倍落差
+/// (层级关系不变, 只是整体放大)。
+pub const LIST_INLINE_NOTE_FONT_DIP: f64 = 13.0;
+
+/// 备注列的**最小可用宽度**: 余量小于此值就整条不画。
+///
+/// Clink 同款判据 (`if (pad_to < cols - 1)` 才画): 只剩一两个字符宽时画出来的是
+/// 一个光秃秃的省略号, 比不画更难看。
+pub const LIST_NOTE_MIN_DIP: f64 = 48.0;
 /// 展开后窗口底边距屏幕底的最小留白 (px): 不越屏。
 pub const LIST_MIN_SCREEN_MARGIN_PX: i32 = 8;
 
@@ -210,7 +233,18 @@ pub const SEARCH_TEXT_PITCH_GRID_CELLS: f64 = 2.0;
 /// R23/参考实现 :69: 文字水平内边距 = round(白框高 × 0.14)。
 pub const TEXT_PAD_RATIO: f64 = 0.14;
 /// 参考实现 :48: bin/font/font.ttf 实测家族名 (用户更换命令字体后需同步)。
-pub const FONT_FAMILY: &str = "更纱黑体 SC";
+///
+/// 沿革: `更纱黑体 SC`(Sarasa Gothic, 拉丁 Inter 比例)
+/// → `等距更纱黑体 SC`(Sarasa Mono, 拉丁 0.5em 等宽)
+/// → `MiWithJBMono`(JetBrains Mono 拉丁 0.591em + MiSans CJK)
+/// → **`JetBrains Maple Mono`** [2026-10-31](JetBrains Mono 拉丁 0.6em + Maple Mono CJK 1.2em,
+///   CJK:拉丁 恰为 2:1; OFL-1.1, 可随仓库分发)。
+/// 四者都只换 bin/font/font.ttf 一个文件, 不新增 font family。
+/// 现行文件 = SemiBold 轮廓 + 元数据对齐 (usWeightClass 600→700, 子族名→Regular
+/// ⇒ 家族里只有一个 face, GDI 精确命中, 无合成加粗)。
+/// 44px 实测: CJK 墨迹 0.0656 (上一版 0.0691), 拉丁 advance 26.4px, CJK 52.8px。
+/// ⚠ 换字体时必须同时改这里 —— 族名对不上时 `CreateFontW` 静默回落系统字体。
+pub const FONT_FAMILY: &str = "JetBrains Maple Mono";
 
 /// R4: 壳固定持有的 WS_EX_ 位 = WS_EX_TOPMOST(0x0800_0000) | WS_EX_NOACTIVATE(0x8)
 /// —— 显示语义, 不可放弃 (R4/R9)。后端经 `RenderBackend::ex_style_additions()` 追加:
@@ -261,14 +295,18 @@ mod tests {
         assert_eq!(CHAR_SPACE, 0x20);
     }
 
-    /// 结果列表面板协议: 消息值与载荷魔数逐字节锁定 (AHK 侧 EverythingHost 镜像)。
+    /// 结果列表面板协议: 消息值与载荷魔数逐字节锁定 (AHK 侧 ResultList / EverythingHost 镜像)。
     #[test]
     fn results_protocol_values_are_locked() {
         assert_eq!(APP_RESULTS_DATA, 0x004A); // WM_COPYDATA
         assert_eq!(APP_RESULTS_SELECT, 0x0407);
         assert_eq!(APP_RESULTS_CLEAR, 0x0408);
         assert_eq!(APP_RESULTS_NOTIFY, 0x0409);
-        assert_eq!(crate::results::PAYLOAD_MAGIC.to_le_bytes(), *b"KFR2");
+        // 三版 (带 style) 是当前发送格式; 二版**仍接收** (everything_search 插件未改)
+        assert_eq!(crate::results::PAYLOAD_MAGIC.to_le_bytes(), *b"KFR3");
+        assert_eq!(crate::results::PAYLOAD_MAGIC_V2.to_le_bytes(), *b"KFR2");
+        assert_eq!(crate::results::HEADER_BYTES, 16);
+        assert_eq!(crate::results::HEADER_BYTES_V2, 12);
     }
 
     /// R4/附录 C #11: GDI 后端实际 ex-style = 0x08080008 (design C §4 表)。

@@ -420,6 +420,9 @@ const HEAD_INCLUDES: &str = r#"#Requires AutoHotkey v2.0
 #Include lib/context/SelectionContext.ahk
 #Include lib/rules/SelectedAction.ahk
 #Include lib/commands/CommandResolver.ahk
+#Include lib/core/ResultList.ahk
+#Include lib/core/AbbrHints.ahk
+#Include lib/commands/AbbrSuggest.ahk
 #Include lib/plugins/Plugins.ahk"#;
 
 /// L31-L43（到 `SetWorkingDir("../")`，**无**末尾换行）。

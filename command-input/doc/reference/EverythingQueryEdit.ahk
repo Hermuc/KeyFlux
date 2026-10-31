@@ -19,7 +19,7 @@
 ;   * 网格间距 = 20 DIP 按 DPI 缩放 (实测 25px @125% ✓), 首线偏移 = 间距-1 (实测 24px);
 ;   * 圆角 = borderRadius; 文字色 = keyColor #000000; 字体 = bin/font/font.ttf
 ;     (用户 commandFont 烘焙副本, 家族名经 PrivateFontCollection 实测
-;     = "更纱黑体 SC"; 用户更换命令字体后需同步此常量)。
+;     = "JetBrains Maple Mono" [2026-10-31 起; 此前 "MiWithJBMono" / "等距更纱黑体 SC" / "更纱黑体 SC"]; 用户更换命令字体后需同步此常量)。
 ;
 ; 职责边界 (渲染层, 同 EverythingDropdown 约定):
 ;   * 入参 = 锚点矩形 (Host.CommandBoxAnchor) + 初始文本;
@@ -45,7 +45,7 @@ global QE_FAMILY_RESOLVED := ""
 global QE_SKIN := 0
 
 ; 字体家族 (bin/font/font.ttf 实测; 用户更换 commandFont 后需同步)
-global QE_FAMILY := "更纱黑体 SC"
+global QE_FAMILY := "JetBrains Maple Mono"
 
 class EverythingQueryEdit {
   /** 显示输入面: 覆盖 anchor {x,y,w,h}, 载入 initial 文本并取得焦点 (IME 随焦点附着)。 */

@@ -14,6 +14,7 @@ pub mod actions;
 pub mod behaviors;
 pub mod config;
 pub mod font;
+pub mod hints;
 pub mod model;
 pub mod plan;
 pub mod plugins;
