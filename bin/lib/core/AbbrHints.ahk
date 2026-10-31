@@ -38,9 +38,7 @@ class AbbrHints {
     if (this.Loaded)
       return this.Table.Count > 0
     this.Loaded := true
-    path := this.Path
-    if (path = "")
-      path := A_ScriptDir "\abbr-hints.gen.txt"
+    path := A_ScriptDir "\abbr-hints.gen.txt"
     if (!FileExist(path))
       return false
     text := ""

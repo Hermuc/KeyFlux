@@ -281,8 +281,4 @@ class EverythingSearch {
         , A_Temp "\kf-everything-channel.log", "UTF-8")
   }
 
-  /** 供 UI 提示: 当前生效的通道名。 */
-  static ProviderName() {
-    return EverythingProviders.Create().Name
-  }
 }

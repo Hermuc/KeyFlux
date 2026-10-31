@@ -41,7 +41,7 @@ const W_LEN: i64 = 5;
 const W_DIR: i64 = 200;
 
 /// 单个命中项的打分。`query` 必须已归一（小写、去首尾空白）。
-pub fn score(hit: &Hit, query: &str) -> i64 {
+fn score(hit: &Hit, query: &str) -> i64 {
     if query.is_empty() {
         return 0;
     }
@@ -99,7 +99,7 @@ pub fn rank(hits: &mut Vec<Hit>, query: &str) {
 }
 
 /// 归一到比较口径：小写 + 去首尾空白。
-pub fn normalize(s: &str) -> String {
+fn normalize(s: &str) -> String {
     s.trim().to_lowercase()
 }
 

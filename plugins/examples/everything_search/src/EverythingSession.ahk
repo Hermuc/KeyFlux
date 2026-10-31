@@ -67,8 +67,6 @@ class EverythingExplorerRunner {
 }
 
 class EverythingController {
-  static SESSION_TYPE := "EverythingSession"
-
   __New(api) {
     this.api := api
     this.session := 0
