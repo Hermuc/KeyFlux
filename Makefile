@@ -265,7 +265,8 @@ check-hooks:
 # 锁两件最容易两端漂移的事: ① 0x406 载荷**逐字节** (对端 = command-input/src/results.rs);
 # ② 候选排序口径 (前缀 > 包含, 同级按长度/字典序, 等值不入列, 截断 MaxItems)。
 # 纯离线: 不建窗口、不注入按键、不需要命令框/引擎在跑 ⇒ 可随时并入 check。
-# 证据落 %TEMP%\kf-abbr-suggest-probe.txt (AHK 的 stdout 在部分宿主下拿不到)。
+# 证据落 %TEMP%\kf-abbr-suggest-probe.txt (AHK 的 stdout 在部分宿主下拿不到);
+# 未捕获异常另落 %TEMP%\kf-abbr-probe-error.txt (带 Stack, 退出码 3)。
 check-abbr:
 	MSYS_NO_PATHCONV=1 bin/AutoHotkey64.exe /ErrorStdOut tools/abbr_suggest_probe.ahk
 

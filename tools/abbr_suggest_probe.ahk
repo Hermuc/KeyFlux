@@ -15,11 +15,12 @@
  */
 
 ; 无人值守诊断: 任何未捕获异常先落盘再退出 —— 否则 AHK 会弹**模态错误框**把探针挂住
-; (在 CI / 后台跑时表现为"无输出且超时", 排查成本极高)。落盘路径固定, 便于回读。
+; (在 CI / 后台跑时表现为"无输出且超时", 排查成本极高)。落 %TEMP%, 与 g_log 同目录
+; (不写死盘符: 换机/换盘符后固定路径失效, 反而丢失唯一堆栈)。
 OnError(ProbeOnError)
 ProbeOnError(err, mode) {
   FileAppend("ERROR mode=" mode "`n" err.Message "`n" (err.HasProp("Stack") ? err.Stack : "") "`n"
-      , "D:\PortableApps\_Temp\kf-abbr-probe-error.txt", "UTF-8")
+      , A_Temp "\kf-abbr-probe-error.txt", "UTF-8")
   ExitApp 3
   return true
 }
