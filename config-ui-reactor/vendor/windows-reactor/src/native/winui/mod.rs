@@ -1326,6 +1326,7 @@ impl WinUiRuntime {
             value
                 .SetKey(match accelerator.key {
                     AcceleratorKey::R => VirtualKey::R,
+                    AcceleratorKey::S => VirtualKey::S,
                     AcceleratorKey::NumberPad0 => VirtualKey::NumberPad0,
                     AcceleratorKey::NumberPad1 => VirtualKey::NumberPad1,
                     AcceleratorKey::NumberPad2 => VirtualKey::NumberPad2,

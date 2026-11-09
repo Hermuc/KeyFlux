@@ -50,6 +50,8 @@ impl Shell {
     /// 一切编辑只改内存（config / 行为目录 / 草稿）并入队
     /// [`save_pipeline::PendingChange`]，只有页脚「保存配置」按钮 / Ctrl+S（同走
     /// `Message::Save`）才经 [`save_pipeline::flush_and_save`] 按序提交全部暂存变更。
+    /// ⚠️ Ctrl+S 的绑定点是 `app.rs` 根 `Grid` 的 `KeyAccelerators`（见
+    /// `views.rs::save_accelerator`）；2026-11-09 前该绑定缺失，注释曾长期与实现不符。
     /// ⚠️ 新增交互**禁止**在编辑处理器里调用本方法做自动保存
     /// （1 秒节流防连点，复刻 `SaveCommand` 的 useThrottleFn）。
     pub(super) fn save_now(&mut self, context: &ComponentContext<Self>) {

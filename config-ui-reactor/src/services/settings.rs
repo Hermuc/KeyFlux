@@ -5,7 +5,7 @@
 //! 命令框皮肤 18 字段表、命令框字重枚举、路径变量行编辑。
 //!
 //! 保存语义：除「开机自启」（计划任务命令 3/4 入队，随保存链路统一发送）外，
-//! 全部随保存链路（Ctrl+S → `PUT /config` → 服务端重启引擎）。
+//! 全部随保存链路（Ctrl+S 或页脚按钮 → `Message::Save` → `PUT /config` → 服务端重启引擎）。
 
 use crate::models::{Config, PathVariable};
 

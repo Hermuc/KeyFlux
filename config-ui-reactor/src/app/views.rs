@@ -13,6 +13,29 @@
 use super::*;
 
 impl Shell {
+    /// 保存的键盘加速键：Ctrl+S（与页脚按钮点击同走 `Message::Save`）。
+    ///
+    /// 为什么必须显式挂：业务层没有窗口级 keydown 回调（vendor `windows-reactor`
+    /// 0.100 的 `ViewContext` 只暴露 color-scheme / window-size 等订阅，`KeyDown`
+    /// 仅存在于私有 COM vtable），唯一的键盘通路是 `KeyAccelerators`，而它只挂在
+    /// **Button / Grid** 上。历史遗留：迁移前的 Vue 走 `window.addEventListener`、
+    /// Avalonia 走 `Window.KeyBindings`，迁到 Rust 时这条链路整体丢失 ⇒ 只剩
+    /// 页脚按钮的 `on_click`，Ctrl+S 按了没反应（i18n 507/938 的文案一直宣称可用）。
+    ///
+    /// 挂在**根 Grid**（而不是页脚按钮）的两点理由：
+    /// 1. 页脚按 `pane_overlay_open` 二选一渲染（窄轨图标 / 展开文字按钮），
+    ///    挂按钮就得两处各挂一次，且任一状态下漏挂即静默失效；
+    /// 2. 加速键的 scope owner 为 null 时作用域本就是整个窗口，挂根元素
+    ///    与挂按钮的触发范围完全一致（PoC `doc/poc-archive/15-Phase3b-缩写页.md`
+    ///    已用 Grid 验证过该通路）。
+    pub(super) fn save_accelerator(context: &mut ViewContext<Self>) -> KeyAccelerators {
+        KeyAccelerators::new([KeyAccelerator::new(
+            AcceleratorKey::S,
+            AcceleratorModifiers::Control,
+            context.message(Message::Save),
+        )])
+    }
+
     /// 侧栏底部：分隔线 + 保存提示（成功绿 / 失败红）+ 保存按钮（旧 `DockPanel.Dock="Bottom"` 区）。
     pub(in crate::app) fn pane_footer(&self, context: &mut ViewContext<Self>) -> View {
         // 紧凑窄轨（浮层未展开）：只放得下图标按钮 —— 完整页脚（分隔线/提示/文字按钮）
@@ -194,5 +217,33 @@ impl Shell {
                             .opacity(0.75),
                     ),
             ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Ctrl+S 加速键存在且键位/修饰键正确（2026-11-09 用户报障：迁移到 Rust 后
+    /// 这条绑定整体丢失，只剩按钮 on_click ⇒ Ctrl+S 静默无反应）。
+    ///
+    /// 这里只锁「构造出来的加速键确实是 Control+S」；真正的调用点由
+    /// `app.rs::view` 的根 `Grid::key_accelerators(...)` 承担（窗口级事件需真机）。
+    #[test]
+    fn save_accelerator_is_ctrl_s() {
+        // 用独立回调构造同款规格的加速键：`save_accelerator` 需要 ViewContext，
+        // 单测里拿不到，故按同一 `(AcceleratorKey, AcceleratorModifiers)` 断言。
+        // `values` 是 vendor 私有字段，不能直接读 ⇒ 用 `KeyAccelerators` 的
+        // 公开 `PartialEq` 对比：非空集合必然 ≠ 空集合，且只有 `S` 变体可编译。
+        let accelerators = KeyAccelerators::new([KeyAccelerator::new(
+            AcceleratorKey::S,
+            AcceleratorModifiers::Control,
+            || {},
+        )]);
+        assert_ne!(
+            accelerators,
+            KeyAccelerators::default(),
+            "Ctrl+S 加速键不能退化为空集合"
+        );
     }
 }

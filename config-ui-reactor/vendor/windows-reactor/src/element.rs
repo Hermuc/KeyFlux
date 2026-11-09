@@ -2118,6 +2118,8 @@ impl IntoUnitCallback for Callback<()> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum AcceleratorKey {
     R,
+    /// The letter S (VK_S). Used by the settings panel's Ctrl+S save shortcut.
+    S,
     NumberPad0,
     NumberPad1,
     NumberPad2,

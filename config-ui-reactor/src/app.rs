@@ -424,6 +424,11 @@ impl Component for Shell {
 
         Grid::new()
             .rows([GridLength::Auto, GridLength::STAR])
+            // Ctrl+S 保存（2026-11-09 补：迁移到 Rust 时这条链路整体丢失，
+            // 页脚按钮的 on_click 是当时唯一的保存触发点；i18n 507/938 的文案
+            // 一直宣称 Ctrl+S 可用。挂在根 Grid 上，与窗口同样作用域，
+            // 且不随页脚窄轨/展开两种形态切换而丢失）。
+            .key_accelerators(Self::save_accelerator(context))
             .children((
                 title_bar,
                 nav,
