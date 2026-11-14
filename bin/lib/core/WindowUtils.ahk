@@ -6,13 +6,41 @@
  * 均为慢路径辅助, 不参与重映射/发键/鼠标快路径。
  */
 
+/**
+ * 桌面壳窗口类清单 (归属 explorer.exe 且常驻)。
+ * 单一真源: 所有"排除壳窗口"的判定都引用本函数, 不再各处硬编码类名。
+ * 背景 (2026-11-14): 此前 ActivateWindow 谓词只排了 Progman, 漏掉任务栏/托盘;
+ *   当 DetectHiddenWindows 全局泄漏成 true 时, ahk_exe explorer.exe 这类宽泛匹配
+ *   会把"系统托盘溢出窗口"当成已打开窗口 → 走 LoopRelatedWindows 轮换 → 用户看到
+ *   "弹系统托盘什么也没做"(fe 命令偶发失效的最深层根因)。
+ * 类名均为 Win10/11 公开窗口类, 跨版本通用; Shell_SecondaryTrayWnd 覆盖副屏任务栏。
+ * @returns {Array}
+ */
+ShellWindowClasses() {
+  static list := ["Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "TopLevelWindowForOverflowXamlIsland", "SystemTray_Main", "XamlExplorerHostIslandWindow_WASDK", "ForegroundStaging"]
+  return list
+}
+
+/** 该窗口是否属于桌面壳 (任务栏/托盘/桌面等常驻窗口)。 */
+IsShellWindow(hwnd) {
+  cls := WinGetClass(hwnd)
+  for c in ShellWindowClasses() {
+    if (cls = c)
+      return true
+  }
+  return false
+}
+
 ActivateDesktop() {
   tmp := A_DetectHiddenWindows
-  DetectHiddenWindows true
-  if WinExist("ahk_class ForegroundStaging") {
-    WinActivate
+  try {
+    DetectHiddenWindows true
+    if WinExist("ahk_class ForegroundStaging") {
+      WinActivate
+    }
+  } finally {
+    DetectHiddenWindows tmp
   }
-  DetectHiddenWindows tmp
 }
 
 /**
@@ -23,10 +51,11 @@ ActivateDesktop() {
  */
 ActivateWindow(winTitle := "", isHide := false) {
   ; 如果匹配不到窗口且认为窗口为隐藏窗口时查找隐藏窗口
-  ; 谓词排除桌面壳窗口 (Progman 即 Program Manager, 归属 explorer.exe 且常驻):
-  ; 否则 ahk_exe explorer.exe 类匹配会把桌面当成"已打开的窗口"提前返回,
-  ; 导致真正的资源管理器窗口永远不会被启动 (fe 命令冷启动失效的根因)
-  hwnds := FindWindows(winTitle, (hwnd) => WinGetTitle(hwnd) != "" && WinGetClass(hwnd) != "Progman")
+  ; 谓词排除**全部**桌面壳窗口 (任务栏/托盘/桌面等, 见 ShellWindowClasses 单一真源):
+  ; 历史上只排了 Progman, 漏掉 Shell_TrayWnd / TopLevelWindowForOverflowXamlIsland 等;
+  ; DetectHiddenWindows=true 时这些壳窗口会把 ahk_exe explorer.exe 的宽泛匹配撑成 30+ 个
+  ; ⇒ 走 LoopRelatedWindows 轮换 → 激活的却是"系统托盘溢出窗口"(fe 命令弹托盘的根因)。
+  hwnds := FindWindows(winTitle, (hwnd) => WinGetTitle(hwnd) != "" && !IsShellWindow(hwnd))
   if ((!hwnds.Length) && isHide) {
     hwnds := FindHiddenWindows(winTitle)
     if hwnds.Length {
@@ -125,10 +154,15 @@ FindHiddenWindows(winTitle) {
     return style & WS_MINIMIZEBOX
   }
 
-  ; 开启可以查找到隐藏窗口
-  DetectHiddenWindows true
-  hwnds := FindWindows(winTitle, Predicate)
-  DetectHiddenWindows false
+  ; 开启可以查找到隐藏窗口; try/finally 保证异常路径也恢复**原值**
+  ; (旧实现硬编码恢复 false: 调用前若本是 true 会被错误改成 false, 且异常时泄漏 true)
+  prev := A_DetectHiddenWindows
+  try {
+    DetectHiddenWindows true
+    hwnds := FindWindows(winTitle, Predicate)
+  } finally {
+    DetectHiddenWindows prev
+  }
 
   return hwnds
 }

@@ -52,16 +52,23 @@ StartInputHook(ih) {
  * @param {number} wParam 消息参数
  */
 PostMessageToCapsAbbr(msg, wParam := 0) {
+  ; 🔴 try/finally (2026-11-14): DetectHiddenWindows 是**全局持久**设置, 旧实现无异常保护 ——
+  ;   `PostMessage`/`Tip` 任一语句抛异常 (窗口销毁竞态等) 都跳过恢复, 全局卡在 true,
+  ;   并自我维持 (下轮 temp 读到 true 又恢复 true), 直到进程重启。
+  ;   泄漏态下 ahk_exe explorer.exe 会把任务栏/托盘壳窗口当成已打开窗口 → fe 弹托盘。
   temp := A_DetectHiddenWindows
-  DetectHiddenWindows(1)
-  ; 调用 WinExist 的耗时都不超过 2ms, 没必要做缓存了
-  ; 窗口标识（类名属命令框 ABI）见本文件顶部 `CommandInputWin` 的文档。
-  if WinExist(CommandInputWin.FULL) {
-    PostMessage(msg, wParam, 0)
-  } else {
-    Tip("无法找到命令框, 可能需要重启 KeyFlux", -3000)
+  try {
+    DetectHiddenWindows(1)
+    ; 调用 WinExist 的耗时都不超过 2ms, 没必要做缓存了
+    ; 窗口标识（类名属命令框 ABI）见本文件顶部 `CommandInputWin` 的文档。
+    if WinExist(CommandInputWin.FULL) {
+      PostMessage(msg, wParam, 0)
+    } else {
+      Tip("无法找到命令框, 可能需要重启 KeyFlux", -3000)
+    }
+  } finally {
+    DetectHiddenWindows(temp)
   }
-  DetectHiddenWindows(temp)
 }
 
 /**

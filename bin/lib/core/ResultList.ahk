@@ -203,12 +203,16 @@ class ResultList {
   /** 命令框窗口句柄 (隐藏态也算)。0 = 找不到 (未启动/已退出)。 */
   static Hwnd() {
     temp := A_DetectHiddenWindows
-    DetectHiddenWindows(true)
-    h := 0
-    try h := WinExist(CommandInputWin.FULL)
-    catch as e
-      EngineLogWarn("ResultList.Hwnd", e.Message)   ; 找不到窗口 ⇒ h 保持 0 (调用方当作失败)
-    DetectHiddenWindows(temp)
+    try {
+      DetectHiddenWindows(true)
+      h := 0
+      try h := WinExist(CommandInputWin.FULL)
+      catch as e
+        EngineLogWarn("ResultList.Hwnd", e.Message)   ; 找不到窗口 ⇒ h 保持 0 (调用方当作失败)
+    } finally {
+      ; try/finally (2026-11-14): 与 AbbrInput 同因 —— DHD 全局持久, 异常路径必须恢复原值
+      DetectHiddenWindows(temp)
+    }
     return h
   }
 }
